@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+.DS_Store
+supabase/.branches
+supabase/.temp
+.tools
+npm-*.tgz
