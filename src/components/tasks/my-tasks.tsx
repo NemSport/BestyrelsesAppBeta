@@ -9,7 +9,6 @@ import {
   EmptyState,
   Select,
   StatusBadge,
-  type StatusTone,
 } from "@/components/ui";
 import {
   getMyOpenTasks,
@@ -84,8 +83,8 @@ export function MyTasks({
         body: JSON.stringify({
           organizationId,
           committeeId: task.committee_id,
-          meetingId: task.meeting_id,
-          agendaItemId: task.agenda_item_id,
+          meetingId: task.meeting ? task.meeting_id : null,
+          agendaItemId: task.agendaItem ? task.agenda_item_id : null,
           decisionId: task.decision_id,
           title: task.title,
           description: task.description,
@@ -148,27 +147,37 @@ export function MyTasks({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {(
-          [
-            ["Åbne opgaver", openTasks.length, "neutral"],
-            ["Overskredet", overdueCount, "danger"],
-            ["Deadline i dag", todayCount, "warning"],
-            ["Deadline snart", soonCount, "progress"],
-            ["Afventer", waitingCount, "progress"],
-          ] satisfies Array<[string, number, StatusTone]>
-        ).map(([label, value, tone]) => (
-          <div
-            className="flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3"
-            key={label}
-          >
-            <span className="text-sm text-muted">{label}</span>
-            <StatusBadge tone={tone}>{value}</StatusBadge>
+      <div className="rounded-[var(--radius-panel)] border border-line bg-surface/75 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Prioritet
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">Mine åbne opgaver</h2>
+            <p className="mt-1 text-sm text-muted">
+              {openTasks.length
+                ? `${openTasks.length} åbne opgaver sorteret efter deadline.`
+                : "Du har ingen åbne opgaver lige nu."}
+            </p>
           </div>
-        ))}
+          <div className="flex flex-wrap gap-2">
+            {overdueCount ? (
+              <StatusBadge tone="danger">{overdueCount} overskredet</StatusBadge>
+            ) : null}
+            {todayCount ? (
+              <StatusBadge tone="warning">{todayCount} i dag</StatusBadge>
+            ) : null}
+            {soonCount ? (
+              <StatusBadge tone="progress">{soonCount} snart</StatusBadge>
+            ) : null}
+            {waitingCount ? (
+              <StatusBadge tone="progress">{waitingCount} afventer</StatusBadge>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-line py-3">
+      <div className="module-filter-surface flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm text-muted">
           <input
             checked={showClosed}
@@ -192,18 +201,20 @@ export function MyTasks({
       ) : null}
 
       {visibleTasks.length ? (
-        <div className="divide-y divide-line border-y border-line">
+        <div className="grid gap-2.5">
           {visibleTasks.map((task) => {
             const deadlineState = getTaskDeadlineState(task);
             const canEdit = data.editableCommitteeIds.includes(
               task.committee_id,
             );
             return (
-              <article className="py-4" key={task.id}>
-                <div className="flex flex-wrap items-start justify-between gap-4">
+              <article className="module-card p-4" key={task.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{task.title}</h2>
+                      <h2 className="text-base font-semibold leading-6">
+                        {task.title}
+                      </h2>
                       <StatusBadge tone={taskStatusTones[task.status]}>
                         {taskStatusLabels[task.status]}
                       </StatusBadge>
@@ -218,7 +229,7 @@ export function MyTasks({
                       ) : null}
                     </div>
                     <p className="mt-1 text-sm text-muted">
-                      {task.committee?.name ?? "Ukendt udvalg"} ·{" "}
+                      {task.committee?.name ?? "Slettet udvalg"} ·{" "}
                       {formatDate(task.deadline)}
                       {task.category ? ` · ${task.category}` : ""}
                     </p>
@@ -239,6 +250,10 @@ export function MyTasks({
                         >
                           Møde: {task.meeting.title}
                         </Link>
+                      ) : task.meeting_id ? (
+                        <span className="font-medium text-muted">
+                          Slettet møde
+                        </span>
                       ) : null}
                       {task.agendaItem ? (
                         <Link
@@ -247,6 +262,10 @@ export function MyTasks({
                         >
                           Punkt: {task.agendaItem.title}
                         </Link>
+                      ) : task.agenda_item_id ? (
+                        <span className="font-medium text-muted">
+                          Slettet punkt
+                        </span>
                       ) : null}
                       {task.decision ? (
                         <Link
@@ -258,7 +277,7 @@ export function MyTasks({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex min-w-48 flex-wrap items-end gap-2">
+                  <div className="flex min-w-48 shrink-0 flex-wrap items-end gap-2">
                     {canEdit ? (
                       <>
                         <div className="min-w-40 flex-1">

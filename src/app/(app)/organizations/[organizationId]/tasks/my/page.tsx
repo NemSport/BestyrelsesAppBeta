@@ -1,4 +1,3 @@
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { MyTasks } from "@/components/tasks/my-tasks";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
@@ -15,8 +14,7 @@ export default async function MyTasksPage({
   );
 
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Se hvad der haster, hvad der afventer, og hvilke opgaver du selv har ansvaret for."
@@ -31,6 +29,6 @@ export default async function MyTasksPage({
         organizationId={organizationId}
         userId={data.userId}
       />
-    </div>
+    </>
   );
 }

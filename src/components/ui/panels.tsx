@@ -5,7 +5,7 @@ export function ContentPanel({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={clsx("panel", className)} {...props} />;
+  return <div className={clsx("panel p-5 sm:p-6", className)} {...props} />;
 }
 
 export function DocumentPanel({
@@ -24,10 +24,24 @@ export function ActionBar({
   return (
     <div
       className={clsx(
-        "flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5",
+        "action-row border-t border-line pt-5",
         className,
       )}
       {...props}
     />
   );
+}
+
+export function FilterBar({
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={clsx("filter-surface", className)} {...props} />;
+}
+
+export function MetadataRow({
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={clsx("metadata-row", className)} {...props} />;
 }

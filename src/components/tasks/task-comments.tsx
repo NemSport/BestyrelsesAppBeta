@@ -98,10 +98,10 @@ export function TaskComments({
   }
 
   return (
-    <section className="space-y-4 border-t border-line pt-5">
+    <section className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-subtle/35 p-3">
       <div>
         <h3 className="font-semibold text-ink">Kommentarer</h3>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-xs text-muted">
           Saml korte statusopdateringer og praktisk opfølgning på opgaven.
         </p>
       </div>
@@ -117,7 +117,7 @@ export function TaskComments({
           Ny kommentar
         </label>
         <Textarea
-          className="min-h-20"
+          className="min-h-16"
           id={`task-comment-${taskId}`}
           maxLength={5000}
           onChange={(event) => setBody(event.target.value)}
@@ -138,9 +138,12 @@ export function TaskComments({
       {loading ? (
         <p className="text-sm text-muted">Henter kommentarer...</p>
       ) : comments.length ? (
-        <ol className="divide-y divide-line border-y border-line">
+        <ol className="space-y-2">
           {comments.map((comment) => (
-            <li className="py-3" key={comment.id}>
+            <li
+              className="rounded-[var(--radius-control)] border border-line bg-surface/80 p-3"
+              key={comment.id}
+            >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">
                   {comment.author?.full_name || "Ukendt medlem"}

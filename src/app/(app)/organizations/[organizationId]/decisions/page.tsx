@@ -1,5 +1,4 @@
 import { DecisionRegister } from "@/components/decisions/decision-register";
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { DecisionService } from "@/services/decision-service";
@@ -18,8 +17,7 @@ export default async function DecisionsPage({
   ]);
 
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Saml organisationens beslutninger, ansvar og deadlines på tværs af udvalg."
@@ -31,6 +29,6 @@ export default async function DecisionsPage({
         organizationId={organizationId}
         taskData={taskData}
       />
-    </div>
+    </>
   );
 }

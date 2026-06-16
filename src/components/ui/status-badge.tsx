@@ -10,12 +10,12 @@ export type StatusTone =
   | "progress";
 
 const toneClasses: Record<StatusTone, string> = {
-  neutral: "bg-subtle text-muted",
-  info: "bg-info-soft text-info",
-  success: "bg-success-soft text-success",
-  warning: "bg-warning-soft text-warning",
-  danger: "bg-danger-soft text-danger",
-  progress: "bg-progress-soft text-progress",
+  neutral: "border-line bg-subtle text-muted",
+  info: "border-info/15 bg-info-soft text-info",
+  success: "border-success/15 bg-success-soft text-success",
+  warning: "border-warning/20 bg-warning-soft text-warning",
+  danger: "border-danger/20 bg-danger-soft text-danger",
+  progress: "border-progress/20 bg-progress-soft text-progress",
 };
 
 export function StatusBadge({
@@ -26,7 +26,7 @@ export function StatusBadge({
   return (
     <span
       className={clsx(
-        "inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold leading-none",
         toneClasses[tone],
         className,
       )}

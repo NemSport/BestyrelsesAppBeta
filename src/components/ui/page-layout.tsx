@@ -17,17 +17,17 @@ export function PageHeader({
   return (
     <header
       className={clsx(
-        "flex flex-wrap items-start justify-between gap-4",
+        "flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5",
         className,
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
         <h1 className="page-title">{title}</h1>
         {description ? <p className="page-lead">{description}</p> : null}
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {actions}
         </div>
       ) : null}
@@ -54,8 +54,8 @@ export function PageSection({
   return (
     <section className={className} {...props}>
       {eyebrow || title || description || actions ? (
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="action-row">
+          <div className="min-w-0">
             {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
             {title ? <h2 className="section-title mt-1">{title}</h2> : null}
             {description ? (
@@ -63,7 +63,9 @@ export function PageSection({
             ) : null}
           </div>
           {actions ? (
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {actions}
+            </div>
           ) : null}
         </div>
       ) : null}

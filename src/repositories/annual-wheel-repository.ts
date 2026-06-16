@@ -7,7 +7,7 @@ export class AnnualWheelRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
   private readonly viewSelect =
-    "*, committee:committees(id, name), meeting:meetings(id, title, starts_at), task:tasks(id, title, status), responsible:profiles!annual_wheel_events_responsible_user_id_fkey(id, full_name)";
+    "*, committee:committees(id, name, deleted_at), meeting:meetings(id, title, starts_at, deleted_at), task:tasks(id, title, status), responsible:profiles!annual_wheel_events_responsible_user_id_fkey(id, full_name)";
 
   async listByOrganization(organizationId: string, year: number) {
     const from = `${year}-01-01`;
@@ -21,7 +21,7 @@ export class AnnualWheelRepository {
       .gte("ends_on", from)
       .order("starts_on");
     if (error) throw error;
-    return data as unknown as AnnualWheelEventView[];
+    return this.activeRelations(data as unknown as AnnualWheelEventViewWithTrash[]);
   }
 
   async findById(eventId: string) {
@@ -56,4 +56,25 @@ export class AnnualWheelRepository {
     if (error) throw error;
     return data;
   }
+
+  private activeRelations(events: AnnualWheelEventViewWithTrash[]) {
+    return events.map((event) => ({
+      ...event,
+      committee: event.committee?.deleted_at ? null : event.committee,
+      meeting: event.meeting?.deleted_at ? null : event.meeting,
+    }));
+  }
 }
+
+type AnnualWheelEventViewWithTrash = AnnualWheelEventView & {
+  committee:
+    | (NonNullable<AnnualWheelEventView["committee"]> & {
+        deleted_at?: string | null;
+      })
+    | null;
+  meeting:
+    | (NonNullable<AnnualWheelEventView["meeting"]> & {
+        deleted_at?: string | null;
+      })
+    | null;
+};

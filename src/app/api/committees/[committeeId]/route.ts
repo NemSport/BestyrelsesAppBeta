@@ -18,3 +18,22 @@ export async function PATCH(
     return apiError(error);
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ committeeId: string }> },
+) {
+  try {
+    const searchParams = new URL(request.url).searchParams;
+    const result = await new CommitteeService(await createClient()).moveToTrash({
+      organizationId: searchParams.get("organizationId") ?? "",
+      committeeId: (await params).committeeId,
+    });
+    return NextResponse.json({
+      ...result,
+      message: "Udvalget er flyttet til papirkurven.",
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}

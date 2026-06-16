@@ -1,4 +1,3 @@
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { MemberAdministration } from "@/components/members/member-administration";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
@@ -15,8 +14,7 @@ export default async function OrganizationMembersPage({
   );
 
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Se organisationens medlemmer, deres roller og udvalgstilknytninger."
@@ -24,6 +22,6 @@ export default async function OrganizationMembersPage({
         title="Medlemmer"
       />
       <MemberAdministration organizationId={organizationId} {...data} />
-    </div>
+    </>
   );
 }

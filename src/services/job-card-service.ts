@@ -134,6 +134,15 @@ export class JobCardService {
     };
   }
 
+  async getPdfData(organizationId: string, roleProfileId: string) {
+    const overview = await this.getOverview(organizationId);
+    const role = overview.roles.find((candidate) => candidate.id === roleProfileId);
+    if (!role) throw new NotFoundError("Jobkortet");
+    const organization = await this.jobCards.findOrganization(organizationId);
+    if (!organization) throw new NotFoundError("Organisationen");
+    return { organization, role };
+  }
+
   async create(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = jobCardInputSchema.parse(input);

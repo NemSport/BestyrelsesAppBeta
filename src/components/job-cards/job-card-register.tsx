@@ -134,6 +134,8 @@ export function JobCardRegister({
   const [creatingArea, setCreatingArea] = useState(false);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const [pdfDownloadingId, setPdfDownloadingId] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -225,6 +227,43 @@ export function JobCardRegister({
         : payload.error ?? "Opgaven kunne ikke oprettes.",
     );
     if (response.ok) router.refresh();
+  }
+
+  async function downloadPdf(role: RoleProfileView) {
+    setPdfError(null);
+    setPdfDownloadingId(role.id);
+    try {
+      const response = await fetch(
+        `/api/job-cards/${role.id}/pdf?organizationId=${organizationId}`,
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          payload.error ?? "PDF-filen kunne ikke downloades. Prøv igen.",
+        );
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition");
+      const fileName =
+        disposition?.match(/filename="([^"]+)"/i)?.[1] ?? "jobkort.pdf";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setPdfError(
+        error instanceof Error
+          ? error.message
+          : "PDF-filen kunne ikke downloades. Prøv igen.",
+      );
+    } finally {
+      setPdfDownloadingId(null);
+    }
   }
 
   async function suggest(role?: RoleProfileView) {
@@ -360,6 +399,7 @@ export function JobCardRegister({
           {taskMessage}
         </div>
       ) : null}
+      {pdfError ? <div className="alert-danger p-3 text-sm">{pdfError}</div> : null}
       {data.roles.length ? (
         <div className="space-y-4">
           {data.roles.map((role) => (
@@ -380,8 +420,18 @@ export function JobCardRegister({
                     ))}
                   </div>
                 </div>
-                {data.canManage ? (
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    disabled={pdfDownloadingId === role.id}
+                    onClick={() => void downloadPdf(role)}
+                    variant="secondary"
+                  >
+                    {pdfDownloadingId === role.id
+                      ? "Henter PDF..."
+                      : "Download PDF"}
+                  </Button>
+                  {data.canManage ? (
+                    <>
                     <Button
                       disabled={aiLoadingId !== null}
                       onClick={() => void suggest(role)}
@@ -394,8 +444,9 @@ export function JobCardRegister({
                     <Button onClick={() => setDraft(fromRole(role))} variant="secondary">
                       Rediger
                     </Button>
-                  </div>
-                ) : null}
+                    </>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-5 grid gap-5 lg:grid-cols-3">
                 <section>

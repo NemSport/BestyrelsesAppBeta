@@ -111,6 +111,10 @@ export const organizationUpdateSchema = organizationInputSchema.extend({
   organizationId: uuidSchema,
 });
 
+export const organizationTrashActionSchema = z.object({
+  organizationId: uuidSchema,
+});
+
 export const organizationInvitationInputSchema = z.object({
   organizationId: uuidSchema,
   email: z
@@ -611,4 +615,14 @@ export const agendaItemOccurrenceTrashActionSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
   occurrenceId: uuidSchema,
+});
+
+export const organizationTrashRestoreSchema = z.object({
+  organizationId: uuidSchema,
+  type: z.enum(["organization", "committee", "meeting", "agenda_item"], {
+    required_error: "Vælg et element, der skal gendannes",
+    invalid_type_error: "Elementtypen er ugyldig",
+  }),
+  id: uuidSchema,
+  committeeId: uuidSchema.nullable().optional(),
 });

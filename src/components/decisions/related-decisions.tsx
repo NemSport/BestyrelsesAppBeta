@@ -51,7 +51,9 @@ export function RelatedDecisions({
                   : "Ingen deadline"}
                 {!compact && decision.agendaItem
                   ? ` · ${decision.agendaItem.title}`
-                  : ""}
+                  : !compact && decision.agenda_item_id
+                    ? " · Slettet dagsordenspunkt"
+                    : ""}
               </p>
               {history ? (
                 <p className="mt-1 text-xs text-muted">
@@ -66,6 +68,8 @@ export function RelatedDecisions({
                         {decision.meeting.title}
                       </Link>
                     </>
+                  ) : decision.meeting_id ? (
+                    " · Slettet møde"
                   ) : null}
                 </p>
               ) : decision.category ? (

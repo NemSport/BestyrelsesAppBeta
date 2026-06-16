@@ -1,5 +1,4 @@
 import { AnnualWheel } from "@/components/annual-wheel/annual-wheel";
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AnnualWheelService } from "@/services/annual-wheel-service";
@@ -19,8 +18,7 @@ export default async function AnnualWheelPage({
   );
 
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Planlæg aktiviteter, gentagelser og deadlines, før de bliver akutte."
@@ -32,6 +30,6 @@ export default async function AnnualWheelPage({
         initialCommitteeId={query.committeeId}
         organizationId={organizationId}
       />
-    </div>
+    </>
   );
 }

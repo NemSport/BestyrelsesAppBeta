@@ -17,12 +17,12 @@ export function EmptyState({
   return (
     <div
       className={clsx(
-        "rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface/60 text-center",
+        "rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface/72 text-center shadow-sm",
         compact ? "px-4 py-5" : "px-6 py-10",
         className,
       )}
     >
-      <p className="font-semibold text-ink">{title}</p>
+      <p className="text-base font-semibold text-ink">{title}</p>
       {description ? (
         <p className="metadata mx-auto mt-1 max-w-xl">{description}</p>
       ) : null}

@@ -93,8 +93,8 @@ function draftFromDecision(decision: DecisionView): DecisionDraft {
   return {
     id: decision.id,
     committeeId: decision.committee_id,
-    meetingId: decision.meeting_id ?? "",
-    agendaItemId: decision.agenda_item_id ?? "",
+    meetingId: decision.meeting ? decision.meeting_id ?? "" : "",
+    agendaItemId: decision.agendaItem ? decision.agenda_item_id ?? "" : "",
     title: decision.title,
     description: decision.description,
     status: decision.status,
@@ -344,8 +344,13 @@ export function DecisionRegister({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4 border-y border-line py-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="module-filter-surface space-y-3">
+        <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto]">
+          <details className="group md:col-span-2">
+            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted transition hover:border-brand/40 hover:text-brand">
+              Vis filtre
+            </summary>
+            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <label className="label" htmlFor="decision-search">
               Søg
@@ -429,13 +434,15 @@ export function DecisionRegister({
               <option value="status">Status</option>
             </Select>
           </div>
+            </div>
+          </details>
         </div>
 
         <details className="group">
-          <summary className="w-fit cursor-pointer text-sm font-semibold text-brand">
+          <summary className="inline-flex min-h-8 w-fit cursor-pointer list-none items-center rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-subtle">
             Flere filtre
           </summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div>
               <label className="label" htmlFor="decision-meeting-filter">
                 Møde
@@ -529,8 +536,8 @@ export function DecisionRegister({
           </div>
         </details>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted">
               <input
                 checked={filters.showArchived}
@@ -567,7 +574,7 @@ export function DecisionRegister({
       ) : null}
 
       {filteredDecisions.length > 0 ? (
-        <div className="divide-y divide-line border-y border-line">
+        <div className="grid gap-2.5">
           {filteredDecisions.map((decision) => {
             const canEdit = data.editableCommitteeIds.includes(
               decision.committee_id,
@@ -591,14 +598,16 @@ export function DecisionRegister({
               }));
             return (
               <article
-                className="scroll-mt-24 py-5"
+                className="module-card scroll-mt-24 p-4"
                 id={`decision-${decision.id}`}
                 key={decision.id}
               >
-                <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-semibold">{decision.title}</h2>
+                      <h2 className="text-base font-semibold leading-6">
+                        {decision.title}
+                      </h2>
                       <StatusBadge tone={decisionStatusTones[decision.status]}>
                         {decisionStatusLabels[decision.status]}
                       </StatusBadge>
@@ -615,7 +624,7 @@ export function DecisionRegister({
                         {decision.description}
                       </p>
                     ) : null}
-                    <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <dl className="mt-3 grid gap-x-5 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
                       <div>
                         <dt className="metadata">Udvalg</dt>
                         <dd>{decision.committee?.name ?? "Ukendt udvalg"}</dd>
@@ -657,7 +666,7 @@ export function DecisionRegister({
                         </div>
                       ) : null}
                     </dl>
-                    <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                    <div className="mt-3 flex flex-wrap gap-3 text-sm">
                       {decision.meeting ? (
                         <Link
                           className="font-semibold text-brand hover:underline"
@@ -665,6 +674,10 @@ export function DecisionRegister({
                         >
                           Åbn møde: {decision.meeting.title}
                         </Link>
+                      ) : decision.meeting_id ? (
+                        <span className="font-medium text-muted">
+                          Slettet møde
+                        </span>
                       ) : null}
                       {decision.agendaItem ? (
                         <Link
@@ -673,11 +686,15 @@ export function DecisionRegister({
                         >
                           Åbn dagsordenspunkt: {decision.agendaItem.title}
                         </Link>
+                      ) : decision.agenda_item_id ? (
+                        <span className="font-medium text-muted">
+                          Slettet dagsordenspunkt
+                        </span>
                       ) : null}
                     </div>
                   </div>
                   {canEdit ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
                       <TaskCreateModal
                         agendaItems={taskData.agendaItems.filter(
                           (item) => item.committee_id === decision.committee_id,
@@ -685,12 +702,16 @@ export function DecisionRegister({
                         categorySource={taskData.tasks}
                         committeeId={decision.committee_id}
                         decisions={[decision]}
-                        initialAgendaItemId={decision.agenda_item_id ?? ""}
+                        initialAgendaItemId={
+                          decision.agendaItem ? decision.agenda_item_id ?? "" : ""
+                        }
                         initialCategory={decision.category ?? ""}
                         initialDeadline={decision.deadline ?? ""}
                         initialDecisionId={decision.id}
                         initialDescription={decision.description}
-                        initialMeetingId={decision.meeting_id ?? ""}
+                        initialMeetingId={
+                          decision.meeting ? decision.meeting_id ?? "" : ""
+                        }
                         initialResponsibleUserId={
                           decision.responsible_user_id ?? ""
                         }
@@ -740,7 +761,7 @@ export function DecisionRegister({
                   ) : null}
                 </div>
                 {relatedTasks.length ? (
-                  <div className="mt-4 border-t border-line pt-3">
+                  <div className="mt-3 rounded-[var(--radius-control)] border border-line bg-subtle/35 p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                       Relaterede opgaver
                     </p>
@@ -782,7 +803,7 @@ export function DecisionRegister({
         title={draft?.id ? "Rediger beslutning" : "Opret beslutning"}
       >
         {draft ? (
-          <form className="space-y-5" noValidate onSubmit={submit}>
+          <form className="space-y-4" noValidate onSubmit={submit}>
             {error ? (
               <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
                 <p className="font-semibold">{error}</p>
@@ -795,7 +816,7 @@ export function DecisionRegister({
                 ) : null}
               </div>
             ) : null}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="label" htmlFor="decision-title">
                   Titel
@@ -981,7 +1002,7 @@ export function DecisionRegister({
                 />
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
               <Button
                 disabled={saving}
                 onClick={() => setDraft(null)}

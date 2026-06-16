@@ -18,3 +18,20 @@ export async function PATCH(
     return apiError(error);
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ organizationId: string }> },
+) {
+  try {
+    const result = await new OrganizationService(await createClient()).moveToTrash({
+      organizationId: (await params).organizationId,
+    });
+    return NextResponse.json({
+      item: result,
+      message: "Organisationen er flyttet til papirkurven.",
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}

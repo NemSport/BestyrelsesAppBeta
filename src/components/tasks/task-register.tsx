@@ -101,8 +101,8 @@ function draftFromTask(task: TaskView): TaskDraft {
   return {
     id: task.id,
     committeeId: task.committee_id,
-    meetingId: task.meeting_id ?? "",
-    agendaItemId: task.agenda_item_id ?? "",
+    meetingId: task.meeting ? task.meeting_id ?? "" : "",
+    agendaItemId: task.agendaItem ? task.agenda_item_id ?? "" : "",
     decisionId: task.decision_id ?? "",
     title: task.title,
     description: task.description,
@@ -358,8 +358,8 @@ export function TaskRegister({
         body: JSON.stringify({
           organizationId,
           committeeId: task.committee_id,
-          meetingId: task.meeting_id,
-          agendaItemId: task.agenda_item_id,
+          meetingId: task.meeting ? task.meeting_id : null,
+          agendaItemId: task.agendaItem ? task.agenda_item_id : null,
           decisionId: task.decision_id,
           title: task.title,
           description: task.description,
@@ -400,8 +400,8 @@ export function TaskRegister({
       <article
         className={
           compact
-            ? "rounded-[var(--radius-control)] border border-line bg-surface p-3 shadow-sm"
-            : "py-5"
+            ? "module-card-compact p-2.5"
+            : "module-card scroll-mt-24 p-4"
         }
         id={`task-${task.id}`}
         key={task.id}
@@ -409,7 +409,13 @@ export function TaskRegister({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className={compact ? "font-semibold" : "text-lg font-semibold"}>
+              <h2
+                className={
+                  compact
+                    ? "text-sm font-semibold leading-5"
+                    : "text-base font-semibold leading-6"
+                }
+              >
                 {task.title}
               </h2>
               {!compact ? (
@@ -427,14 +433,14 @@ export function TaskRegister({
             <dl
               className={
                 compact
-                  ? "mt-3 space-y-1.5 text-xs"
-                  : "mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4"
+                  ? "mt-2 space-y-1 text-xs"
+                  : "mt-3 grid gap-x-5 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-4"
               }
             >
               <div className={compact ? "flex justify-between gap-3" : ""}>
                 <dt className="metadata">Udvalg</dt>
                 <dd className={compact ? "truncate text-right" : ""}>
-                  {task.committee?.name ?? "Ukendt udvalg"}
+                  {task.committee?.name ?? "Slettet udvalg"}
                 </dd>
               </div>
               <div className={compact ? "flex justify-between gap-3" : ""}>
@@ -458,13 +464,13 @@ export function TaskRegister({
                   ) : null}
                 </dd>
               </div>
-              <div className={compact ? "flex justify-between gap-3" : ""}>
-                <dt className="metadata">Kategori</dt>
-                <dd className={compact ? "truncate text-right" : ""}>
-                  {task.category || "Ikke angivet"}
-                </dd>
-              </div>
-              {task.reminder_at ? (
+              {!compact ? (
+                <div>
+                  <dt className="metadata">Kategori</dt>
+                  <dd>{task.category || "Ikke angivet"}</dd>
+                </div>
+              ) : null}
+              {!compact && task.reminder_at ? (
                 <div className={compact ? "flex justify-between gap-3" : ""}>
                   <dt className="metadata">Påmindelse</dt>
                   <dd className={compact ? "truncate text-right" : ""}>
@@ -477,8 +483,12 @@ export function TaskRegister({
               ) : null}
             </dl>
             {!compact &&
-            (task.meeting || task.agendaItem || task.decision) ? (
-              <div className="mt-3 flex flex-wrap gap-4 text-sm">
+            (task.meeting ||
+              task.meeting_id ||
+              task.agendaItem ||
+              task.agenda_item_id ||
+              task.decision) ? (
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 {task.meeting ? (
                   <Link
                     className="font-semibold text-brand hover:underline"
@@ -486,6 +496,8 @@ export function TaskRegister({
                   >
                     Åbn møde: {task.meeting.title}
                   </Link>
+                ) : task.meeting_id ? (
+                  <span className="font-medium text-muted">Slettet møde</span>
                 ) : null}
                 {task.agendaItem ? (
                   <Link
@@ -494,6 +506,10 @@ export function TaskRegister({
                   >
                     Åbn dagsordenspunkt: {task.agendaItem.title}
                   </Link>
+                ) : task.agenda_item_id ? (
+                  <span className="font-medium text-muted">
+                    Slettet dagsordenspunkt
+                  </span>
                 ) : null}
                 {task.decision ? (
                   <Link
@@ -508,7 +524,7 @@ export function TaskRegister({
           </div>
         </div>
         {canEdit ? (
-          <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
+          <div className="mt-2.5 flex flex-wrap items-end gap-2 border-t border-line pt-2.5">
             <div className="min-w-40 flex-1">
               <label
                 className="mb-1 block text-xs font-semibold text-muted"
@@ -563,8 +579,13 @@ export function TaskRegister({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4 border-y border-line py-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="module-filter-surface space-y-3">
+        <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto]">
+          <details className="group md:col-span-2">
+            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted transition hover:border-brand/40 hover:text-brand">
+              Vis filtre
+            </summary>
+            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <label className="label" htmlFor="task-search">
               Søg
@@ -650,10 +671,12 @@ export function TaskRegister({
               ))}
             </Select>
           </div>
+            </div>
+          </details>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted">
               <input
                 checked={filters.showArchived}
@@ -677,7 +700,10 @@ export function TaskRegister({
               </Button>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button disabled={!canCreate} onClick={openCreate}>
+              Opret opgave
+            </Button>
             <div
               aria-label="Vælg opgavevisning"
               className="flex rounded-[var(--radius-control)] border border-line-strong bg-surface p-1"
@@ -700,9 +726,6 @@ export function TaskRegister({
                 Liste
               </Button>
             </div>
-            <Button disabled={!canCreate} onClick={openCreate}>
-              Opret opgave
-            </Button>
           </div>
         </div>
       </div>
@@ -715,17 +738,17 @@ export function TaskRegister({
 
       {filteredTasks.length ? (
         viewMode === "board" ? (
-          <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid items-start gap-2.5 md:grid-cols-2 xl:grid-cols-5">
             {taskBoardStatuses.map((status) => {
               const columnTasks = filteredTasks.filter(
                 (task) => task.status === status,
               );
               return (
                 <section
-                  className="min-w-0 rounded-[var(--radius-panel)] border border-line bg-subtle/45"
+                  className="min-w-0 rounded-[var(--radius-panel)] border border-line bg-surface/70"
                   key={status}
                 >
-                  <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+                  <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
                     <StatusBadge tone={taskStatusTones[status]}>
                       {taskStatusLabels[status]}
                     </StatusBadge>
@@ -733,7 +756,7 @@ export function TaskRegister({
                       {columnTasks.length}
                     </span>
                   </header>
-                  <div className="space-y-2 p-2.5">
+                  <div className="space-y-2 p-2">
                     {columnTasks.length ? (
                       columnTasks.map((task) => taskCard(task, true))
                     ) : (
@@ -749,7 +772,7 @@ export function TaskRegister({
             })}
           </div>
         ) : (
-          <div className="divide-y divide-line border-y border-line">
+          <div className="grid gap-2.5">
             {filteredTasks.map((task) => taskCard(task, false))}
           </div>
         )
@@ -780,8 +803,8 @@ export function TaskRegister({
         title={draft?.id ? "Rediger opgave" : "Opret opgave"}
       >
         {draft ? (
-          <div className="space-y-5">
-            <form className="space-y-5" noValidate onSubmit={submit}>
+          <div className="space-y-4">
+            <form className="space-y-4" noValidate onSubmit={submit}>
               {error ? (
                 <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
                   <p className="font-semibold">{error}</p>
@@ -794,7 +817,7 @@ export function TaskRegister({
                   ) : null}
                 </div>
               ) : null}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="label" htmlFor="task-title">
                   Titel
@@ -989,7 +1012,7 @@ export function TaskRegister({
                 />
               </div>
               </div>
-              <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+              <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
                 <Button
                   disabled={saving}
                   onClick={() => setDraft(null)}

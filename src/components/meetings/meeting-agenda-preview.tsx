@@ -22,8 +22,8 @@ export function MeetingAgendaPreview({
   const hiddenCount = Math.max(agendaItems.length - previewLimit, 0);
 
   return (
-    <details className="group mt-3">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted [&::-webkit-details-marker]:hidden">
+    <details className="group mt-2">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-control)] py-1 text-xs text-muted [&::-webkit-details-marker]:hidden">
         <span>
           {agendaItems.length} {agendaItems.length === 1 ? "punkt" : "punkter"}
           {" · "}
@@ -41,12 +41,12 @@ export function MeetingAgendaPreview({
         </span>
       </summary>
 
-      <div className="mt-3 border-l border-line pl-3">
+      <div className="mt-2 border-l border-line pl-3">
         {agendaItems.length > 0 ? (
-          <ol className="space-y-1.5">
+          <ol className="space-y-1">
             {agendaItems.slice(0, previewLimit).map((item) => (
               <li
-                className="grid grid-cols-[1.5rem_minmax(0,1fr)] text-sm leading-5"
+                className="grid grid-cols-[1.4rem_minmax(0,1fr)] text-xs leading-5 sm:text-sm"
                 key={item.id}
               >
                 <span className="text-muted">{item.position + 1}.</span>

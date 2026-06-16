@@ -1,5 +1,4 @@
 import { JobCardRegister } from "@/components/job-cards/job-card-register";
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { JobCardService } from "@/services/job-card-service";
@@ -14,8 +13,7 @@ export default async function JobCardsPage({
     organizationId,
   );
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Dokumentér roller, ansvar og onboarding, så vigtig viden bliver i organisationen."
@@ -23,6 +21,6 @@ export default async function JobCardsPage({
         title="Jobkort og roller"
       />
       <JobCardRegister data={data} organizationId={organizationId} />
-    </div>
+    </>
   );
 }

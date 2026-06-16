@@ -40,15 +40,33 @@ export class MeetingMinutesRepository {
   async listByAgendaItem(agendaItemId: string) {
     const { data, error } = await this.db
       .from("agenda_item_minutes")
-      .select("*, meetings(id, title, starts_at)")
+      .select("*, meetings(id, title, starts_at, deleted_at)")
       .eq("agenda_item_id", agendaItemId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as Array<
+    return (data as unknown as Array<
       AgendaItemMinutes & {
-        meetings: { id: string; title: string; starts_at: string } | null;
+        meetings:
+          | {
+              id: string;
+              title: string;
+              starts_at: string;
+              deleted_at?: string | null;
+            }
+          | null;
       }
-    >;
+    >)
+      .filter((minutes) => !minutes.meetings?.deleted_at)
+      .map((minutes) => ({
+        ...minutes,
+        meetings: minutes.meetings
+          ? {
+              id: minutes.meetings.id,
+              title: minutes.meetings.title,
+              starts_at: minutes.meetings.starts_at,
+            }
+          : null,
+      }));
   }
 
   async createMeetingMinutes(input: TableInsert<"meeting_minutes">) {

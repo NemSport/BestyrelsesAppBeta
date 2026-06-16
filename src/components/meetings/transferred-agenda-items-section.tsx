@@ -124,7 +124,7 @@ export function TransferredAgendaItemsSection({
   }
 
   return (
-    <section className="mt-10 border-t border-line pt-8">
+    <section className="mt-6 border-t border-line pt-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="page-eyebrow">Videreførelse</p>
@@ -155,13 +155,13 @@ export function TransferredAgendaItemsSection({
         </div>
       ) : null}
 
-      <div className="mt-5 divide-y divide-line border-y border-line">
+      <div className="mt-4 divide-y divide-line border-y border-line">
         {items.map((item) => (
           <article
-            className="border-l-4 border-l-progress/35 py-5 pl-4"
+            className="border-l-4 border-l-progress/35 py-3 pl-3"
             key={item.id}
           >
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
@@ -177,7 +177,7 @@ export function TransferredAgendaItemsSection({
                     {transferredAgendaItemStatusLabels[item.status]}
                   </StatusBadge>
                 </div>
-                <dl className="mt-3 space-y-1 text-sm text-slate-600">
+                <dl className="mt-2 space-y-1 text-xs text-slate-600 sm:text-sm">
                   <div>
                     <dt className="inline font-semibold text-slate-700">
                       Overført fra:{" "}
@@ -221,7 +221,7 @@ export function TransferredAgendaItemsSection({
                 </dl>
 
                 {item.status === "scheduled" && item.targetMeeting ? (
-                  <p className="mt-4 border-l-4 border-info/35 bg-info-soft px-4 py-3 text-sm text-info">
+                  <p className="mt-3 border-l-4 border-info/35 bg-info-soft px-3 py-2 text-sm text-info">
                     Planlagt på{" "}
                     <Link
                       className="font-semibold underline"
@@ -246,7 +246,7 @@ export function TransferredAgendaItemsSection({
                 ) : null}
 
                 {item.status === "pending" && futureMeetings.length === 0 ? (
-                  <div className="mt-4 border-l-4 border-warning/35 bg-warning-soft px-4 py-3 text-sm text-warning">
+                  <div className="mt-3 border-l-4 border-warning/35 bg-warning-soft px-3 py-2 text-sm text-warning">
                     <p className="font-semibold">
                       Der findes ikke et kommende møde i dette udvalg endnu.
                     </p>

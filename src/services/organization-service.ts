@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { toSlug } from "@/lib/slug";
-import { organizationInputSchema, organizationUpdateSchema } from "@/lib/validation";
+import {
+  organizationInputSchema,
+  organizationTrashActionSchema,
+  organizationUpdateSchema,
+} from "@/lib/validation";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
@@ -177,6 +181,25 @@ export class OrganizationService {
       ),
     );
 
+    const visibleRecentMinutes = recentMinutes.flatMap((minutes) => {
+      const meeting = meetingsById.get(minutes.meeting_id);
+      const committee = committeesById.get(minutes.committee_id);
+      return meeting && committee
+        ? [
+            {
+              id: minutes.id,
+              meetingId: meeting.id,
+              meetingTitle: meeting.title,
+              meetingStartsAt: meeting.starts_at,
+              committeeId: committee.id,
+              committeeName: committee.name,
+              status: minutes.status,
+              updatedAt: minutes.updated_at,
+            },
+          ]
+        : [];
+    });
+
     return {
       committees: committees.map((committee) => {
         const committeeMeetings = upcomingMeetings.filter(
@@ -197,24 +220,7 @@ export class OrganizationService {
           ? [{ ...meeting, committeeName: committee.name }]
           : [];
       }),
-      recentMinutes: recentMinutes.flatMap((minutes) => {
-        const meeting = meetingsById.get(minutes.meeting_id);
-        const committee = committeesById.get(minutes.committee_id);
-        return meeting && committee
-          ? [
-              {
-                id: minutes.id,
-                meetingId: meeting.id,
-                meetingTitle: meeting.title,
-                meetingStartsAt: meeting.starts_at,
-                committeeId: committee.id,
-                committeeName: committee.name,
-                status: minutes.status,
-                updatedAt: minutes.updated_at,
-              },
-            ]
-          : [];
-      }),
+      recentMinutes: visibleRecentMinutes,
       actionItems: actionItems.slice(0, 12),
       activeDecisions: activeDecisions.slice(0, 5),
       openTasks: openTasks.slice(0, 5),
@@ -222,7 +228,7 @@ export class OrganizationService {
       metrics: {
         committeeCount: committees.length,
         upcomingMeetingCount: upcomingMeetings.length,
-        recentMinutesCount: recentMinutes.length,
+        recentMinutesCount: visibleRecentMinutes.length,
         openFollowUpCount: openFollowUpMinutes.length,
         decisionsRequiredCount: decisionsRequiredMinutes.length,
         activeDecisionCount: activeDecisions.length,
@@ -237,5 +243,23 @@ export class OrganizationService {
     const parsed = organizationUpdateSchema.parse(input);
     await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
     return this.organizations.update(parsed.organizationId, { name: parsed.name });
+  }
+
+  async moveToTrash(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = organizationTrashActionSchema.parse(input);
+    await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
+    return this.organizations.softDelete(parsed.organizationId);
+  }
+
+  async restore(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = organizationTrashActionSchema.parse(input);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+      { includeDeleted: true },
+    );
+    return this.organizations.restore(parsed.organizationId);
   }
 }

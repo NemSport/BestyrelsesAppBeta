@@ -7,7 +7,9 @@ import { EditAgendaItemModal } from "@/components/agenda-items/edit-agenda-item-
 import { DecisionHistory } from "@/components/decisions/decision-history";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
+import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
+  ActionMenu,
   ContentPanel,
   DocumentPanel,
   EmptyState,
@@ -93,11 +95,20 @@ export default async function AgendaItemPage({
                 />
               ) : null}
               {canEdit ? (
-                <EditAgendaItemModal
-                  committeeId={committeeId}
-                  item={item}
-                  organizationId={organizationId}
-                />
+                <ActionMenu>
+                  <EditAgendaItemModal
+                    committeeId={committeeId}
+                    item={item}
+                    organizationId={organizationId}
+                  />
+                  <TrashActionButton
+                    confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                    endpoint={`/api/agenda-items/${item.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                    label="Flyt dagsordenspunkt til papirkurv"
+                    pendingLabel="Flytter..."
+                    redirectTo={`/organizations/${organizationId}/committees/${committeeId}/agenda-items`}
+                  />
+                </ActionMenu>
               ) : null}
             </div>
           }

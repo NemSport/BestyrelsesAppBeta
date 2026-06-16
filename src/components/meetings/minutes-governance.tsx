@@ -96,7 +96,7 @@ export function MinuteAttachments({
 
   return (
     <details className="group rounded-[var(--radius-control)] border border-line bg-surface">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
         <div>
           <h4 className="text-sm font-semibold">Vedhæftninger</h4>
           <p className="mt-0.5 text-xs text-muted">
@@ -112,7 +112,7 @@ export function MinuteAttachments({
           <span className="hidden group-open:inline">Skjul vedhæftninger</span>
         </span>
       </summary>
-      <div className="border-t border-line p-4">
+      <div className="border-t border-line p-3">
       <section>
       <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="hidden">
@@ -347,12 +347,12 @@ export function MinutesApprovalPanel({
 
   return (
     <section
-      className={`overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface ${className ?? ""}`}
+      className={`overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm ${className ?? ""}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Godkendelse</p>
-          <p className="mt-1 text-sm text-muted">
+        <p className="mt-0.5 text-xs text-muted sm:text-sm">
             {approvalSummary}
             {minutes?.approval_deadline
               ? ` · Frist ${formatDate(minutes.approval_deadline)}`
@@ -394,7 +394,7 @@ export function MinutesApprovalPanel({
         </div>
       </div>
       <div
-        className="border-t border-line px-4 pb-4 sm:px-5 sm:pb-5"
+        className="border-t border-line px-3 pb-3 sm:px-4 sm:pb-4"
         hidden={!showDetails}
       >
       <div className="hidden">

@@ -43,6 +43,9 @@ export type Database = {
           name: string;
           slug: string;
           created_by: string;
+          deleted_at: string | null;
+          deleted_by: string | null;
+          delete_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -55,6 +58,9 @@ export type Database = {
         Update: {
           name?: string;
           slug?: string;
+          deleted_at?: string | null;
+          deleted_by?: string | null;
+          delete_expires_at?: string | null;
         };
         Relationships: [];
       };
@@ -999,6 +1005,14 @@ export type Database = {
       can_edit_agenda_item: {
         Args: { target_committee_id: string };
         Returns: boolean;
+      };
+      soft_delete_organization: {
+        Args: { target_organization_id: string };
+        Returns: Database["public"]["Tables"]["organizations"]["Row"];
+      };
+      restore_organization: {
+        Args: { target_organization_id: string };
+        Returns: Database["public"]["Tables"]["organizations"]["Row"];
       };
       list_organization_members: {
         Args: { target_organization_id: string };

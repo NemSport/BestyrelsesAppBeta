@@ -13,6 +13,7 @@ import { RelatedDecisions } from "@/components/decisions/related-decisions";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { AiTaskReviewModal } from "@/components/tasks/ai-task-review-modal";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
+import { TrashActionButton } from "@/components/trash/trash-action-button";
 import { RichTextContent } from "@/components/forms/rich-text-content";
 import { RichTextEditor } from "@/components/forms/rich-text-editor";
 import {
@@ -309,7 +310,7 @@ function AgendaMinutesCard({
     storageKey: agendaStorageKey,
     data: draftData,
     serverUpdatedAt: initialMinutes?.updated_at ?? null,
-    enabled: canEdit && !deleting,
+    enabled: canEdit,
     save: persistDraft,
     restore: (draft) => {
       setNotes(draft.notes);
@@ -372,7 +373,7 @@ function AgendaMinutesCard({
   async function removeAgendaItem() {
     if (
       !window.confirm(
-        `Er du sikker på, at du vil fjerne "${item.title}" fra mødet?`,
+        "Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage.",
       )
     ) {
       return;
@@ -414,7 +415,7 @@ function AgendaMinutesCard({
   return (
     <details
       className={clsx(
-        "group overflow-hidden rounded-[var(--radius-panel)] border bg-surface",
+        "group overflow-hidden rounded-[var(--radius-panel)] border bg-surface shadow-sm",
         isStandardItem ? "border-line bg-subtle/35" : "border-line-strong",
         isTransferredItem && "border-l-4 border-l-progress/40",
         isAnyOtherBusiness && "border-dashed",
@@ -424,11 +425,11 @@ function AgendaMinutesCard({
     >
       <summary
         className={clsx(
-          "grid cursor-pointer list-none grid-cols-[2.25rem_minmax(0,1fr)] items-start gap-3 px-3 py-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:px-4 [&::-webkit-details-marker]:hidden",
+          "grid cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)] items-start gap-2.5 px-3 py-2.5 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] [&::-webkit-details-marker]:hidden",
           isStandardItem ? "bg-subtle/65" : "bg-surface",
         )}
       >
-        <span className="font-document flex h-8 w-8 shrink-0 items-center justify-center border-r border-line text-lg font-semibold text-brand">
+        <span className="font-document flex h-7 w-7 shrink-0 items-center justify-center border-r border-line text-base font-semibold text-brand">
           {occurrence.position + 1}
         </span>
         <div className="min-w-0 flex-1">
@@ -444,7 +445,7 @@ function AgendaMinutesCard({
           </div>
           <h4
             className={clsx(
-              "mt-2 break-words text-base font-semibold leading-6 sm:text-lg",
+              "mt-1.5 break-words text-base font-semibold leading-6",
               isAnyOtherBusiness && "italic",
             )}
           >
@@ -454,12 +455,12 @@ function AgendaMinutesCard({
             />
           </h4>
           {item.objective || item.description ? (
-            <p className="mt-1.5 line-clamp-1 text-xs text-muted sm:line-clamp-2 sm:text-sm">
+            <p className="mt-1 line-clamp-1 text-xs text-muted">
               {item.objective || item.description}
             </p>
           ) : null}
         </div>
-        <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:flex-col">
+        <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:flex-col sm:items-end">
           <StatusBadge tone={agendaStatusTones[status]}>
             {agendaItemMinutesStatusLabels[status]}
           </StatusBadge>
@@ -481,7 +482,7 @@ function AgendaMinutesCard({
 
       {canEdit ? (
         <form
-          className="space-y-4 border-t border-line bg-surface p-3 sm:p-4"
+          className="space-y-3.5 border-t border-line bg-surface p-3"
           onSubmit={save}
         >
           <LocalDraftConflict
@@ -513,7 +514,7 @@ function AgendaMinutesCard({
             </label>
             <RichTextEditor
               id={`notes-${occurrence.id}`}
-              minHeightClass="min-h-16"
+              minHeightClass="min-h-14"
               onChange={setNotes}
               value={notes}
             />
@@ -535,7 +536,7 @@ function AgendaMinutesCard({
               <p className="mt-1 text-sm text-red-700">{fieldErrors.notes[0]}</p>
             ) : null}
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className="label" htmlFor={`decision-${occurrence.id}`}>
                 Beslutning
@@ -548,7 +549,7 @@ function AgendaMinutesCard({
                 }
                 id={`decision-${occurrence.id}`}
                 invalid={Boolean(fieldErrors.decision?.[0])}
-                minHeightClass="min-h-14"
+                minHeightClass="min-h-12"
                 onChange={setDecision}
                 value={decision}
               />
@@ -590,7 +591,7 @@ function AgendaMinutesCard({
                 }
                 id={`follow-up-${occurrence.id}`}
                 invalid={Boolean(fieldErrors.followUp?.[0])}
-                minHeightClass="min-h-14"
+                minHeightClass="min-h-12"
                 onChange={setFollowUp}
                 value={followUp}
               />
@@ -619,7 +620,7 @@ function AgendaMinutesCard({
               ) : null}
             </div>
           </div>
-          <div className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="sm:col-span-2 lg:col-span-3">
               <MinutesSectionLabel>Status og opfølgning</MinutesSectionLabel>
             </div>
@@ -727,7 +728,7 @@ function AgendaMinutesCard({
               </>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
             <div className="space-y-1">
               <Link
                 className="text-sm font-semibold text-forest hover:underline"
@@ -823,15 +824,35 @@ function AgendaMinutesCard({
                   </details>
                 </>
               ) : null}
-              {item.standard_key ? (
-                <button
-                  className="rounded-xl border border-red-200 bg-white px-3 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
-                  disabled={deleting || autosave.status === "saving"}
-                  onClick={removeAgendaItem}
-                  type="button"
-                >
-                  {deleting ? "Fjerner..." : "Fjern standardpunkt"}
-                </button>
+              {canEdit ? (
+                <details className="group relative">
+                  <summary className="min-h-9 cursor-pointer list-none rounded-[var(--radius-control)] bg-transparent px-3 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
+                    Slettehandlinger
+                  </summary>
+                  <div className="absolute right-0 z-10 mt-2 min-w-72 space-y-2 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg">
+                    <p className="text-xs text-muted">
+                      Fjern kun dette mødets forekomst, eller flyt hele
+                      dagsordenspunktet til papirkurven.
+                    </p>
+                    <TrashActionButton
+                      confirmMessage="Vil du fjerne punktet fra dette møde? Selve dagsordenspunktet og dets historik bevares."
+                      endpoint={`/api/agenda-item-occurrences/${occurrence.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                      label="Fjern punkt fra dette møde"
+                      pendingLabel="Fjerner..."
+                      variant="secondary"
+                    />
+                    <button
+                      className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
+                      disabled={deleting || autosave.status === "saving"}
+                      onClick={removeAgendaItem}
+                      type="button"
+                    >
+                      {deleting
+                        ? "Flytter..."
+                        : "Flyt dagsordenspunkt til papirkurv"}
+                    </button>
+                  </div>
+                </details>
               ) : null}
               <Button
                 disabled={deleting || autosave.status === "saving"}
@@ -1248,12 +1269,12 @@ export function MeetingMinutesSection({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <section
-        className="order-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface"
+        className="order-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
         aria-labelledby="general-minutes-heading"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
           <button
             aria-controls="general-minutes-content"
             aria-expanded={isGeneralMinutesOpen}
@@ -1296,12 +1317,12 @@ export function MeetingMinutesSection({
         </div>
 
         <div
-          className="border-t border-line p-3 sm:p-4"
+          className="border-t border-line p-3"
           hidden={!isGeneralMinutesOpen}
           id="general-minutes-content"
         >
           {effectiveCanEdit ? (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               <LocalDraftConflict
                 draft={meetingAutosave.conflict}
                 onKeepServer={meetingAutosave.keepServerVersion}
@@ -1330,7 +1351,7 @@ export function MeetingMinutesSection({
                 </label>
                 <RichTextEditor
                   id="meeting-minutes-text"
-                  minHeightClass="min-h-32"
+                  minHeightClass="min-h-24"
                   onChange={setMinutesText}
                   value={minutesText}
                 />
@@ -1346,7 +1367,7 @@ export function MeetingMinutesSection({
                 </label>
                 <RichTextEditor
                   id="meeting-decisions"
-                  minHeightClass="min-h-20"
+                  minHeightClass="min-h-16"
                   onChange={setDecisions}
                   value={decisions}
                 />
@@ -1362,7 +1383,7 @@ export function MeetingMinutesSection({
                 <div className="border-t border-line p-3">
                   <RichTextEditor
                     id="meeting-internal-note"
-                    minHeightClass="min-h-16"
+                    minHeightClass="min-h-14"
                     onChange={setInternalNote}
                     value={internalNote}
                   />
@@ -1391,7 +1412,7 @@ export function MeetingMinutesSection({
               </ActionBar>
             </div>
           ) : minutes ? (
-            <DocumentPanel className="minutes-document space-y-8 border-0 p-0 shadow-none">
+            <DocumentPanel className="minutes-document space-y-6 border-0 p-0 shadow-none">
               <section className="minutes-document-section">
                 <p className="minutes-document-label">Referat</p>
                 <RichTextContent
@@ -1501,7 +1522,7 @@ export function MeetingMinutesSection({
       />
 
       <section aria-labelledby="agenda-minutes-heading" className="order-1">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-2.5">
           <div>
           <p className="page-eyebrow">Dagsorden</p>
           <h3 className="section-title mt-1" id="agenda-minutes-heading">
@@ -1533,7 +1554,7 @@ export function MeetingMinutesSection({
             ) : null}
           </div>
         </div>
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-2">
           {occurrences.map((occurrence) => (
             <AgendaMinutesCard
               canEdit={effectiveCanEdit}

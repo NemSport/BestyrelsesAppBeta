@@ -1,4 +1,3 @@
-import { OrganizationNav } from "@/components/layout/organization-nav";
 import { TaskRegister } from "@/components/tasks/task-register";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
@@ -15,8 +14,7 @@ export default async function TasksPage({
   );
 
   return (
-    <div>
-      <OrganizationNav organizationId={organizationId} />
+    <>
       <PageHeader
         className="mb-8"
         description="Saml organisationens opgaver, ansvar og deadlines på tværs af udvalg."
@@ -24,6 +22,6 @@ export default async function TasksPage({
         title="Opgaver"
       />
       <TaskRegister data={data} organizationId={organizationId} />
-    </div>
+    </>
   );
 }

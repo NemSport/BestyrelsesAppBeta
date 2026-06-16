@@ -457,6 +457,14 @@ tasks, linked Annual Wheel occurrences, relevant committee decisions, role
 documents, and first-30-days onboarding. Owners and administrators maintain
 the handbook; organization members may read it.
 
+Individual Job Cards can be exported as read-only PDFs for onboarding,
+printing, sharing, and role handover. The server-generated PDF includes the
+role description, committees, current role holders, responsibility areas,
+onboarding introduction, first 30 days, practical information, task templates,
+related Annual Wheel events, related decisions, document links, and export
+date. PDF export does not replace the editable Job Card and does not include
+email delivery, signatures, template administration, or organization branding.
+
 The AI draft flow is manual and advisory. It analyzes only RLS-visible
 minutes, tasks, decisions, and Annual Wheel activity, returns one structured
 source-grounded draft, and opens the normal edit form. AI never saves or
@@ -546,6 +554,109 @@ boundary, non-goals, and shared-flow checklist live in
 semantic tokens rather than add isolated palette values or organization-
 specific styling.
 
+PDF exports use the shared `src/lib/pdf-report.ts` layout foundation. Server
+generators compose the same document header, metadata grid, section hierarchy,
+status badges, tables, spacing, page footer, export date, and page numbering
+instead of building one-off print layouts. The default PDF direction is a calm
+A4 report suitable for sharing, printing, onboarding, and archiving. Future
+agenda, decision, task, Annual Wheel, onboarding, and Job Card exports should
+reuse this foundation before adding module-specific content.
+
+Referattekst uses document prose styling in both the web UI and PDF exports.
+Sanitized TipTap content is rendered with constrained line length, generous
+line height, paragraph spacing, readable lists, and clearer subpoints. PDF
+generators convert rich text into structured prose blocks so paragraphs,
+line breaks, headings, list items, and simple a/b/c subpoints remain readable
+across page breaks.
+
+Phase 7.1 establishes the next shared frontend design foundation. The app
+shell, organization navigation, page headers, panels, action rows, filter
+surfaces, metadata rows, tables, status badges, empty states, modals, and
+feedback states now share calmer spacing, softer surfaces, clearer hierarchy,
+and responsive wrapping rules. This is a presentation foundation only: it does
+not change data models, RLS, services, repositories, or product workflows.
+Later redesign phases should build on these shared patterns instead of adding
+one-off Tailwind layouts.
+
+Phase 7.2 redesigns the authenticated app shell and organization navigation on
+top of that foundation. The global topbar now gives the app a calmer frame with
+clear access back to organizations, while the organization navigation exposes
+Overview, Meetings, Decisions, Tasks, My Tasks, Annual Wheel, Job Cards,
+Members, and Trash in a compact responsive module rail. The active module and
+organization context are visible without changing routes, data contracts,
+permissions, or feature workflows.
+
+Phase 7.2b replaces the horizontal organization module rail with a sidebar
+workspace layout. On desktop and tablet, organization pages render navigation
+as a left sidebar with full readable labels and a clear active state; content
+stays in a separate right-hand work area. On mobile, the same navigation
+collapses into a compact vertical block above the page content. Routes,
+authorization, data models, services, and feature flows remain unchanged.
+
+Phase 7.2c tightens the sidebar typography and spacing so organization
+navigation reads more like a compact admin workspace than a marketing
+navigation. Labels remain fully readable, active state remains clear, and the
+change is limited to presentation density.
+
+Phase 7.3 redesigns the organization front page as a compact control center.
+The page prioritizes attention items, personal tasks, deadline pressure,
+upcoming meetings, active decisions, recent minutes, and committee status using
+the existing organization overview read model. It does not introduce new data
+contracts or feature flows; it reorganizes the available RLS-scoped data into
+a more useful daily workspace.
+
+Phase 7.4 compacts meeting, agenda, and minutes surfaces without changing
+meeting workflows. Meeting lists use scanable rows with lightweight agenda
+previews, meeting headers use tighter metadata, agenda-item minute cards have
+smaller summaries and editor surfaces, and governance, attachment, PDF,
+transfer, decision, task, and AI actions remain available through the existing
+components.
+
+Phase 7.5 applies the same compact admin direction to Decisions and Tasks.
+The decision register, Task View, My Tasks, task cards, filters, edit modals,
+and task comments use quieter module surfaces, tighter metadata, and clearer
+deadline/status emphasis. Decisions and tasks remain separate modules and the
+change is presentation-only; task and decision services, repositories, RLS,
+relations, comments, reminders, and status workflows are unchanged.
+
+Phase 7R resets the densest Phase 7 surfaces around progressive disclosure
+instead of further compaction. The organization dashboard now starts with
+only attention items, critical deadlines, personal tasks, and the next meeting;
+secondary organization-wide lists are folded into a calmer "more overview"
+area. Meeting pages keep the existing agenda/minutes flows but reduce visible
+secondary actions and move meeting trash, task/decision creation, transfers,
+and supporting context behind explicit controls. Decision and task registers
+hide filter forms until requested, and My Tasks presents one prioritized work
+summary rather than many competing metric cards. No data model, service,
+repository, RLS, AI, or route contract changes are part of this reset.
+
+Phase 7R.1 turns organization navigation into a real admin shell. The
+organization sidebar sits flush to the left edge as a dark, sticky navigation
+surface, and dashboard module shortcuts are removed so the sidebar is the
+single primary navigation pattern. The Meetings entry now opens a dedicated
+organization-level meetings route instead of scrolling to a dashboard section.
+Secondary organization actions are grouped under a discreet menu, and the
+dashboard avoids prominent "create committee" chrome. This is a layout and
+navigation change only; no domain, RLS, service, repository, or AI behavior is
+changed.
+
+Phase 7R.2 moves the organization workspace shell to the organization route
+layout so every organization page and nested committee page shares the same
+sidebar, including concrete meeting pages. The layout removes the top gap
+created by page-shell padding, resolves organization name display centrally,
+and keeps deep meeting and Annual Wheel routes highlighted in the sidebar.
+The dashboard's "more overview" area is split into smaller disclosure groups
+instead of one large mixed overview. The change remains presentation and route
+composition only.
+
+Phase 7R.3 streamlines headers and actions across the organization workspace.
+Shared page headers now render as compact flat section headers instead of large
+rounded panels. Secondary and destructive actions use a common "Flere
+handlinger" menu pattern, while primary creation actions remain visible. The
+committee overview, meeting detail, agenda-item detail, organization edit, and
+organization dashboard adopt the same action hierarchy without changing the
+underlying routes, services, permissions, or mutation behavior.
+
 ## MVP Constraints
 
 - Build as one Next.js application.
@@ -561,11 +672,18 @@ specific styling.
 
 ## Trash And Retention Foundation
 
-Committees, meetings, durable agenda items, and agenda-item occurrences use
-soft delete metadata: `deleted_at`, `deleted_by`, and `delete_expires_at`.
+Organizations, committees, meetings, durable agenda items, and agenda-item
+occurrences use soft delete metadata: `deleted_at`, `deleted_by`, and
+`delete_expires_at`.
 Moving a record to trash sets a 30-day retention deadline; restoring it clears
 all three fields. Application repositories exclude trashed records from normal
 reads, while dedicated restore paths may load them explicitly.
+
+Organizations are root-level trash records. Moving an organization to trash
+hides it from normal organization lists and blocks ordinary organization
+flows, but it does not hard-delete or cascade-delete committees, meetings,
+decisions, tasks, minutes, Annual Wheel records, Job Cards, or history.
+Owners and administrators can restore the organization through the trash flow.
 
 Trashing a committee also trashes its active meetings and agenda-item
 occurrences. Trashing a meeting also trashes its active occurrences. Durable
@@ -578,6 +696,20 @@ Restore operations only restore child rows carrying the exact deletion marker
 and actor from the parent operation. This preserves rows that were already in
 trash independently. Hard delete and automatic expiry processing are not part
 of this foundation phase.
+
+The organization trash page lives at `/organizations/[organizationId]/trash`.
+It lists the deleted organization itself when relevant plus deleted
+committees, meetings, and durable agenda items. It shows who deleted the item
+when that profile is available and restores through the existing service and
+PostgreSQL restore functions. Expired records are marked as ready for
+permanent deletion, but permanent deletion remains deferred.
+
+Authorized UI flows move committees, meetings, and durable agenda items to the
+trash through those same service/RLS boundaries. On a meeting, removing an
+agenda item from the agenda is a separate occurrence-level action: it hides
+only that meeting occurrence and preserves the durable agenda item, decisions,
+tasks, minutes, and history. Moving the durable agenda item itself to trash is
+always shown as an explicit action.
 
 ## Terminology Contract
 

@@ -9,7 +9,8 @@ import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-sec
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
-import { PageSection } from "@/components/ui";
+import { TrashActionButton } from "@/components/trash/trash-action-button";
+import { ActionMenu, PageSection } from "@/components/ui";
 import { canManageCommittee } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
@@ -91,11 +92,22 @@ export default async function MeetingPage({
       <MeetingDocumentHeader
         actions={
           canEditMeeting ? (
-            <EditMeetingModal
-              committeeId={committeeId}
-              meeting={meeting}
-              organizationId={organizationId}
-            />
+            <>
+              <EditMeetingModal
+                committeeId={committeeId}
+                meeting={meeting}
+                organizationId={organizationId}
+              />
+              <ActionMenu>
+                <TrashActionButton
+                  confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                  endpoint={`/api/meetings/${meetingId}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                  label="Flyt møde til papirkurv"
+                  pendingLabel="Flytter..."
+                  redirectTo={root}
+                />
+              </ActionMenu>
+            </>
           ) : null
         }
         agendaItemCount={meeting.agenda_item_occurrences.length}
@@ -109,6 +121,8 @@ export default async function MeetingPage({
       <PageSection
         actions={
           <div className="flex flex-wrap gap-2">
+            {(decisionContext.canEdit || taskContext.canEdit) ? (
+              <ActionMenu className="order-2">
             {decisionContext.canEdit ? (
               <DecisionCreateModal
                 agendaItems={meeting.agenda_item_occurrences.flatMap(
@@ -159,6 +173,8 @@ export default async function MeetingPage({
                 triggerLabel="Opret opgave"
               />
             ) : null}
+              </ActionMenu>
+            ) : null}
             {canEditMeeting ? (
               <AddAgendaItemModal
                 committeeId={committeeId}
@@ -182,14 +198,14 @@ export default async function MeetingPage({
             ) : null}
           </div>
         }
-        className="mt-8"
+        className="mt-6"
         description="Arbejd gennem dagsordenen punkt for punkt. Noter, beslutninger og opfølgning samles i referatet."
         eyebrow="Mødedokument"
         title="Dagsorden og referat"
       >
         {decisionContext.decisions.length > 0 || taskContext.tasks.length > 0 ? (
-          <details className="group mb-6 rounded-[var(--radius-panel)] border border-line bg-subtle/20">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <details className="group mb-4 rounded-[var(--radius-panel)] border border-line bg-subtle/20">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-4">
               <span>
                 Relateret arbejde
                 <span className="ml-2 font-normal text-muted">
@@ -202,7 +218,7 @@ export default async function MeetingPage({
                 <span className="hidden group-open:inline">Skjul</span>
               </span>
             </summary>
-            <div className="grid gap-5 border-t border-line p-4 lg:grid-cols-2">
+            <div className="grid gap-4 border-t border-line p-3 sm:p-4 lg:grid-cols-2">
               <section>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Beslutninger</h3>
@@ -263,12 +279,23 @@ export default async function MeetingPage({
           root={root}
           userId={user.id}
         />
-        <TransferredAgendaItemsSection
-          canEdit={canEditMeeting}
-          futureMeetings={transferredAgendaItems.futureMeetings}
-          items={transferredAgendaItems.items}
-          root={root}
-        />
+        <details className="group mt-6 rounded-[var(--radius-panel)] border border-line bg-surface/60">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <span>Overførte punkter</span>
+            <span className="text-xs font-semibold text-brand">
+              <span className="group-open:hidden">Vis</span>
+              <span className="hidden group-open:inline">Skjul</span>
+            </span>
+          </summary>
+          <div className="border-t border-line p-4">
+            <TransferredAgendaItemsSection
+              canEdit={canEditMeeting}
+              futureMeetings={transferredAgendaItems.futureMeetings}
+              items={transferredAgendaItems.items}
+              root={root}
+            />
+          </div>
+        </details>
       </PageSection>
     </div>
   );

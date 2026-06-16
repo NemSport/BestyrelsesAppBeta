@@ -353,3 +353,28 @@ export type MyTasksData = {
   tasks: TaskView[];
   editableCommitteeIds: string[];
 };
+
+export type TrashItemType = "organization" | "committee" | "meeting" | "agenda_item";
+
+export type OrganizationTrashItem = {
+  id: string;
+  type: TrashItemType;
+  title: string;
+  organizationId: string;
+  committeeId: string | null;
+  committeeName: string | null;
+  meetingId: string | null;
+  meetingTitle: string | null;
+  deletedAt: string;
+  deletedBy: string | null;
+  deletedByName: string | null;
+  deleteExpiresAt: string;
+  daysLeft: number;
+  status: "restorable" | "ready_for_permanent_delete";
+  canRestore: boolean;
+  restoreBlockedReason: string | null;
+};
+
+export type OrganizationTrashData = {
+  items: OrganizationTrashItem[];
+};

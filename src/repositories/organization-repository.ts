@@ -23,15 +23,23 @@ export class OrganizationRepository {
       .eq("status", "active")
       .order("created_at", { ascending: true });
     if (error) throw error;
-    return data as unknown as OrganizationMembershipResult[];
+    return (data as unknown as OrganizationMembershipResult[]).filter(
+      (membership) =>
+        Boolean(membership.organizations) &&
+        !membership.organizations?.deleted_at,
+    );
   }
 
-  async findById(organizationId: string) {
-    const { data, error } = await this.db
+  async findById(
+    organizationId: string,
+    { includeDeleted = false }: { includeDeleted?: boolean } = {},
+  ) {
+    let query = this.db
       .from("organizations")
       .select("*")
-      .eq("id", organizationId)
-      .maybeSingle();
+      .eq("id", organizationId);
+    if (!includeDeleted) query = query.is("deleted_at", null);
+    const { data, error } = await query.maybeSingle();
     if (error) throw error;
     return data;
   }
@@ -68,6 +76,22 @@ export class OrganizationRepository {
       .eq("id", organizationId)
       .select()
       .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async softDelete(organizationId: string) {
+    const { data, error } = await this.db.rpc("soft_delete_organization", {
+      target_organization_id: organizationId,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async restore(organizationId: string) {
+    const { data, error } = await this.db.rpc("restore_organization", {
+      target_organization_id: organizationId,
+    });
     if (error) throw error;
     return data;
   }

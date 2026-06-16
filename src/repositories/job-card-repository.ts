@@ -5,6 +5,17 @@ import type { Database, TableInsert, TableUpdate } from "@/types/database";
 export class JobCardRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async findOrganization(organizationId: string) {
+    const { data, error } = await this.db
+      .from("organizations")
+      .select("*")
+      .eq("id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
   async listRoles(organizationId: string) {
     const { data, error } = await this.db
       .from("role_profiles")

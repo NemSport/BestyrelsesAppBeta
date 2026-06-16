@@ -13,7 +13,7 @@ export function TableContainer({
   return (
     <div
       className={clsx(
-        "overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface",
+        "overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm",
         className,
       )}
       {...props}
@@ -26,7 +26,10 @@ export function Table({
   ...props
 }: TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <table className={clsx("w-full text-left text-sm", className)} {...props} />
+    <table
+      className={clsx("w-full min-w-full text-left text-sm", className)}
+      {...props}
+    />
   );
 }
 
@@ -37,7 +40,7 @@ export function TableHead({
   return (
     <thead
       className={clsx(
-        "border-b border-line bg-subtle text-xs uppercase tracking-wide text-muted",
+        "border-b border-line bg-subtle/80 text-xs uppercase tracking-wide text-muted",
         className,
       )}
       {...props}
@@ -58,7 +61,10 @@ export function TableRow({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={clsx("border-b border-line last:border-b-0", className)}
+      className={clsx(
+        "border-b border-line transition-colors last:border-b-0 hover:bg-subtle/45",
+        className,
+      )}
       {...props}
     />
   );
@@ -70,7 +76,7 @@ export function TableHeaderCell({
 }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={clsx("px-4 py-3 font-semibold sm:px-5", className)}
+      className={clsx("whitespace-nowrap px-4 py-3 font-semibold sm:px-5", className)}
       {...props}
     />
   );

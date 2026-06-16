@@ -14,16 +14,28 @@ export class AuthorizationService {
     this.committees = new CommitteeRepository(db);
   }
 
-  async requireOrganizationMember(organizationId: string, userId: string) {
-    const organization = await this.organizations.findById(organizationId);
+  async requireOrganizationMember(
+    organizationId: string,
+    userId: string,
+    { includeDeleted = false }: { includeDeleted?: boolean } = {},
+  ) {
+    const organization = await this.organizations.findById(organizationId, {
+      includeDeleted,
+    });
     if (!organization) throw new NotFoundError("Organisationen");
     const membership = await this.organizations.getMembership(organizationId, userId);
     if (!membership) throw new AuthorizationError();
     return { organization, membership };
   }
 
-  async requireOrganizationAdmin(organizationId: string, userId: string) {
-    const context = await this.requireOrganizationMember(organizationId, userId);
+  async requireOrganizationAdmin(
+    organizationId: string,
+    userId: string,
+    { includeDeleted = false }: { includeDeleted?: boolean } = {},
+  ) {
+    const context = await this.requireOrganizationMember(organizationId, userId, {
+      includeDeleted,
+    });
     if (!["owner", "admin"].includes(context.membership.role)) {
       throw new AuthorizationError("Kun ejere og administratorer kan gøre dette.");
     }

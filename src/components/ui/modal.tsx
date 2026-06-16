@@ -48,7 +48,7 @@ export function Modal({
     <div
       aria-labelledby={titleId}
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) onClose();
       }}
@@ -56,14 +56,14 @@ export function Modal({
     >
       <div
         className={clsx(
-          "max-h-[92vh] w-full overflow-y-auto rounded-t-[var(--radius-dialog)] bg-surface shadow-dialog sm:rounded-[var(--radius-dialog)]",
+          "max-h-[92vh] w-full overflow-y-auto rounded-t-[var(--radius-dialog)] border border-line bg-surface shadow-dialog sm:rounded-[var(--radius-dialog)]",
           maxWidth === "lg" && "max-w-lg",
           maxWidth === "2xl" && "max-w-2xl",
           maxWidth === "3xl" && "max-w-3xl",
         )}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-surface/95 p-5 backdrop-blur">
-          <div>
+          <div className="min-w-0">
             {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
             <h2 className="section-title mt-1" id={titleId}>
               {title}
@@ -81,7 +81,9 @@ export function Modal({
         </div>
         <div className="p-5 sm:p-7">{children}</div>
         {footer ? (
-          <div className="border-t border-line px-5 py-4 sm:px-7">{footer}</div>
+          <div className="border-t border-line bg-subtle/45 px-5 py-4 sm:px-7">
+            {footer}
+          </div>
         ) : null}
       </div>
     </div>

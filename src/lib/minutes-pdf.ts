@@ -1,11 +1,10 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-
 import {
   agendaItemMinutesStatusLabels,
   agendaItemTypeLabels,
   meetingMinuteApprovalStatusLabels,
 } from "@/lib/localization";
-import { richTextToPlainText } from "@/lib/rich-text";
+import { createPdfReport, formatPdfDate } from "@/lib/pdf-report";
+import { richTextToPdfBlocks } from "@/lib/rich-text";
 import type {
   AgendaItemMinutes,
   MeetingMinuteApprovalView,
@@ -26,169 +25,157 @@ type PdfInput = {
   attendeeIds: string[];
 };
 
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const lines: string[] = [];
-  const safeText = text.replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, "?");
-  for (const paragraph of safeText.split(/\r?\n/)) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    if (words.length === 0) {
-      lines.push("");
-      continue;
-    }
-    let line = "";
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
-        line = candidate;
-      } else {
-        if (line) lines.push(line);
-        line = word;
-      }
-    }
-    if (line) lines.push(line);
-  }
-  return lines;
+function approvalSummary(approvals: MeetingMinuteApprovalView[]) {
+  const approved = approvals.filter((approval) => approval.status === "approved")
+    .length;
+  const changeRequests = approvals.filter(
+    (approval) => approval.status === "change_requested",
+  ).length;
+  if (!approvals.length) return "Ingen godkendelsesrunde";
+  return `${approved} af ${approvals.length} har godkendt${
+    changeRequests ? ` · ${changeRequests} ønsker ændringer` : ""
+  }`;
+}
+
+function statusTone(status: MeetingMinuteApprovalView["status"]) {
+  if (status === "approved") return "success" as const;
+  if (status === "change_requested") return "warning" as const;
+  if (status === "no_response") return "danger" as const;
+  return "neutral" as const;
 }
 
 export async function generateMeetingMinutesPdf(input: PdfInput) {
-  const document = await PDFDocument.create();
-  const regular = await document.embedFont(StandardFonts.Helvetica);
-  const bold = await document.embedFont(StandardFonts.HelveticaBold);
-  const pageSize: [number, number] = [595.28, 841.89];
-  const margin = 50;
-  const contentWidth = pageSize[0] - margin * 2;
-  let page: PDFPage;
-  let y = pageSize[1] - margin;
-
-  const newPage = () => {
-    page = document.addPage(pageSize);
-    y = pageSize[1] - margin;
-  };
-  const ensureSpace = (height: number) => {
-    if (y - height < margin) newPage();
-  };
-  const write = (
-    text: string,
-    options: {
-      font?: PDFFont;
-      size?: number;
-      color?: ReturnType<typeof rgb>;
-      gapAfter?: number;
-    } = {},
-  ) => {
-    const font = options.font ?? regular;
-    const size = options.size ?? 10;
-    const lineHeight = size * 1.35;
-    const lines = wrapText(text || "Ikke angivet", font, size, contentWidth);
-    ensureSpace(lines.length * lineHeight + (options.gapAfter ?? 0));
-    for (const line of lines) {
-      page.drawText(line, {
-        x: margin,
-        y,
-        font,
-        size,
-        color: options.color ?? rgb(0.09, 0.13, 0.11),
-      });
-      y -= lineHeight;
-    }
-    y -= options.gapAfter ?? 0;
-  };
-  const heading = (text: string) => {
-    ensureSpace(30);
-    y -= 8;
-    write(text, { font: bold, size: 14, gapAfter: 6 });
-  };
-  const subheading = (text: string) => {
-    ensureSpace(24);
-    write(text, { font: bold, size: 11, gapAfter: 3 });
-  };
-
-  newPage();
-  write("Godkendt mødereferat", {
-    font: bold,
-    size: 20,
-    color: rgb(0.08, 0.3, 0.2),
-    gapAfter: 8,
+  const meetingDate = formatPdfDate(input.meeting.starts_at, true);
+  const report = await createPdfReport({
+    documentType: "Mødereferat",
+    title: input.meeting.title,
+    subtitle: meetingDate,
+    committeeName: input.committeeName,
+    generatedAt: new Date(),
+    meta: [
+      { label: "Udvalg", value: input.committeeName },
+      { label: "Mødedato", value: meetingDate },
+      {
+        label: "Referatstatus",
+        value:
+          input.meetingMinutes.status === "approved"
+            ? "Godkendt"
+            : input.meetingMinutes.status === "ready_for_approval"
+              ? "Klar til godkendelse"
+              : "Kladde",
+      },
+      { label: "Godkendelse", value: approvalSummary(input.approvals) },
+    ],
   });
-  write(input.meeting.title, { font: bold, size: 16, gapAfter: 8 });
-  write(
-    `Udvalg: ${input.committeeName}\nMødedato: ${new Intl.DateTimeFormat(
-      "da-DK",
-      { dateStyle: "long", timeStyle: "short" },
-    ).format(new Date(input.meeting.starts_at))}`,
-    { gapAfter: 8 },
-  );
 
   const attendeeNames = input.attendeeIds
     .map((id) => input.responsiblePeople.find((person) => person.id === id)?.name)
     .filter((name): name is string => Boolean(name));
+
   if (attendeeNames.length > 0) {
-    subheading("Deltagere");
-    write(attendeeNames.join(", "), { gapAfter: 6 });
+    report.addSection("Deltagere");
+    report.addParagraph(attendeeNames.join(", "));
   }
 
-  heading("Generelt referat");
-  write(richTextToPlainText(input.meetingMinutes.minutes_text), {
-    gapAfter: 6,
-  });
-  subheading("Beslutninger");
-  write(richTextToPlainText(input.meetingMinutes.decisions), { gapAfter: 8 });
+  report.addSection("Generelt referat");
+  report.addSubsection("Referattekst");
+  report.addProse(
+    richTextToPdfBlocks(input.meetingMinutes.minutes_text),
+    "Der er ingen referattekst.",
+  );
+  report.addSubsection("Beslutninger");
+  report.addProse(
+    richTextToPdfBlocks(input.meetingMinutes.decisions),
+    "Der er ingen samlede beslutninger.",
+  );
 
-  heading("Dagsorden og punktreferater");
+  report.addSection("Dagsorden og punktreferater");
   const minutesByAgendaItem = new Map(
     input.agendaItemMinutes.map((minutes) => [minutes.agenda_item_id, minutes]),
   );
+
   for (const occurrence of input.meeting.agenda_item_occurrences) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const minutes = minutesByAgendaItem.get(item.id);
-    subheading(
-      `${occurrence.position + 1}. (${agendaItemTypeLabels[item.item_type].short}) ${item.title}`,
-    );
+    const itemTitle = `${occurrence.position + 1}. (${
+      agendaItemTypeLabels[item.item_type].short
+    }) ${item.title}`;
+
+    report.addSubsection(itemTitle);
     if (!minutes) {
-      write("Der er ikke gemt et punktreferat.", { gapAfter: 6 });
+      report.addParagraph("Der er ikke gemt et punktreferat.");
       continue;
     }
-    write(`Status: ${agendaItemMinutesStatusLabels[minutes.status]}`, {
-      gapAfter: 3,
-    });
-    const notes = richTextToPlainText(minutes.notes);
-    const decision = richTextToPlainText(minutes.decision);
-    const followUp = richTextToPlainText(minutes.follow_up);
-    if (notes) write(`Noter\n${notes}`, { gapAfter: 3 });
-    if (decision) write(`Beslutning\n${decision}`, { gapAfter: 3 });
-    if (followUp) write(`Opfølgning\n${followUp}`, { gapAfter: 3 });
-    if (minutes.responsible_user_id) {
-      const responsible = input.responsiblePeople.find(
-        (person) => person.id === minutes.responsible_user_id,
-      );
-      write(`Ansvarlig: ${responsible?.name ?? "Ukendt medlem"}`);
+
+    report.addBadge(agendaItemMinutesStatusLabels[minutes.status]);
+    const responsible = minutes.responsible_user_id
+      ? input.responsiblePeople.find(
+          (person) => person.id === minutes.responsible_user_id,
+        )
+      : null;
+    report.addMetaGrid([
+      {
+        label: "Ansvarlig",
+        value: responsible?.name ?? (minutes.responsible_user_id ? "Ukendt medlem" : ""),
+      },
+      { label: "Deadline", value: minutes.deadline ?? "" },
+    ]);
+
+    const notes = richTextToPdfBlocks(minutes.notes);
+    const decision = richTextToPdfBlocks(minutes.decision);
+    const followUp = richTextToPdfBlocks(minutes.follow_up);
+    if (notes.length) {
+      report.addSubsection("Noter");
+      report.addProse(notes);
     }
-    if (minutes.deadline) write(`Deadline: ${minutes.deadline}`);
-    y -= 6;
+    if (decision.length) {
+      report.addSubsection("Beslutning");
+      report.addProse(decision);
+    }
+    if (followUp.length) {
+      report.addSubsection("Opfølgning");
+      report.addProse(followUp);
+    }
   }
 
-  heading("Godkendelsesstatus");
+  report.addSection("Godkendelsesstatus");
   for (const approval of input.approvals) {
-    write(
-      `${approval.memberName}: ${
-        meetingMinuteApprovalStatusLabels[approval.status]
-      }${approval.comment ? `\nKommentar: ${approval.comment}` : ""}`,
-      { gapAfter: 4 },
+    report.addBadge(
+      `${approval.memberName}: ${meetingMinuteApprovalStatusLabels[approval.status]}`,
+      statusTone(approval.status),
     );
-  }
-
-  heading("Vedhæftninger");
-  if (input.attachments.length === 0) {
-    write("Ingen vedhæftninger.");
-  } else {
-    for (const attachment of input.attachments) {
-      write(
-        `${attachment.fileName} (${attachment.mimeType}) - uploadet af ${attachment.uploadedByName}`,
-        { gapAfter: 3 },
-      );
+    if (approval.comment) {
+      report.addParagraph(`Kommentar: ${approval.comment}`);
     }
   }
+  if (!input.approvals.length) {
+    report.addParagraph("Der er ikke registreret godkendelser.");
+  }
 
-  return document.save();
+  report.addSection("Vedhæftninger");
+  report.addTable(
+    [
+      {
+        label: "Filnavn",
+        width: 220,
+        getValue: (attachment: MinuteAttachmentView) => attachment.fileName,
+      },
+      {
+        label: "Filtype",
+        width: 120,
+        getValue: (attachment: MinuteAttachmentView) => attachment.mimeType,
+      },
+      {
+        label: "Uploadet af",
+        width: 160,
+        getValue: (attachment: MinuteAttachmentView) =>
+          attachment.uploadedByName,
+      },
+    ],
+    input.attachments,
+    "Ingen vedhæftninger.",
+  );
+
+  return report.save();
 }

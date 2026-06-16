@@ -15,6 +15,13 @@ const allowedTags = new Set([
   "u",
 ]);
 
+export type RichTextPdfBlock = {
+  type: "paragraph" | "heading" | "listItem" | "quote";
+  text: string;
+  ordered?: boolean;
+  index?: number;
+};
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -113,6 +120,87 @@ export function richTextToPlainText(value: string | null | undefined) {
   return decodeHtmlEntities(normalized)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+export function richTextToPdfBlocks(value: string | null | undefined) {
+  const sanitized = sanitizeRichText(value);
+  if (!sanitized) return [] satisfies RichTextPdfBlock[];
+
+  const blocks: RichTextPdfBlock[] = [];
+  const listStack: Array<"ul" | "ol"> = [];
+  const listCounters: number[] = [];
+  let active: RichTextPdfBlock["type"] | null = null;
+  let buffer = "";
+
+  const pushBuffer = () => {
+    const text = decodeHtmlEntities(buffer)
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    if (!text) {
+      buffer = "";
+      return;
+    }
+    if (active === "listItem") {
+      const ordered = listStack[listStack.length - 1] === "ol";
+      const counterIndex = Math.max(listCounters.length - 1, 0);
+      if (ordered) listCounters[counterIndex] += 1;
+      blocks.push({
+        type: "listItem",
+        text,
+        ordered,
+        index: ordered ? listCounters[counterIndex] : undefined,
+      });
+    } else {
+      blocks.push({ type: active ?? "paragraph", text });
+    }
+    buffer = "";
+  };
+
+  for (const token of sanitized.match(/<[^>]*>|[^<]+/g) ?? []) {
+    if (!token.startsWith("<")) {
+      buffer += token;
+      continue;
+    }
+
+    const tagMatch = token.match(/^<\s*(\/?)\s*([a-z0-9]+)[^>]*>$/i);
+    if (!tagMatch) continue;
+    const [, closing, rawTag] = tagMatch;
+    const tag = rawTag.toLowerCase();
+
+    if (tag === "br" && !closing) {
+      buffer += "\n";
+      continue;
+    }
+
+    if (!closing && (tag === "p" || tag === "h2" || tag === "blockquote" || tag === "li")) {
+      pushBuffer();
+      active =
+        tag === "h2" ? "heading" : tag === "blockquote" ? "quote" : tag === "li" ? "listItem" : "paragraph";
+      continue;
+    }
+
+    if (closing && (tag === "p" || tag === "h2" || tag === "blockquote" || tag === "li")) {
+      pushBuffer();
+      active = null;
+      continue;
+    }
+
+    if (!closing && (tag === "ul" || tag === "ol")) {
+      listStack.push(tag);
+      listCounters.push(0);
+      continue;
+    }
+
+    if (closing && (tag === "ul" || tag === "ol")) {
+      pushBuffer();
+      listStack.pop();
+      listCounters.pop();
+    }
+  }
+
+  pushBuffer();
+  return blocks;
 }
 
 export function firstRichTextToPlainText(

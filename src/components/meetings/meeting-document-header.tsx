@@ -44,26 +44,28 @@ export function MeetingDocumentHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="meeting-document-header">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <header className="meeting-document-header border-b border-line pb-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="page-eyebrow">Møde og referat</p>
-          <h1 className="mt-2 max-w-4xl break-words text-2xl font-semibold leading-tight sm:text-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+            Møde og referat
+          </p>
+          <h1 className="mt-1.5 max-w-4xl break-words text-3xl font-semibold leading-tight tracking-[-0.035em]">
             {meeting.title}
           </h1>
-          <p className="mt-2 text-sm text-muted sm:text-base">
+          <p className="mt-1.5 text-sm text-muted">
             {committeeName} · {formatDateTime(meeting.starts_at, "full")}
           </p>
         </div>
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {actions}
           </div>
         ) : null}
       </div>
 
       {meeting.description ? (
-        <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-muted">
+        <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-muted">
           {meeting.description}
         </p>
       ) : null}

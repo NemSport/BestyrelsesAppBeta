@@ -7,7 +7,7 @@ export class TaskRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
   private readonly viewSelect =
-    "*, committee:committees(id, name), meeting:meetings(id, title, starts_at), agendaItem:agenda_items(id, title, item_type), decision:decisions(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
+    "*, committee:committees(id, name, deleted_at), meeting:meetings(id, title, starts_at, deleted_at), agendaItem:agenda_items(id, title, item_type, deleted_at), decision:decisions(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
 
   async listByOrganization(organizationId: string) {
     const { data, error } = await this.db
@@ -17,7 +17,7 @@ export class TaskRepository {
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listByResponsible(organizationId: string, userId: string) {
@@ -29,7 +29,7 @@ export class TaskRepository {
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listByMeeting(meetingId: string) {
@@ -41,7 +41,7 @@ export class TaskRepository {
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listByAgendaItem(agendaItemId: string) {
@@ -53,7 +53,7 @@ export class TaskRepository {
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listByDecision(decisionId: string) {
@@ -65,7 +65,7 @@ export class TaskRepository {
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listOpenDueSoon(
@@ -83,7 +83,7 @@ export class TaskRepository {
       .lte("deadline", throughDate)
       .order("deadline", { ascending: true });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listOpenOverdue(organizationId: string, beforeDate: string) {
@@ -96,7 +96,7 @@ export class TaskRepository {
       .lt("deadline", beforeDate)
       .order("deadline", { ascending: true });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async listRemindersDue(organizationId: string, throughTime: string) {
@@ -110,7 +110,7 @@ export class TaskRepository {
       .lte("reminder_at", throughTime)
       .order("reminder_at", { ascending: true });
     if (error) throw error;
-    return data as unknown as TaskView[];
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
   async findById(taskId: string) {
@@ -143,4 +143,25 @@ export class TaskRepository {
     if (error) throw error;
     return data;
   }
+
+  private activeRelations(tasks: TaskViewWithTrash[]): TaskView[] {
+    return tasks.map((task) => ({
+      ...task,
+      committee: task.committee?.deleted_at ? null : task.committee,
+      meeting: task.meeting?.deleted_at ? null : task.meeting,
+      agendaItem: task.agendaItem?.deleted_at ? null : task.agendaItem,
+    }));
+  }
 }
+
+type TaskViewWithTrash = TaskView & {
+  committee:
+    | (NonNullable<TaskView["committee"]> & { deleted_at?: string | null })
+    | null;
+  meeting:
+    | (NonNullable<TaskView["meeting"]> & { deleted_at?: string | null })
+    | null;
+  agendaItem:
+    | (NonNullable<TaskView["agendaItem"]> & { deleted_at?: string | null })
+    | null;
+};

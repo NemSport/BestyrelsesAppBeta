@@ -51,43 +51,49 @@ export default async function MeetingsPage({
       title="Mødeplan"
     >
       {meetings.length > 0 ? (
-        <div className="divide-y divide-line border-y border-line">
+        <div className="grid gap-2">
           {meetings.map((meeting) => (
             <article
-              className="px-1 py-5 transition hover:bg-surface/60 sm:px-3"
+              className="rounded-[var(--radius-panel)] border border-line bg-surface/80 px-3 py-3 transition hover:border-brand/30 hover:bg-surface sm:px-4"
               key={meeting.id}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                 <div className="min-w-0">
-                  <h3 className="font-semibold">{meeting.title}</h3>
-                  <p className="mt-1 text-sm text-muted">
+                  <Link
+                    className="font-semibold text-ink hover:text-brand hover:underline"
+                    href={`${root}/meetings/${meeting.id}`}
+                  >
+                    {meeting.title}
+                  </Link>
+                  <p className="mt-0.5 text-xs text-muted">
                     {formatDateTime(meeting.starts_at)}
                     {meeting.location ? ` · ${meeting.location}` : ""}
                   </p>
                 </div>
-                <StatusBadge
-                  tone={
-                    meeting.status === "completed"
-                      ? "success"
-                      : meeting.status === "cancelled"
-                        ? "danger"
-                        : "info"
-                  }
-                >
-                  {meetingStatusLabels[meeting.status]}
-                </StatusBadge>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <StatusBadge
+                    tone={
+                      meeting.status === "completed"
+                        ? "success"
+                        : meeting.status === "cancelled"
+                          ? "danger"
+                          : "info"
+                    }
+                  >
+                    {meetingStatusLabels[meeting.status]}
+                  </StatusBadge>
+                  <Link
+                    className="text-sm font-semibold text-brand hover:underline"
+                    href={`${root}/meetings/${meeting.id}`}
+                  >
+                    Åbn møde
+                  </Link>
+                </div>
               </div>
 
               <MeetingAgendaPreview
                 occurrences={meeting.agenda_item_occurrences}
               />
-
-              <Link
-                className="mt-3 inline-flex text-sm font-semibold text-brand hover:underline"
-                href={`${root}/meetings/${meeting.id}`}
-              >
-                Åbn hele mødet
-              </Link>
             </article>
           ))}
         </div>

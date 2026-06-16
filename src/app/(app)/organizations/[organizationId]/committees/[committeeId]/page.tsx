@@ -2,9 +2,12 @@ import Link from "next/link";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
 import { MeetingAgendaPreview } from "@/components/meetings/meeting-agenda-preview";
+import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
+  ActionMenu,
   ContentPanel,
   EmptyState,
+  PageHeader,
   PageSection,
   StatusBadge,
   buttonClassName,
@@ -159,24 +162,37 @@ export default async function CommitteeDashboardPage({
 
   return (
     <div className="section-stack">
-      <div className="flex flex-wrap justify-end gap-2">
-        {canEditItems ? (
-          <Link
-            className={buttonClassName()}
-            href={`${root}/agenda-items/new`}
-          >
-            Nyt dagsordenspunkt
-          </Link>
-        ) : null}
-        {canEditCommittee ? (
-          <Link
-            className={buttonClassName({ variant: "secondary" })}
-            href={`${root}/edit`}
-          >
-            Rediger udvalg
-          </Link>
-        ) : null}
-      </div>
+      <PageHeader
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditItems ? (
+              <Link className={buttonClassName()} href={`${root}/agenda-items/new`}>
+                Nyt dagsordenspunkt
+              </Link>
+            ) : null}
+            {canEditCommittee ? (
+              <ActionMenu>
+                <Link
+                  className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
+                  href={`${root}/edit`}
+                >
+                  Rediger udvalg
+                </Link>
+                <TrashActionButton
+                  confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                  endpoint={`/api/committees/${committeeId}?organizationId=${organizationId}`}
+                  label="Flyt udvalg til papirkurv"
+                  pendingLabel="Flytter..."
+                  redirectTo={`/organizations/${organizationId}`}
+                />
+              </ActionMenu>
+            ) : null}
+          </div>
+        }
+        description="Se møder, dagsordenspunkter, referater og opfølgning for udvalget."
+        eyebrow="Udvalg"
+        title={context.committee.name}
+      />
 
       <div className="grid divide-y divide-line border-y border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <div className="px-1 py-4 sm:px-5">
