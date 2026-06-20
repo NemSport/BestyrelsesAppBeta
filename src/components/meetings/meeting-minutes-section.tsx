@@ -20,6 +20,7 @@ import {
   AutosaveStatusLine,
   LocalDraftConflict,
 } from "@/components/meetings/autosave-feedback";
+import { MinutesAiAssistant } from "@/components/meetings/minutes-ai-assistant";
 import {
   MinuteAttachments,
   MinutesApprovalPanel,
@@ -518,6 +519,16 @@ function AgendaMinutesCard({
               onChange={setNotes}
               value={notes}
             />
+            <MinutesAiAssistant
+              agendaItemId={item.id}
+              committeeId={committeeId}
+              field="notes"
+              meetingId={meetingId}
+              onApply={setNotes}
+              organizationId={organizationId}
+              source="agenda_item_minutes"
+              value={notes}
+            />
             <details className="group mt-1.5 text-xs text-muted">
               <summary className="inline-flex cursor-pointer list-none font-medium text-secondary hover:underline [&::-webkit-details-marker]:hidden">
                 Skrivehjælp
@@ -551,6 +562,16 @@ function AgendaMinutesCard({
                 invalid={Boolean(fieldErrors.decision?.[0])}
                 minHeightClass="min-h-12"
                 onChange={setDecision}
+                value={decision}
+              />
+              <MinutesAiAssistant
+                agendaItemId={item.id}
+                committeeId={committeeId}
+                field="decision"
+                meetingId={meetingId}
+                onApply={setDecision}
+                organizationId={organizationId}
+                source="agenda_item_minutes"
                 value={decision}
               />
               <details className="group mt-1.5 text-xs text-muted">
@@ -593,6 +614,16 @@ function AgendaMinutesCard({
                 invalid={Boolean(fieldErrors.followUp?.[0])}
                 minHeightClass="min-h-12"
                 onChange={setFollowUp}
+                value={followUp}
+              />
+              <MinutesAiAssistant
+                agendaItemId={item.id}
+                committeeId={committeeId}
+                field="follow_up"
+                meetingId={meetingId}
+                onApply={setFollowUp}
+                organizationId={organizationId}
+                source="agenda_item_minutes"
                 value={followUp}
               />
               <details className="group mt-1.5 text-xs text-muted">
@@ -1167,7 +1198,11 @@ export function MeetingMinutesSection({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [savingStatus, setSavingStatus] = useState<MinutesStatus | null>(null);
-  const [isGeneralMinutesOpen, setIsGeneralMinutesOpen] = useState(false);
+  const [isGeneralMinutesOpen, setIsGeneralMinutesOpen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.location.hash === "#general-minutes-content",
+  );
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const effectiveCanEdit =
     canEdit && (meetingStatus !== "approved" || isEditingApproved);
@@ -1355,6 +1390,15 @@ export function MeetingMinutesSection({
                   onChange={setMinutesText}
                   value={minutesText}
                 />
+                <MinutesAiAssistant
+                  committeeId={committeeId}
+                  field="minutes_text"
+                  meetingId={meetingId}
+                  onApply={setMinutesText}
+                  organizationId={organizationId}
+                  source="meeting_minutes"
+                  value={minutesText}
+                />
                 {fieldErrors.minutesText?.[0] ? (
                   <p className="mt-1 text-sm text-red-700">
                     {fieldErrors.minutesText[0]}
@@ -1371,6 +1415,15 @@ export function MeetingMinutesSection({
                   onChange={setDecisions}
                   value={decisions}
                 />
+                <MinutesAiAssistant
+                  committeeId={committeeId}
+                  field="decisions"
+                  meetingId={meetingId}
+                  onApply={setDecisions}
+                  organizationId={organizationId}
+                  source="meeting_minutes"
+                  value={decisions}
+                />
               </div>
               <details className="group rounded-[var(--radius-control)] border border-line bg-subtle/30">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
@@ -1385,6 +1438,15 @@ export function MeetingMinutesSection({
                     id="meeting-internal-note"
                     minHeightClass="min-h-14"
                     onChange={setInternalNote}
+                    value={internalNote}
+                  />
+                  <MinutesAiAssistant
+                    committeeId={committeeId}
+                    field="internal_note"
+                    meetingId={meetingId}
+                    onApply={setInternalNote}
+                    organizationId={organizationId}
+                    source="meeting_minutes"
                     value={internalNote}
                   />
                   <p className="mt-1 text-xs text-muted">

@@ -21,6 +21,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type {
+  AnnualWheelCalendarItem,
   AnnualWheelEventView,
   AnnualWheelOverview,
 } from "@/types/domain";
@@ -73,10 +74,45 @@ const monthNames = [
 ];
 
 const kindLabels = {
+  activity: "Aktivitet",
   meeting: "Møde",
   task: "Opgave",
-  decision: "Beslutning",
+  decision: "Beslutningsdeadline",
 } as const;
+
+type AnnualWheelTimelineItem =
+  | {
+      id: string;
+      kind: "activity";
+      title: string;
+      date: string;
+      committeeId: string | null;
+      responsibleUserId: string | null;
+      priority: AnnualWheelPriority;
+      event: AnnualWheelEventView;
+      href: null;
+    }
+  | (AnnualWheelCalendarItem & {
+      event: null;
+    });
+
+function getMonthItems(items: AnnualWheelTimelineItem[], month: number) {
+  return items.filter((item) => Number(item.date.slice(5, 7)) - 1 === month);
+}
+
+function splitMonthItems(items: AnnualWheelTimelineItem[]) {
+  return {
+    meetings: items.filter((item) => item.kind === "meeting"),
+    otherItems: items.filter((item) => item.kind !== "meeting"),
+  };
+}
+
+function shortDate(value: string) {
+  return new Intl.DateTimeFormat("da-DK", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(`${value}T00:00:00`));
+}
 
 function emptyDraft(defaultCommitteeId = ""): EventDraft {
   const today = new Date().toISOString().slice(0, 10);
@@ -138,6 +174,7 @@ export function AnnualWheel({
   const [aiResult, setAiResult] = useState<AiResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const canCreate =
     data.canEditOrganization || data.editableCommitteeIds.length > 0;
@@ -150,7 +187,7 @@ export function AnnualWheel({
           )
         : [focusMonth];
 
-  const items = useMemo(() => {
+  const items = useMemo<AnnualWheelTimelineItem[]>(() => {
     const activities = data.events.map((event) => ({
       id: event.id,
       kind: "activity" as const,
@@ -180,6 +217,136 @@ export function AnnualWheel({
     .filter((item) => item.kind !== "meeting")
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 12);
+
+  const selectedMonthItems =
+    selectedMonth === null ? [] : getMonthItems(items, selectedMonth);
+  const selectedMonthGroups = splitMonthItems(selectedMonthItems);
+
+  function itemHref(item: AnnualWheelTimelineItem) {
+    if (item.kind === "task") {
+      const taskId = item.id.startsWith("task:") ? item.id.slice(5) : "";
+      return taskId
+        ? `/organizations/${organizationId}/tasks?editTask=${taskId}#task-${taskId}`
+        : item.href;
+    }
+    return item.href;
+  }
+
+  function renderTimelineItem(
+    item: AnnualWheelTimelineItem,
+    variant: "card" | "detail" = "card",
+  ) {
+    const state =
+      item.kind === "meeting"
+        ? null
+        : annualWheelDeadlineState(item.date, item.priority);
+    const content = (
+      <>
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <span className="mt-0.5 w-12 shrink-0 text-xs font-semibold text-muted">
+            {variant === "detail" ? shortDate(item.date) : item.date.slice(8, 10)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-ink">
+              {item.title}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+              {item.kind === "meeting" ? (
+                <StatusBadge tone="neutral">Møde</StatusBadge>
+              ) : (
+                <span>{kindLabels[item.kind]}</span>
+              )}
+              {item.kind === "activity" ? (
+                <span>{annualWheelPriorityLabels[item.priority]}</span>
+              ) : null}
+              {state === "overdue" ? (
+                <StatusBadge tone="danger">Forsinket</StatusBadge>
+              ) : state === "critical" ? (
+                <StatusBadge tone="warning">Kritisk</StatusBadge>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+
+    const rowClass =
+      "group flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left transition hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30";
+
+    if (item.event) {
+      return (
+        <button
+          className={rowClass}
+          key={item.id}
+          onClick={() => {
+            setSelectedMonth(null);
+            openEdit(item.event);
+          }}
+          type="button"
+        >
+          {content}
+        </button>
+      );
+    }
+
+    const href = itemHref(item);
+    if (!href) {
+      return (
+        <div className={rowClass} key={item.id}>
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <Link className={rowClass} href={href} key={item.id}>
+        {content}
+      </Link>
+    );
+  }
+
+  function renderMonthList(
+    meetings: AnnualWheelTimelineItem[],
+    otherItems: AnnualWheelTimelineItem[],
+    variant: "card" | "detail" = "card",
+  ) {
+    const visibleMeetings = variant === "card" ? meetings.slice(0, 3) : meetings;
+    const visibleOtherItems =
+      variant === "card" ? otherItems.slice(0, Math.max(0, 5 - visibleMeetings.length)) : otherItems;
+    const hiddenCount =
+      meetings.length +
+      otherItems.length -
+      visibleMeetings.length -
+      visibleOtherItems.length;
+
+    return (
+      <div className="mt-3 space-y-1">
+        {visibleMeetings.map((item) => renderTimelineItem(item, variant))}
+        {meetings.length > 0 && otherItems.length > 0 ? (
+          <div className="flex items-center gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <span className="h-px flex-1 border-t border-dashed border-line" />
+            <span>Opgaver og deadlines</span>
+            <span className="h-px flex-1 border-t border-dashed border-line" />
+          </div>
+        ) : null}
+        {visibleOtherItems.map((item) => renderTimelineItem(item, variant))}
+        {hiddenCount > 0 ? (
+          <button
+            className="px-2 py-1 text-sm font-medium text-brand hover:underline"
+            onClick={() => {
+              const month = Number(
+                [...meetings, ...otherItems][0]?.date.slice(5, 7),
+              );
+              if (month) setSelectedMonth(month - 1);
+            }}
+            type="button"
+          >
+            + {hiddenCount} flere
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   function openCreate() {
     const defaultCommittee =
@@ -514,49 +681,38 @@ export function AnnualWheel({
         className={`grid gap-4 ${view === "year" ? "md:grid-cols-3 xl:grid-cols-4" : view === "quarter" ? "md:grid-cols-3" : "grid-cols-1"}`}
       >
         {visibleMonths.map((month) => {
-          const monthItems = items.filter(
-            (item) => Number(item.date.slice(5, 7)) - 1 === month,
-          );
+          const monthItems = getMonthItems(items, month);
+          const { meetings, otherItems } = splitMonthItems(monthItems);
           return (
-            <section className="panel min-h-44 p-4" key={month}>
-              <h2 className="font-semibold">
-                {monthNames[month]} {data.year}
-              </h2>
+            <section
+              className="min-h-44 border-b border-line bg-surface px-3 py-4 sm:px-4"
+              key={month}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  className="min-w-0 text-left hover:text-brand"
+                  onClick={() => setSelectedMonth(month)}
+                  type="button"
+                >
+                  <h2 className="font-semibold">
+                    {monthNames[month]} {data.year}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {monthItems.length
+                      ? `${monthItems.length} elementer`
+                      : "Ingen planlagte aktiviteter"}
+                  </p>
+                </button>
+                <Button
+                  onClick={() => setSelectedMonth(month)}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Vis måned
+                </Button>
+              </div>
               {monthItems.length ? (
-                <div className="mt-3 divide-y divide-line">
-                  {monthItems.map((item) => (
-                    <div className="py-2" key={item.id}>
-                      <div className="flex items-start gap-2">
-                        <span className="w-7 shrink-0 text-xs font-semibold text-muted">
-                          {item.date.slice(8, 10)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          {item.event ? (
-                            <button
-                              className="text-left text-sm font-medium hover:text-brand"
-                              onClick={() => openEdit(item.event!)}
-                              type="button"
-                            >
-                              {item.title}
-                            </button>
-                          ) : (
-                            <Link
-                              className="text-sm font-medium hover:text-brand"
-                              href={item.href!}
-                            >
-                              {item.title}
-                            </Link>
-                          )}
-                          <p className="mt-0.5 text-xs text-muted">
-                            {item.kind === "activity"
-                              ? annualWheelPriorityLabels[item.priority]
-                              : kindLabels[item.kind]}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                renderMonthList(meetings, otherItems)
               ) : (
                 <p className="mt-3 text-sm text-muted">
                   Ingen planlagte aktiviteter.
@@ -628,6 +784,56 @@ export function AnnualWheel({
         responsibleOptions={responsibleOptions}
         saving={saving}
       />
+      <Modal
+        description="Møder står øverst. Opgaver, beslutningsdeadlines og aktiviteter er samlet nedenunder."
+        maxWidth="3xl"
+        onClose={() => setSelectedMonth(null)}
+        open={selectedMonth !== null}
+        title={
+          selectedMonth !== null
+            ? `${monthNames[selectedMonth]} ${data.year}`
+            : "Måned"
+        }
+      >
+        {selectedMonth !== null && selectedMonthItems.length ? (
+          <div className="space-y-5">
+            <section>
+              <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+                <h3 className="text-sm font-semibold">Møder</h3>
+                <span className="text-xs text-muted">
+                  {selectedMonthGroups.meetings.length} møder
+                </span>
+              </div>
+              {selectedMonthGroups.meetings.length ? (
+                renderMonthList(selectedMonthGroups.meetings, [], "detail")
+              ) : (
+                <p className="mt-3 text-sm text-muted">
+                  Der er ingen møder i denne måned.
+                </p>
+              )}
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+                <h3 className="text-sm font-semibold">Opgaver og deadlines</h3>
+                <span className="text-xs text-muted">
+                  {selectedMonthGroups.otherItems.length} elementer
+                </span>
+              </div>
+              {selectedMonthGroups.otherItems.length ? (
+                renderMonthList([], selectedMonthGroups.otherItems, "detail")
+              ) : (
+                <p className="mt-3 text-sm text-muted">
+                  Der er ingen opgaver, deadlines eller aktiviteter i denne
+                  måned.
+                </p>
+              )}
+            </section>
+          </div>
+        ) : (
+          <EmptyState title="Ingen planlagte aktiviteter i denne måned." />
+        )}
+      </Modal>
     </div>
   );
 }

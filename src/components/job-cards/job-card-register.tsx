@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  ActionMenu,
   Button,
   EmptyState,
   Input,
@@ -343,17 +344,25 @@ export function JobCardRegister({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {data.roles.some((role) =>
         role.assignments.some(
           (assignment) => assignment.userId === data.currentUserId,
         ),
       ) ? (
-        <section className="rounded-[var(--radius-panel)] border border-brand/20 bg-brand-soft p-5">
-          <p className="page-eyebrow">Din onboarding</p>
-          <h2 className="mt-1 text-lg font-semibold">
-            Roller du aktuelt varetager
-          </h2>
+        <section className="border-l-2 border-brand bg-brand-soft/45 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="page-eyebrow">Din onboarding</p>
+              <h2 className="mt-1 text-base font-semibold">
+                Roller du aktuelt varetager
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Gå direkte til introduktion, første 30 dage og praktisk
+                rolleviden.
+              </p>
+            </div>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {data.roles
               .filter((role) =>
@@ -364,7 +373,7 @@ export function JobCardRegister({
               )
               .map((role) => (
                 <a
-                  className="button-secondary"
+                  className="button-secondary text-xs"
                   href={`#job-card-${role.id}`}
                   key={role.id}
                 >
@@ -383,14 +392,19 @@ export function JobCardRegister({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={aiLoadingId !== null}
-              onClick={() => void suggest()}
-              variant="secondary"
-            >
-              {aiLoadingId === "new" ? "Analyserer..." : "Foreslå jobkort med AI"}
-            </Button>
             <Button onClick={() => setDraft(emptyDraft())}>Opret jobkort</Button>
+            <ActionMenu>
+              <button
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                disabled={aiLoadingId !== null}
+                onClick={() => void suggest()}
+                type="button"
+              >
+                {aiLoadingId === "new"
+                  ? "Analyserer..."
+                  : "Foreslå jobkort med AI"}
+              </button>
+            </ActionMenu>
           </div>
         </div>
       ) : null}
@@ -401,96 +415,207 @@ export function JobCardRegister({
       ) : null}
       {pdfError ? <div className="alert-danger p-3 text-sm">{pdfError}</div> : null}
       {data.roles.length ? (
-        <div className="space-y-4">
+        <div className="divide-y divide-line border-y border-line">
           {data.roles.map((role) => (
-            <article className="panel p-5" id={`job-card-${role.id}`} key={role.id}>
+            <article
+              className="scroll-mt-24 bg-surface py-5"
+              id={`job-card-${role.id}`}
+              key={role.id}
+            >
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="page-eyebrow">Jobkort</p>
-                  <h2 className="mt-1 text-xl font-semibold">{role.title}</h2>
-                  <p className="mt-2 max-w-3xl text-sm text-muted">
-                    {role.purpose || role.description || "Formål er ikke beskrevet endnu."}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="page-eyebrow">Jobkort</p>
+                    <StatusBadge tone={role.archived_at ? "neutral" : "success"}>
+                      {role.archived_at ? "Arkiveret" : "Aktiv"}
+                    </StatusBadge>
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold">{role.title}</h2>
+                  <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
+                    {role.purpose ||
+                      role.description ||
+                      "Formål er ikke beskrevet endnu."}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {role.responsibilityAreas.map((area) => (
-                      <StatusBadge key={area.id} tone="info">{area.name}</StatusBadge>
+                      <StatusBadge key={area.id} tone="info">
+                        {area.name}
+                      </StatusBadge>
                     ))}
                     {role.committees.map((committee) => (
-                      <StatusBadge key={committee.id} tone="neutral">{committee.name}</StatusBadge>
+                      <StatusBadge key={committee.id} tone="neutral">
+                        {committee.name}
+                      </StatusBadge>
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
+                <ActionMenu>
+                  <button
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
                     disabled={pdfDownloadingId === role.id}
                     onClick={() => void downloadPdf(role)}
-                    variant="secondary"
+                    type="button"
                   >
                     {pdfDownloadingId === role.id
                       ? "Henter PDF..."
                       : "Download PDF"}
-                  </Button>
+                  </button>
                   {data.canManage ? (
                     <>
-                    <Button
-                      disabled={aiLoadingId !== null}
-                      onClick={() => void suggest(role)}
-                      variant="ghost"
-                    >
-                      {aiLoadingId === role.id
-                        ? "Analyserer..."
-                        : "Foreslå opdatering"}
-                    </Button>
-                    <Button onClick={() => setDraft(fromRole(role))} variant="secondary">
-                      Rediger
-                    </Button>
+                      <button
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                        disabled={aiLoadingId !== null}
+                        onClick={() => void suggest(role)}
+                        type="button"
+                      >
+                        {aiLoadingId === role.id
+                          ? "Analyserer..."
+                          : "Foreslå opdatering med AI"}
+                      </button>
+                      <button
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                        onClick={() => setDraft(fromRole(role))}
+                        type="button"
+                      >
+                        Rediger jobkort
+                      </button>
                     </>
                   ) : null}
-                </div>
+                </ActionMenu>
               </div>
               <div className="mt-5 grid gap-5 lg:grid-cols-3">
                 <section>
                   <h3 className="text-sm font-semibold">Rolleholdere</h3>
-                  {role.assignments.length ? role.assignments.map((assignment) => (
-                    <p className="mt-2 text-sm" key={assignment.id}>
-                      {assignment.name}<span className="block text-xs text-muted">{assignment.email}</span>
+                  {role.assignments.length ? (
+                    <div className="mt-2 space-y-2">
+                      {role.assignments.map((assignment) => (
+                        <p className="text-sm" key={assignment.id}>
+                          {assignment.name}
+                          <span className="block text-xs text-muted">
+                            {assignment.email}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">
+                      Ingen er tilknyttet rollen.
                     </p>
-                  )) : <p className="mt-2 text-sm text-muted">Ingen er tilknyttet rollen.</p>}
+                  )}
                 </section>
                 <section>
                   <h3 className="text-sm font-semibold">Opgaveskabeloner</h3>
-                  {role.taskTemplates.length ? role.taskTemplates.map((template) => (
-                    <div className="mt-2 flex items-center justify-between gap-3" key={template.id}>
-                      <span className="text-sm">{template.title}</span>
-                      <Button onClick={() => void instantiate(template.id)} size="sm" variant="secondary">
-                        Opret opgave
-                      </Button>
+                  {role.taskTemplates.length ? (
+                    <div className="mt-2 space-y-2">
+                      {role.taskTemplates.map((template) => (
+                        <div
+                          className="flex items-center justify-between gap-3"
+                          key={template.id}
+                        >
+                          <span className="min-w-0 text-sm">
+                            {template.title}
+                          </span>
+                          <Button
+                            onClick={() => void instantiate(template.id)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Opret opgave
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                  )) : <p className="mt-2 text-sm text-muted">Ingen skabeloner endnu.</p>}
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">
+                      Ingen skabeloner endnu.
+                    </p>
+                  )}
                 </section>
                 <section>
                   <h3 className="text-sm font-semibold">Dokumenter og links</h3>
-                  {role.documents.length ? role.documents.map((document) => (
-                    <a className="mt-2 block text-sm font-medium text-brand hover:underline" href={document.url} key={document.id} rel="noreferrer" target="_blank">
-                      {document.title}
-                    </a>
-                  )) : <p className="mt-2 text-sm text-muted">Ingen dokumenter tilknyttet.</p>}
+                  {role.documents.length ? (
+                    <div className="mt-2 space-y-2">
+                      {role.documents.map((document) => (
+                        <a
+                          className="block truncate text-sm font-medium text-brand hover:underline"
+                          href={document.url}
+                          key={document.id}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {document.title}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">
+                      Ingen dokumenter tilknyttet.
+                    </p>
+                  )}
                 </section>
               </div>
               <details className="mt-5 border-t border-line pt-4">
-                <summary className="cursor-pointer font-semibold">Onboarding og rollekontekst</summary>
+                <summary className="cursor-pointer text-sm font-semibold">
+                  Onboarding og rollekontekst
+                </summary>
                 <div className="mt-4 grid gap-5 lg:grid-cols-2">
-                  <TextBlock title="Introduktion" value={role.onboardingGuide?.introduction} />
-                  <TextBlock title="De første 30 dage" value={role.onboardingGuide?.first_30_days} />
+                  <TextBlock
+                    title="Introduktion"
+                    value={role.onboardingGuide?.introduction}
+                  />
+                  <TextBlock
+                    title="De første 30 dage"
+                    value={role.onboardingGuide?.first_30_days}
+                  />
+                  <TextBlock
+                    title="Praktisk information"
+                    value={role.onboardingGuide?.practical_information}
+                  />
                   <TextBlock title="Ansvar" value={role.responsibilities} />
                   <TextBlock title="Ikke ansvar for" value={role.exclusions} />
                   <TextBlock title="Samarbejde" value={role.collaboration} />
-                  <TextBlock title="Mødedeltagelse" value={role.meeting_expectations} />
+                  <TextBlock
+                    title="Mødedeltagelse"
+                    value={role.meeting_expectations}
+                  />
                 </div>
                 <div className="mt-5 grid gap-5 lg:grid-cols-3">
-                  <ContextList title="Åbne opgaver" empty="Ingen åbne opgaver." items={role.relatedTasks.filter((task) => !task.archived_at && !["completed","cancelled"].includes(task.status)).slice(0,5).map((task) => ({ id: task.id, title: task.title, href: `/organizations/${organizationId}/tasks#task-${task.id}` }))} />
-                  <ContextList title="Årshjul" empty="Ingen årshjulspunkter." items={role.annualWheelEvents.slice(0,5).map((item) => ({ id: item.id, title: `${item.starts_on} · ${item.title}`, href: `/organizations/${organizationId}/annual-wheel` }))} />
-                  <ContextList title="Historiske beslutninger" empty="Ingen relevante beslutninger." items={role.decisions.slice(0,5).map((decision) => ({ id: decision.id, title: decision.title, href: `/organizations/${organizationId}/decisions#decision-${decision.id}` }))} />
+                  <ContextList
+                    empty="Ingen åbne opgaver."
+                    items={role.relatedTasks
+                      .filter(
+                        (task) =>
+                          !task.archived_at &&
+                          !["completed", "cancelled"].includes(task.status),
+                      )
+                      .slice(0, 5)
+                      .map((task) => ({
+                        id: task.id,
+                        title: task.title,
+                        href: `/organizations/${organizationId}/tasks?editTask=${task.id}#task-${task.id}`,
+                      }))}
+                    title="Åbne opgaver"
+                  />
+                  <ContextList
+                    empty="Ingen årshjulspunkter."
+                    items={role.annualWheelEvents
+                      .slice(0, 5)
+                      .map((item) => ({
+                        id: item.id,
+                        title: `${item.starts_on} · ${item.title}`,
+                        href: `/organizations/${organizationId}/annual-wheel`,
+                      }))}
+                    title="Årshjul"
+                  />
+                  <ContextList
+                    empty="Ingen relevante beslutninger."
+                    items={role.decisions.slice(0, 5).map((decision) => ({
+                      id: decision.id,
+                      title: decision.title,
+                      href: `/organizations/${organizationId}/decisions#decision-${decision.id}`,
+                    }))}
+                    title="Historiske beslutninger"
+                  />
                 </div>
               </details>
             </article>
@@ -518,11 +643,45 @@ export function JobCardRegister({
 }
 
 function TextBlock({ title, value }: { title: string; value?: string | null }) {
-  return <section><h3 className="text-sm font-semibold">{title}</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted">{value || "Ikke beskrevet endnu."}</p></section>;
+  return (
+    <section>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted">
+        {value || "Ikke beskrevet endnu."}
+      </p>
+    </section>
+  );
 }
 
-function ContextList({ title, items, empty }: { title: string; items: Array<{ id: string; title: string; href: string }>; empty: string }) {
-  return <section><h3 className="text-sm font-semibold">{title}</h3>{items.length ? items.map((item) => <Link className="mt-2 block text-sm text-brand hover:underline" href={item.href} key={item.id}>{item.title}</Link>) : <p className="mt-2 text-sm text-muted">{empty}</p>}</section>;
+function ContextList({
+  title,
+  items,
+  empty,
+}: {
+  title: string;
+  items: Array<{ id: string; title: string; href: string }>;
+  empty: string;
+}) {
+  return (
+    <section>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {items.length ? (
+        <div className="mt-2 space-y-2">
+          {items.map((item) => (
+            <Link
+              className="block truncate text-sm text-brand hover:underline"
+              href={item.href}
+              key={item.id}
+            >
+              {item.title}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted">{empty}</p>
+      )}
+    </section>
+  );
 }
 
 function RoleModal(props: {

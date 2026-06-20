@@ -47,7 +47,7 @@ type TableColumn<T> = {
 
 const pageSize: [number, number] = [595.28, 841.89];
 const margin = 46;
-const headerHeight = 78;
+const headerHeight = 86;
 const footerHeight = 34;
 const palette = {
   ink: rgb(0.09, 0.12, 0.12),
@@ -83,6 +83,26 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 
     let line = "";
     for (const word of words) {
+      if (font.widthOfTextAtSize(word, size) > maxWidth) {
+        if (line) {
+          lines.push(line);
+          line = "";
+        }
+
+        let chunk = "";
+        for (const char of word) {
+          const candidate = `${chunk}${char}`;
+          if (!chunk || font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+            chunk = candidate;
+          } else {
+            lines.push(chunk);
+            chunk = char;
+          }
+        }
+        line = chunk;
+        continue;
+      }
+
       const candidate = line ? `${line} ${word}` : word;
       if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
         line = candidate;
@@ -94,6 +114,13 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
     if (line) lines.push(line);
   }
   return lines;
+}
+
+function clampLines(lines: string[], maxLines: number) {
+  if (lines.length <= maxLines) return lines;
+  const visible = lines.slice(0, maxLines);
+  visible[visible.length - 1] = `${visible[visible.length - 1].replace(/\.*$/, "")}...`;
+  return visible;
 }
 
 export async function createPdfReport(options: PdfReportOptions) {
@@ -121,13 +148,18 @@ export async function createPdfReport(options: PdfReportOptions) {
       size: 8.5,
       color: palette.brand,
     });
-    page.drawText(safePdfText(options.title), {
-      x: margin,
-      y: pageSize[1] - 52,
-      font: bold,
-      size: 15,
-      color: palette.ink,
-    });
+    const titleLines = clampLines(wrapText(options.title, bold, 14.5, contentWidth), 2);
+    let titleY = pageSize[1] - 50;
+    for (const line of titleLines) {
+      page.drawText(line, {
+        x: margin,
+        y: titleY,
+        font: bold,
+        size: 14.5,
+        color: palette.ink,
+      });
+      titleY -= 14;
+    }
     const context = [
       options.organizationName,
       options.committeeName,
@@ -136,11 +168,12 @@ export async function createPdfReport(options: PdfReportOptions) {
       .filter(Boolean)
       .join("  |  ");
     if (context) {
-      page.drawText(safePdfText(context), {
+      const contextLines = clampLines(wrapText(context, regular, 8.8, contentWidth), 1);
+      page.drawText(contextLines[0], {
         x: margin,
-        y: pageSize[1] - 68,
+        y: pageSize[1] - 76,
         font: regular,
-        size: 9,
+        size: 8.8,
         color: palette.muted,
       });
     }
@@ -368,17 +401,28 @@ export async function createPdfReport(options: PdfReportOptions) {
     const visible = items.filter((item) => item.value);
     if (!visible.length) return;
     const columnWidth = contentWidth / 2 - 8;
-    const rowHeight = 35;
     for (let index = 0; index < visible.length; index += 2) {
-      ensureSpace(rowHeight + 8);
       const row = visible.slice(index, index + 2);
+      const prepared = row.map((item) => ({
+        item,
+        valueLines: clampLines(
+          wrapText(item.value, regular, 8.8, columnWidth - 16),
+          3,
+        ),
+      }));
+      const rowHeight = Math.max(
+        36,
+        Math.max(...prepared.map((item) => item.valueLines.length)) * 10.5 + 21,
+      );
+      ensureSpace(rowHeight + 8);
       row.forEach((item, column) => {
+        const valueLines = prepared[column].valueLines;
         const x = margin + column * (columnWidth + 16);
         page.drawRectangle({
           x,
-          y: y - 24,
+          y: y - rowHeight + 7,
           width: columnWidth,
-          height: 30,
+          height: rowHeight,
           color: palette.subtle,
         });
         page.drawText(safePdfText(item.label.toLocaleUpperCase("da-DK")), {
@@ -388,13 +432,17 @@ export async function createPdfReport(options: PdfReportOptions) {
           size: 7,
           color: palette.muted,
         });
-        page.drawText(safePdfText(item.value), {
-          x: x + 8,
-          y: y - 16,
-          font: regular,
-          size: 9,
-          color: palette.ink,
-        });
+        let valueY = y - 16;
+        for (const line of valueLines) {
+          page.drawText(line, {
+            x: x + 8,
+            y: valueY,
+            font: regular,
+            size: 8.8,
+            color: palette.ink,
+          });
+          valueY -= 10.5;
+        }
       });
       y -= rowHeight;
     }
@@ -448,6 +496,7 @@ export async function createPdfReport(options: PdfReportOptions) {
 
     const headerHeight = 22;
     const lineHeight = 12;
+    const maxCellLines = 6;
     let shouldDrawHeader = true;
     const drawTableHeader = () => {
       page.drawRectangle({
@@ -472,12 +521,19 @@ export async function createPdfReport(options: PdfReportOptions) {
       shouldDrawHeader = false;
     };
 
+    const usablePageHeight = pageSize[1] - headerHeight - footerHeight - margin * 2;
     for (const row of rows) {
       const cells = columns.map((column) =>
-        wrapText(column.getValue(row) || "-", regular, 8.5, column.width - 10),
+        clampLines(
+          wrapText(column.getValue(row) || "-", regular, 8.5, column.width - 10),
+          maxCellLines,
+        ),
       );
       const rowHeight =
-        Math.max(24, Math.max(...cells.map((cell) => cell.length)) * lineHeight + 10);
+        Math.min(
+          usablePageHeight - headerHeight - 18,
+          Math.max(26, Math.max(...cells.map((cell) => cell.length)) * lineHeight + 12),
+        );
       const startedNewPage = ensureSpace(
         (shouldDrawHeader ? headerHeight : 0) + rowHeight + 12,
       );
@@ -490,6 +546,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         y: y - rowHeight + 4,
         width: contentWidth,
         height: rowHeight,
+        color: rgb(1, 1, 1),
         borderColor: palette.line,
         borderWidth: 0.35,
       });

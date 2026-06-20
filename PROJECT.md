@@ -657,6 +657,126 @@ committee overview, meeting detail, agenda-item detail, organization edit, and
 organization dashboard adopt the same action hierarchy without changing the
 underlying routes, services, permissions, or mutation behavior.
 
+Phase 7R.4 makes the Annual Wheel easier to scan without changing its read
+model. Month cards and the month detail view now order meetings first, separate
+meetings from tasks, decision deadlines, and Annual Wheel activities, and keep
+meetings and tasks actionable through their existing meeting routes and
+task-edit links. The month detail view is a presentation-only modal over the
+same RLS-visible overview data.
+
+Phase 7R.5 brings Job Cards and onboarding into the same admin workspace
+language. The Job Card register now uses flatter role-profile rows, keeps only
+the primary creation action visible, moves PDF, AI update, and edit actions
+behind the shared action menu, and presents onboarding, task templates,
+documents, Annual Wheel links, and decision context as quieter role-profile
+sections. Existing Job Card CRUD, AI draft review, task-template instantiation,
+PDF export, services, permissions, and RLS behavior are unchanged.
+
+Phase 7R.6 aligns secondary organization surfaces with the same admin layout.
+Member administration now uses flatter invitation and manual-creation sections,
+keeps destructive member removal behind the shared action menu, and preserves
+the existing role and invitation workflows. The trash view presents restore
+context and retention status more calmly. Organization, committee, meeting, and
+agenda-item create/edit routes use compact `PageHeader` plus flat form sections
+instead of older hero/panel layouts; all forms still submit to the same routes
+and mutations.
+
+Phase 7R.7 is a regression-polish pass across the organization workspace. It
+keeps the existing sidebar shell and feature flows, but tightens responsive
+defaults for action menus, tables, task summary surfaces, and workspace width so
+mobile layouts are less likely to overflow. The pass is intentionally limited to
+presentation consistency: no data model, RLS, service, repository, AI, or route
+contracts changed.
+
+Phase 7R.8 polishes the shared PDF/export foundation. The common PDF report
+renderer now handles long titles, metadata values, table cells, and URLs more
+defensively so exported minutes and Job Cards remain readable on A4. Job Card
+PDF prose fields are rendered through the same sanitized rich-text-to-PDF
+pipeline used by minutes, avoiding raw HTML while preserving the existing PDF
+download routes and authorization flows.
+
+Update 5 adds an AI minutes assistant for general meeting minutes and
+agenda-item minutes fields. Authorized minutes editors can ask AI to improve
+language, formality, brevity, neutrality, decision clarity, or professional
+board style. The assistant runs server-side, validates meeting and committee
+access, treats minutes text as untrusted data, and returns only a sanitized
+suggestion for human review. Existing text is never overwritten until the user
+explicitly chooses to apply the suggestion; rejected suggestions create no
+records and do not affect autosave, approval, task, or decision flows.
+
+Update 6 adds a review-only AI meeting overview on the meeting page. Committee
+members can generate a structured preparation and summary package covering a
+short meeting summary, agenda summary, minutes summary, decision points,
+follow-up points, preparation points, and attention risks. The server-side
+service validates access to the meeting, reads the existing meeting, agenda,
+minutes, related decision, and related task data, and returns Structured
+Outputs for display in a modal. The overview is advisory preparation support;
+it is not saved automatically and never becomes official minutes, decisions,
+or tasks.
+
+Update 9 adds a compact Quick Action entry point to the organization
+workspace header. It lets authorized users create a new meeting from any
+organization page while preserving the existing committee-scoped meeting API,
+standard agenda-item creation, service authorization, and RLS boundaries. The
+action uses the current route context when it is unambiguous; on organization
+level with several committees, the user must choose the committee explicitly.
+Agenda-item creation is only enabled from a meeting context, while task and
+decision creation remain available through their existing module and meeting
+flows until the full relation context can be supplied safely.
+
+Update 9.1 adds "Hurtigt møde" as a separate Quick Action for ad hoc meetings.
+It uses the same committee context rules as ordinary meeting creation, but
+creates the meeting without standard agenda items and writes the user's first
+free notes to a draft general minutes record. The meeting is marked through the
+existing description field rather than a new database field, and the user is
+sent directly to the general minutes section. A "Strukturer med AI" placeholder
+is visible only as future intent; no AI structuring, decisions, tasks, or agenda
+items are created automatically.
+
+Update 10 makes committees easier to reach from the organization dashboard.
+The existing organization overview read model now exposes compact per-committee
+counts for open tasks and active decisions alongside next meeting and open
+follow-up counts. The dashboard presents these as a flat "Mine udvalg" section
+with one-click links to each committee workspace, ordered by attention need and
+upcoming meeting timing. This is a navigation and presentation improvement only;
+committee pages, permissions, services, repositories, and RLS remain unchanged.
+
+Mobile App v1 introduces an Expo/React Native companion app under
+`apps/mobile`. It is not a full copy of the web app; it focuses on Home, My
+Tasks, Meetings and minutes, My Committees, AI Assistant, Profile, and Quick
+Action for quick meetings. The mobile app authenticates with Supabase on the
+device and calls a small `/api/mobile/*` API surface with a bearer token. Those
+routes create a Supabase client scoped to that token and then call existing
+services and repositories, so organization membership, committee membership,
+role checks, and Row Level Security remain server-side boundaries.
+
+Mobile v1 can read RLS-scoped organization overviews, update task status,
+create task comments, read meeting agendas and minutes, create quick meetings
+without agenda items, and ask a source-oriented AI Assistant. Quick meetings
+reuse `MeetingService.createQuick` and create a draft general minutes record
+from the free-note field. AI responses are suggestions only and never mutate
+records automatically. Push notifications are prepared in the Expo client, but
+server-side token registration and notification dispatch are deferred. Offline
+support is limited to friendly Danish error messages plus simple cached reads
+for the latest organizations, overview, tasks, meetings, comments, and meeting
+detail data.
+
+Update 11 adds an explicit email foundation. Email delivery is server-side only
+through `EmailService`, with Resend prepared as the first real provider and
+`EMAIL_DELIVERY_MODE=stub` as the safe default for development and test. The
+first fully exposed flow is sending a meeting agenda from the meeting page.
+Committee managers can choose the whole committee or individual active
+committee members, review the subject and a short message, and send manually.
+Recipients are validated again on the server against organization and
+committee membership before delivery. Internal notes, AI drafts, and private
+minutes fields are not included.
+
+The email template layer includes simple Danish templates for agendas,
+approved minutes, task reminders, and decision overviews, but only agenda
+email has UI and route support in this update. No automatic reminders or bulk
+schedulers are active yet. Email event persistence is intentionally deferred
+until a dedicated audit/logging migration is needed.
+
 ## MVP Constraints
 
 - Build as one Next.js application.

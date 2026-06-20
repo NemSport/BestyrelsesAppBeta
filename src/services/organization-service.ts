@@ -40,8 +40,8 @@ export class OrganizationService {
   }
 
   async listForCurrentUser() {
-    await this.auth.requireUser();
-    return this.organizations.listForCurrentUser();
+    const user = await this.auth.requireUser();
+    return this.organizations.listForCurrentUser(user.id);
   }
 
   async create(input: unknown) {
@@ -211,6 +211,12 @@ export class OrganizationService {
           upcomingMeetingCount: committeeMeetings.length,
           openFollowUpCount: openFollowUpMinutes.filter(
             (minutes) => minutes.committee_id === committee.id,
+          ).length,
+          openTaskCount: openTasks.filter(
+            (task) => task.committee_id === committee.id,
+          ).length,
+          activeDecisionCount: activeDecisions.filter(
+            (decision) => decision.committee_id === committee.id,
           ).length,
         };
       }),

@@ -101,6 +101,23 @@ export default async function OrganizationPage({
     overview.metrics.myOpenTaskCount +
     overview.metrics.decisionsRequiredCount +
     deadlineBuckets.overdue.length;
+  const committeeHighlights = [...overview.committees].sort((left, right) => {
+    const leftAttention =
+      left.openTaskCount + left.activeDecisionCount + left.openFollowUpCount;
+    const rightAttention =
+      right.openTaskCount + right.activeDecisionCount + right.openFollowUpCount;
+    if (leftAttention !== rightAttention) return rightAttention - leftAttention;
+    const leftMeetingTime = left.nextMeeting
+      ? new Date(left.nextMeeting.starts_at).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    const rightMeetingTime = right.nextMeeting
+      ? new Date(right.nextMeeting.starts_at).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    if (leftMeetingTime !== rightMeetingTime) {
+      return leftMeetingTime - rightMeetingTime;
+    }
+    return left.committee.name.localeCompare(right.committee.name, "da");
+  });
 
   return (
     <div className="space-y-7">
@@ -247,12 +264,105 @@ export default async function OrganizationPage({
           </ContentPanel>
         </div>
 
+        <section className="border-y border-line py-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                Mine udvalg
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">
+                Åbn dit udvalg med ét klik
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted">
+                Se de udvalg du har adgang til, og prioritér dem med kommende
+                møder, åbne opgaver eller aktive beslutninger.
+              </p>
+            </div>
+          </div>
+
+          {committeeHighlights.length > 0 ? (
+            <div className="divide-y divide-line border-y border-line">
+              {committeeHighlights.map(
+                ({
+                  committee,
+                  nextMeeting: committeeNextMeeting,
+                  upcomingMeetingCount,
+                  openFollowUpCount,
+                  openTaskCount,
+                  activeDecisionCount,
+                }) => {
+                  const committeeRoot = `${organizationRoot}/committees/${committee.id}`;
+                  const attentionTotal =
+                    openTaskCount + activeDecisionCount + openFollowUpCount;
+                  return (
+                    <article
+                      className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                      key={committee.id}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            className="text-base font-semibold hover:text-brand hover:underline"
+                            href={committeeRoot}
+                          >
+                            {committee.name}
+                          </Link>
+                          {attentionTotal > 0 ? (
+                            <StatusBadge tone="warning">
+                              {attentionTotal} kræver opmærksomhed
+                            </StatusBadge>
+                          ) : (
+                            <StatusBadge tone="neutral">Roligt</StatusBadge>
+                          )}
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-sm text-muted">
+                          {committee.description ||
+                            "Der er endnu ingen beskrivelse."}
+                        </p>
+                        <p className="mt-2 text-xs text-muted">
+                          Næste møde:{" "}
+                          {committeeNextMeeting
+                            ? formatDateTime(committeeNextMeeting.starts_at)
+                            : "Ikke planlagt"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <StatusBadge>{upcomingMeetingCount} møder</StatusBadge>
+                        <StatusBadge tone={openTaskCount ? "warning" : "neutral"}>
+                          {openTaskCount} opgaver
+                        </StatusBadge>
+                        <StatusBadge
+                          tone={activeDecisionCount ? "info" : "neutral"}
+                        >
+                          {activeDecisionCount} beslutninger
+                        </StatusBadge>
+                        <Link
+                          className="ml-0 text-sm font-semibold text-brand hover:underline lg:ml-2"
+                          href={committeeRoot}
+                        >
+                          Åbn udvalg
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                },
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              compact
+              description="Når du bliver tilknyttet et udvalg, får du en hurtig vej ind til møder, opgaver og beslutninger her."
+              title="Du er endnu ikke tilknyttet et udvalg."
+            />
+          )}
+        </section>
+
         <details className="group border-y border-line bg-transparent">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
             <span>Mere overblik</span>
             <span className="text-xs font-semibold text-brand">
               <span className="group-open:hidden">
-                Vis beslutninger, møder og udvalg
+                Vis beslutninger og møder
               </span>
               <span className="hidden group-open:inline">Skjul</span>
             </span>
@@ -432,79 +542,6 @@ export default async function OrganizationPage({
             )}
           </PageSection>
         </div>
-            </details>
-
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                <span>Udvalg</span>
-                <span className="text-xs text-brand">
-                  <span className="group-open:hidden">Åbn</span>
-                  <span className="hidden group-open:inline">Skjul</span>
-                </span>
-              </summary>
-              <div className="pt-3">
-        <PageSection
-          description="Organisationens udvalg og deres nærmeste planlagte arbejde."
-          title="Udvalg"
-        >
-          <div>
-            {overview.committees.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {overview.committees.map(
-                  ({
-                    committee,
-                    nextMeeting: committeeNextMeeting,
-                    upcomingMeetingCount,
-                    openFollowUpCount,
-                  }) => {
-                    const committeeRoot = `${organizationRoot}/committees/${committee.id}`;
-                    return (
-                      <article
-                        className="rounded-[var(--radius-panel)] border border-line bg-surface/80 p-4"
-                        key={committee.id}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="font-semibold">{committee.name}</h3>
-                            <p className="mt-1 text-sm text-muted">
-                              {committee.description ||
-                                "Der er endnu ingen beskrivelse."}
-                            </p>
-                          </div>
-                          <Link
-                            className="text-sm font-semibold text-brand hover:underline"
-                            href={committeeRoot}
-                          >
-                            Åbn
-                          </Link>
-                        </div>
-                        <div className="mt-3 grid gap-1 text-xs text-muted">
-                          <span>
-                            Næste møde:{" "}
-                            {committeeNextMeeting
-                              ? formatDateTime(committeeNextMeeting.starts_at)
-                              : "Ikke planlagt"}
-                          </span>
-                          <span>
-                            {upcomingMeetingCount} kommende ·{" "}
-                            {openFollowUpCount} åbne opfølgninger
-                          </span>
-                        </div>
-                      </article>
-                    );
-                  },
-                )}
-              </div>
-            ) : (
-              <EmptyState
-                description="Start med at oprette et udvalg, så møder, dagsordenspunkter og opgaver får et naturligt hjem."
-                title="Der er endnu ikke oprettet udvalg i organisationen."
-              />
-            )}
-
-          </div>
-        </PageSection>
-              </div>
             </details>
           </div>
         </details>

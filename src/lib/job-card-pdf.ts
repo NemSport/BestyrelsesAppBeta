@@ -1,4 +1,5 @@
 import { createPdfReport, formatPdfDate } from "@/lib/pdf-report";
+import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
 import type { RoleProfileView } from "@/types/domain";
 
 type JobCardPdfInput = {
@@ -33,10 +34,18 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
     ],
   });
 
+  const addRichKeyValue = (label: string, value: string | null | undefined) => {
+    report.addSubsection(label);
+    report.addProse(richTextToPdfBlocks(value), "Ikke angivet");
+  };
+
+  const tableText = (value: string | null | undefined) =>
+    richTextToPlainText(value) || "";
+
   report.addSection("Rollebeskrivelse");
-  report.addKeyValue("Formål", input.role.purpose);
-  report.addKeyValue("Kort rollebeskrivelse", input.role.description);
-  report.addKeyValue("Kompetencer", input.role.competencies);
+  addRichKeyValue("Formål", input.role.purpose);
+  addRichKeyValue("Kort rollebeskrivelse", input.role.description);
+  addRichKeyValue("Kompetencer", input.role.competencies);
 
   report.addSection("Tilknytning");
   report.addKeyValue(
@@ -51,28 +60,28 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
       ),
     ),
   );
-  report.addKeyValue("Kontaktpersoner", input.role.contact_people);
+  addRichKeyValue("Kontaktpersoner", input.role.contact_people);
 
   report.addSection("Ansvar og samarbejde");
   report.addKeyValue(
     "Ansvarsområder",
     listOrEmpty(input.role.responsibilityAreas.map((area) => area.name)),
   );
-  report.addKeyValue("Hvad rollen har ansvar for", input.role.responsibilities);
-  report.addKeyValue("Hvad rollen ikke har ansvar for", input.role.exclusions);
-  report.addKeyValue("Samarbejde", input.role.collaboration);
-  report.addKeyValue("Mødedeltagelse", input.role.meeting_expectations);
+  addRichKeyValue("Hvad rollen har ansvar for", input.role.responsibilities);
+  addRichKeyValue("Hvad rollen ikke har ansvar for", input.role.exclusions);
+  addRichKeyValue("Samarbejde", input.role.collaboration);
+  addRichKeyValue("Mødedeltagelse", input.role.meeting_expectations);
 
   report.addSection("Onboarding");
-  report.addKeyValue(
+  addRichKeyValue(
     "Onboardingintroduktion",
     input.role.onboardingGuide?.introduction ?? "",
   );
-  report.addKeyValue(
+  addRichKeyValue(
     "Første 30 dage",
     input.role.onboardingGuide?.first_30_days ?? "",
   );
-  report.addKeyValue(
+  addRichKeyValue(
     "Praktisk information",
     input.role.onboardingGuide?.practical_information ?? "",
   );
@@ -104,7 +113,7 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
         label: "Beskrivelse",
         width: 115,
         getValue: (template: RoleProfileView["taskTemplates"][number]) =>
-          template.description,
+          tableText(template.description),
       },
     ],
     input.role.taskTemplates,
@@ -130,7 +139,7 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
         label: "Beskrivelse",
         width: 235,
         getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
-          event.description ?? "",
+          tableText(event.description),
       },
     ],
     input.role.annualWheelEvents,
@@ -158,7 +167,7 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
         label: "Beskrivelse",
         width: 220,
         getValue: (decision: RoleProfileView["decisions"][number]) =>
-          decision.description,
+          tableText(decision.description),
       },
     ],
     input.role.decisions,

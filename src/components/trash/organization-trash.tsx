@@ -109,6 +109,14 @@ export function OrganizationTrash({
           {error}
         </div>
       ) : null}
+      <div className="border-l-2 border-warning bg-warning-soft/45 px-4 py-3">
+        <p className="text-sm font-semibold">Gendannelige elementer</p>
+        <p className="mt-1 text-sm text-muted">
+          Papirkurven viser slettede elementer i 30 dage. Permanent sletning er
+          ikke implementeret endnu; udløbne elementer markeres kun som klar til
+          permanent sletning.
+        </p>
+      </div>
       <TableContainer>
         <Table>
           <TableHead>
@@ -180,10 +188,6 @@ export function OrganizationTrash({
           </TableBody>
         </Table>
       </TableContainer>
-      <p className="text-sm text-muted">
-        Permanent sletning er ikke implementeret endnu. Elementer der har
-        passeret udløbsdatoen markeres kun som klar til permanent sletning.
-      </p>
     </div>
   );
 }

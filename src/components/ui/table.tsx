@@ -13,7 +13,7 @@ export function TableContainer({
   return (
     <div
       className={clsx(
-        "overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm",
+        "overflow-x-auto border-y border-line bg-surface",
         className,
       )}
       {...props}

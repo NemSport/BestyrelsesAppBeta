@@ -8,6 +8,8 @@ export const defaultAiTaskSuggestionModel = "gpt-4.1-mini";
 export const defaultAgendaItemAssistantModel = "gpt-4.1-mini";
 export const defaultAnnualWheelAiModel = "gpt-4.1-mini";
 export const defaultJobCardAiModel = "gpt-4.1-mini";
+export const defaultMinutesAssistantModel = "gpt-4.1-mini";
+export const defaultMeetingOverviewModel = "gpt-4.1-mini";
 
 const aiEnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
@@ -27,6 +29,14 @@ const aiEnvSchema = z.object({
     .string()
     .min(1)
     .default(defaultJobCardAiModel),
+  OPENAI_MINUTES_ASSISTANT_MODEL: z
+    .string()
+    .min(1)
+    .default(defaultMinutesAssistantModel),
+  OPENAI_MEETING_OVERVIEW_MODEL: z
+    .string()
+    .min(1)
+    .default(defaultMeetingOverviewModel),
 });
 
 export function getAiEnv() {
@@ -40,6 +50,10 @@ export function getAiEnv() {
       process.env.OPENAI_ANNUAL_WHEEL_MODEL || undefined,
     OPENAI_JOB_CARD_MODEL:
       process.env.OPENAI_JOB_CARD_MODEL || undefined,
+    OPENAI_MINUTES_ASSISTANT_MODEL:
+      process.env.OPENAI_MINUTES_ASSISTANT_MODEL || undefined,
+    OPENAI_MEETING_OVERVIEW_MODEL:
+      process.env.OPENAI_MEETING_OVERVIEW_MODEL || undefined,
   });
 
   if (!result.success) {

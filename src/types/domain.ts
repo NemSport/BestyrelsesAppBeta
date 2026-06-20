@@ -195,6 +195,8 @@ export type OrganizationOverview = {
     nextMeeting: MeetingWithAgendaPreview | null;
     upcomingMeetingCount: number;
     openFollowUpCount: number;
+    openTaskCount: number;
+    activeDecisionCount: number;
   }>;
   upcomingMeetings: Array<
     MeetingWithAgendaPreview & {

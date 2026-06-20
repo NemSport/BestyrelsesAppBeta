@@ -1,11 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { NotFoundError } from "@/lib/errors";
+import { sanitizeRichText } from "@/lib/rich-text";
 import {
   meetingInputSchema,
   meetingTrashActionSchema,
   meetingUpdateSchema,
+  quickMeetingInputSchema,
 } from "@/lib/validation";
+import { MeetingMinutesRepository } from "@/repositories/meeting-minutes-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -13,11 +16,13 @@ import type { Database } from "@/types/database";
 
 export class MeetingService {
   private readonly meetings: MeetingRepository;
+  private readonly minutes: MeetingMinutesRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
   constructor(db: SupabaseClient<Database>) {
     this.meetings = new MeetingRepository(db);
+    this.minutes = new MeetingMinutesRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
   }
@@ -68,6 +73,44 @@ export class MeetingService {
       endsAt: parsed.endsAt ?? null,
       location: parsed.location ?? null,
     });
+  }
+
+  async createQuick(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = quickMeetingInputSchema.parse(input);
+    await this.authorization.requireCommitteeManager(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+
+    const meeting = await this.meetings.create({
+      organization_id: parsed.organizationId,
+      committee_id: parsed.committeeId,
+      title: parsed.title,
+      description:
+        parsed.description ||
+        "Hurtigt/ad hoc møde oprettet uden dagsorden via Quick Action.",
+      status: "scheduled",
+      starts_at: parsed.startsAt,
+      ends_at: parsed.endsAt ?? null,
+      location: parsed.location ?? null,
+      created_by: user.id,
+    });
+
+    await this.minutes.createMeetingMinutes({
+      organization_id: parsed.organizationId,
+      committee_id: parsed.committeeId,
+      meeting_id: meeting.id,
+      minutes_text: sanitizeRichText(parsed.minutesText),
+      decisions: "",
+      internal_note: null,
+      status: "draft",
+      created_by: user.id,
+      updated_by: user.id,
+    });
+
+    return meeting;
   }
 
   async update(input: unknown) {

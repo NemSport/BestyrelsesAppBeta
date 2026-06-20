@@ -63,6 +63,51 @@ export const meetingInputSchema = z
     { message: "Slutdato skal ligge efter startdato", path: ["endsAt"] },
   );
 
+export const quickMeetingInputSchema = meetingInputSchema.and(
+  z.object({
+    minutesText: z
+      .string()
+      .trim()
+      .max(100000, "Referattekst må højst være 100.000 tegn")
+      .default(""),
+  }),
+);
+
+export const emailRecipientSchema = z.object({
+  memberUserIds: z.array(uuidSchema).max(200).default([]),
+  includeCommittee: z.boolean().default(false),
+});
+
+export const sendMeetingAgendaEmailSchema = z
+  .object({
+    organizationId: uuidSchema,
+    committeeId: uuidSchema,
+    meetingId: uuidSchema,
+    subject: z
+      .string()
+      .trim()
+      .min(3, "Emne skal udfyldes")
+      .max(180, "Emne må højst være 180 tegn"),
+    message: z
+      .string()
+      .trim()
+      .max(2000, "Beskeden må højst være 2.000 tegn")
+      .default(""),
+    recipients: emailRecipientSchema,
+  })
+  .superRefine((value, context) => {
+    if (
+      !value.recipients.includeCommittee &&
+      value.recipients.memberUserIds.length === 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Vælg mindst én modtager eller hele udvalget.",
+        path: ["recipients"],
+      });
+    }
+  });
+
 const agendaItemContentSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,

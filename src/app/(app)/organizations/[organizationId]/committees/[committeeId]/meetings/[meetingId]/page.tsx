@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 
 import { DecisionCreateModal } from "@/components/decisions/decision-create-modal";
 import { RelatedDecisions } from "@/components/decisions/related-decisions";
+import { SendMeetingAgendaEmailModal } from "@/components/email/send-meeting-agenda-email-modal";
 import { AddAgendaItemModal } from "@/components/meetings/add-agenda-item-modal";
 import { EditMeetingModal } from "@/components/meetings/edit-meeting-modal";
+import { MeetingAiOverview } from "@/components/meetings/meeting-ai-overview";
 import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-header";
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
@@ -11,8 +13,10 @@ import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import { ActionMenu, PageSection } from "@/components/ui";
+import { formatDateTime } from "@/lib/localization";
 import { canManageCommittee } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { DecisionService } from "@/services/decision-service";
@@ -52,6 +56,7 @@ export default async function MeetingPage({
     attendees,
     decisionContext,
     taskContext,
+    memberDirectory,
   ] = await Promise.all([
       minutesService.get(organizationId, committeeId, meetingId),
       minutesService.getPreviousMeetingReference(
@@ -75,6 +80,7 @@ export default async function MeetingPage({
         committeeId,
         meetingId,
       ),
+      new OrganizationMemberRepository(db).listMembers(organizationId),
     ]);
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const organizationRole = context.organizationMembership.role;
@@ -86,12 +92,29 @@ export default async function MeetingPage({
   const activeTransfers = transferredAgendaItems.items.filter(
     (item) => item.status !== "dismissed",
   ).length;
+  const emailRecipients = memberDirectory
+    .filter(
+      (member) =>
+        member.status === "active" &&
+        member.committees.some((committee) => committee.id === committeeId),
+    )
+    .map((member) => ({
+      userId: member.user_id,
+      name: member.full_name || member.email,
+      email: member.email,
+    }));
 
   return (
     <div>
       <MeetingDocumentHeader
         actions={
-          canEditMeeting ? (
+          <>
+            <MeetingAiOverview
+              committeeId={committeeId}
+              meetingId={meetingId}
+              organizationId={organizationId}
+            />
+            {canEditMeeting ? (
             <>
               <EditMeetingModal
                 committeeId={committeeId}
@@ -99,6 +122,15 @@ export default async function MeetingPage({
                 organizationId={organizationId}
               />
               <ActionMenu>
+                <SendMeetingAgendaEmailModal
+                  agendaItemCount={meeting.agenda_item_occurrences.length}
+                  committeeId={committeeId}
+                  meetingDateLabel={formatDateTime(meeting.starts_at, "full")}
+                  meetingId={meetingId}
+                  meetingTitle={meeting.title}
+                  organizationId={organizationId}
+                  recipients={emailRecipients}
+                />
                 <TrashActionButton
                   confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
                   endpoint={`/api/meetings/${meetingId}?organizationId=${organizationId}&committeeId=${committeeId}`}
@@ -108,7 +140,8 @@ export default async function MeetingPage({
                 />
               </ActionMenu>
             </>
-          ) : null
+            ) : null}
+          </>
         }
         agendaItemCount={meeting.agenda_item_occurrences.length}
         attendeeCount={attendeeCount}

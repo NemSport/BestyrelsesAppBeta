@@ -147,7 +147,7 @@ export function MyTasks({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[var(--radius-panel)] border border-line bg-surface/75 p-4">
+      <div className="border-l-2 border-brand bg-brand-soft/35 px-4 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">

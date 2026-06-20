@@ -202,6 +202,141 @@ secondary, administrative, and destructive actions move into the shared
 only: feature components still call the same modals, API routes, services, and
 RLS-protected mutations.
 
+Phase 7R.4 applies the same selective-disclosure principle to the Annual Wheel.
+The shared annual-wheel component still consumes the existing RLS-scoped
+overview from `AnnualWheelService`, but month cards now group meetings first
+and render tasks, decision deadlines, and activities below a quiet separator.
+Clicking a month opens a presentation-only month detail modal; meeting rows use
+the existing concrete meeting route, and task rows use the existing task
+register `editTask` link so no new task detail route or persistence contract is
+introduced.
+
+Phase 7R.5 applies the organization workspace action hierarchy to Job Cards and
+onboarding. `JobCardRegister` remains the client component that calls the same
+Job Card, AI, PDF, and task-template endpoints, but renders roles as flatter
+role-profile rows instead of large nested panels. PDF export, AI update, and
+edit actions are secondary actions in `ActionMenu`; onboarding, task templates,
+documents, Annual Wheel context, and decision context are quieter read sections
+within the same authorized read model.
+
+Phase 7R.6 extends that secondary-surface rule to members, trash, and legacy
+CRUD pages. Member administration keeps the same membership APIs and protected
+PostgreSQL functions, but renders invitation/manual creation as quieter
+sections and moves destructive removal behind `ActionMenu`. The organization
+trash component still calls the same restore endpoint while presenting the
+30-day retention context as a subdued administrative notice. Organization,
+committee, meeting, and agenda-item create/edit pages use `PageHeader` and flat
+form sections rather than older panel shells.
+
+Phase 7R.7 treats responsive UI consistency as part of the shared composition
+contract. Organization workspace content should avoid viewport-width layouts
+that create horizontal scroll, shared `ActionMenu` dropdowns must stay within
+small screens, shared table containers should be scrollable without heavy panel
+chrome, and personal task summaries should use lightweight emphasis instead of
+large dashboard cards. These are presentation rules only and do not alter
+authorization, services, repositories, or data ownership.
+
+Phase 7R.8 extends the same polish principle to PDF exports. The shared
+`pdf-report` foundation remains the only report layout system for existing
+minutes and Job Card downloads, but it now wraps long words and URLs, constrains
+header and metadata text, repeats table headers after page breaks, and caps
+overlong table cells to protect A4 page flow. Job Card prose fields pass
+through the same sanitized rich-text PDF conversion as minutes, so stored HTML
+is rendered as document text rather than printed raw.
+
+Update 5 introduces a review-only AI minutes assistant. The client sends the
+current rich-text field value to
+`POST /api/meetings/[meetingId]/minutes/ai-assist`; the route authenticates,
+verifies organization/committee/meeting scope through the service layer, and
+requires the same committee-manager permission used for editing minutes. The
+service converts sanitized rich text to plain text for the model, uses
+Structured Outputs for a single rewritten suggestion, sanitizes the returned
+HTML, and sends it back to a review modal. The suggestion is advisory data
+only: it is not persisted, does not change authoritative minutes, and is
+applied to the editor only after explicit user acceptance.
+
+Update 6 introduces `POST /api/meetings/[meetingId]/overview` for a
+review-only AI meeting overview. `AiMeetingOverviewService` authenticates the
+user, verifies committee membership for the requested organization,
+committee, and meeting, and then assembles a bounded context from the meeting
+record, agenda items, agenda-item minutes, general minutes, related decisions,
+and related tasks. Internal notes and attachments are excluded. OpenAI
+Structured Outputs are validated against `aiMeetingOverviewOutputSchema` and
+returned to `MeetingAiOverview` for modal display only. The output is
+preparation support and is never persisted as official minutes, decisions, or
+tasks.
+
+Update 9 adds `QuickActionMenu` to `OrganizationWorkspace` as a compact
+organization-header action surface. The component receives only the
+RLS-scoped committees loaded by the organization layout and derives
+committee, meeting, and agenda-item hints from the current route. Meeting
+creation still posts to the existing committee-scoped meeting route and is
+authorized by `MeetingService`; the UI never guesses a committee when several
+committees exist at organization level. Agenda-item creation reuses the
+existing create form only in a concrete meeting context. Task and decision
+shortcuts are deliberately disabled in the header until the existing modal
+flows can be supplied with their required member, category, meeting, and
+relation read models without duplicating business logic.
+
+Update 9.1 adds a second Quick Action path for ad hoc meetings. The
+`/api/committees/[committeeId]/meetings/quick` route calls
+`MeetingService.createQuick`, which validates the same organization and
+committee ownership input, requires committee-manager access, inserts the
+meeting directly through `MeetingRepository`, and creates a draft
+`meeting_minutes` row from the optional free-note field. It intentionally does
+not call the standard-agenda creation path, so quick meetings start without
+agenda items. The route stores no AI output and creates no decisions or tasks;
+the visible "Strukturer med AI" copy is only a placeholder for a later
+human-review workflow.
+
+Update 10 keeps committee navigation inside the organization dashboard rather
+than adding another global navigation layer. `OrganizationService.getOverview`
+derives per-committee attention counts from the same RLS-scoped meetings,
+agenda-item minutes, decisions, and tasks it already loads. The dashboard shows
+a flat "Mine udvalg" list with next meeting, open tasks, active decisions, open
+follow-ups, and a direct committee link. The list is ordered for attention and
+recency, but it does not change committee routes, ownership, permissions, or
+the Committee Workspace read/write contracts.
+
+Mobile App v1 lives in `apps/mobile` as a separate Expo/React Native app rather
+than a monorepo refactor. It uses Supabase auth on device and sends the access
+token as `Authorization: Bearer ...` to `/api/mobile/*` routes. Those routes
+use `createBearerClient` and existing service classes such as
+`OrganizationService`, `TaskService`, `TaskCommentService`,
+`MeetingMinutesService`, `MeetingService`, and `AiMeetingOverviewService`.
+This keeps mobile RLS, scope validation, and role checks aligned with the web
+app while avoiding duplicated business logic in React Native components.
+
+The mobile API is intentionally narrow: organizations, organization overview,
+my tasks, task status, task comments, meeting detail, quick meetings, AI meeting
+overview, and a source-oriented mobile AI Assistant. The AI Assistant uses the
+RLS-scoped organization overview as bounded context and returns structured
+answers with sources; it does not create or update authoritative records. Expo
+push permissions and token retrieval are prepared client-side, but token
+storage, server dispatch, and reminder scheduling remain future work. Offline
+behavior is companion-grade only: cached reads are returned when available, and
+Danish error messages explain missing connectivity.
+
+Update 11 introduces a narrow server-side email boundary. `EmailService`
+orchestrates authorization, recipient validation, template selection, and
+provider delivery. Resend is the prepared provider, but `EMAIL_DELIVERY_MODE`
+defaults to `stub`; in stub mode the application prepares the message and logs
+only operational metadata, not message bodies. Real delivery requires
+`EMAIL_DELIVERY_MODE=resend`, `RESEND_API_KEY`, and `EMAIL_FROM`.
+
+The first active route is
+`POST /api/meetings/[meetingId]/email/agenda`. It requires the sender to pass
+existing committee-manager authorization for the meeting's committee, loads the
+meeting with agenda through the existing repository, and validates every
+recipient against active organization members assigned to that committee.
+The meeting page exposes this through a compact "Send dagsorden pr. email"
+modal under "Flere handlinger". The template includes organization,
+committee, meeting title, date, agenda items, a short sender message, and a
+meeting link. It deliberately excludes internal notes, unapproved AI drafts,
+and private minutes fields. Additional templates for approved minutes, task
+reminders, and decision overviews are available as foundation code, but no
+automatic email jobs, reminder schedulers, or email event table exist yet.
+
 ### Shared UI Composition
 
 Phase 1.6-A3 adds a small, reusable component layer in `src/components/ui`.

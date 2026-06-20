@@ -5,8 +5,8 @@ import { useState } from "react";
 
 import { ManualMemberForm } from "@/components/members/manual-member-form";
 import {
+  ActionMenu,
   Button,
-  ContentPanel,
   EmptyState,
   Input,
   PageSection,
@@ -186,8 +186,8 @@ export function MemberAdministration({
       ) : null}
 
       {canManage ? (
-        <ContentPanel className="p-6">
-          <h2 className="text-lg font-semibold">Inviter medlem</h2>
+        <section className="border-l-2 border-brand bg-brand-soft/35 px-4 py-4">
+          <h2 className="text-base font-semibold">Inviter medlem</h2>
           <p className="mt-2 text-sm text-muted">
             Invitationen gemmes som afventende. Der sendes endnu ingen e-mail.
           </p>
@@ -240,7 +240,7 @@ export function MemberAdministration({
               {loadingKey === "invite" ? "Gemmer..." : "Gem invitation"}
             </Button>
           </form>
-        </ContentPanel>
+        </section>
       ) : null}
 
       {currentUserRole === "owner" ? (
@@ -343,16 +343,18 @@ export function MemberAdministration({
                       </TableCell>
                       <TableCell>
                         {canRemove ? (
-                          <Button
-                            disabled={loadingKey === `remove-${member.user_id}`}
-                            onClick={() => removeMember(member)}
-                            size="sm"
-                            variant="danger"
-                          >
-                            {loadingKey === `remove-${member.user_id}`
-                              ? "Fjerner..."
-                              : "Fjern"}
-                          </Button>
+                          <ActionMenu align="right">
+                            <button
+                              className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
+                              disabled={loadingKey === `remove-${member.user_id}`}
+                              onClick={() => removeMember(member)}
+                              type="button"
+                            >
+                              {loadingKey === `remove-${member.user_id}`
+                                ? "Fjerner..."
+                                : "Fjern medlem"}
+                            </button>
+                          </ActionMenu>
                         ) : (
                           <span className="text-muted">Kun læseadgang</span>
                         )}

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "BestyrelsesApp",
+    "slug": "bestyrelsesapp-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "bestyrelsesapp",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dk.bestyrelsesapp.mobile"
+    },
+    "android": {
+      "package": "dk.bestyrelsesapp.mobile"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "local-development"
+      }
+    }
+  }
+}

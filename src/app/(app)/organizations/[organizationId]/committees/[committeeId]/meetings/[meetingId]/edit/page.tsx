@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { MeetingEditForm } from "@/components/meetings/meeting-edit-form";
+import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -29,12 +30,14 @@ export default async function EditMeetingPage({
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h2 className="text-2xl font-bold">Rediger møde</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Opdater mødetid og mødedetaljer.
-      </p>
-      <div className="panel mt-6 p-6">
+    <div className="max-w-3xl">
+      <PageHeader
+        className="mb-6"
+        description="Opdater mødetid og mødedetaljer."
+        eyebrow="Møde"
+        title="Rediger møde"
+      />
+      <div className="border-y border-line py-5">
         <MeetingEditForm
           committeeId={committeeId}
           meeting={meeting}

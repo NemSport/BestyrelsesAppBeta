@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AgendaItemEditForm } from "@/components/agenda-items/agenda-item-edit-form";
+import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AgendaItemService } from "@/services/agenda-item-service";
 import { AuthService } from "@/services/auth-service";
@@ -29,12 +30,14 @@ export default async function EditAgendaItemPage({
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h2 className="text-2xl font-bold">Rediger dagsordenspunkt</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Opdater emnet uden at miste dets mødehistorik.
-      </p>
-      <div className="panel mt-6 p-6">
+    <div className="max-w-3xl">
+      <PageHeader
+        className="mb-6"
+        description="Opdater emnet uden at miste dets mødehistorik."
+        eyebrow="Dagsordenspunkt"
+        title="Rediger dagsordenspunkt"
+      />
+      <div className="border-y border-line py-5">
         <AgendaItemEditForm
           committeeId={committeeId}
           item={item}

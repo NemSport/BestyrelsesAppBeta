@@ -20,7 +20,7 @@ export default async function EditOrganizationPage({
   if (!context) notFound();
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <PageHeader
         className="mb-6"
         description="Opdater organisationens navn."

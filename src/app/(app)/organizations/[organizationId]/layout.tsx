@@ -4,6 +4,7 @@ import { OrganizationWorkspace } from "@/components/layout/organization-workspac
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
+import { CommitteeService } from "@/services/committee-service";
 
 export default async function OrganizationLayout({
   children,
@@ -20,9 +21,14 @@ export default async function OrganizationLayout({
     .catch(() => null);
 
   if (!context) notFound();
+  const committees = await new CommitteeService(db).list(organizationId);
 
   return (
     <OrganizationWorkspace
+      committees={committees.map((committee) => ({
+        id: committee.id,
+        name: committee.name,
+      }))}
       organizationId={organizationId}
       organizationName={context.organization.name}
     >

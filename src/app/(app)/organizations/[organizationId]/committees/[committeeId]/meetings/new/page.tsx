@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ResourceForm } from "@/components/forms/resource-form";
+import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -19,13 +20,14 @@ export default async function NewMeetingPage({
   if (!allowed) notFound();
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   return (
-    <div className="mx-auto max-w-2xl">
-      <h2 className="text-2xl font-bold">Opret møde</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Mødet oprettes med standardpunkterne Godkendelse af dagsorden,
-        Godkendelse af seneste referat og Eventuelt.
-      </p>
-      <div className="panel mt-6 p-6">
+    <div className="max-w-3xl">
+      <PageHeader
+        className="mb-6"
+        description="Mødet oprettes med standardpunkterne Godkendelse af dagsorden, Godkendelse af seneste referat og Eventuelt."
+        eyebrow="Møde"
+        title="Opret møde"
+      />
+      <div className="border-y border-line py-5">
         <ResourceForm
           endpoint={`/api/committees/${committeeId}/meetings`}
           fields={[

@@ -131,11 +131,11 @@ export function ManualMemberForm({
   }
 
   return (
-    <details className="panel p-6">
-      <summary className="cursor-pointer text-lg font-bold">
+    <details className="border-y border-line py-4">
+      <summary className="cursor-pointer text-sm font-semibold">
         Opret medlem manuelt
       </summary>
-      <p className="mt-3 text-sm text-slate-600">
+      <p className="mt-3 max-w-3xl text-sm text-muted">
         Brugeren oprettes med bekræftet e-mail og kan logge ind med den
         midlertidige adgangskode. Del adgangskoden via en sikker kanal.
       </p>
@@ -143,7 +143,7 @@ export function ManualMemberForm({
       <form className="mt-6 space-y-4" noValidate onSubmit={submit}>
         {message ? (
           <div
-            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+            className="alert-success rounded-[var(--radius-control)] px-4 py-3 text-sm"
             role="status"
           >
             {message}
@@ -151,7 +151,7 @@ export function ManualMemberForm({
         ) : null}
         {error ? (
           <div
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
             role="alert"
           >
             <p className="font-semibold">{error}</p>
@@ -178,7 +178,7 @@ export function ManualMemberForm({
               value={fullName}
             />
             {fieldErrors.fullName ? (
-              <p className="mt-1 text-sm text-red-700" id="fullName-error">
+              <p className="mt-1 text-sm text-danger" id="fullName-error">
                 {fieldErrors.fullName}
               </p>
             ) : null}
@@ -196,7 +196,7 @@ export function ManualMemberForm({
               value={email}
             />
             {fieldErrors.email ? (
-              <p className="mt-1 text-sm text-red-700" id="email-error">
+              <p className="mt-1 text-sm text-danger" id="email-error">
                 {fieldErrors.email}
               </p>
             ) : null}
@@ -219,7 +219,7 @@ export function ManualMemberForm({
             />
             {fieldErrors.temporaryPassword ? (
               <p
-                className="mt-1 text-sm text-red-700"
+                className="mt-1 text-sm text-danger"
                 id="temporaryPassword-error"
               >
                 {fieldErrors.temporaryPassword}
@@ -254,7 +254,7 @@ export function ManualMemberForm({
           <label className="label" htmlFor="manual-committee">
             Udvalg
           </label>
-          <p className="mb-3 text-sm text-slate-600">
+          <p className="mb-3 text-sm text-muted">
             Vælg et eller flere udvalg, medlemmet skal tilknyttes.
           </p>
           <select
@@ -294,12 +294,12 @@ export function ManualMemberForm({
 
               return (
                 <div
-                  className="grid gap-3 rounded-xl border border-line bg-slate-50 p-3 sm:grid-cols-[1fr_200px_auto] sm:items-center"
+                  className="grid gap-3 border border-line bg-subtle/40 p-3 sm:grid-cols-[1fr_200px_auto] sm:items-center"
                   key={assignment.committeeId}
                 >
                   <div>
                     <p className="font-semibold">{committee.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-xs text-muted">
                       Valgt udvalg
                     </p>
                   </div>
@@ -336,7 +336,7 @@ export function ManualMemberForm({
                     </select>
                   </div>
                   <button
-                    className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                    className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft"
                     onClick={() => removeCommittee(committee.id)}
                     type="button"
                   >
@@ -346,7 +346,7 @@ export function ManualMemberForm({
               );
             })}
             {committeeAssignments.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-slate-500">
+              <div className="border border-dashed border-line px-4 py-3 text-sm text-muted">
                 Ingen udvalg valgt. Medlemmet oprettes kun i organisationen.
               </div>
             ) : null}

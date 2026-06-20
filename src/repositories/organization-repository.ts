@@ -16,18 +16,27 @@ type OrganizationMembershipResult = Pick<OrganizationMember, "role"> & {
 export class OrganizationRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
-  async listForCurrentUser() {
+  async listForCurrentUser(userId: string) {
     const { data, error } = await this.db
       .from("organization_members")
       .select("role, organizations(*)")
+      .eq("user_id", userId)
       .eq("status", "active")
       .order("created_at", { ascending: true });
     if (error) throw error;
-    return (data as unknown as OrganizationMembershipResult[]).filter(
+    const memberships = (data as unknown as OrganizationMembershipResult[]).filter(
       (membership) =>
         Boolean(membership.organizations) &&
         !membership.organizations?.deleted_at,
     );
+    return [
+      ...new Map(
+        memberships.map((membership) => [
+          membership.organizations!.id,
+          membership,
+        ]),
+      ).values(),
+    ];
   }
 
   async findById(
