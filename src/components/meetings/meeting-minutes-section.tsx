@@ -68,6 +68,7 @@ type AgendaMinutesStatus =
   Database["public"]["Enums"]["agenda_item_minutes_status"];
 type AgendaOccurrence = MeetingWithAgenda["agenda_item_occurrences"][number];
 type FieldErrors = Record<string, string[] | undefined>;
+type AgendaActionPanel = "followUp" | "more" | null;
 type AgendaMinutesDraft = {
   notes: string;
   decision: string;
@@ -235,6 +236,8 @@ function AgendaMinutesCard({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isOpen, setIsOpen] = useState(false);
+  const [activeActionPanel, setActiveActionPanel] =
+    useState<AgendaActionPanel>(null);
   const [deleting, setDeleting] = useState(false);
   const transferStatusRef = useRef<AgendaMinutesStatus | null>(
     initialMinutes &&
@@ -399,6 +402,12 @@ function AgendaMinutesCard({
     }
   }
 
+  function toggleActionPanel(panel: Exclude<AgendaActionPanel, null>) {
+    setActiveActionPanel((currentPanel) =>
+      currentPanel === panel ? null : panel,
+    );
+  }
+
   const responsible = responsiblePeople.find(
     (person) => person.id === minutes?.responsible_user_id,
   );
@@ -410,24 +419,34 @@ function AgendaMinutesCard({
     status,
     followUp,
   );
+  const relatedDecisions = meetingDecisions.filter(
+    (relatedDecision) => relatedDecision.agenda_item_id === item.id,
+  );
+  const relatedTasks = meetingTasks.filter(
+    (relatedTask) => relatedTask.agenda_item_id === item.id,
+  );
+  const hasMinutesContent = Boolean(
+    firstRichTextToPlainText(notes, decision, followUp).trim(),
+  );
   const statusOptions = agendaItemMinutesStatusOptions[itemType];
   const fieldGuidance = agendaMinutesFieldGuidance[itemType];
 
   return (
     <details
       className={clsx(
-        "group overflow-hidden rounded-[var(--radius-panel)] border bg-surface shadow-sm",
-        isStandardItem ? "border-line bg-subtle/35" : "border-line-strong",
+        "group overflow-hidden rounded-[var(--radius-panel)] border bg-subtle/60 shadow-sm",
+        isStandardItem ? "border-line bg-subtle/70" : "border-line-strong",
         isTransferredItem && "border-l-4 border-l-progress/40",
         isAnyOtherBusiness && "border-dashed",
       )}
+      id={`agenda-point-${occurrence.id}`}
       onToggle={(event) => setIsOpen(event.currentTarget.open)}
       open={isOpen}
     >
       <summary
         className={clsx(
           "grid cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)] items-start gap-2.5 px-3 py-2.5 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] [&::-webkit-details-marker]:hidden",
-          isStandardItem ? "bg-subtle/65" : "bg-surface",
+          isStandardItem ? "bg-subtle/75" : "bg-subtle/45",
         )}
       >
         <span className="font-document flex h-7 w-7 shrink-0 items-center justify-center border-r border-line text-base font-semibold text-brand">
@@ -442,6 +461,24 @@ function AgendaMinutesCard({
             ) : null}
             {isTransferredItem ? (
               <StatusBadge tone="progress">Overført punkt</StatusBadge>
+            ) : null}
+            {!hasMinutesContent ? (
+              <StatusBadge tone="warning">Mangler referat</StatusBadge>
+            ) : null}
+            {requiresAction ? (
+              <StatusBadge tone="warning">Kræver opfølgning</StatusBadge>
+            ) : null}
+            {relatedDecisions.length > 0 ? (
+              <StatusBadge tone="success">
+                {relatedDecisions.length}{" "}
+                {relatedDecisions.length === 1 ? "beslutning" : "beslutninger"}
+              </StatusBadge>
+            ) : null}
+            {relatedTasks.length > 0 ? (
+              <StatusBadge tone="info">
+                {relatedTasks.length}{" "}
+                {relatedTasks.length === 1 ? "opgave" : "opgaver"}
+              </StatusBadge>
             ) : null}
           </div>
           <h4
@@ -482,10 +519,7 @@ function AgendaMinutesCard({
       ) : null}
 
       {canEdit ? (
-        <form
-          className="space-y-3.5 border-t border-line bg-surface p-3"
-          onSubmit={save}
-        >
+        <form className="space-y-3.5 border-t border-line p-3" onSubmit={save}>
           <LocalDraftConflict
             draft={autosave.conflict}
             onKeepServer={autosave.keepServerVersion}
@@ -508,25 +542,61 @@ function AgendaMinutesCard({
               {message}
             </div>
           ) : null}
-          <MinutesSectionLabel>Referat</MinutesSectionLabel>
-          <div>
-            <label className="label" htmlFor={`notes-${occurrence.id}`}>
-              Noter
-            </label>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <MinutesSectionLabel>Noter først</MinutesSectionLabel>
+            <div className="flex min-w-56 flex-wrap items-center gap-2">
+              <label
+                className="text-xs font-semibold uppercase tracking-wide text-muted"
+                htmlFor={`status-${occurrence.id}`}
+              >
+                Punktstatus
+              </label>
+              <Select
+                aria-describedby={
+                  fieldErrors.status?.[0]
+                    ? `status-${occurrence.id}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.status?.[0])}
+                className="min-h-8 py-1 text-xs"
+                id={`status-${occurrence.id}`}
+                onChange={(event) =>
+                  setStatus(event.target.value as AgendaMinutesStatus)
+                }
+                value={status}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {agendaItemMinutesStatusLabels[option]}
+                  </option>
+                ))}
+              </Select>
+              {fieldErrors.status?.[0] ? (
+                <p
+                  className="basis-full text-xs text-red-700"
+                  id={`status-${occurrence.id}-error`}
+                >
+                  {fieldErrors.status[0]}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="space-y-2 rounded-[var(--radius-panel)] bg-surface p-3 shadow-sm">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <label className="label" htmlFor={`notes-${occurrence.id}`}>
+                  Noter/referat
+                </label>
+                <p className="mt-0.5 text-xs text-muted">
+                  Skriv det væsentlige fra punktet her. Beslutninger og
+                  opgaver oprettes som handlinger bagefter.
+                </p>
+              </div>
+            </div>
             <RichTextEditor
               id={`notes-${occurrence.id}`}
-              minHeightClass="min-h-14"
+              minHeightClass="min-h-24"
               onChange={setNotes}
-              value={notes}
-            />
-            <MinutesAiAssistant
-              agendaItemId={item.id}
-              committeeId={committeeId}
-              field="notes"
-              meetingId={meetingId}
-              onApply={setNotes}
-              organizationId={organizationId}
-              source="agenda_item_minutes"
               value={notes}
             />
             <details className="group mt-1.5 text-xs text-muted">
@@ -547,216 +617,314 @@ function AgendaMinutesCard({
               <p className="mt-1 text-sm text-red-700">{fieldErrors.notes[0]}</p>
             ) : null}
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="label" htmlFor={`decision-${occurrence.id}`}>
-                Beslutning
-              </label>
-              <RichTextEditor
-                describedBy={
-                  fieldErrors.decision?.[0]
-                    ? `decision-${occurrence.id}-error`
-                    : undefined
-                }
-                id={`decision-${occurrence.id}`}
-                invalid={Boolean(fieldErrors.decision?.[0])}
-                minHeightClass="min-h-12"
-                onChange={setDecision}
-                value={decision}
-              />
+          <div className="space-y-3 rounded-[var(--radius-panel)] bg-surface/75 p-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              {canEditDecisions ? (
+                <DecisionCreateModal
+                  agendaItems={[{ id: item.id, title: item.title }]}
+                  categorySource={decisionCategorySource}
+                  committeeId={committeeId}
+                  initialAgendaItemId={item.id}
+                  initialCategory={decisionHistory.categories[0] ?? ""}
+                  initialDeadline={deadline}
+                  initialDescription={firstRichTextToPlainText(notes)}
+                  initialResponsibleUserId={responsibleUserId}
+                  initialTitle={item.title}
+                  meetingDate={meetingDate}
+                  meetingId={meetingId}
+                  organizationId={organizationId}
+                  responsiblePeople={responsiblePeople}
+                  sourceLabel="punktnoterne"
+                  triggerLabel="+ Beslutning"
+                />
+              ) : null}
+              {canEditTasks ? (
+                <TaskCreateModal
+                  agendaItems={[{ id: item.id, title: item.title }]}
+                  categorySource={taskCategorySource}
+                  committeeId={committeeId}
+                  initialAgendaItemId={item.id}
+                  initialCategory={decisionHistory.categories[0] ?? ""}
+                  initialDeadline={deadline}
+                  initialDescription={firstRichTextToPlainText(notes)}
+                  initialMeetingId={meetingId}
+                  initialResponsibleUserId={responsibleUserId}
+                  initialTitle={item.title}
+                  instanceId={`agenda-task-${item.id}`}
+                  meetings={[
+                    {
+                      id: meetingId,
+                      title: "Aktuelt møde",
+                      starts_at: meetingDate,
+                    },
+                  ]}
+                  organizationId={organizationId}
+                  responsiblePeople={responsiblePeople}
+                  sourceLabel="punktnoterne"
+                  triggerLabel="+ Opgave"
+                />
+              ) : null}
               <MinutesAiAssistant
                 agendaItemId={item.id}
                 committeeId={committeeId}
-                field="decision"
+                field="notes"
                 meetingId={meetingId}
-                onApply={setDecision}
+                onApply={setNotes}
                 organizationId={organizationId}
                 source="agenda_item_minutes"
-                value={decision}
+                value={notes}
               />
-              <details className="group mt-1.5 text-xs text-muted">
-                <summary className="inline-flex cursor-pointer list-none font-medium text-secondary hover:underline [&::-webkit-details-marker]:hidden">
-                  Skrivehjælp
-                </summary>
-                <div className="mt-1.5 space-y-1">
-              <p className="mt-1.5 text-xs leading-4 text-slate-500">
-                Skriv kun en beslutning, konklusion eller statusafklaring, hvis
-                punktet førte til noget konkret. På opfølgningspunkter kan
-                feltet bruges til resultatet af opfølgningen.
-              </p>
-              {fieldGuidance.decision ? (
-                <p className="mt-1 text-xs font-medium leading-4 text-slate-600">
-                  {fieldGuidance.decision}
-                </p>
-              ) : null}
-                </div>
-              </details>
-              {fieldErrors.decision?.[0] ? (
-                <p
-                  className="mt-1 text-sm text-red-700"
-                  id={`decision-${occurrence.id}-error`}
-                >
-                  {fieldErrors.decision[0]}
-                </p>
-              ) : null}
-            </div>
-            <div>
-              <label className="label" htmlFor={`follow-up-${occurrence.id}`}>
-                Opfølgning
-              </label>
-              <RichTextEditor
-                describedBy={
-                  fieldErrors.followUp?.[0]
-                    ? `follow-up-${occurrence.id}-error`
-                    : undefined
-                }
-                id={`follow-up-${occurrence.id}`}
-                invalid={Boolean(fieldErrors.followUp?.[0])}
-                minHeightClass="min-h-12"
-                onChange={setFollowUp}
-                value={followUp}
-              />
-              <MinutesAiAssistant
-                agendaItemId={item.id}
-                committeeId={committeeId}
-                field="follow_up"
-                meetingId={meetingId}
-                onApply={setFollowUp}
-                organizationId={organizationId}
-                source="agenda_item_minutes"
-                value={followUp}
-              />
-              <details className="group mt-1.5 text-xs text-muted">
-                <summary className="inline-flex cursor-pointer list-none font-medium text-secondary hover:underline [&::-webkit-details-marker]:hidden">
-                  Skrivehjælp
-                </summary>
-                <div className="mt-1.5 space-y-1">
-              <p className="mt-1.5 text-xs leading-4 text-slate-500">
-                Skriv hvad der skal ske efter mødet. Brug feltet, hvis punktet
-                kræver handling, ansvarlig, deadline eller skal videreføres til
-                næste møde.
-              </p>
-              <p className="mt-1 text-xs font-medium leading-4 text-slate-600">
-                {fieldGuidance.followUp}
-              </p>
-                </div>
-              </details>
-              {fieldErrors.followUp?.[0] ? (
-                <p
-                  className="mt-1 text-sm text-red-700"
-                  id={`follow-up-${occurrence.id}-error`}
-                >
-                  {fieldErrors.followUp[0]}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="sm:col-span-2 lg:col-span-3">
-              <MinutesSectionLabel>Status og opfølgning</MinutesSectionLabel>
-            </div>
-            <div>
-              <label className="label" htmlFor={`status-${occurrence.id}`}>
-                Punktstatus
-              </label>
-              <Select
-                aria-describedby={
-                  fieldErrors.status?.[0]
-                    ? `status-${occurrence.id}-error`
-                    : undefined
-                }
-                aria-invalid={Boolean(fieldErrors.status?.[0])}
-                id={`status-${occurrence.id}`}
-                onChange={(event) =>
-                  setStatus(event.target.value as AgendaMinutesStatus)
-                }
-                value={status}
+              <button
+                aria-expanded={activeActionPanel === "followUp"}
+                className={clsx(
+                  "min-h-9 rounded-[var(--radius-control)] border px-3 py-2 text-sm font-semibold transition",
+                  activeActionPanel === "followUp"
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-line bg-surface text-ink hover:bg-subtle",
+                )}
+                onClick={() => toggleActionPanel("followUp")}
+                type="button"
               >
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {agendaItemMinutesStatusLabels[option]}
-                  </option>
-                ))}
-              </Select>
-              {fieldErrors.status?.[0] ? (
-                <p
-                  className="mt-1 text-sm text-red-700"
-                  id={`status-${occurrence.id}-error`}
-                >
-                  {fieldErrors.status[0]}
-                </p>
-              ) : null}
+                + Opfølgning
+              </button>
+              <button
+                aria-expanded={activeActionPanel === "more"}
+                className={clsx(
+                  "min-h-9 rounded-[var(--radius-control)] border px-3 py-2 text-sm font-semibold transition",
+                  activeActionPanel === "more"
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-line bg-surface text-muted hover:bg-subtle hover:text-ink",
+                )}
+                onClick={() => toggleActionPanel("more")}
+                type="button"
+              >
+                Mere
+              </button>
             </div>
-            {!isStandardItem ? (
-              <>
-                <div className={requiresAction ? "" : "opacity-75"}>
+            {activeActionPanel === "followUp" ? (
+              <div className="space-y-3 border-t border-line pt-3">
+                <div className="grid gap-2 text-xs text-muted sm:grid-cols-3">
+                  <div>
+                    <p className="font-semibold text-ink">Opret opgave</p>
+                    <p className="mt-1">
+                      Brug + Opgave, når opfølgningen skal eksekveres.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-ink">Overfør punkt</p>
+                    <p className="mt-1">
+                      Vælg en status ovenfor, der markerer videre behandling.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-ink">
+                      Kræver beslutning senere
+                    </p>
+                    <p className="mt-1">
+                      Notér behovet og sæt ansvar/deadline ved behov.
+                    </p>
+                  </div>
+                </div>
+                <div>
                   <label
                     className="label"
-                    htmlFor={`responsible-${occurrence.id}`}
+                    htmlFor={`follow-up-${occurrence.id}`}
                   >
-                    Ansvarlig {requiresAction ? "(påkrævet)" : "(valgfri)"}
+                    Opfølgningsnote
                   </label>
-                  <Select
-                    aria-describedby={
-                      fieldErrors.responsibleUserId?.[0]
-                        ? `responsible-${occurrence.id}-error`
+                  <RichTextEditor
+                    describedBy={
+                      fieldErrors.followUp?.[0]
+                        ? `follow-up-${occurrence.id}-error`
                         : undefined
                     }
-                    aria-invalid={Boolean(fieldErrors.responsibleUserId?.[0])}
-                    id={`responsible-${occurrence.id}`}
-                    onChange={(event) =>
-                      setResponsibleUserId(event.target.value)
-                    }
-                    value={responsibleUserId}
-                  >
-                    <option value="">Ingen ansvarlig</option>
-                    {responsiblePeople.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </Select>
-                  {fieldErrors.responsibleUserId?.[0] ? (
+                    id={`follow-up-${occurrence.id}`}
+                    invalid={Boolean(fieldErrors.followUp?.[0])}
+                    minHeightClass="min-h-10"
+                    onChange={setFollowUp}
+                    value={followUp}
+                  />
+                  <MinutesAiAssistant
+                    agendaItemId={item.id}
+                    committeeId={committeeId}
+                    field="follow_up"
+                    meetingId={meetingId}
+                    onApply={setFollowUp}
+                    organizationId={organizationId}
+                    source="agenda_item_minutes"
+                    value={followUp}
+                  />
+                  {fieldErrors.followUp?.[0] ? (
                     <p
                       className="mt-1 text-sm text-red-700"
-                      id={`responsible-${occurrence.id}-error`}
+                      id={`follow-up-${occurrence.id}-error`}
                     >
-                      {fieldErrors.responsibleUserId[0]}
+                      {fieldErrors.followUp[0]}
                     </p>
                   ) : null}
                 </div>
-                <div className={requiresAction ? "" : "opacity-75"}>
-                  <label className="label" htmlFor={`deadline-${occurrence.id}`}>
-                    Deadline {requiresAction ? "(påkrævet)" : "(valgfri)"}
-                  </label>
-                  <Input
-                    aria-describedby={
-                      fieldErrors.deadline?.[0]
-                        ? `deadline-${occurrence.id}-error`
-                        : undefined
-                    }
-                    aria-invalid={Boolean(fieldErrors.deadline?.[0])}
-                    id={`deadline-${occurrence.id}`}
-                    onChange={(event) => setDeadline(event.target.value)}
-                    type="date"
-                    value={deadline}
-                  />
-                  {fieldErrors.deadline?.[0] ? (
-                    <p
-                      className="mt-1 text-sm text-red-700"
-                      id={`deadline-${occurrence.id}-error`}
+                {!isStandardItem ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className={requiresAction ? "" : "opacity-75"}>
+                      <label
+                        className="label"
+                        htmlFor={`responsible-${occurrence.id}`}
+                      >
+                        Ansvarlig {requiresAction ? "(påkrævet)" : "(valgfri)"}
+                      </label>
+                      <Select
+                        aria-describedby={
+                          fieldErrors.responsibleUserId?.[0]
+                            ? `responsible-${occurrence.id}-error`
+                            : undefined
+                        }
+                        aria-invalid={Boolean(
+                          fieldErrors.responsibleUserId?.[0],
+                        )}
+                        id={`responsible-${occurrence.id}`}
+                        onChange={(event) =>
+                          setResponsibleUserId(event.target.value)
+                        }
+                        value={responsibleUserId}
+                      >
+                        <option value="">Ingen ansvarlig</option>
+                        {responsiblePeople.map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name}
+                          </option>
+                        ))}
+                      </Select>
+                      {fieldErrors.responsibleUserId?.[0] ? (
+                        <p
+                          className="mt-1 text-sm text-red-700"
+                          id={`responsible-${occurrence.id}-error`}
+                        >
+                          {fieldErrors.responsibleUserId[0]}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className={requiresAction ? "" : "opacity-75"}>
+                      <label
+                        className="label"
+                        htmlFor={`deadline-${occurrence.id}`}
+                      >
+                        Deadline {requiresAction ? "(påkrævet)" : "(valgfri)"}
+                      </label>
+                      <Input
+                        aria-describedby={
+                          fieldErrors.deadline?.[0]
+                            ? `deadline-${occurrence.id}-error`
+                            : undefined
+                        }
+                        aria-invalid={Boolean(fieldErrors.deadline?.[0])}
+                        id={`deadline-${occurrence.id}`}
+                        onChange={(event) => setDeadline(event.target.value)}
+                        type="date"
+                        value={deadline}
+                      />
+                      {fieldErrors.deadline?.[0] ? (
+                        <p
+                          className="mt-1 text-sm text-red-700"
+                          id={`deadline-${occurrence.id}-error`}
+                        >
+                          {fieldErrors.deadline[0]}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {activeActionPanel === "more" ? (
+              <div className="space-y-3 border-t border-line pt-3">
+                  <div>
+                    <label
+                      className="label"
+                      htmlFor={`decision-${occurrence.id}`}
                     >
-                      {fieldErrors.deadline[0]}
+                      Gammelt beslutningsfelt
+                    </label>
+                    <RichTextEditor
+                      describedBy={
+                        fieldErrors.decision?.[0]
+                          ? `decision-${occurrence.id}-error`
+                          : undefined
+                      }
+                      id={`decision-${occurrence.id}`}
+                      invalid={Boolean(fieldErrors.decision?.[0])}
+                      minHeightClass="min-h-10"
+                      onChange={setDecision}
+                      value={decision}
+                    />
+                    <p className="mt-1 text-xs text-muted">
+                      Brug primært + Beslutning. Feltet bevares for ældre
+                      referater og intern struktur.
                     </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-500">
-                      {requiresAction
-                        ? "Angiv hvornår opfølgningen skal være gennemført."
-                        : "Kun nødvendig, når punktet medfører en opfølgning."}
-                    </p>
-                  )}
-                </div>
-              </>
+                    <MinutesAiAssistant
+                      agendaItemId={item.id}
+                      committeeId={committeeId}
+                      field="decision"
+                      meetingId={meetingId}
+                      onApply={setDecision}
+                      organizationId={organizationId}
+                      source="agenda_item_minutes"
+                      value={decision}
+                    />
+                    {fieldErrors.decision?.[0] ? (
+                      <p
+                        className="mt-1 text-sm text-red-700"
+                        id={`decision-${occurrence.id}-error`}
+                      >
+                        {fieldErrors.decision[0]}
+                      </p>
+                    ) : null}
+                  </div>
+                  {canEditTasks ? (
+                    <div className="border-t border-line pt-3">
+                      <p className="mb-2 text-xs text-muted">
+                        Analysér kun dette punkt med AI.
+                      </p>
+                      <AiTaskReviewModal
+                        agendaItemId={item.id}
+                        categorySource={taskCategorySource}
+                        committeeId={committeeId}
+                        decisions={meetingDecisions}
+                        existingTasks={relatedTasks}
+                        meetingId={meetingId}
+                        minutesStatus={minutesStatus}
+                        organizationId={organizationId}
+                        responsiblePeople={responsiblePeople}
+                        source="agenda_item_minutes"
+                        sourceLabel={`punktreferatet “${item.title}”`}
+                      />
+                    </div>
+                  ) : null}
+                  {canEdit ? (
+                    <div className="space-y-2 border-t border-line pt-3">
+                      <p className="text-xs text-muted">
+                        Fjern kun dette mødes forekomst, eller flyt hele
+                        dagsordenspunktet til papirkurven.
+                      </p>
+                      <TrashActionButton
+                        confirmMessage="Vil du fjerne punktet fra dette møde? Selve dagsordenspunktet og dets historik bevares."
+                        endpoint={`/api/agenda-item-occurrences/${occurrence.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                        label="Fjern punkt fra dette møde"
+                        pendingLabel="Fjerner..."
+                        variant="secondary"
+                      />
+                      <button
+                        className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
+                        disabled={deleting || autosave.status === "saving"}
+                        onClick={removeAgendaItem}
+                        type="button"
+                      >
+                        {deleting
+                          ? "Flytter..."
+                          : "Flyt dagsordenspunkt til papirkurv"}
+                      </button>
+                    </div>
+                  ) : null}
+              </div>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
@@ -774,117 +942,6 @@ function AgendaMinutesCard({
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {canEditDecisions ? (
-                <DecisionCreateModal
-                  agendaItems={[{ id: item.id, title: item.title }]}
-                  categorySource={decisionCategorySource}
-                  committeeId={committeeId}
-                  initialAgendaItemId={item.id}
-                  initialCategory={decisionHistory.categories[0] ?? ""}
-                  initialDeadline={deadline}
-                  initialDescription={firstRichTextToPlainText(
-                    decision,
-                    notes,
-                    followUp,
-                  )}
-                  initialResponsibleUserId={responsibleUserId}
-                  initialTitle={item.title}
-                  meetingDate={meetingDate}
-                  meetingId={meetingId}
-                  organizationId={organizationId}
-                  responsiblePeople={responsiblePeople}
-                  sourceLabel="punktreferatet"
-                  triggerLabel="Opret beslutning fra referat"
-                />
-              ) : null}
-              {canEditTasks ? (
-                <>
-                  <TaskCreateModal
-                    agendaItems={[{ id: item.id, title: item.title }]}
-                    categorySource={taskCategorySource}
-                    committeeId={committeeId}
-                    initialAgendaItemId={item.id}
-                    initialCategory={decisionHistory.categories[0] ?? ""}
-                    initialDeadline={deadline}
-                    initialDescription={firstRichTextToPlainText(
-                      followUp,
-                      notes,
-                      decision,
-                    )}
-                    initialMeetingId={meetingId}
-                    initialResponsibleUserId={responsibleUserId}
-                    initialTitle={item.title}
-                    instanceId={`agenda-task-${item.id}`}
-                    meetings={[
-                      {
-                        id: meetingId,
-                        title: "Aktuelt møde",
-                        starts_at: meetingDate,
-                      },
-                    ]}
-                    organizationId={organizationId}
-                    responsiblePeople={responsiblePeople}
-                    sourceLabel="punktreferatet"
-                    triggerLabel="Opret opgave"
-                  />
-                  <details className="group relative">
-                    <summary className="min-h-9 cursor-pointer list-none rounded-[var(--radius-control)] bg-transparent px-3 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
-                      Flere handlinger
-                    </summary>
-                    <div className="absolute right-0 z-10 mt-2 min-w-72 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg">
-                      <p className="mb-2 text-xs text-muted">
-                        Analysér kun dette punkt med AI.
-                      </p>
-                      <AiTaskReviewModal
-                        agendaItemId={item.id}
-                        categorySource={taskCategorySource}
-                        committeeId={committeeId}
-                        decisions={meetingDecisions}
-                        existingTasks={meetingTasks.filter(
-                          (relatedTask) =>
-                            relatedTask.agenda_item_id === item.id,
-                        )}
-                        meetingId={meetingId}
-                        minutesStatus={minutesStatus}
-                        organizationId={organizationId}
-                        responsiblePeople={responsiblePeople}
-                        source="agenda_item_minutes"
-                        sourceLabel={`punktreferatet “${item.title}”`}
-                      />
-                    </div>
-                  </details>
-                </>
-              ) : null}
-              {canEdit ? (
-                <details className="group relative">
-                  <summary className="min-h-9 cursor-pointer list-none rounded-[var(--radius-control)] bg-transparent px-3 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
-                    Slettehandlinger
-                  </summary>
-                  <div className="absolute right-0 z-10 mt-2 min-w-72 space-y-2 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg">
-                    <p className="text-xs text-muted">
-                      Fjern kun dette mødets forekomst, eller flyt hele
-                      dagsordenspunktet til papirkurven.
-                    </p>
-                    <TrashActionButton
-                      confirmMessage="Vil du fjerne punktet fra dette møde? Selve dagsordenspunktet og dets historik bevares."
-                      endpoint={`/api/agenda-item-occurrences/${occurrence.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
-                      label="Fjern punkt fra dette møde"
-                      pendingLabel="Fjerner..."
-                      variant="secondary"
-                    />
-                    <button
-                      className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
-                      disabled={deleting || autosave.status === "saving"}
-                      onClick={removeAgendaItem}
-                      type="button"
-                    >
-                      {deleting
-                        ? "Flytter..."
-                        : "Flyt dagsordenspunkt til papirkurv"}
-                    </button>
-                  </div>
-                </details>
-              ) : null}
               <Button
                 disabled={deleting || autosave.status === "saving"}
                 type="submit"
@@ -903,20 +960,6 @@ function AgendaMinutesCard({
             <RichTextContent
               className="mt-2 text-sm leading-7"
               value={minutes?.notes}
-            />
-          </div>
-          <div className="minutes-decision">
-            <p className="minutes-document-label text-success">Beslutning</p>
-            <RichTextContent
-              className="mt-2 text-sm leading-7"
-              value={minutes?.decision}
-            />
-          </div>
-          <div className="minutes-follow-up">
-            <p className="minutes-document-label text-warning">Opfølgning</p>
-            <RichTextContent
-              className="mt-2 text-sm leading-7"
-              value={minutes?.follow_up}
             />
           </div>
           {!isStandardItem ? (
@@ -938,6 +981,41 @@ function AgendaMinutesCard({
                 </p>
               </div>
             </>
+          ) : null}
+          {minutes?.decision || minutes?.follow_up ? (
+            <details className="group rounded-[var(--radius-control)] border border-line bg-subtle/30 md:col-span-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span>Beslutning og opfølgning</span>
+                <span className="text-xs font-semibold text-brand">
+                  <span className="group-open:hidden">Åbn</span>
+                  <span className="hidden group-open:inline">Skjul</span>
+                </span>
+              </summary>
+              <div className="grid gap-3 border-t border-line p-3 md:grid-cols-2">
+                {minutes?.decision ? (
+                  <div className="minutes-decision">
+                    <p className="minutes-document-label text-success">
+                      Beslutning
+                    </p>
+                    <RichTextContent
+                      className="mt-2 text-sm leading-7"
+                      value={minutes.decision}
+                    />
+                  </div>
+                ) : null}
+                {minutes?.follow_up ? (
+                  <div className="minutes-follow-up">
+                    <p className="minutes-document-label text-warning">
+                      Opfølgning
+                    </p>
+                    <RichTextContent
+                      className="mt-2 text-sm leading-7"
+                      value={minutes.follow_up}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </details>
           ) : null}
           <div className="md:col-span-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -1036,37 +1114,58 @@ function AgendaMinutesCard({
           </div>
         </div>
       )}
-      {meetingDecisions.some(
-        (relatedDecision) => relatedDecision.agenda_item_id === item.id,
-      ) ? (
-        <div className="border-t border-line bg-surface px-4 py-3 sm:px-5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Relaterede beslutninger
-          </p>
-          <RelatedDecisions
-            compact
-            decisions={meetingDecisions.filter(
-              (relatedDecision) => relatedDecision.agenda_item_id === item.id,
-            )}
-            organizationId={organizationId}
-          />
-        </div>
-      ) : null}
-      {meetingTasks.some(
-        (relatedTask) => relatedTask.agenda_item_id === item.id,
-      ) ? (
-        <div className="border-t border-line bg-surface px-4 py-3 sm:px-5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Relaterede opgaver
-          </p>
-          <RelatedTasks
-            compact
-            organizationId={organizationId}
-            tasks={meetingTasks.filter(
-              (relatedTask) => relatedTask.agenda_item_id === item.id,
-            )}
-          />
-        </div>
+      {relatedDecisions.length > 0 || relatedTasks.length > 0 ? (
+        <details className="group border-t border-line bg-surface">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-5">
+            <span className="flex flex-wrap items-center gap-2">
+              Relationer
+              {relatedDecisions.length > 0 ? (
+                <span className="rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                  {relatedDecisions.length}{" "}
+                  {relatedDecisions.length === 1
+                    ? "beslutning"
+                    : "beslutninger"}
+                </span>
+              ) : null}
+              {relatedTasks.length > 0 ? (
+                <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+                  {relatedTasks.length}{" "}
+                  {relatedTasks.length === 1 ? "opgave" : "opgaver"}
+                </span>
+              ) : null}
+            </span>
+            <span className="text-xs font-semibold text-brand">
+              <span className="group-open:hidden">Åbn</span>
+              <span className="hidden group-open:inline">Skjul</span>
+            </span>
+          </summary>
+          <div className="grid gap-4 border-t border-line px-4 py-3 sm:px-5 md:grid-cols-2">
+            {relatedDecisions.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                  Relaterede beslutninger
+                </p>
+                <RelatedDecisions
+                  compact
+                  decisions={relatedDecisions}
+                  organizationId={organizationId}
+                />
+              </div>
+            ) : null}
+            {relatedTasks.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                  Relaterede opgaver
+                </p>
+                <RelatedTasks
+                  compact
+                  organizationId={organizationId}
+                  tasks={relatedTasks}
+                />
+              </div>
+            ) : null}
+          </div>
+        </details>
       ) : null}
       <details className="group border-t border-line bg-subtle/20">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-5">

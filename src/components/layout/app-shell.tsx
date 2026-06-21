@@ -31,6 +31,7 @@ export function AppShell({
             </span>
           </Link>
           <div className="flex min-w-0 items-center gap-2">
+            <div className="shrink-0" id="app-header-quick-action" />
             <Link
               className="hidden rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink sm:inline-flex"
               href="/organizations"

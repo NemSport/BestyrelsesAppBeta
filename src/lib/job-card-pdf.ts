@@ -1,4 +1,8 @@
-import { createPdfReport, formatPdfDate } from "@/lib/pdf-report";
+import {
+  createPdfReport,
+  formatPdfDate,
+  type PdfReportBranding,
+} from "@/lib/pdf-report";
 import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
 import type { RoleProfileView } from "@/types/domain";
 
@@ -6,6 +10,7 @@ type JobCardPdfInput = {
   organizationName: string;
   role: RoleProfileView;
   exportedAt: Date;
+  branding?: PdfReportBranding;
 };
 
 function listOrEmpty(values: string[]) {
@@ -18,6 +23,7 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
     title: input.role.title,
     organizationName: input.organizationName,
     generatedAt: input.exportedAt,
+    branding: input.branding,
     meta: [
       { label: "Organisation", value: input.organizationName },
       {

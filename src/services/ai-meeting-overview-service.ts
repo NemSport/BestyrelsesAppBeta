@@ -15,6 +15,7 @@ import { DecisionRepository } from "@/repositories/decision-repository";
 import { MeetingMinutesRepository } from "@/repositories/meeting-minutes-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { TaskRepository } from "@/repositories/task-repository";
+import { AiActivityLogService } from "@/services/ai-activity-log-service";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
@@ -106,6 +107,7 @@ export class AiMeetingOverviewService {
   private readonly minutes: MeetingMinutesRepository;
   private readonly decisions: DecisionRepository;
   private readonly tasks: TaskRepository;
+  private readonly aiActivityLog: AiActivityLogService;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
@@ -114,6 +116,7 @@ export class AiMeetingOverviewService {
     this.minutes = new MeetingMinutesRepository(db);
     this.decisions = new DecisionRepository(db);
     this.tasks = new TaskRepository(db);
+    this.aiActivityLog = new AiActivityLogService(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
   }
@@ -301,18 +304,43 @@ export class AiMeetingOverviewService {
         );
       }
 
-      return {
-        status: "ok" as const,
-        overview: aiMeetingOverviewOutputSchema.parse(response.output_parsed),
+      const overview = aiMeetingOverviewOutputSchema.parse(
+        response.output_parsed,
+      );
+      const usage = response.usage
+        ? {
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : null;
+      const activityLogId = await this.aiActivityLog.recordGenerated({
+        organizationId: parsed.organizationId,
+        meetingId: meeting.id,
+        agendaItemId: null,
+        userId: user.id,
+        field: "meeting_overview",
+        actionType: "generate_meeting_overview",
+        originalText: meetingContext,
+        aiSuggestion: JSON.stringify(overview),
+        label: "AI-resumÃ©",
         model,
         promptVersion: meetingOverviewPromptVersion,
-        usage: response.usage
-          ? {
-              inputTokens: response.usage.input_tokens,
-              outputTokens: response.usage.output_tokens,
-              totalTokens: response.usage.total_tokens,
-            }
-          : null,
+        metadata: {
+          usage,
+          agendaItemCount: meeting.agenda_item_occurrences.length,
+          relatedDecisionCount: relatedDecisions.length,
+          relatedTaskCount: relatedTasks.length,
+        },
+      });
+
+      return {
+        status: "ok" as const,
+        overview,
+        activityLogId,
+        model,
+        promptVersion: meetingOverviewPromptVersion,
+        usage,
       };
     } catch (error) {
       logAiMeetingOverviewError({

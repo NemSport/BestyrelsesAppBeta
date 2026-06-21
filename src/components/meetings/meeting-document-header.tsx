@@ -45,7 +45,7 @@ export function MeetingDocumentHeader({
 }) {
   return (
     <header className="meeting-document-header border-b border-line pb-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
             Møde og referat
@@ -57,11 +57,6 @@ export function MeetingDocumentHeader({
             {committeeName} · {formatDateTime(meeting.starts_at, "full")}
           </p>
         </div>
-        {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            {actions}
-          </div>
-        ) : null}
       </div>
 
       {meeting.description ? (
@@ -108,6 +103,17 @@ export function MeetingDocumentHeader({
           <dd>{transferredItemCount}</dd>
         </div>
       </dl>
+
+      {actions ? (
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+            Mødehandlinger
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {actions}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

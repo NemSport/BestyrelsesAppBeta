@@ -494,6 +494,127 @@ aliases such as `forest`, `mist`, `line`, and the existing status utility
 classes. Future organization branding may override the semantic variables at
 an organization-scoped root without changing component markup.
 
+Update 2 introduces the first organization branding foundation. Optional
+branding lives in `organization_branding` and can provide a logo URL, primary,
+secondary, and accent hex colors, and one controlled font choice. The
+organization workspace reads this data server-side, validates it, converts
+safe colors to the existing RGB CSS variable format, and applies the variables
+at the organization workspace root. Missing or invalid branding falls back to
+the standard calm 7R theme, and there is no branding admin/editor, font upload,
+external font URL, or complete white-label system in this phase.
+
+Update 2.1 adds a small branding editor to the existing "Rediger organisation"
+page. Organization administrators can save a secure logo URL, three optional
+hex colors, and a controlled font choice through the ordinary server-side
+service and RLS-protected `organization_branding` table. Empty fields continue
+to use the fallback theme. The editor includes only a compact preview and does
+not add logo upload, external font loading, or a separate branding page.
+
+Update 2.2 adds server-side logo upload to that same branding section. Logos
+are uploaded to the `organization-logos` Supabase Storage bucket under
+`{organization_id}/logo/{uuid}.{ext}` and then written back to
+`organization_branding.logo_url` as a public bucket URL. Uploads are limited to
+PNG, JPG, and WEBP at 2 MB, SVG is intentionally excluded, and only
+organization administrators can manage files for their organization path.
+Clearing the logo URL still falls back to the standard no-logo display.
+
+Update 2.3 applies the same validated organization branding to existing PDF
+exports. `pdf-report.ts` accepts an optional PDF branding object with
+organization name, primary/accent colors, and a best-effort logo image. The
+minutes and Job Card PDF routes resolve branding server-side through
+`OrganizationBrandingService` after ordinary access checks. Missing branding,
+invalid colors, unsupported logo formats, or logo fetch failures never block
+PDF generation; the standard report layout is used as fallback.
+
+Update 2.4 applies organization branding to the email template foundation. The
+shared email shell accepts validated organization name, logo URL, and
+primary/accent colors, then renders simple inline-safe HTML with the same
+fallback palette when branding is missing. Agenda email resolves branding
+server-side through `OrganizationBrandingService` before rendering; private
+minutes fields, internal notes, AI drafts, and non-approved suggestions remain
+excluded. Stub and Resend delivery modes are unchanged, and there is no email
+marketing editor or white-label mail system.
+
+Update 2.5 makes branding usable in the workspace itself. Logo upload now
+normalizes common PNG/JPG/WEBP MIME variants, reports concrete Danish upload
+errors, and keeps the existing server-side API/storage flow. The controlled
+font list is expanded to common safe web and system font names, including
+Ubuntu, Share, Montserrat, Open Sans, Lato, Poppins, Nunito, Merriweather,
+Georgia, Verdana, Tahoma, Trebuchet MS, Times New Roman, and Courier New; it
+is still not free font upload or external font URL input. Organization
+branding CSS variables now drive the sidebar, active navigation marker,
+primary buttons, Quick Action portal, and branding preview with contrast
+fallbacks for readable navigation. Organizations without branding still use
+the standard 7R theme.
+
+Update 2.5b fixes the runtime application of that branding. The selected font
+is applied on the organization workspace root and on shared modals rendered
+through portals, so dashboards, sidebars, forms, buttons, and Quick Action
+dialogs inherit the active organization font. Quick Action passes the
+organization CSS variables to both the topbar trigger and the modal overlay,
+so primary actions use the active brand colors outside the normal workspace
+DOM tree. Logo-upload errors now distinguish missing storage migration,
+permission/RLS failure, unsupported file type, too-large files, Storage upload
+failure, and failed `logo_url` persistence.
+
+Update 2.5c fixes the Supabase Storage runtime path for organization logos.
+The upload service now sends a neutral file body to Storage instead of the
+route `File` object, while keeping MIME normalization, the 2 MB limit, and the
+server-side administrator check. The storage policy migration is tightened to
+the exact runtime path `{organization_id}/logo/{uuid}.{ext}` and remains
+idempotent for the `organization-logos` bucket. Existing branding is only
+updated after a successful upload; failed uploads leave the previous logo URL
+unchanged. Deployments must apply the storage migration, for example with
+`supabase.cmd db push` on Windows.
+
+Update 2.5d removes regex repetition from the logo storage path and URL
+constraints. The logo URL check now uses simple length, `like`, and forbidden
+character checks instead of bounded regular expressions. Storage path helpers
+use `split_part(name, '/', ...)` to enforce
+`{organization_id}/logo/{file}` without regex. This keeps organization logo
+uploads scoped to organization administrators while avoiding PostgreSQL regex
+repetition errors during `supabase.cmd db push`.
+
+Update 2.5e improves logo presentation in the organization sidebar. Uploaded
+logos are no longer shown as a small header thumbnail; when present, the logo
+appears in a dedicated sidebar branding zone below navigation with centered
+`object-contain` sizing and max dimensions that work better for both wide and
+tall logos. The branding editor preview mirrors this placement, while
+organizations without a logo keep the standard text-only sidebar fallback.
+
+Update 2.5f removes that dedicated sidebar logo zone again after browser
+testing showed it made logos look like a heavy white block in the navigation.
+The organization sidebar is now intentionally branded by organization name,
+color variables, active navigation treatment, and font. Uploaded logos remain
+available for the branding editor preview, PDF exports, and email templates,
+but they are not used as large decorative sidebar elements.
+
+Update 12 makes the meeting page more usable as a live meeting workspace. The
+meeting header is followed by a compact meeting overview with agenda count,
+incoming transferred points, missing minutes, decision/follow-up indicators,
+active decisions, and open tasks. Incoming transferred agenda items are shown
+near the agenda with source meeting, source status, transfer reason, and a
+direct jump to the relevant point when the transfer relation exists. Agenda
+point headers now surface missing minutes, follow-up needs, and related
+decision/task counts before the point is opened, while the existing autosave,
+minutes status, AI, decision, task, attachment, PDF, and approval flows remain
+unchanged.
+
+Update 12.1 simplifies agenda-item minutes around a "notes first" workflow.
+Each point now exposes one primary `Noter/referat` editor for live meeting
+work, with AI help placed next to that editor. Creating decisions and tasks is
+handled through compact `+ Beslutning` and `+ Opgave` actions that use the
+point notes as the starting text. Follow-up status, responsible person,
+deadline, transfer intent, legacy decision text, AI task analysis, and delete
+actions are kept behind secondary panels so autosave and the existing minutes
+model remain unchanged while the live meeting view shows fewer writing fields.
+
+Update 12.1b keeps that workflow but calms the point card itself. Agenda points
+use a tinted container with a lighter notes surface, expose point status as a
+compact always-visible control, and use one shared inline action panel for
+follow-up or extra fields. This keeps transfer/status behavior visible while
+avoiding multiple floating action panels.
+
 Phase 1.6-A3 defines the shared composition layer in `src/components/ui`.
 Pages use `PageHeader` and `PageSection` for hierarchy, `ContentPanel` only
 when a bounded surface adds meaning, and `DocumentPanel` for minutes and other
@@ -558,9 +679,12 @@ PDF exports use the shared `src/lib/pdf-report.ts` layout foundation. Server
 generators compose the same document header, metadata grid, section hierarchy,
 status badges, tables, spacing, page footer, export date, and page numbering
 instead of building one-off print layouts. The default PDF direction is a calm
-A4 report suitable for sharing, printing, onboarding, and archiving. Future
-agenda, decision, task, Annual Wheel, onboarding, and Job Card exports should
-reuse this foundation before adding module-specific content.
+A4 report suitable for sharing, printing, onboarding, and archiving. Existing
+minutes and Job Card exports may apply organization branding in the shared
+header and section colors, but PDF generation must remain usable without
+branding or logo. Future agenda, decision, task, Annual Wheel, onboarding, and
+Job Card exports should reuse this foundation before adding module-specific
+content.
 
 Referattekst uses document prose styling in both the web UI and PDF exports.
 Sanitized TipTap content is rendered with constrained line length, generous
@@ -714,6 +838,17 @@ Outputs for display in a modal. The overview is advisory preparation support;
 it is not saved automatically and never becomes official minutes, decisions,
 or tasks.
 
+Update 7 adds the first AI transparency foundation. `ai_activity_log` stores
+bounded metadata for AI-assisted suggestions, including organization, meeting,
+optional agenda item, user, field, action type, original text, AI suggestion,
+model, prompt version, and whether the suggestion was generated, applied, or
+dismissed. The AI minutes assistant now logs generated rewrite suggestions and
+marks them applied or dismissed from the review modal. The AI meeting overview
+logs generated overview output as advisory preparation support. The log is
+RLS-protected by the same organization, meeting, and committee access rules as
+the underlying content. Task suggestions, agenda-item assistant answers, and
+mobile AI assistant answers are not yet logged in this first foundation pass.
+
 Update 9 adds a compact Quick Action entry point to the organization
 workspace header. It lets authorized users create a new meeting from any
 organization page while preserving the existing committee-scoped meeting API,
@@ -776,6 +911,11 @@ approved minutes, task reminders, and decision overviews, but only agenda
 email has UI and route support in this update. No automatic reminders or bulk
 schedulers are active yet. Email event persistence is intentionally deferred
 until a dedicated audit/logging migration is needed.
+
+Email templates may receive the same organization branding used by the app and
+PDF exports. Branding is presentation-only: logo and colors are validated,
+missing branding falls back to the standard email look, and email generation or
+delivery must not depend on a logo being reachable.
 
 ## MVP Constraints
 

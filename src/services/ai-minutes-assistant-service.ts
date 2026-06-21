@@ -16,6 +16,7 @@ import {
   sanitizeRichText,
 } from "@/lib/rich-text";
 import { MeetingRepository } from "@/repositories/meeting-repository";
+import { AiActivityLogService } from "@/services/ai-activity-log-service";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
@@ -97,11 +98,13 @@ function responseWasRefused(
 
 export class AiMinutesAssistantService {
   private readonly meetings: MeetingRepository;
+  private readonly aiActivityLog: AiActivityLogService;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
   constructor(private readonly db: SupabaseClient<Database>) {
     this.meetings = new MeetingRepository(db);
+    this.aiActivityLog = new AiActivityLogService(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
   }
@@ -220,22 +223,43 @@ export class AiMinutesAssistantService {
         );
       }
 
+      const suggestionText = richTextToPlainText(suggestionHtml);
+      const usage = response.usage
+        ? {
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : null;
+      const activityLogId = await this.aiActivityLog.recordGenerated({
+        organizationId: parsed.organizationId,
+        meetingId: meeting.id,
+        agendaItemId: agendaItem?.id ?? null,
+        userId: user.id,
+        field: parsed.field,
+        actionType: parsed.action,
+        originalText: plainText,
+        aiSuggestion: suggestionText,
+        label: "AI-omskrivning",
+        model,
+        promptVersion: minutesAssistantPromptVersion,
+        metadata: {
+          source: parsed.source,
+          usage,
+        },
+      });
+
       return {
         action: parsed.action,
         originalHtml: sanitizeRichText(parsed.text),
         originalText: plainText,
         suggestionHtml,
-        suggestionText: richTextToPlainText(suggestionHtml),
+        suggestionText,
         summary: parsedOutput.summary,
+        activityLogId,
         model,
         promptVersion: minutesAssistantPromptVersion,
-        usage: response.usage
-          ? {
-              inputTokens: response.usage.input_tokens,
-              outputTokens: response.usage.output_tokens,
-              totalTokens: response.usage.total_tokens,
-            }
-          : null,
+        usage,
       };
     } catch (error) {
       logAiMinutesAssistantError({

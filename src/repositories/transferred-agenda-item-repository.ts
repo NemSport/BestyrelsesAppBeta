@@ -16,6 +16,40 @@ export class TransferredAgendaItemRepository {
     return data as TransferredAgendaItem[];
   }
 
+  async listByTargetMeeting(meetingId: string) {
+    const { data, error } = await this.db
+      .from("transferred_agenda_items")
+      .select("*")
+      .eq("target_meeting_id", meetingId)
+      .order("created_at");
+    if (error) throw error;
+    return data as TransferredAgendaItem[];
+  }
+
+  async listSourceMeetings(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.db
+      .from("meetings")
+      .select("id,title,starts_at")
+      .in("id", ids);
+    if (error) throw error;
+    return data as Array<{ id: string; title: string; starts_at: string }>;
+  }
+
+  async listSourceAgendaItems(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.db
+      .from("agenda_items")
+      .select("id,title,item_type")
+      .in("id", ids);
+    if (error) throw error;
+    return data as Array<{
+      id: string;
+      title: string;
+      item_type: Database["public"]["Enums"]["agenda_item_type"];
+    }>;
+  }
+
   async listPendingBySourceMinutes(agendaItemMinutesId: string) {
     const { data, error } = await this.db
       .from("transferred_agenda_items")

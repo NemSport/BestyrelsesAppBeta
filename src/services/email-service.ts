@@ -8,6 +8,7 @@ import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
+import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import type { Database } from "@/types/database";
 import type { OrganizationMemberDirectoryEntry } from "@/types/domain";
 
@@ -91,6 +92,12 @@ export class EmailService {
         : [],
     );
     const root = appUrl.replace(/\/$/, "");
+    const branding = await new OrganizationBrandingService(
+      this.db,
+    ).getEmailBranding(
+      parsed.organizationId,
+      organizationContext.organization.name,
+    );
     const template = meetingAgendaEmailTemplate({
       organizationName: organizationContext.organization.name,
       committeeName: committeeContext.committee.name,
@@ -99,6 +106,7 @@ export class EmailService {
       subject: parsed.subject,
       message: parsed.message,
       meetingUrl: `${root}/organizations/${parsed.organizationId}/committees/${parsed.committeeId}/meetings/${parsed.meetingId}`,
+      branding,
     });
 
     const delivery = await this.deliver({

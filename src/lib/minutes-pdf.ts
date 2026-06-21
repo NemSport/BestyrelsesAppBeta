@@ -3,7 +3,11 @@ import {
   agendaItemTypeLabels,
   meetingMinuteApprovalStatusLabels,
 } from "@/lib/localization";
-import { createPdfReport, formatPdfDate } from "@/lib/pdf-report";
+import {
+  createPdfReport,
+  formatPdfDate,
+  type PdfReportBranding,
+} from "@/lib/pdf-report";
 import { richTextToPdfBlocks } from "@/lib/rich-text";
 import type {
   AgendaItemMinutes,
@@ -23,6 +27,7 @@ type PdfInput = {
   attachments: MinuteAttachmentView[];
   responsiblePeople: MinutesResponsiblePerson[];
   attendeeIds: string[];
+  branding?: PdfReportBranding;
 };
 
 function approvalSummary(approvals: MeetingMinuteApprovalView[]) {
@@ -50,9 +55,12 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     documentType: "Mødereferat",
     title: input.meeting.title,
     subtitle: meetingDate,
+    organizationName: input.branding?.organizationName,
     committeeName: input.committeeName,
     generatedAt: new Date(),
+    branding: input.branding,
     meta: [
+      { label: "Organisation", value: input.branding?.organizationName ?? "" },
       { label: "Udvalg", value: input.committeeName },
       { label: "Mødedato", value: meetingDate },
       {

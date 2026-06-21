@@ -18,6 +18,7 @@ export function SendMeetingAgendaEmailModal({
   meetingDateLabel,
   agendaItemCount,
   recipients,
+  triggerStyle = "menu",
 }: {
   organizationId: string;
   committeeId: string;
@@ -26,6 +27,7 @@ export function SendMeetingAgendaEmailModal({
   meetingDateLabel: string;
   agendaItemCount: number;
   recipients: Recipient[];
+  triggerStyle?: "button" | "menu";
 }) {
   const [open, setOpen] = useState(false);
   const [includeCommittee, setIncludeCommittee] = useState(true);
@@ -93,17 +95,32 @@ export function SendMeetingAgendaEmailModal({
 
   return (
     <>
-      <button
-        className="block w-full rounded-[var(--radius-control)] px-3 py-2 text-left text-sm font-semibold text-ink transition hover:bg-subtle"
-        onClick={() => {
-          setOpen(true);
-          setStatus(null);
-          setError(null);
-        }}
-        type="button"
-      >
-        Send dagsorden pr. email
-      </button>
+      {triggerStyle === "button" ? (
+        <Button
+          onClick={() => {
+            setOpen(true);
+            setStatus(null);
+            setError(null);
+          }}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          Send dagsorden pr. email
+        </Button>
+      ) : (
+        <button
+          className="block w-full rounded-[var(--radius-control)] px-3 py-2 text-left text-sm font-semibold text-ink transition hover:bg-subtle"
+          onClick={() => {
+            setOpen(true);
+            setStatus(null);
+            setError(null);
+          }}
+          type="button"
+        >
+          Send dagsorden pr. email
+        </button>
+      )}
       <Modal
         description="Vælg modtagere, gennemgå emne og send dagsordenen manuelt."
         maxWidth="2xl"

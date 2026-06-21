@@ -64,6 +64,96 @@ export type Database = {
         };
         Relationships: [];
       };
+      organization_branding: {
+        Row: {
+          id: string;
+          organization_id: string;
+          logo_url: string | null;
+          primary_color: string | null;
+          secondary_color: string | null;
+          accent_color: string | null;
+          font_family:
+            | "Inter"
+            | "System"
+            | "Arial"
+            | "Roboto"
+            | "Source Sans 3"
+            | "Ubuntu"
+            | "Share"
+            | "Montserrat"
+            | "Open Sans"
+            | "Lato"
+            | "Poppins"
+            | "Nunito"
+            | "Merriweather"
+            | "Georgia"
+            | "Verdana"
+            | "Tahoma"
+            | "Trebuchet MS"
+            | "Times New Roman"
+            | "Courier New"
+            | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          logo_url?: string | null;
+          primary_color?: string | null;
+          secondary_color?: string | null;
+          accent_color?: string | null;
+          font_family?:
+            | "Inter"
+            | "System"
+            | "Arial"
+            | "Roboto"
+            | "Source Sans 3"
+            | "Ubuntu"
+            | "Share"
+            | "Montserrat"
+            | "Open Sans"
+            | "Lato"
+            | "Poppins"
+            | "Nunito"
+            | "Merriweather"
+            | "Georgia"
+            | "Verdana"
+            | "Tahoma"
+            | "Trebuchet MS"
+            | "Times New Roman"
+            | "Courier New"
+            | null;
+        };
+        Update: {
+          logo_url?: string | null;
+          primary_color?: string | null;
+          secondary_color?: string | null;
+          accent_color?: string | null;
+          font_family?:
+            | "Inter"
+            | "System"
+            | "Arial"
+            | "Roboto"
+            | "Source Sans 3"
+            | "Ubuntu"
+            | "Share"
+            | "Montserrat"
+            | "Open Sans"
+            | "Lato"
+            | "Poppins"
+            | "Nunito"
+            | "Merriweather"
+            | "Georgia"
+            | "Verdana"
+            | "Tahoma"
+            | "Trebuchet MS"
+            | "Times New Roman"
+            | "Courier New"
+            | null;
+        };
+        Relationships: [];
+      };
       organization_members: {
         Row: {
           organization_id: string;
@@ -82,6 +172,63 @@ export type Database = {
         Update: {
           role?: Database["public"]["Enums"]["organization_role"];
           status?: Database["public"]["Enums"]["membership_status"];
+        };
+        Relationships: [];
+      };
+      ai_activity_log: {
+        Row: {
+          id: string;
+          organization_id: string;
+          meeting_id: string | null;
+          agenda_item_id: string | null;
+          user_id: string;
+          field: string;
+          action_type: string;
+          original_text: string | null;
+          ai_suggestion: string | null;
+          status: Database["public"]["Enums"]["ai_activity_status"];
+          provider: string | null;
+          model: string | null;
+          prompt_version: string | null;
+          label: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+          applied_at: string | null;
+          dismissed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          meeting_id?: string | null;
+          agenda_item_id?: string | null;
+          user_id: string;
+          field: string;
+          action_type: string;
+          original_text?: string | null;
+          ai_suggestion?: string | null;
+          status?: Database["public"]["Enums"]["ai_activity_status"];
+          provider?: string | null;
+          model?: string | null;
+          prompt_version?: string | null;
+          label: string;
+          metadata?: Json;
+          applied_at?: string | null;
+          dismissed_at?: string | null;
+        };
+        Update: {
+          field?: string;
+          action_type?: string;
+          original_text?: string | null;
+          ai_suggestion?: string | null;
+          status?: Database["public"]["Enums"]["ai_activity_status"];
+          provider?: string | null;
+          model?: string | null;
+          prompt_version?: string | null;
+          label?: string;
+          metadata?: Json;
+          applied_at?: string | null;
+          dismissed_at?: string | null;
         };
         Relationships: [];
       };
@@ -1117,6 +1264,7 @@ export type Database = {
       };
     };
     Enums: {
+      ai_activity_status: "generated" | "applied" | "dismissed" | "failed";
       organization_role: "owner" | "admin" | "member" | "viewer";
       membership_status: "active" | "suspended";
       committee_role: "chair" | "secretary" | "member" | "viewer";

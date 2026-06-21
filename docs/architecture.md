@@ -30,7 +30,152 @@ compatibility aliases used by earlier phases. This lets a future
 organization-scoped branding layer override variables without duplicating
 components or changing application behavior.
 
+Update 2 implements that branding layer as a small technical foundation rather
+than a white-label product. `organization_branding` is a one-row-per-
+organization optional table with RLS: active organization members may read,
+and organization administrators may insert or update. Database checks and
+runtime validation only allow six-digit hex colors, `https://` or single-slash
+relative logo URLs, and the controlled font list `Inter`, `System`, `Arial`,
+`Roboto`, and `Source Sans 3`. `OrganizationBrandingService` reads the row
+server-side after normal organization membership authorization, and
+`resolveOrganizationBranding` converts valid values into the existing RGB CSS
+variables on `OrganizationWorkspace`: `--brand-primary`,
+`--brand-secondary`, `--brand-accent`, `--brand-background`,
+`--brand-surface`, `--brand-text`, `--brand-text-muted`, `--brand-muted`, and
+`--font-sans`. Missing or invalid values fall back to the standard 7R theme.
+There is intentionally no branding editor, logo upload flow, external font
+loading, or full white-label system in this update.
+
+Update 2.1 keeps branding administration on the existing
+`/organizations/[organizationId]/edit` route. Organization administrators see
+a compact branding section with logo URL, primary, secondary, and accent color
+fields, a controlled font select, and a small preview. The client form is only
+presentation and posts to `PATCH /api/organizations/[organizationId]/branding`;
+`OrganizationBrandingService` revalidates admin access and the same safe input
+schema before upserting `organization_branding`. Empty fields are stored as
+`null` and resolve back to the default 7R theme. Logo upload, separate
+branding pages, external font URLs, and full white-label editing remain out of
+scope.
+
+Update 2.2 adds logo upload without changing the branding administration
+surface. The client sends the selected file as `FormData` to
+`POST /api/organizations/[organizationId]/branding/logo`; the route calls
+`OrganizationBrandingService.uploadLogo`, which rechecks organization-admin
+access, validates size and MIME type, uploads server-side, and updates only
+`organization_branding.logo_url`. The `organization-logos` Storage bucket is
+public-read so sidebar logos do not require expiring signed URLs, but write
+access is locked by storage policies to paths whose first folder is the
+organization id and where the user is an organization administrator. Paths use
+`{organization_id}/logo/{uuid}.{ext}`. Only PNG, JPG, and WEBP up to 2 MB are
+accepted; SVG and arbitrary files are rejected. Deleting old uploaded objects
+is not automated in this update, but replacing the logo moves the active
+branding pointer to the newest file.
+
+Update 2.3 extends the shared PDF foundation with optional organization
+branding. Existing PDF routes resolve branding server-side through
+`OrganizationBrandingService.getPdfBranding`, so the same organization
+membership authorization and RLS-protected row are used before PDF generation.
+`src/lib/pdf-branding.ts` validates colors for PDF use and loads HTTP(S) logo
+images on a short best-effort path; only PNG and JPG logos are embedded because
+they are supported by the PDF renderer. Unsupported or unreachable logos are
+ignored, not treated as export failures. `src/lib/pdf-report.ts` owns the
+branded header, section color, table header tint, metadata, footer, and
+fallback report palette for minutes and Job Card exports.
+
+Update 2.4 applies the same principle to email templates. Existing email flows
+resolve branding through `OrganizationBrandingService.getEmailBranding`, which
+performs ordinary organization membership authorization before reading the
+RLS-protected branding row. `src/lib/email-branding.ts` provides the safe
+template shape: organization name, optional HTTP(S) logo URL, primary color,
+and accent color with fallbacks. `src/lib/email-templates.ts` owns the branded
+email shell and keeps HTML simple with inline-safe styles. Branding is
+presentation-only and must never cause delivery failure; missing or invalid
+branding falls back to the standard email template. Stub and Resend delivery
+modes remain unchanged.
+
+Update 2.5 keeps branding scoped and controlled while making it visible in the
+admin workspace. Logo upload still runs through the server-side branding API
+and Supabase Storage policies, but the service now normalizes common PNG, JPG,
+and WEBP MIME variants and converts storage/database failures into concrete
+Danish errors. The `organization_branding.font_family` check constraint is
+expanded by migration to a larger controlled list of safe web/system font
+names; there is still no font upload and no arbitrary external font URL. The
+resolved branding CSS variables now include contrast variables for text on the
+primary color, allowing `OrganizationNav`, active nav states, primary buttons,
+and the Quick Action portal to use organization colors while falling back to
+the standard 7R theme when values are missing or unsafe.
+
+Update 2.5b tightens the runtime boundary for those variables. The organization
+workspace root explicitly sets `font-family: var(--font-sans)` so the validated
+font stack affects the whole organization area rather than only preview
+components. Because Quick Action and shared modals render through portals,
+`QuickActionHeaderSlot` passes the organization CSS variables into the portal
+and `Modal` applies them, including `font-family`, on the overlay root. The
+branding upload route and service keep the same server-side storage path and
+RLS checks, but return clearer Danish errors for missing buckets/migrations,
+permission failures, unsupported files, oversized files, Storage upload
+failure, and failed persistence of `organization_branding.logo_url`.
+
+Update 2.5c corrects the logo upload boundary between Next route handlers and
+Supabase Storage. `OrganizationBrandingService.uploadLogo` converts the
+validated PNG/JPG/WEBP `File` to an `ArrayBuffer` before calling Storage, so
+the repository receives a stable server-side upload body instead of a route
+runtime `File` instance. The follow-up storage migration reasserts the public
+`organization-logos` bucket configuration and recreates object policies around
+the exact path contract `{organization_id}/logo/{uuid}.{ext}`. Administrators
+may insert/update/delete only inside their own organization folder, members
+may read organization logo objects, and failed uploads do not update
+`organization_branding.logo_url`. The migration must be applied to affected
+environments, for example with `supabase.cmd db push` on Windows.
+
+Update 2.5d removes regex from the logo Storage policy and URL constraint
+path. The database URL check uses length, `like`, and explicit forbidden
+character checks instead of bounded repetition such as `{1,500}`. Storage
+helper functions use `split_part(name, '/', ...)` to require exactly an
+organization id, the `logo` folder, and one file name. This preserves the
+same organization-admin write boundary without relying on regular expression
+syntax that can fail during Supabase migration pushes.
+
+Update 2.5e treats organization logos as a sidebar branding element rather
+than a navigation-header thumbnail. `OrganizationNav` keeps the organization
+name and active-page metadata in the header, then renders an optional
+dedicated logo zone below navigation with centered `object-contain` sizing and
+bounded dimensions. The edit-page branding preview mirrors the same placement.
+No logo still resolves to the ordinary text-only sidebar.
+
+Update 2.5f removes the dedicated sidebar logo zone from the runtime
+navigation. The sidebar branding contract is now deliberately narrower:
+organization name, scoped colors, active-state styling, and font. Logo upload
+and `logo_url` remain part of organization branding for the editor preview,
+PDF exports, and email templates, but `OrganizationNav` no longer renders a
+large logo block in the navigation.
+
 ### Meeting Document Layout
+
+Update 12 adds a meeting-work overview layer without changing the underlying
+meeting or minutes model. The meeting page derives counts from the existing
+meeting agenda, agenda-item minutes, decisions, tasks, and transfer read
+models. Incoming transferred points are fetched through the transfer service
+by target meeting and rendered near the agenda with source context when it is
+available. Agenda point accordions remain the editing surface and keep their
+existing autosave/storage keys, but their summaries now expose missing minutes,
+follow-up needs, and related decision/task counts so users can navigate a live
+meeting faster.
+
+Update 12.1 keeps the same agenda-item minutes persistence model but changes
+the editing hierarchy: `notes` is the only primary large editor on each point.
+The existing `decision`, `follow_up`, status, responsible, and deadline fields
+are still autosaved through the same route and storage key, but they are moved
+behind secondary action panels. Decisions and tasks are created through the
+existing modals with the point notes prefilled as suggested content, and
+related records are shown first as compact counts before the user opens the
+details.
+
+Update 12.1b refines that interaction without changing persistence. Point
+status is intentionally kept visible as a compact control because it drives
+follow-up and transfer logic. Secondary agenda-item actions share a single
+inline panel state, so only one follow-up or extra-fields panel is visible at a
+time and no action panel relies on floating layout inside the minutes editor.
 
 Phase 1.6-A4 treats the meeting page as an interactive document rather than an
 administration dashboard. The header combines authoritative meeting metadata
@@ -101,6 +246,9 @@ authorized read models and content only; they should not recreate independent
 typography, spacing, or footer systems. This keeps minutes, Job Cards, and
 future agenda, decision, task, Annual Wheel, and onboarding exports visually
 consistent while preserving server-side authorization and RLS boundaries.
+Organization branding is an optional input to this foundation, not a separate
+PDF pipeline. Missing branding or failed logo loading falls back to the
+standard report palette.
 
 Referat prose uses a shared rendering contract. On the website,
 `RichTextContent` applies document-style max-width, line height, paragraph
@@ -265,6 +413,22 @@ Structured Outputs are validated against `aiMeetingOverviewOutputSchema` and
 returned to `MeetingAiOverview` for modal display only. The output is
 preparation support and is never persisted as official minutes, decisions, or
 tasks.
+
+Update 7 introduces `ai_activity_log` as the shared AI transparency foundation.
+Rows are scoped to an organization and may reference a meeting and agenda item.
+They store the acting user, AI field, action type, bounded original text,
+bounded AI suggestion, provider/model/prompt metadata, a user-facing label,
+and lifecycle status (`generated`, `applied`, `dismissed`, or `failed`).
+RLS allows reads only for organization administrators or members of the
+related meeting or agenda-item committee, and writes are performed through
+server-side AI flows under the existing editor checks. The AI minutes
+assistant creates a generated log entry for each review suggestion, then the
+review modal marks that entry applied or dismissed when the user explicitly
+acts. The AI meeting overview logs generated advisory output only; it is still
+not official documentation and is not written back to minutes, decisions, or
+tasks. AI task suggestions, agenda-item assistant responses, mobile AI
+assistant answers, and failed provider calls remain documented as future
+logging targets to avoid a broad refactor in this first transparency pass.
 
 Update 9 adds `QuickActionMenu` to `OrganizationWorkspace` as a compact
 organization-header action surface. The component receives only the

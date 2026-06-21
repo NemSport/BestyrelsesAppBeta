@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { generateJobCardPdf } from "@/lib/job-card-pdf";
 import { createClient } from "@/lib/supabase/server";
 import { JobCardService } from "@/services/job-card-service";
+import { OrganizationBrandingService } from "@/services/organization-branding-service";
 
 function fileSlug(value: string) {
   return (
@@ -30,14 +31,21 @@ export async function GET(
       "organizationId",
     );
 
-    const { organization, role } = await new JobCardService(
-      await createClient(),
-    ).getPdfData(organizationId ?? "", roleProfileId);
+    const db = await createClient();
+    const { organization, role } = await new JobCardService(db).getPdfData(
+      organizationId ?? "",
+      roleProfileId,
+    );
+    const branding = await new OrganizationBrandingService(db).getPdfBranding(
+      organization.id,
+      organization.name,
+    );
 
     const pdf = await generateJobCardPdf({
       organizationName: organization.name,
       role,
       exportedAt: new Date(),
+      branding,
     });
 
     return new NextResponse(Buffer.from(pdf), {

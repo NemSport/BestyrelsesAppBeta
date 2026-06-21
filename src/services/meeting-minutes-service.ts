@@ -593,6 +593,8 @@ export class MeetingMinutesService {
       committeeId,
       user.id,
     );
+    const organizationContext =
+      await this.authorization.requireOrganizationMember(organizationId, user.id);
     const meeting = await this.requireMeeting(
       organizationId,
       committeeId,
@@ -608,6 +610,7 @@ export class MeetingMinutesService {
     }
     const attendees = await this.meetings.listAttendees(meetingId);
     return {
+      organization: organizationContext.organization,
       committee: context.committee,
       meeting,
       attendees,

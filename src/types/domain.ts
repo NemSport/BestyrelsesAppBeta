@@ -4,6 +4,7 @@ import type { TableRow } from "@/types/database";
 
 export type Profile = TableRow<"profiles">;
 export type Organization = TableRow<"organizations">;
+export type OrganizationBranding = TableRow<"organization_branding">;
 export type OrganizationMember = TableRow<"organization_members">;
 export type OrganizationInvitation = TableRow<"organization_invitations">;
 export type Committee = TableRow<"committees">;

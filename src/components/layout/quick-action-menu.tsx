@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { AgendaItemCreateForm } from "@/components/agenda-items/agenda-item-create-form";
@@ -41,9 +41,11 @@ function datetimeLocalToIso(value: string) {
 export function QuickActionMenu({
   organizationId,
   committees,
+  style,
 }: {
   organizationId: string;
   committees: CommitteeOption[];
+  style?: CSSProperties;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -342,6 +344,7 @@ export function QuickActionMenu({
         maxWidth="lg"
         onClose={() => setMeetingOpen(false)}
         open={meetingOpen}
+        style={style}
         title="Opret nyt møde"
       >
         <form className="space-y-4" noValidate onSubmit={submitMeeting}>
@@ -443,6 +446,7 @@ export function QuickActionMenu({
         maxWidth="lg"
         onClose={() => setQuickMeetingOpen(false)}
         open={quickMeetingOpen}
+        style={style}
         title="Hurtigt møde"
       >
         <form className="space-y-4" noValidate onSubmit={submitQuickMeeting}>
@@ -569,6 +573,7 @@ export function QuickActionMenu({
         maxWidth="2xl"
         onClose={() => setAgendaItemOpen(false)}
         open={agendaItemOpen}
+        style={style}
         title="Opret dagsordenspunkt"
       >
         {context.committeeId && context.meetingId ? (

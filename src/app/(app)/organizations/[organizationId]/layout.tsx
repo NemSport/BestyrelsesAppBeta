@@ -4,6 +4,7 @@ import { OrganizationWorkspace } from "@/components/layout/organization-workspac
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
+import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import { CommitteeService } from "@/services/committee-service";
 
 export default async function OrganizationLayout({
@@ -21,10 +22,14 @@ export default async function OrganizationLayout({
     .catch(() => null);
 
   if (!context) notFound();
-  const committees = await new CommitteeService(db).list(organizationId);
+  const [committees, branding] = await Promise.all([
+    new CommitteeService(db).list(organizationId),
+    new OrganizationBrandingService(db).getSafeBranding(organizationId),
+  ]);
 
   return (
     <OrganizationWorkspace
+      branding={branding}
       committees={committees.map((committee) => ({
         id: committee.id,
         name: committee.name,

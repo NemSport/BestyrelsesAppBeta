@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { CommitteeNav } from "@/components/layout/committee-nav";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -20,14 +19,5 @@ export default async function CommitteeLayout({
     .catch(() => null);
   if (!context) notFound();
 
-  return (
-    <>
-      <div className="mb-6">
-        <p className="page-eyebrow">Udvalgets arbejdsområde</p>
-        <h1 className="page-title">{context.committee.name}</h1>
-      </div>
-      <CommitteeNav organizationId={organizationId} committeeId={committeeId} />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

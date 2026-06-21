@@ -31,6 +31,23 @@ export class TransferredAgendaItemService {
     meetingId: string,
   ): Promise<{
     items: TransferredAgendaItemView[];
+    incomingItems: Array<{
+      id: string;
+      targetAgendaItemId: string | null;
+      sourceStatus: Database["public"]["Enums"]["agenda_item_minutes_status"];
+      transferReason: Database["public"]["Enums"]["agenda_item_transfer_reason"];
+      targetItemType: Database["public"]["Enums"]["agenda_item_type"];
+      sourceMeeting: {
+        id: string;
+        title: string;
+        starts_at: string;
+      } | null;
+      sourceAgendaItem: {
+        id: string;
+        title: string;
+        item_type: Database["public"]["Enums"]["agenda_item_type"];
+      } | null;
+    }>;
     futureMeetings: TransferMeetingOption[];
   }> {
     const user = await this.auth.requireUser();
@@ -48,8 +65,9 @@ export class TransferredAgendaItemService {
       throw new NotFoundError("Mødet");
     }
 
-    const [transfers, futureMeetings] = await Promise.all([
+    const [transfers, incomingTransfers, futureMeetings] = await Promise.all([
       this.transfers.listBySourceMeeting(meetingId),
+      this.transfers.listByTargetMeeting(meetingId),
       this.meetings.listFutureByCommittee(
         organizationId,
         committeeId,
@@ -94,9 +112,39 @@ export class TransferredAgendaItemService {
         ];
       })
       .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+    const [sourceMeetings, sourceAgendaItems] = await Promise.all([
+      this.transfers.listSourceMeetings([
+        ...new Set(incomingTransfers.map((transfer) => transfer.source_meeting_id)),
+      ]),
+      this.transfers.listSourceAgendaItems([
+        ...new Set(
+          incomingTransfers.map((transfer) => transfer.source_agenda_item_id),
+        ),
+      ]),
+    ]);
+    const sourceMeetingsById = new Map(
+      sourceMeetings.map((sourceMeeting) => [sourceMeeting.id, sourceMeeting]),
+    );
+    const sourceAgendaItemsById = new Map(
+      sourceAgendaItems.map((sourceAgendaItem) => [
+        sourceAgendaItem.id,
+        sourceAgendaItem,
+      ]),
+    );
 
     return {
       items,
+      incomingItems: incomingTransfers.map((transfer) => ({
+        id: transfer.id,
+        targetAgendaItemId: transfer.target_agenda_item_id,
+        sourceStatus: transfer.source_status,
+        transferReason: transfer.transfer_reason,
+        targetItemType: transfer.target_item_type,
+        sourceMeeting:
+          sourceMeetingsById.get(transfer.source_meeting_id) ?? null,
+        sourceAgendaItem:
+          sourceAgendaItemsById.get(transfer.source_agenda_item_id) ?? null,
+      })),
       futureMeetings: futureMeetings
         .filter(({ status }) => status !== "cancelled")
         .map(({ id, title, starts_at, status }) => ({

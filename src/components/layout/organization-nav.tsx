@@ -20,6 +20,7 @@ export function OrganizationNav({
   organizationId,
   organizationName,
 }: {
+  logoUrl?: string | null;
   organizationId: string;
   organizationName?: string;
 }) {
@@ -56,14 +57,14 @@ export function OrganizationNav({
     <aside className="org-sidebar">
       <nav aria-label="Organisationsnavigation">
         <div className="org-sidebar-header">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-muted">
+          <p className="org-sidebar-kicker text-[0.62rem] font-semibold uppercase tracking-[0.16em]">
             Organisation
           </p>
-          <p className="mt-0.5 text-[0.82rem] font-semibold leading-5 text-ink">
+          <p className="org-sidebar-title mt-0.5 text-[0.82rem] font-semibold leading-5">
             {organizationName ?? "Organisation"}
           </p>
-          <p className="mt-1.5 text-[0.72rem] font-medium text-muted">
-            Aktuel side: <span className="text-ink">{activeItem.label}</span>
+          <p className="org-sidebar-current mt-1.5 text-[0.72rem] font-medium">
+            Aktuel side: <span>{activeItem.label}</span>
           </p>
         </div>
         <div className="org-nav-list">

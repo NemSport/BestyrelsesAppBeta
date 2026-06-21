@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import { createClient } from "@/lib/supabase/server";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
+import { OrganizationBrandingService } from "@/services/organization-branding-service";
 
 export async function GET(
   request: Request,
@@ -11,12 +12,15 @@ export async function GET(
 ) {
   try {
     const { searchParams } = new URL(request.url);
-    const data = await new MeetingMinutesService(
-      await createClient(),
-    ).getApprovedPdfData(
+    const db = await createClient();
+    const data = await new MeetingMinutesService(db).getApprovedPdfData(
       searchParams.get("organizationId") ?? "",
       searchParams.get("committeeId") ?? "",
       (await params).meetingId,
+    );
+    const branding = await new OrganizationBrandingService(db).getPdfBranding(
+      data.organization.id,
+      data.organization.name,
     );
     const pdf = await generateMeetingMinutesPdf({
       meeting: data.meeting,
@@ -34,6 +38,7 @@ export async function GET(
           ["accepted", "attended"].includes(attendee.attendance_status),
         )
         .map((attendee) => attendee.user_id),
+      branding,
     });
     const fileName = `referat-${data.meeting.starts_at.slice(0, 10)}.pdf`;
 

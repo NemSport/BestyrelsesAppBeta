@@ -3,8 +3,7 @@
 import { useState } from "react";
 
 import { RichTextContent } from "@/components/forms/rich-text-content";
-import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
+import { Button, Modal, StatusBadge } from "@/components/ui";
 import {
   aiMinutesAssistantActionLabels,
   type AiMinutesAssistantAction,
@@ -23,6 +22,7 @@ type AiMinutesAssistantResult = {
   suggestionHtml: string;
   suggestionText: string;
   summary: string;
+  activityLogId: string | null;
   model: string;
   promptVersion: string;
   usage: {
@@ -61,12 +61,14 @@ export function MinutesAiAssistant({
   const [result, setResult] = useState<AiMinutesAssistantResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [appliedMessage, setAppliedMessage] = useState<string | null>(null);
 
   async function requestSuggestion(action: AiMinutesAssistantAction) {
     setSelectedAction(action);
     setLoadingAction(action);
     setError(null);
     setCopied(false);
+    setAppliedMessage(null);
     try {
       const response = await fetch(
         `/api/meetings/${meetingId}/minutes/ai-assist`,
@@ -104,15 +106,48 @@ export function MinutesAiAssistant({
     }
   }
 
+  async function updateActivityStatus(
+    activityLogId: string | null,
+    status: "applied" | "dismissed",
+  ) {
+    if (!activityLogId) return;
+    const response = await fetch(`/api/ai-activity/${activityLogId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) {
+      throw new Error("AI-historikken kunne ikke opdateres.");
+    }
+  }
+
   function closeReview() {
+    const currentResult = result;
+    if (currentResult) {
+      void updateActivityStatus(currentResult.activityLogId, "dismissed").catch(
+        () => {
+          setError("AI-historikken kunne ikke markeres som afvist.");
+        },
+      );
+    }
     setOpen(false);
     setCopied(false);
+    setResult(null);
   }
 
   function applySuggestion() {
     if (!result) return;
+    const currentResult = result;
     onApply(result.suggestionHtml);
-    closeReview();
+    setAppliedMessage("AI-forslag anvendt");
+    void updateActivityStatus(currentResult.activityLogId, "applied").catch(
+      () => {
+        setError("AI-historikken kunne ikke markeres som anvendt.");
+      },
+    );
+    setOpen(false);
+    setCopied(false);
+    setResult(null);
   }
 
   async function copySuggestion() {
@@ -156,6 +191,11 @@ export function MinutesAiAssistant({
           {error}
         </p>
       ) : null}
+      {appliedMessage ? (
+        <span className="text-xs font-medium text-muted">
+          {appliedMessage}
+        </span>
+      ) : null}
       <Modal
         description="Gennemgå forslaget, før du anvender det. Original tekst ændres ikke automatisk."
         eyebrow="AI-forslag"
@@ -184,6 +224,13 @@ export function MinutesAiAssistant({
       >
         {result ? (
           <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="info">AI-assisteret</StatusBadge>
+              <span className="text-xs text-muted">
+                Forslaget gemmes i AI-historikken, men Ã¦ndrer ikke referatet
+                uden din accept.
+              </span>
+            </div>
             <div className="border-l-2 border-brand bg-brand-soft/35 px-3 py-2 text-sm text-ink">
               {result.summary}
             </div>

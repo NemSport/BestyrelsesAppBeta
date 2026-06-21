@@ -9,6 +9,7 @@ type OverviewResponse =
   | {
       status: "ok";
       overview: AiMeetingOverviewOutput;
+      activityLogId: string | null;
       model: string;
       promptVersion: string;
       usage: {
@@ -115,6 +116,8 @@ export function MeetingAiOverview({
   }
 
   const overview = result?.status === "ok" ? result.overview : null;
+  const activityLogId =
+    result?.status === "ok" ? result.activityLogId : null;
 
   return (
     <>
@@ -165,6 +168,9 @@ export function MeetingAiOverview({
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone="info">AI-genereret forslag</StatusBadge>
+              {activityLogId ? (
+                <StatusBadge tone="neutral">AI-historik gemt</StatusBadge>
+              ) : null}
               <span className="text-xs text-muted">
                 Ikke officiel dokumentation
               </span>

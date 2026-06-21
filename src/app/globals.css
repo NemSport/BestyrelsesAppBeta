@@ -19,6 +19,9 @@
   --brand-text-subtle: 128 136 137;
   --brand-border: 218 219 213;
   --brand-border-strong: 197 201 195;
+  --brand-on-primary: 248 250 249;
+  --brand-on-primary-muted: 200 211 215;
+  --brand-on-primary-active: 255 255 255;
 
   --brand-danger: 143 55 49;
   --brand-danger-soft: 249 238 235;
@@ -251,22 +254,13 @@ a {
     margin-inline: 0;
     align-items: stretch;
     background: rgb(var(--brand-background));
+    font-family: var(--font-sans);
   }
 
   .org-layout-content {
     min-width: 0;
     padding: clamp(1rem, 3vw, 2.35rem) var(--space-page-x)
       var(--space-page-y);
-  }
-
-  .org-workspace-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: clamp(1rem, 2vw, 1.45rem);
-    border-bottom: 1px solid rgb(var(--brand-border));
-    padding-bottom: 0.85rem;
   }
 
   .quick-action-item {
@@ -292,31 +286,33 @@ a {
   }
 
   .org-sidebar {
-    background: linear-gradient(180deg, rgb(17 34 44), rgb(13 28 38));
-    color: rgb(232 238 240);
+    background:
+      linear-gradient(180deg, rgb(var(--brand-primary) / 0.98), rgb(var(--brand-primary-hover) / 0.98)),
+      rgb(var(--brand-primary));
+    color: rgb(var(--brand-on-primary));
     padding: 0.8rem 0.65rem;
   }
 
   .org-sidebar-header {
-    border-bottom: 1px solid rgb(255 255 255 / 0.1);
+    border-bottom: 1px solid rgb(var(--brand-on-primary) / 0.14);
     margin-bottom: 0.7rem;
     padding: 0.15rem 0.45rem 0.75rem;
   }
 
-  .org-sidebar-header p:first-child {
-    color: rgb(160 174 180);
+  .org-sidebar-kicker {
+    color: rgb(var(--brand-on-primary-muted));
   }
 
-  .org-sidebar-header p:nth-child(2) {
-    color: rgb(248 250 249);
+  .org-sidebar-title {
+    color: rgb(var(--brand-on-primary-active));
   }
 
-  .org-sidebar-header p:nth-child(3) {
-    color: rgb(177 189 194);
+  .org-sidebar-current {
+    color: rgb(var(--brand-on-primary-muted));
   }
 
-  .org-sidebar-header p:nth-child(3) span {
-    color: rgb(248 250 249);
+  .org-sidebar-current span {
+    color: rgb(var(--brand-on-primary-active));
   }
 
   .org-nav-list {
@@ -331,7 +327,7 @@ a {
     border-radius: var(--radius-control);
     border: 1px solid transparent;
     padding: 0.42rem 0.6rem;
-    color: rgb(201 211 215);
+    color: rgb(var(--brand-on-primary-muted));
     font-size: 0.8125rem;
     font-weight: 550;
     line-height: 1.25rem;
@@ -343,17 +339,17 @@ a {
   }
 
   .org-nav-link:hover {
-    border-color: rgb(255 255 255 / 0.08);
-    background: rgb(255 255 255 / 0.06);
-    color: white;
+    border-color: rgb(var(--brand-on-primary) / 0.14);
+    background: rgb(var(--brand-on-primary) / 0.08);
+    color: rgb(var(--brand-on-primary-active));
   }
 
   .org-nav-link-active {
-    border-color: rgb(255 255 255 / 0.14);
-    background: rgb(255 255 255 / 0.1);
-    color: white;
+    border-color: rgb(var(--brand-on-primary) / 0.18);
+    background: rgb(var(--brand-on-primary) / 0.12);
+    color: rgb(var(--brand-on-primary-active));
     font-weight: 650;
-    box-shadow: inset 2px 0 0 rgb(var(--brand-accent-soft));
+    box-shadow: inset 2px 0 0 rgb(var(--brand-accent));
   }
 
   @media (min-width: 1024px) {
@@ -386,10 +382,6 @@ a {
       border-bottom: 1px solid rgb(255 255 255 / 0.1);
     }
 
-    .org-workspace-topbar {
-      align-items: flex-start;
-      flex-direction: column;
-    }
   }
 
   .page-header-surface {

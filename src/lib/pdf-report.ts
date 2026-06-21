@@ -3,6 +3,7 @@ import {
   StandardFonts,
   rgb,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
   type RGB,
 } from "pdf-lib";
@@ -19,6 +20,15 @@ export type PdfProseBlock = {
   index?: number;
 };
 
+export type PdfReportBranding = {
+  organizationName?: string;
+  logoUrl?: string | null;
+  logoBytes?: Uint8Array | null;
+  logoMimeType?: "image/png" | "image/jpeg" | null;
+  primaryColor?: string;
+  accentColor?: string;
+};
+
 type PdfReportOptions = {
   documentType: string;
   title: string;
@@ -27,6 +37,7 @@ type PdfReportOptions = {
   committeeName?: string;
   generatedAt?: Date;
   meta?: PdfMetaItem[];
+  branding?: PdfReportBranding;
 };
 
 type TextOptions = {
@@ -60,6 +71,27 @@ const palette = {
   success: rgb(0.12, 0.42, 0.25),
   danger: rgb(0.62, 0.16, 0.16),
 };
+
+function rgbFromHex(value: string | null | undefined, fallback: RGB) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(value ?? "")) return fallback;
+  const hex = value!.slice(1);
+  return rgb(
+    Number.parseInt(hex.slice(0, 2), 16) / 255,
+    Number.parseInt(hex.slice(2, 4), 16) / 255,
+    Number.parseInt(hex.slice(4, 6), 16) / 255,
+  );
+}
+
+function softRgbFromHex(value: string | null | undefined, fallback: RGB) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(value ?? "")) return fallback;
+  const hex = value!.slice(1);
+  const channels = [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ].map((channel) => (channel + (255 - channel) * 0.86) / 255);
+  return rgb(channels[0], channels[1], channels[2]);
+}
 
 export function safePdfText(value: string) {
   return value.replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, "?");
@@ -127,6 +159,23 @@ export async function createPdfReport(options: PdfReportOptions) {
   const document = await PDFDocument.create();
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const reportPalette = {
+    ...palette,
+    brand: rgbFromHex(options.branding?.primaryColor, palette.brand),
+    brandSoft: softRgbFromHex(options.branding?.primaryColor, palette.brandSoft),
+    accent: rgbFromHex(options.branding?.accentColor, palette.brand),
+  };
+  let logoImage: PDFImage | null = null;
+  if (options.branding?.logoBytes && options.branding.logoMimeType) {
+    try {
+      logoImage =
+        options.branding.logoMimeType === "image/png"
+          ? await document.embedPng(options.branding.logoBytes)
+          : await document.embedJpg(options.branding.logoBytes);
+    } catch {
+      logoImage = null;
+    }
+  }
   const contentWidth = pageSize[0] - margin * 2;
   let page: PDFPage;
   let y = pageSize[1] - margin - headerHeight;
@@ -139,16 +188,41 @@ export async function createPdfReport(options: PdfReportOptions) {
       y: pageSize[1] - headerHeight,
       width: pageSize[0],
       height: headerHeight,
-      color: palette.subtle,
+      color: reportPalette.subtle,
     });
+    page.drawRectangle({
+      x: 0,
+      y: pageSize[1] - 4,
+      width: pageSize[0],
+      height: 4,
+      color: reportPalette.brand,
+    });
+    const logoMaxWidth = 78;
+    const logoMaxHeight = 38;
+    const textWidth = logoImage ? contentWidth - logoMaxWidth - 18 : contentWidth;
+    if (logoImage) {
+      const scale = Math.min(
+        logoMaxWidth / logoImage.width,
+        logoMaxHeight / logoImage.height,
+        1,
+      );
+      const width = logoImage.width * scale;
+      const height = logoImage.height * scale;
+      page.drawImage(logoImage, {
+        x: pageSize[0] - margin - width,
+        y: pageSize[1] - 62,
+        width,
+        height,
+      });
+    }
     page.drawText(safePdfText(options.documentType.toLocaleUpperCase("da-DK")), {
       x: margin,
       y: pageSize[1] - 32,
       font: bold,
       size: 8.5,
-      color: palette.brand,
+      color: reportPalette.brand,
     });
-    const titleLines = clampLines(wrapText(options.title, bold, 14.5, contentWidth), 2);
+    const titleLines = clampLines(wrapText(options.title, bold, 14.5, textWidth), 2);
     let titleY = pageSize[1] - 50;
     for (const line of titleLines) {
       page.drawText(line, {
@@ -156,32 +230,32 @@ export async function createPdfReport(options: PdfReportOptions) {
         y: titleY,
         font: bold,
         size: 14.5,
-        color: palette.ink,
+        color: reportPalette.ink,
       });
       titleY -= 14;
     }
     const context = [
-      options.organizationName,
+      options.branding?.organizationName ?? options.organizationName,
       options.committeeName,
       options.subtitle,
     ]
       .filter(Boolean)
       .join("  |  ");
     if (context) {
-      const contextLines = clampLines(wrapText(context, regular, 8.8, contentWidth), 1);
+      const contextLines = clampLines(wrapText(context, regular, 8.8, textWidth), 1);
       page.drawText(contextLines[0], {
         x: margin,
         y: pageSize[1] - 76,
         font: regular,
         size: 8.8,
-        color: palette.muted,
+        color: reportPalette.muted,
       });
     }
     page.drawLine({
       start: { x: margin, y: pageSize[1] - headerHeight },
       end: { x: pageSize[0] - margin, y: pageSize[1] - headerHeight },
       thickness: 0.7,
-      color: palette.line,
+      color: reportPalette.line,
     });
   };
 
@@ -191,21 +265,21 @@ export async function createPdfReport(options: PdfReportOptions) {
       start: { x: margin, y: footerHeight + 8 },
       end: { x: pageSize[0] - margin, y: footerHeight + 8 },
       thickness: 0.5,
-      color: palette.line,
+      color: reportPalette.line,
     });
     page.drawText(`Eksporteret ${formatPdfDate(generatedAt)}`, {
       x: margin,
       y: footerHeight - 7,
       font: regular,
       size: 8,
-      color: palette.muted,
+      color: reportPalette.muted,
     });
     page.drawText(`Side ${pageNumber}`, {
       x: pageSize[0] - margin - 36,
       y: footerHeight - 7,
       font: regular,
       size: 8,
-      color: palette.muted,
+      color: reportPalette.muted,
     });
   };
 
@@ -244,7 +318,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         y,
         font,
         size,
-        color: textOptions.color ?? palette.ink,
+        color: textOptions.color ?? reportPalette.ink,
       });
       y -= lineHeight;
     }
@@ -283,7 +357,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           y,
           font: bold,
           size,
-          color: options.color ?? palette.ink,
+          color: options.color ?? reportPalette.ink,
         });
       }
       for (const [index, line] of lines.entries()) {
@@ -292,7 +366,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           y,
           font,
           size,
-          color: options.color ?? palette.ink,
+          color: options.color ?? reportPalette.ink,
         });
         y -= lineHeight;
         if (index === 0 && options.bullet) {
@@ -324,10 +398,10 @@ export async function createPdfReport(options: PdfReportOptions) {
           y: y - 5,
           width: 3,
           height: 18,
-          color: palette.line,
+          color: reportPalette.line,
         });
         addProseLine(block.text, {
-          color: palette.muted,
+          color: reportPalette.muted,
           indent: 12,
           gapAfter: 9,
         });
@@ -366,21 +440,21 @@ export async function createPdfReport(options: PdfReportOptions) {
       y: y - 6,
       width: 4,
       height: 18,
-      color: palette.brand,
+      color: reportPalette.brand,
     });
     page.drawText(safePdfText(title), {
       x: margin + 12,
       y,
       font: bold,
       size: 13,
-      color: palette.brand,
+      color: reportPalette.brand,
     });
     y -= 18;
     page.drawLine({
       start: { x: margin, y },
       end: { x: pageSize[0] - margin, y },
       thickness: 0.5,
-      color: palette.line,
+      color: reportPalette.line,
     });
     y -= 12;
   };
@@ -392,7 +466,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       y,
       font: bold,
       size: 10.5,
-      color: palette.ink,
+      color: reportPalette.ink,
     });
     y -= 15;
   };
@@ -423,14 +497,14 @@ export async function createPdfReport(options: PdfReportOptions) {
           y: y - rowHeight + 7,
           width: columnWidth,
           height: rowHeight,
-          color: palette.subtle,
+          color: reportPalette.subtle,
         });
         page.drawText(safePdfText(item.label.toLocaleUpperCase("da-DK")), {
           x: x + 8,
           y: y - 2,
           font: bold,
           size: 7,
-          color: palette.muted,
+          color: reportPalette.muted,
         });
         let valueY = y - 16;
         for (const line of valueLines) {
@@ -439,7 +513,7 @@ export async function createPdfReport(options: PdfReportOptions) {
             y: valueY,
             font: regular,
             size: 8.8,
-            color: palette.ink,
+            color: reportPalette.ink,
           });
           valueY -= 10.5;
         }
@@ -459,10 +533,10 @@ export async function createPdfReport(options: PdfReportOptions) {
     tone: "neutral" | "success" | "warning" | "danger" = "neutral",
   ) => {
     const colors = {
-      neutral: { fill: palette.subtle, text: palette.ink },
-      success: { fill: rgb(0.88, 0.95, 0.9), text: palette.success },
-      warning: { fill: rgb(0.98, 0.93, 0.84), text: palette.warning },
-      danger: { fill: rgb(0.97, 0.88, 0.88), text: palette.danger },
+      neutral: { fill: reportPalette.subtle, text: reportPalette.ink },
+      success: { fill: rgb(0.88, 0.95, 0.9), text: reportPalette.success },
+      warning: { fill: rgb(0.98, 0.93, 0.84), text: reportPalette.warning },
+      danger: { fill: rgb(0.97, 0.88, 0.88), text: reportPalette.danger },
     }[tone];
     const width = Math.min(
       Math.max(bold.widthOfTextAtSize(label, 8) + 16, 48),
@@ -475,7 +549,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       width,
       height: 16,
       color: colors.fill,
-      borderColor: palette.line,
+      borderColor: reportPalette.line,
       borderWidth: 0.3,
     });
     page.drawText(safePdfText(label), {
@@ -504,7 +578,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         y: y - 15,
         width: contentWidth,
         height: headerHeight,
-        color: palette.brandSoft,
+        color: reportPalette.brandSoft,
       });
       let headerX = margin;
       for (const column of columns) {
@@ -513,7 +587,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           y: y - 8,
           font: bold,
           size: 8,
-          color: palette.brand,
+          color: reportPalette.brand,
         });
         headerX += column.width;
       }
@@ -547,7 +621,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         width: contentWidth,
         height: rowHeight,
         color: rgb(1, 1, 1),
-        borderColor: palette.line,
+        borderColor: reportPalette.line,
         borderWidth: 0.35,
       });
       let cellX = margin;
@@ -559,7 +633,7 @@ export async function createPdfReport(options: PdfReportOptions) {
             y: cellY,
             font: regular,
             size: 8.5,
-            color: palette.ink,
+            color: reportPalette.ink,
           });
           cellY -= lineHeight;
         }
@@ -584,7 +658,7 @@ export async function createPdfReport(options: PdfReportOptions) {
   return {
     document,
     fonts: { regular, bold },
-    palette,
+    palette: reportPalette,
     addBadge,
     addKeyValue,
     addMetaGrid,
