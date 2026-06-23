@@ -8,6 +8,7 @@ import {
 } from "@/lib/validation";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
+import { AnnualWheelRepository } from "@/repositories/annual-wheel-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
@@ -21,6 +22,7 @@ export class TaskService {
   private readonly committees: CommitteeRepository;
   private readonly meetings: MeetingRepository;
   private readonly agendaItems: AgendaItemRepository;
+  private readonly annualWheel: AnnualWheelRepository;
   private readonly decisions: DecisionRepository;
   private readonly members: OrganizationMemberRepository;
   private readonly auth: AuthService;
@@ -31,6 +33,7 @@ export class TaskService {
     this.committees = new CommitteeRepository(db);
     this.meetings = new MeetingRepository(db);
     this.agendaItems = new AgendaItemRepository(db);
+    this.annualWheel = new AnnualWheelRepository(db);
     this.decisions = new DecisionRepository(db);
     this.members = new OrganizationMemberRepository(db);
     this.auth = new AuthService(db);
@@ -240,7 +243,7 @@ export class TaskService {
       parsed.responsibleUserId,
     );
     await this.requireValidReferences(parsed);
-    return this.tasks.update(parsed.taskId, {
+    const updated = await this.tasks.update(parsed.taskId, {
       committee_id: parsed.committeeId,
       meeting_id: parsed.meetingId ?? null,
       agenda_item_id: parsed.agendaItemId ?? null,
@@ -261,6 +264,8 @@ export class TaskService {
       completed_at:
         parsed.status === "completed" ? task.completed_at ?? new Date().toISOString() : null,
     });
+    await this.maybeCompleteAnnualWheelEvent(updated, user.id);
+    return updated;
   }
 
   async performAction(input: unknown) {
@@ -278,11 +283,13 @@ export class TaskService {
         updated_by: user.id,
       });
     }
-    return this.tasks.update(parsed.taskId, {
+    const updated = await this.tasks.update(parsed.taskId, {
       status: "completed",
       completed_at: task.completed_at ?? new Date().toISOString(),
       updated_by: user.id,
     });
+    await this.maybeCompleteAnnualWheelEvent(updated, user.id);
+    return updated;
   }
 
   async getFollowUpCandidates(
@@ -315,6 +322,23 @@ export class TaskService {
       throw new NotFoundError("Opgaven");
     }
     return task;
+  }
+
+  private async maybeCompleteAnnualWheelEvent(
+    task: Awaited<ReturnType<TaskRepository["update"]>>,
+    userId: string,
+  ) {
+    if (
+      task.annual_wheel_event_id &&
+      task.annual_wheel_activation_year &&
+      task.status === "completed"
+    ) {
+      await this.annualWheel.completeIfAllActivatedTasksDone(
+        task.annual_wheel_event_id,
+        task.annual_wheel_activation_year,
+        userId,
+      );
+    }
   }
 
   private localDate(value: Date) {

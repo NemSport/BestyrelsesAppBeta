@@ -38,8 +38,11 @@ type RoleDraft = {
   meetingExpectations: string;
   contactPeople: string;
   responsibilityAreaIds: string[];
+  responsibilityAreaNames: string[];
   committeeIds: string[];
   assignedUserIds: string[];
+  annualWheelEventIds: string[];
+  decisionIds: string[];
   documents: DocumentDraft[];
   taskTemplates: TemplateDraft[];
   onboarding: {
@@ -48,6 +51,8 @@ type RoleDraft = {
     practicalInformation: string;
   };
 };
+type JobCardStatusFilter = "all" | "active" | "archived";
+type JobCardAssignmentFilter = "all" | "assigned" | "unassigned";
 type AiJobCardDraft = {
   title: string; purpose: string; description: string; responsibilities: string;
   exclusions: string; competencies: string; collaboration: string;
@@ -70,8 +75,11 @@ function emptyDraft(): RoleDraft {
     meetingExpectations: "",
     contactPeople: "",
     responsibilityAreaIds: [],
+    responsibilityAreaNames: [],
     committeeIds: [],
     assignedUserIds: [],
+    annualWheelEventIds: [],
+    decisionIds: [],
     documents: [],
     taskTemplates: [],
     onboarding: {
@@ -95,8 +103,11 @@ function fromRole(role: RoleProfileView): RoleDraft {
     meetingExpectations: role.meeting_expectations,
     contactPeople: role.contact_people,
     responsibilityAreaIds: role.responsibilityAreas.map((area) => area.id),
+    responsibilityAreaNames: [],
     committeeIds: role.committees.map((committee) => committee.id),
     assignedUserIds: role.assignments.map((assignment) => assignment.userId),
+    annualWheelEventIds: role.annualWheelEvents.map((event) => event.id),
+    decisionIds: role.decisions.map((decision) => decision.id),
     documents: role.documents.map(({ title, url }) => ({ title, url })),
     taskTemplates: role.taskTemplates.map((template) => ({
       committeeId: template.committee_id,
@@ -120,6 +131,43 @@ function toggle(values: string[], value: string) {
     : [...values, value];
 }
 
+function normalizeAreaName(value: string) {
+  return value.trim().toLocaleLowerCase("da-DK");
+}
+
+function addResponsibilityAreaInput(
+  draft: RoleDraft,
+  value: string,
+  areas: JobCardOverview["responsibilityAreas"],
+) {
+  const name = value.trim();
+  if (!name) return draft;
+  const normalized = normalizeAreaName(name);
+  const existing = areas.find((area) => normalizeAreaName(area.name) === normalized);
+  if (existing) {
+    return {
+      ...draft,
+      responsibilityAreaIds: [
+        ...new Set([...draft.responsibilityAreaIds, existing.id]),
+      ],
+      responsibilityAreaNames: draft.responsibilityAreaNames.filter(
+        (current) => normalizeAreaName(current) !== normalized,
+      ),
+    };
+  }
+  return {
+    ...draft,
+    responsibilityAreaNames: [
+      ...new Map(
+        [...draft.responsibilityAreaNames, name]
+          .map((current) => current.trim())
+          .filter(Boolean)
+          .map((current) => [normalizeAreaName(current), current]),
+      ).values(),
+    ],
+  };
+}
+
 function compactFieldErrors(payload: { fieldErrors?: Record<string, string[]> }) {
   return [
     ...new Set(
@@ -134,6 +182,15 @@ function payloadForSubmit(organizationId: string, draft: RoleDraft) {
   return {
     organizationId,
     ...draft,
+    responsibilityAreaIds: [...new Set(draft.responsibilityAreaIds)],
+    responsibilityAreaNames: [
+      ...new Map(
+        draft.responsibilityAreaNames
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .map((name) => [normalizeAreaName(name), name]),
+      ).values(),
+    ],
     documents: draft.documents.filter(
       (document) => document.title.trim() || document.url.trim(),
     ),
@@ -152,6 +209,31 @@ function payloadForSubmit(organizationId: string, draft: RoleDraft) {
   };
 }
 
+function normalizeSearchValue(value: string | null | undefined) {
+  return (value ?? "").toLocaleLowerCase("da-DK").trim();
+}
+
+function roleSearchText(role: RoleProfileView) {
+  return [
+    role.title,
+    role.purpose,
+    role.description,
+    role.responsibilities,
+    role.competencies,
+    role.collaboration,
+    role.meeting_expectations,
+    role.contact_people,
+    ...role.assignments.flatMap((assignment) => [
+      assignment.name,
+      assignment.email,
+    ]),
+    ...role.committees.map((committee) => committee.name),
+    ...role.responsibilityAreas.map((area) => area.name),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function JobCardRegister({
   organizationId,
   data,
@@ -164,40 +246,97 @@ export function JobCardRegister({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [areaName, setAreaName] = useState("");
-  const [creatingArea, setCreatingArea] = useState(false);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
   const [pdfDownloadingId, setPdfDownloadingId] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<JobCardStatusFilter>("all");
+  const [committeeFilter, setCommitteeFilter] = useState("all");
+  const [assignmentFilter, setAssignmentFilter] =
+    useState<JobCardAssignmentFilter>("all");
+
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+  const filtersAreActive =
+    normalizedSearchTerm ||
+    statusFilter !== "all" ||
+    committeeFilter !== "all" ||
+    assignmentFilter !== "all";
+  const filteredRoles = data.roles.filter((role) => {
+    const matchesSearch =
+      !normalizedSearchTerm ||
+      normalizeSearchValue(roleSearchText(role)).includes(normalizedSearchTerm);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && !role.archived_at) ||
+      (statusFilter === "archived" && Boolean(role.archived_at));
+    const matchesCommittee =
+      committeeFilter === "all" ||
+      role.committees.some((committee) => committee.id === committeeFilter);
+    const matchesAssignment =
+      assignmentFilter === "all" ||
+      (assignmentFilter === "assigned" && role.assignments.length > 0) ||
+      (assignmentFilter === "unassigned" && role.assignments.length === 0);
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesCommittee &&
+      matchesAssignment
+    );
+  });
+  const resultText = filtersAreActive
+    ? `Viser ${filteredRoles.length} af ${data.roles.length} jobkort`
+    : `Viser ${data.roles.length} jobkort`;
+
+  function resetFilters() {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setCommitteeFilter("all");
+    setAssignmentFilter("all");
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
     setSaving(true);
     setError(null);
-    const response = await fetch(
-      draft.id
-        ? `/api/job-cards/${draft.id}`
-        : `/api/organizations/${organizationId}/job-cards`,
-      {
-        method: draft.id ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloadForSubmit(organizationId, draft)),
-      },
+    const draftForSubmit = addResponsibilityAreaInput(
+      draft,
+      areaName,
+      data.responsibilityAreas,
     );
-    const payload = await response.json().catch(() => ({}));
-    setSaving(false);
-    if (!response.ok) {
-      const fieldMessages = compactFieldErrors(payload);
-      setError(
-        fieldMessages.length
-          ? fieldMessages.join(" ")
-          : payload.error ?? "Jobkortet kunne ikke gemmes.",
+    try {
+      const response = await fetch(
+        draft.id
+          ? `/api/job-cards/${draft.id}`
+          : `/api/organizations/${organizationId}/job-cards`,
+        {
+          method: draft.id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payloadForSubmit(organizationId, draftForSubmit)),
+        },
       );
-      return;
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const fieldMessages = compactFieldErrors(payload);
+        setError(
+          fieldMessages.length
+            ? fieldMessages.join(" ")
+            : payload.error ?? "Jobkortet kunne ikke gemmes.",
+        );
+        return;
+      }
+      setDraft(null);
+      setAreaName("");
+      router.refresh();
+    } catch (error) {
+      console.error("[job-cards] Jobkort-formular kunne ikke gemmes", error);
+      setError("Forbindelsen til serveren mislykkedes. Prøv igen.");
+    } finally {
+      setSaving(false);
     }
-    setDraft(null);
-    router.refresh();
   }
 
   async function archive(roleId: string) {
@@ -216,29 +355,10 @@ export function JobCardRegister({
     router.refresh();
   }
 
-  async function createArea() {
-    if (!areaName.trim()) return;
-    setCreatingArea(true);
-    const response = await fetch(
-      `/api/organizations/${organizationId}/responsibility-areas`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          name: areaName,
-          description: "",
-        }),
-      },
-    );
-    setCreatingArea(false);
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setError(payload.error ?? "Ansvarsområdet kunne ikke oprettes.");
-      return;
-    }
+  function createArea() {
+    if (!draft || !areaName.trim()) return;
+    setDraft(addResponsibilityAreaInput(draft, areaName, data.responsibilityAreas));
     setAreaName("");
-    router.refresh();
   }
 
   async function instantiate(templateId: string) {
@@ -321,7 +441,7 @@ export function JobCardRegister({
     const base = role ? fromRole(role) : emptyDraft();
     const normalizedAreas = new Set(
       suggestion.responsibilityAreas.map((value) =>
-        value.toLocaleLowerCase("da-DK"),
+        normalizeAreaName(value),
       ),
     );
     const normalizedCommittees = new Set(
@@ -342,9 +462,15 @@ export function JobCardRegister({
       contactPeople: suggestion.contactPeople,
       responsibilityAreaIds: data.responsibilityAreas
         .filter((area) =>
-          normalizedAreas.has(area.name.toLocaleLowerCase("da-DK")),
+          normalizedAreas.has(normalizeAreaName(area.name)),
         )
         .map((area) => area.id),
+      responsibilityAreaNames: suggestion.responsibilityAreas.filter(
+        (suggestedArea) =>
+          !data.responsibilityAreas.some(
+            (area) => normalizeAreaName(area.name) === normalizeAreaName(suggestedArea),
+          ),
+      ),
       committeeIds: data.committees
         .filter((committee) =>
           normalizedCommittees.has(committee.name.toLocaleLowerCase("da-DK")),
@@ -445,10 +571,77 @@ export function JobCardRegister({
       ) : null}
       {pdfError ? <div className="alert-danger p-3 text-sm">{pdfError}</div> : null}
       {data.roles.length ? (
-        <div className="divide-y divide-line border-y border-line">
-          {data.roles.map((role) => (
+        <>
+          <section className="border-y border-line bg-subtle/35 px-4 py-3">
+            <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto] lg:items-end">
+              <label className="space-y-1.5">
+                <span className="label">Søg jobkort</span>
+                <Input
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Søg efter rolle, udvalg, ansvar..."
+                  value={searchTerm}
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="label">Status</span>
+                <select
+                  className="field min-w-[150px]"
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as JobCardStatusFilter)
+                  }
+                  value={statusFilter}
+                >
+                  <option value="all">Alle</option>
+                  <option value="active">Aktiv</option>
+                  <option value="archived">Arkiveret</option>
+                </select>
+              </label>
+              <label className="space-y-1.5">
+                <span className="label">Udvalg</span>
+                <select
+                  className="field min-w-[170px]"
+                  onChange={(event) => setCommitteeFilter(event.target.value)}
+                  value={committeeFilter}
+                >
+                  <option value="all">Alle udvalg</option>
+                  {data.committees.map((committee) => (
+                    <option key={committee.id} value={committee.id}>
+                      {committee.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5">
+                <span className="label">Rolleholder</span>
+                <select
+                  className="field min-w-[160px]"
+                  onChange={(event) =>
+                    setAssignmentFilter(
+                      event.target.value as JobCardAssignmentFilter,
+                    )
+                  }
+                  value={assignmentFilter}
+                >
+                  <option value="all">Alle</option>
+                  <option value="assigned">Med rolleholder</option>
+                  <option value="unassigned">Uden rolleholder</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+              <span>{resultText}</span>
+              {filtersAreActive ? (
+                <Button onClick={resetFilters} size="sm" variant="ghost">
+                  Ryd filtre
+                </Button>
+              ) : null}
+            </div>
+          </section>
+          {filteredRoles.length ? (
+            <div className="space-y-4">
+              {filteredRoles.map((role) => (
             <article
-              className="scroll-mt-24 bg-surface py-5"
+              className="scroll-mt-24 border border-line bg-surface px-4 py-5 shadow-sm sm:px-5"
               id={`job-card-${role.id}`}
               key={role.id}
             >
@@ -649,21 +842,28 @@ export function JobCardRegister({
                 </div>
               </details>
             </article>
-          ))}
-        </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              compact
+              description="Prøv at ændre søgning eller filtre."
+              title="Ingen jobkort matcher din søgning"
+            />
+          )}
+        </>
       ) : (
         <EmptyState title="Der er endnu ikke oprettet jobkort i organisationen." />
       )}
       <RoleModal
         areaName={areaName}
-        creatingArea={creatingArea}
         data={data}
         draft={draft}
         error={error}
         onAreaName={setAreaName}
         onArchive={archive}
         onClose={() => setDraft(null)}
-        onCreateArea={() => void createArea()}
+        onCreateArea={createArea}
         onDraft={setDraft}
         onSubmit={submit}
         saving={saving}
@@ -716,7 +916,7 @@ function ContextList({
 
 function RoleModal(props: {
   data: JobCardOverview; draft: RoleDraft | null; error: string | null; saving: boolean;
-  areaName: string; creatingArea: boolean; onAreaName: (value: string) => void;
+  areaName: string; onAreaName: (value: string) => void;
   onDraft: (draft: RoleDraft) => void; onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onArchive: (id: string) => void; onCreateArea: () => void;
@@ -740,9 +940,79 @@ function RoleModal(props: {
           <Field label="Kontaktpersoner"><Textarea value={draft.contactPeople} onChange={(e) => props.onDraft({ ...draft, contactPeople: e.target.value })} /></Field>
         </div>
         <ChoiceGroup label="Ansvarsområder" options={data.responsibilityAreas.map((area) => ({ id: area.id, label: area.name }))} values={draft.responsibilityAreaIds} onToggle={(id) => props.onDraft({ ...draft, responsibilityAreaIds: toggle(draft.responsibilityAreaIds, id) })} />
-        <div className="flex gap-2"><Input placeholder="Nyt ansvarsområde" value={props.areaName} onChange={(e) => props.onAreaName(e.target.value)} /><Button disabled={props.creatingArea} onClick={props.onCreateArea} type="button" variant="secondary">Tilføj område</Button></div>
+        {draft.responsibilityAreaNames.length ? (
+          <div className="flex flex-wrap gap-2">
+            {draft.responsibilityAreaNames.map((name) => (
+              <button
+                className="rounded border border-brand/30 bg-brand-soft px-3 py-1 text-sm text-brand"
+                key={normalizeAreaName(name)}
+                onClick={() => props.onDraft({
+                  ...draft,
+                  responsibilityAreaNames: draft.responsibilityAreaNames.filter(
+                    (current) => normalizeAreaName(current) !== normalizeAreaName(name),
+                  ),
+                })}
+                type="button"
+              >
+                {name} x
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex gap-2"><Input list="job-card-responsibility-areas" placeholder="Skriv nyt eller eksisterende ansvarsområde" value={props.areaName} onChange={(e) => props.onAreaName(e.target.value)} /><datalist id="job-card-responsibility-areas">{data.responsibilityAreas.map((area) => <option key={area.id} value={area.name} />)}</datalist><Button disabled={!props.areaName.trim()} onClick={props.onCreateArea} type="button" variant="secondary">Tilføj område</Button></div>
         <ChoiceGroup label="Udvalg" options={data.committees.map((committee) => ({ id: committee.id, label: committee.name }))} values={draft.committeeIds} onToggle={(id) => props.onDraft({ ...draft, committeeIds: toggle(draft.committeeIds, id) })} />
         <ChoiceGroup label="Rolleholdere" options={data.members.filter((member) => member.status === "active").map((member) => ({ id: member.user_id, label: member.full_name || member.email }))} values={draft.assignedUserIds} onToggle={(id) => props.onDraft({ ...draft, assignedUserIds: toggle(draft.assignedUserIds, id) })} />
+        <details className="border-y border-line py-4">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Relationer
+            <span className="ml-2 font-normal text-muted">
+              ({draft.annualWheelEventIds.length + draft.decisionIds.length})
+            </span>
+          </summary>
+          <div className="mt-4 space-y-5">
+            <RelationChoiceGroup
+              empty="Ingen årshjulsaktiviteter er tilgængelige."
+              label="Årshjulsaktiviteter"
+              onToggle={(id) =>
+                props.onDraft({
+                  ...draft,
+                  annualWheelEventIds: toggle(
+                    draft.annualWheelEventIds,
+                    id,
+                  ),
+                })
+              }
+              options={data.annualWheelEvents.map((event) => ({
+                id: event.id,
+                label: event.title,
+                meta: `${event.starts_on} · ${
+                  event.committee?.name ?? "Hele organisationen"
+                }`,
+              }))}
+              values={draft.annualWheelEventIds}
+            />
+            <RelationChoiceGroup
+              empty="Ingen beslutninger er tilgængelige."
+              label="Beslutninger"
+              onToggle={(id) =>
+                props.onDraft({
+                  ...draft,
+                  decisionIds: toggle(draft.decisionIds, id),
+                })
+              }
+              options={data.decisions.map((decision) => ({
+                id: decision.id,
+                label: decision.title,
+                meta: `${decision.decision_date} · ${
+                  data.committees.find(
+                    (committee) => committee.id === decision.committee_id,
+                  )?.name ?? "Udvalg"
+                }`,
+              }))}
+              values={draft.decisionIds}
+            />
+          </div>
+        </details>
         <DynamicDocuments draft={draft} onDraft={props.onDraft} />
         <DynamicTemplates data={data} draft={draft} onDraft={props.onDraft} />
         <div className="border-t border-line pt-5"><h3 className="font-semibold">Onboarding</h3><div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -758,6 +1028,53 @@ function RoleModal(props: {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block space-y-1.5"><span className="label">{label}</span>{children}</label>; }
 function ChoiceGroup({ label, options, values, onToggle }: { label: string; options: Array<{ id: string; label: string }>; values: string[]; onToggle: (id: string) => void }) { return <fieldset><legend className="label">{label}</legend><div className="mt-2 flex flex-wrap gap-2">{options.length ? options.map((option) => <label className="flex items-center gap-2 rounded border border-line px-3 py-2 text-sm" key={option.id}><input checked={values.includes(option.id)} onChange={() => onToggle(option.id)} type="checkbox" />{option.label}</label>) : <span className="text-sm text-muted">Ingen valgmuligheder endnu.</span>}</div></fieldset>; }
+
+function RelationChoiceGroup({
+  empty,
+  label,
+  onToggle,
+  options,
+  values,
+}: {
+  empty: string;
+  label: string;
+  onToggle: (id: string) => void;
+  options: Array<{ id: string; label: string; meta: string }>;
+  values: string[];
+}) {
+  return (
+    <fieldset>
+      <legend className="label">{label}</legend>
+      {options.length ? (
+        <div className="mt-2 max-h-56 divide-y divide-line overflow-y-auto border-y border-line">
+          {options.map((option) => (
+            <label
+              className="flex cursor-pointer items-start gap-3 px-2 py-2.5 hover:bg-subtle/60"
+              key={option.id}
+            >
+              <input
+                checked={values.includes(option.id)}
+                className="mt-1"
+                onChange={() => onToggle(option.id)}
+                type="checkbox"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">
+                  {option.label}
+                </span>
+                <span className="block truncate text-xs text-muted">
+                  {option.meta}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted">{empty}</p>
+      )}
+    </fieldset>
+  );
+}
 
 function DynamicDocuments({ draft, onDraft }: { draft: RoleDraft; onDraft: (draft: RoleDraft) => void }) {
   return <section><div className="flex items-center justify-between"><h3 className="font-semibold">Dokumenter og links</h3><Button onClick={() => onDraft({ ...draft, documents: [...draft.documents, { title: "", url: "" }] })} size="sm" type="button" variant="secondary">Tilføj link</Button></div><div className="mt-3 space-y-3">{draft.documents.map((document, index) => <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]" key={index}><Input placeholder="Titel" value={document.title} onChange={(e) => onDraft({ ...draft, documents: draft.documents.map((item, i) => i === index ? { ...item, title: e.target.value } : item) })} /><Input placeholder="https://..." value={document.url} onChange={(e) => onDraft({ ...draft, documents: draft.documents.map((item, i) => i === index ? { ...item, url: e.target.value } : item) })} /><Button onClick={() => onDraft({ ...draft, documents: draft.documents.filter((_, i) => i !== index) })} type="button" variant="ghost">Fjern</Button></div>)}</div></section>;

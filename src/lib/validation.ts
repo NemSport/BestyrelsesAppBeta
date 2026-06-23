@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 import {
   agendaItemMinutesNeedsAction,
@@ -535,6 +535,9 @@ export const annualWheelEventInputSchema = z
     responsibleUserId: uuidSchema.nullable().optional(),
     category: optionalDecisionText("Kategori", 120),
     priority: z.enum(["low", "medium", "high", "critical"]),
+    status: z
+      .enum(["planned", "in_progress", "completed", "postponed", "cancelled"])
+      .default("planned"),
     recurrence: z.enum([
       "none",
       "monthly",
@@ -548,7 +551,61 @@ export const annualWheelEventInputSchema = z
       .int("Intervallet skal være et helt tal")
       .min(1, "Intervallet skal være mindst 1")
       .max(120, "Intervallet må højst være 120 måneder"),
-  })
+      taskTemplates: z
+        .array(
+          z.object({
+          id: uuidSchema.optional(),
+          title: requiredName("Fast opgave", 240),
+          description: z
+            .string()
+            .trim()
+            .max(20000, "Beskrivelsen må højst være 20.000 tegn")
+            .default(""),
+          suggestedResponsibleUserId: uuidSchema.nullable().optional(),
+          deadlineAnchor: z.enum(["start", "end"]).default("start"),
+          deadlineOffsetDays: z
+            .number()
+            .int("Deadlineforskydning skal være et helt tal")
+            .min(-3650, "Deadlineforskydning er for lav")
+            .max(3650, "Deadlineforskydning er for høj")
+            .nullable()
+            .optional(),
+        }),
+        )
+        .max(50, "Der kan højst være 50 faste opgaver")
+        .default([]),
+      keyPeople: z
+        .preprocess(
+          compactAnnualWheelKeyPeople,
+          z
+            .array(
+              z.object({
+                id: uuidSchema.optional(),
+                userId: uuidSchema.nullable().optional(),
+                name: requiredName("Navn", 180),
+                roleTitle: requiredName("Funktion", 180),
+                phone: z
+                  .string()
+                  .trim()
+                  .max(80, "Telefon må højst være 80 tegn")
+                  .nullable()
+                  .optional()
+                  .transform((value) => value || null),
+                email: z
+                  .string()
+                  .trim()
+                  .toLowerCase()
+                  .email("Indtast en gyldig e-mailadresse")
+                  .max(254, "E-mail må højst være 254 tegn")
+                  .nullable()
+                  .optional()
+                  .or(z.literal("").transform(() => null)),
+              }),
+            )
+            .max(50, "Der kan højst være 50 nøglepersoner"),
+        )
+        .default([]),
+    })
   .superRefine((value, context) => {
     if (value.endsOn < value.startsOn) {
       context.addIssue({
@@ -566,6 +623,31 @@ export const annualWheelEventDeleteSchema = z.object({
   organizationId: uuidSchema,
   eventId: uuidSchema,
 });
+
+export const annualWheelTaskActivationSchema = z.object({
+  organizationId: uuidSchema,
+  eventId: uuidSchema,
+  year: z
+    .number({ required_error: "År skal vælges" })
+    .int("År skal være et helt tal")
+    .min(2000, "År er for lavt")
+      .max(2100, "År er for højt"),
+});
+
+function compactAnnualWheelKeyPeople(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.filter((item) => {
+    if (!item || typeof item !== "object") return true;
+    const record = item as Record<string, unknown>;
+    return Boolean(
+      String(record.userId ?? "").trim() ||
+        String(record.name ?? "").trim() ||
+        String(record.roleTitle ?? "").trim() ||
+        String(record.phone ?? "").trim() ||
+        String(record.email ?? "").trim(),
+    );
+  });
+}
 
 const jobCardText = (label: string, max = 20000) =>
   z.string().trim().max(max, `${label} må højst være ${max.toLocaleString("da-DK")} tegn`).default("");
@@ -608,8 +690,11 @@ export const jobCardInputSchema = z.object({
   meetingExpectations: jobCardText("Mødedeltagelse"),
   contactPeople: jobCardText("Kontaktpersoner"),
   responsibilityAreaIds: z.array(uuidSchema).max(30).default([]),
+  responsibilityAreaNames: z.array(requiredName("Ansvarsområde", 120)).max(30).default([]),
   committeeIds: z.array(uuidSchema).max(30).default([]),
   assignedUserIds: z.array(uuidSchema).max(30).default([]),
+  annualWheelEventIds: z.array(uuidSchema).max(100).default([]),
+  decisionIds: z.array(uuidSchema).max(100).default([]),
   documents: z.preprocess(
     compactJobCardDocuments,
     z

@@ -20,6 +20,19 @@ import type { JobCardOverview, RoleProfileView } from "@/types/domain";
 
 type ParsedJobCardInput = typeof jobCardInputSchema["_output"];
 
+function normalizeResponsibilityAreaName(name: string) {
+  return name.trim().toLocaleLowerCase("da-DK");
+}
+
+function dbErrorRecord(error: unknown) {
+  return error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+}
+
 export class JobCardService {
   private readonly jobCards: JobCardRepository;
   private readonly committees: CommitteeRepository;
@@ -56,13 +69,18 @@ export class JobCardService {
         this.decisions.listByOrganization(organizationId),
         this.db
           .from("annual_wheel_events")
-          .select("*, committee:committees(id, name), meeting:meetings(id, title, starts_at), task:tasks(id, title, status), responsible:profiles!annual_wheel_events_responsible_user_id_fkey(id, full_name)")
+          .select("*, committee:committees(id, name), meeting:meetings(id, title, starts_at), task:tasks!annual_wheel_events_task_id_fkey(id, title, status), responsible:profiles!annual_wheel_events_responsible_user_id_fkey(id, full_name)")
           .eq("organization_id", organizationId)
           .is("deleted_at", null)
-          .not("role_profile_id", "is", null)
           .order("starts_on"),
       ]);
     if (annualWheel.error) throw annualWheel.error;
+    const annualWheelEvents = (annualWheel.data ?? []).map((event) => ({
+      ...event,
+      keyPeople: [],
+      taskTemplates: [],
+      activatedTasks: [],
+    })) as unknown as RoleProfileView["annualWheelEvents"];
     const memberMap = new Map(members.map((member) => [member.user_id, member]));
     const committeeMap = new Map(committees.map((committee) => [committee.id, committee]));
     const areaMap = new Map(areas.map((area) => [area.id, area]));
@@ -116,14 +134,17 @@ export class JobCardService {
                   assignment.user_id === task.responsible_user_id,
               )),
         ),
-        annualWheelEvents: ((annualWheel.data ?? []) as unknown as RoleProfileView["annualWheelEvents"]).filter(
+        annualWheelEvents: annualWheelEvents.filter(
           (event) => event.role_profile_id === role.id,
         ),
         decisions: decisions.filter(
           (decision) =>
-            roleCommitteeIds.includes(decision.committee_id) &&
-            !decision.archived_at,
-        ).slice(0, 10),
+            relations.decisions.some(
+              (relation) =>
+                relation.role_profile_id === role.id &&
+                relation.decision_id === decision.id,
+            ) && !decision.archived_at,
+        ),
       };
     });
     return {
@@ -132,6 +153,8 @@ export class JobCardService {
       responsibilityAreas: areas,
       committees,
       members,
+      annualWheelEvents,
+      decisions: decisions.filter((decision) => !decision.archived_at),
       canManage: ["owner", "admin"].includes(context.membership.role),
     };
   }
@@ -152,7 +175,13 @@ export class JobCardService {
       parsed.organizationId,
       user.id,
     );
-    await this.validateRelationScope(parsed);
+    const responsibilityAreaIds = await this.resolveResponsibilityAreaIds(
+      parsed,
+      user.id,
+    );
+    const relationInput = { ...parsed, responsibilityAreaIds };
+    this.logNormalizedRelations("create", relationInput);
+    await this.validateRelationScope(relationInput);
     const role = await this.jobCards.createRole({
       organization_id: parsed.organizationId,
       title: parsed.title,
@@ -168,7 +197,7 @@ export class JobCardService {
       updated_by: user.id,
     });
     await this.jobCards.replaceRelations({
-      ...parsed,
+      ...relationInput,
       roleProfileId: role.id,
       userId: user.id,
     });
@@ -183,7 +212,13 @@ export class JobCardService {
       user.id,
     );
     await this.requireRole(parsed.organizationId, parsed.roleProfileId);
-    await this.validateRelationScope(parsed);
+    const responsibilityAreaIds = await this.resolveResponsibilityAreaIds(
+      parsed,
+      user.id,
+    );
+    const relationInput = { ...parsed, responsibilityAreaIds };
+    this.logNormalizedRelations("update", relationInput);
+    await this.validateRelationScope(relationInput);
     const role = await this.jobCards.updateRole(parsed.roleProfileId, {
       title: parsed.title,
       purpose: parsed.purpose,
@@ -197,7 +232,7 @@ export class JobCardService {
       updated_by: user.id,
     });
     await this.jobCards.replaceRelations({
-      ...parsed,
+      ...relationInput,
       userId: user.id,
     });
     return role;
@@ -286,14 +321,162 @@ export class JobCardService {
     return role;
   }
 
+  private logNormalizedRelations(
+    operation: "create" | "update",
+    parsed: ParsedJobCardInput & { roleProfileId?: string },
+  ) {
+    console.info("[job-cards] Normaliserede jobkort-relationer", {
+      operation,
+      organizationId: parsed.organizationId,
+      roleProfileId: parsed.roleProfileId,
+      responsibilityAreaIds: parsed.responsibilityAreaIds.length,
+      responsibilityAreaNames: parsed.responsibilityAreaNames.length,
+      committeeIds: parsed.committeeIds.length,
+      assignedUserIds: parsed.assignedUserIds.length,
+      annualWheelEventIds: parsed.annualWheelEventIds.length,
+      decisionIds: parsed.decisionIds.length,
+      taskTemplates: parsed.taskTemplates.length,
+    });
+  }
+
+  private async resolveResponsibilityAreaIds(
+    parsed: ParsedJobCardInput & { roleProfileId?: string },
+    userId: string,
+  ) {
+    const ids = new Set(parsed.responsibilityAreaIds);
+    const requestedNames = [
+      ...new Map(
+        parsed.responsibilityAreaNames
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .map((name) => [normalizeResponsibilityAreaName(name), name]),
+      ).values(),
+    ];
+    if (!requestedNames.length) {
+      return [...ids];
+    }
+
+    let areas = await this.jobCards.listAllResponsibilityAreas(parsed.organizationId);
+    const areaByName = new Map(
+      areas.map((area) => [normalizeResponsibilityAreaName(area.name), area]),
+    );
+
+    for (const name of requestedNames) {
+      const normalizedName = normalizeResponsibilityAreaName(name);
+      const existing = areaByName.get(normalizedName);
+      if (existing) {
+        const activeArea = existing.archived_at
+          ? await this.restoreResponsibilityArea(
+              parsed.organizationId,
+              parsed.roleProfileId,
+              existing.id,
+            )
+          : existing;
+        areaByName.set(normalizedName, activeArea);
+        ids.add(activeArea.id);
+        continue;
+      }
+
+      try {
+        const created = await this.jobCards.createResponsibilityArea({
+          organization_id: parsed.organizationId,
+          name,
+          description: "",
+          created_by: userId,
+        });
+        areaByName.set(normalizedName, created);
+        ids.add(created.id);
+      } catch (error) {
+        const record = dbErrorRecord(error);
+        if (record.code === "23505") {
+          areas = await this.jobCards.listAllResponsibilityAreas(
+            parsed.organizationId,
+          );
+          const concurrentMatch = areas.find(
+            (area) => normalizeResponsibilityAreaName(area.name) === normalizedName,
+          );
+          if (concurrentMatch) {
+            const activeArea = concurrentMatch.archived_at
+              ? await this.restoreResponsibilityArea(
+                  parsed.organizationId,
+                  parsed.roleProfileId,
+                  concurrentMatch.id,
+                )
+              : concurrentMatch;
+            areaByName.set(normalizedName, activeArea);
+            ids.add(activeArea.id);
+            continue;
+          }
+        }
+
+        console.error("[job-cards] Ansvarsområde kunne ikke oprettes", {
+          organizationId: parsed.organizationId,
+          roleProfileId: parsed.roleProfileId,
+          code: record.code,
+          message: record.message,
+          details: record.details,
+          hint: record.hint,
+        });
+        if (record.code === "42501") {
+          throw new AppError(
+            "Du har ikke rettigheder til at oprette ansvarsområder i organisationen.",
+            403,
+            "JOB_CARD_RESPONSIBILITY_AREA_FORBIDDEN",
+          );
+        }
+        throw new AppError(
+          "Ansvarsområdet kunne ikke oprettes i organisationen. Prøv igen.",
+          422,
+          "JOB_CARD_RESPONSIBILITY_AREA_CREATE_FAILED",
+        );
+      }
+    }
+
+    return [...ids];
+  }
+
+  private async restoreResponsibilityArea(
+    organizationId: string,
+    roleProfileId: string | undefined,
+    areaId: string,
+  ) {
+    try {
+      return await this.jobCards.restoreResponsibilityArea(areaId, organizationId);
+    } catch (error) {
+      const record = dbErrorRecord(error);
+      console.error("[job-cards] Arkiveret ansvarsområde kunne ikke gendannes", {
+        organizationId,
+        roleProfileId,
+        areaId,
+        code: record.code,
+        message: record.message,
+        details: record.details,
+        hint: record.hint,
+      });
+      throw new AppError(
+        "Ansvarsområdet findes allerede i organisationen, men kunne ikke gendannes.",
+        422,
+        "JOB_CARD_RESPONSIBILITY_AREA_RESTORE_FAILED",
+      );
+    }
+  }
+
   private async validateRelationScope(
     parsed: ParsedJobCardInput & { roleProfileId?: string },
   ) {
-    const [areas, committees, members] = await Promise.all([
+    const [areas, committees, members, annualWheel, decisions] =
+      await Promise.all([
       this.jobCards.listResponsibilityAreas(parsed.organizationId),
       this.committees.listByOrganization(parsed.organizationId),
       this.members.listMembers(parsed.organizationId),
+      this.db
+        .from("annual_wheel_events")
+        .select("id")
+        .eq("organization_id", parsed.organizationId)
+        .is("deleted_at", null),
+      this.decisions.listByOrganization(parsed.organizationId),
     ]);
+    if (annualWheel.error) throw annualWheel.error;
     const areaIds = new Set(areas.map((area) => area.id));
     const committeeIds = new Set(committees.map((committee) => committee.id));
     const activeMemberIds = new Set(
@@ -301,6 +484,10 @@ export class JobCardService {
         .filter((member) => member.status === "active")
         .map((member) => member.user_id),
     );
+    const annualWheelEventIds = new Set(
+      (annualWheel.data ?? []).map((event) => event.id),
+    );
+    const decisionIds = new Set(decisions.map((decision) => decision.id));
 
     const invalidArea = parsed.responsibilityAreaIds.find((id) => !areaIds.has(id));
     if (invalidArea) {
@@ -330,6 +517,28 @@ export class JobCardService {
         "Den valgte rolleholder er ikke et aktivt medlem af organisationen.",
         422,
         "JOB_CARD_ASSIGNMENT_SCOPE_INVALID",
+      );
+    }
+
+    const invalidAnnualWheelEvent = parsed.annualWheelEventIds.find(
+      (id) => !annualWheelEventIds.has(id),
+    );
+    if (invalidAnnualWheelEvent) {
+      throw new AppError(
+        "Den valgte årshjulsaktivitet findes ikke i organisationen.",
+        422,
+        "JOB_CARD_ANNUAL_WHEEL_SCOPE_INVALID",
+      );
+    }
+
+    const invalidDecision = parsed.decisionIds.find(
+      (id) => !decisionIds.has(id),
+    );
+    if (invalidDecision) {
+      throw new AppError(
+        "Den valgte beslutning findes ikke i organisationen.",
+        422,
+        "JOB_CARD_DECISION_SCOPE_INVALID",
       );
     }
 

@@ -822,6 +822,9 @@ export type Database = {
           decision_id: string | null;
           role_profile_id: string | null;
           task_template_id: string | null;
+          annual_wheel_event_id: string | null;
+          annual_wheel_task_template_id: string | null;
+          annual_wheel_activation_year: number | null;
           title: string;
           description: string;
           status: Database["public"]["Enums"]["task_status"];
@@ -848,6 +851,9 @@ export type Database = {
           decision_id?: string | null;
           role_profile_id?: string | null;
           task_template_id?: string | null;
+          annual_wheel_event_id?: string | null;
+          annual_wheel_task_template_id?: string | null;
+          annual_wheel_activation_year?: number | null;
           title: string;
           description?: string;
           status?: Database["public"]["Enums"]["task_status"];
@@ -870,6 +876,9 @@ export type Database = {
           decision_id?: string | null;
           role_profile_id?: string | null;
           task_template_id?: string | null;
+          annual_wheel_event_id?: string | null;
+          annual_wheel_task_template_id?: string | null;
+          annual_wheel_activation_year?: number | null;
           title?: string;
           description?: string;
           status?: Database["public"]["Enums"]["task_status"];
@@ -927,6 +936,7 @@ export type Database = {
           responsible_user_id: string | null;
           category: string | null;
           priority: Database["public"]["Enums"]["annual_wheel_priority"];
+          status: Database["public"]["Enums"]["annual_wheel_event_status"];
           recurrence: Database["public"]["Enums"]["annual_wheel_recurrence"];
           recurrence_interval: number;
           recurrence_rule: string | null;
@@ -953,6 +963,7 @@ export type Database = {
           responsible_user_id?: string | null;
           category?: string | null;
           priority?: Database["public"]["Enums"]["annual_wheel_priority"];
+          status?: Database["public"]["Enums"]["annual_wheel_event_status"];
           recurrence?: Database["public"]["Enums"]["annual_wheel_recurrence"];
           recurrence_interval?: number;
           recurrence_rule?: string | null;
@@ -973,12 +984,99 @@ export type Database = {
           responsible_user_id?: string | null;
           category?: string | null;
           priority?: Database["public"]["Enums"]["annual_wheel_priority"];
+          status?: Database["public"]["Enums"]["annual_wheel_event_status"];
           recurrence?: Database["public"]["Enums"]["annual_wheel_recurrence"];
           recurrence_interval?: number;
           recurrence_rule?: string | null;
           is_exception?: boolean;
           updated_by?: string;
           deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      annual_wheel_key_people: {
+        Row: {
+          id: string;
+          organization_id: string;
+          annual_wheel_event_id: string;
+          user_id: string | null;
+          name: string;
+          role_title: string;
+          phone: string | null;
+          email: string | null;
+          sort_order: number;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          annual_wheel_event_id: string;
+          user_id?: string | null;
+          name: string;
+          role_title: string;
+          phone?: string | null;
+          email?: string | null;
+          sort_order?: number;
+          created_by: string;
+          updated_by: string;
+          archived_at?: string | null;
+        };
+        Update: {
+          user_id?: string | null;
+          name?: string;
+          role_title?: string;
+          phone?: string | null;
+          email?: string | null;
+          sort_order?: number;
+          updated_by?: string;
+          archived_at?: string | null;
+        };
+        Relationships: [];
+      };
+      annual_wheel_task_templates: {
+        Row: {
+          id: string;
+          organization_id: string;
+          annual_wheel_event_id: string;
+          title: string;
+          description: string;
+          suggested_responsible_user_id: string | null;
+          deadline_anchor: Database["public"]["Enums"]["annual_wheel_deadline_anchor"];
+          deadline_offset_days: number | null;
+          sort_order: number;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          annual_wheel_event_id: string;
+          title: string;
+          description?: string;
+          suggested_responsible_user_id?: string | null;
+          deadline_anchor?: Database["public"]["Enums"]["annual_wheel_deadline_anchor"];
+          deadline_offset_days?: number | null;
+          sort_order?: number;
+          created_by: string;
+          updated_by: string;
+          archived_at?: string | null;
+        };
+        Update: {
+          title?: string;
+          description?: string;
+          suggested_responsible_user_id?: string | null;
+          deadline_anchor?: Database["public"]["Enums"]["annual_wheel_deadline_anchor"];
+          deadline_offset_days?: number | null;
+          sort_order?: number;
+          updated_by?: string;
+          archived_at?: string | null;
         };
         Relationships: [];
       };
@@ -1026,6 +1124,24 @@ export type Database = {
       role_profile_committees: {
         Row: { role_profile_id: string; committee_id: string; organization_id: string };
         Insert: { role_profile_id: string; committee_id: string; organization_id: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      role_profile_decisions: {
+        Row: {
+          organization_id: string;
+          role_profile_id: string;
+          decision_id: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          organization_id: string;
+          role_profile_id: string;
+          decision_id: string;
+          created_by: string;
+          created_at?: string;
+        };
         Update: Record<string, never>;
         Relationships: [];
       };
@@ -1329,6 +1445,13 @@ export type Database = {
         | "completed"
         | "cancelled";
       annual_wheel_priority: "low" | "medium" | "high" | "critical";
+      annual_wheel_event_status:
+        | "planned"
+        | "in_progress"
+        | "completed"
+        | "postponed"
+        | "cancelled";
+      annual_wheel_deadline_anchor: "start" | "end";
       annual_wheel_recurrence:
         | "none"
         | "monthly"

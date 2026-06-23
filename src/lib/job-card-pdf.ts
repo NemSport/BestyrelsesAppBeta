@@ -126,79 +126,85 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
     "Ingen opgaveskabeloner.",
   );
 
-  report.addSection("Relaterede årshjulspunkter");
-  report.addTable(
-    [
-      {
-        label: "Dato",
-        width: 105,
-        getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
-          formatPdfDate(event.starts_on),
-      },
-      {
-        label: "Titel",
-        width: 160,
-        getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
-          event.title,
-      },
-      {
-        label: "Beskrivelse",
-        width: 235,
-        getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
-          tableText(event.description),
-      },
-    ],
-    input.role.annualWheelEvents,
-    "Ingen relaterede årshjulspunkter.",
-  );
+  if (input.role.annualWheelEvents.length) {
+    report.addSection("Relaterede årshjulspunkter");
+    report.addTable(
+      [
+        {
+          label: "Dato",
+          width: 105,
+          getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
+            formatPdfDate(event.starts_on),
+        },
+        {
+          label: "Titel",
+          width: 160,
+          getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
+            event.title,
+        },
+        {
+          label: "Beskrivelse",
+          width: 235,
+          getValue: (event: RoleProfileView["annualWheelEvents"][number]) =>
+            tableText(event.description),
+        },
+      ],
+      input.role.annualWheelEvents,
+      "Ingen relaterede årshjulspunkter.",
+    );
+  }
 
-  report.addSection("Relaterede beslutninger");
-  report.addTable(
-    [
-      {
-        label: "Dato",
-        width: 105,
-        getValue: (decision: RoleProfileView["decisions"][number]) =>
-          decision.decision_date
-            ? formatPdfDate(decision.decision_date)
-            : "Uden dato",
-      },
-      {
-        label: "Titel",
-        width: 175,
-        getValue: (decision: RoleProfileView["decisions"][number]) =>
-          decision.title,
-      },
-      {
-        label: "Beskrivelse",
-        width: 220,
-        getValue: (decision: RoleProfileView["decisions"][number]) =>
-          tableText(decision.description),
-      },
-    ],
-    input.role.decisions,
-    "Ingen relaterede beslutninger.",
-  );
+  if (input.role.decisions.length) {
+    report.addSection("Relaterede beslutninger");
+    report.addTable(
+      [
+        {
+          label: "Dato",
+          width: 105,
+          getValue: (decision: RoleProfileView["decisions"][number]) =>
+            decision.decision_date
+              ? formatPdfDate(decision.decision_date)
+              : "Uden dato",
+        },
+        {
+          label: "Titel",
+          width: 175,
+          getValue: (decision: RoleProfileView["decisions"][number]) =>
+            decision.title,
+        },
+        {
+          label: "Beskrivelse",
+          width: 220,
+          getValue: (decision: RoleProfileView["decisions"][number]) =>
+            tableText(decision.description),
+        },
+      ],
+      input.role.decisions,
+      "Ingen relaterede beslutninger.",
+    );
+  }
 
-  report.addSection("Dokumentlinks");
-  report.addTable(
-    [
-      {
-        label: "Titel",
-        width: 180,
-        getValue: (document: RoleProfileView["documents"][number]) =>
-          document.title,
-      },
-      {
-        label: "Link",
-        width: 320,
-        getValue: (document: RoleProfileView["documents"][number]) =>
-          document.url,
-      },
-    ],
-    input.role.documents,
-    "Ingen dokumentlinks.",
-  );
+  if (input.role.documents.length) {
+    report.addSection("Dokumentlinks");
+    report.addTable(
+      [
+        {
+          label: "Titel",
+          width: 180,
+          getValue: (document: RoleProfileView["documents"][number]) =>
+            document.title,
+        },
+        {
+          label: "Link",
+          width: 320,
+          getValue: (document: RoleProfileView["documents"][number]) =>
+            document.url,
+        },
+      ],
+      input.role.documents,
+      "Ingen dokumentlinks.",
+    );
+  }
 
   return report.save();
 }

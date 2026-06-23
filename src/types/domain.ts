@@ -23,6 +23,10 @@ export type Decision = TableRow<"decisions">;
 export type Task = TableRow<"tasks">;
 export type TaskComment = TableRow<"task_comments">;
 export type AnnualWheelEvent = TableRow<"annual_wheel_events">;
+export type AnnualWheelKeyPerson =
+  TableRow<"annual_wheel_key_people">;
+export type AnnualWheelTaskTemplate =
+  TableRow<"annual_wheel_task_templates">;
 export type RoleProfile = TableRow<"role_profiles">;
 export type ResponsibilityArea = TableRow<"responsibility_areas">;
 export type TaskTemplate = TableRow<"task_templates">;
@@ -53,6 +57,8 @@ export type JobCardOverview = {
   responsibilityAreas: ResponsibilityArea[];
   committees: Committee[];
   members: OrganizationMemberDirectoryEntry[];
+  annualWheelEvents: AnnualWheelEventView[];
+  decisions: DecisionView[];
   canManage: boolean;
 };
 
@@ -61,6 +67,22 @@ export type AnnualWheelEventView = AnnualWheelEvent & {
   meeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
   task: Pick<Task, "id" | "title" | "status"> | null;
   responsible: Pick<Profile, "id" | "full_name"> | null;
+  keyPeople: AnnualWheelKeyPerson[];
+  taskTemplates: AnnualWheelTaskTemplate[];
+  activatedTasks: Array<
+    Pick<
+      Task,
+      | "id"
+      | "title"
+      | "status"
+      | "deadline"
+      | "responsible_user_id"
+      | "annual_wheel_event_id"
+      | "annual_wheel_activation_year"
+      | "annual_wheel_task_template_id"
+      | "archived_at"
+    >
+  >;
 };
 
 export type AnnualWheelCalendarItem = {
@@ -71,6 +93,7 @@ export type AnnualWheelCalendarItem = {
   committeeId: string;
   responsibleUserId: string | null;
   priority: AnnualWheelEvent["priority"];
+  status?: Task["status"] | Decision["status"];
   href: string;
 };
 

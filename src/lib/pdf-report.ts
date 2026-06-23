@@ -426,7 +426,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       }
       const text = token.replace(/\s+/g, " ");
       if (!text.trim() && !line.length) return;
-      const candidate = [...line];
+      const candidate = line.map((lineRun) => ({ ...lineRun }));
       mergeRun(candidate, { ...source, text });
       if (!line.length || runLineWidth(candidate, size) <= maxWidth) {
         line = candidate;
@@ -630,7 +630,7 @@ export async function createPdfReport(options: PdfReportOptions) {
   };
 
   const addSection = (title: string) => {
-    ensureSpace(46);
+    ensureSpace(110);
     y -= 10;
     page.drawRectangle({
       x: margin,

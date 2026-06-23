@@ -30,7 +30,7 @@ export function Modal({
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  maxWidth?: "lg" | "2xl" | "3xl";
+  maxWidth?: "lg" | "2xl" | "3xl" | "6xl";
   style?: CSSProperties;
 }) {
   const titleId = useId();
@@ -75,6 +75,7 @@ export function Modal({
           maxWidth === "lg" && "max-w-lg",
           maxWidth === "2xl" && "max-w-2xl",
           maxWidth === "3xl" && "max-w-3xl",
+          maxWidth === "6xl" && "max-w-6xl",
         )}
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-surface/95 p-5 backdrop-blur">

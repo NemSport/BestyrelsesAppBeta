@@ -388,6 +388,10 @@ Clicking a month opens a presentation-only month detail modal; meeting rows use
 the existing concrete meeting route, and task rows use the existing task
 register `editTask` link so no new task detail route or persistence contract is
 introduced.
+The V1.1 presentation bugfix keeps meetings and Annual Wheel activities visible
+in the month detail modal while tasks and deadlines are collapsed by default.
+Completed tasks suppress overdue badges and render as completed in Annual Wheel
+task lists.
 
 Phase 7R.5 applies the organization workspace action hierarchy to Job Cards and
 onboarding. `JobCardRegister` remains the client component that calls the same
@@ -1029,6 +1033,52 @@ Structured Outputs return source-grounded activity and agenda-item proposals;
 unknown source ids are discarded. Selecting a proposal pre-fills the standard
 activity form, and a separate human submit action remains mandatory.
 
+Annual Wheel Job Card link validation is table-specific. The
+`annual_wheel_events` trigger validates only `role_profile_id` against the
+event `organization_id`, while task-template scope is handled by the separate
+task trigger that runs on `tasks`, where `task_template_id` actually exists.
+This avoids shared trigger functions that assume identical `NEW.*` columns
+across unrelated tables.
+
+V1.1 adds fixed task templates below Annual Wheel activities rather than a
+separate subtask model. `annual_wheel_task_templates` stores inactive work
+steps scoped to the activity organization, and activation creates normal
+`tasks` with `annual_wheel_event_id`,
+`annual_wheel_task_template_id`, and `annual_wheel_activation_year`.
+`annual_wheel_key_people` stores practical activity contacts with optional
+`user_id`, display name, function, phone, email, and sort order. The trigger
+validates the linked activity and, when `user_id` is present, requires an
+active organization membership; manual external contacts remain organization
+scoped without linking to another tenant's user.
+The Annual Wheel event modal uses progressive disclosure at the presentation
+boundary. Existing events open in a wide read view assembled from the same
+authorized event read model; entering edit mode reuses the existing draft,
+validation, and mutation flow. New events bypass the read view and open the
+form directly.
+`GET /api/annual-wheel/[eventId]/pdf` reuses that authorized event read model
+and the shared `pdf-report` foundation. The route validates organization
+membership through `AnnualWheelService`, relies on RLS for event visibility,
+loads branding server-side, and exports only public activity fields, key
+people, fixed task templates, and activated tasks.
+Organization-level Annual Wheel exports use the same RLS-scoped overview read
+model through
+`/api/organizations/[organizationId]/annual-wheel/pdf/overview` and
+`/api/organizations/[organizationId]/annual-wheel/pdf/wheel`. Both render
+landscape A4 with safe PDF fonts and server-resolved branding. The first is a
+multi-page month matrix; the second is a quarter/month presentation view that
+prioritizes activities and meetings and summarizes task/decision deadlines.
+The unique template/year task index prevents duplicate activation of the same
+fixed task for the same period. Activity status is stored on
+`annual_wheel_events`; "Forsinket" is calculated from `ends_on` and hidden for
+completed or cancelled activities. Task status changes run a server-side check
+that completes the linked activity when all activated tasks for the period are
+completed.
+PostgREST embeds between `annual_wheel_events` and `tasks` must always name
+the intended foreign key. The legacy single task link uses
+`tasks!annual_wheel_events_task_id_fkey`, while activated activity tasks are
+loaded from `tasks.annual_wheel_event_id` or with
+`tasks!tasks_annual_wheel_event_id_fkey` when embedded from an activity.
+
 ### Job Cards
 
 Job Cards are organization-owned role profiles. They combine structured role
@@ -1036,6 +1086,31 @@ scope, reusable responsibility areas, committee links, dated member
 assignments, document links, task templates, and one onboarding guide.
 Assignment history is append-preserving: removing a current role holder sets
 `ends_on`, while a new holder receives a new assignment row.
+Create and update flows share the same service/repository path. The service
+validates that selected holders, committees, and responsibility areas belong
+to the same organization, and the repository deduplicates relation ids before
+replacing the editable relation sets. Database/RLS failures are mapped to
+concrete Danish `AppError` responses so the UI does not hide relation issues
+behind a generic retry message.
+Responsibility area input may include both existing ids and new names. The
+service resolves those names inside the current organization by trimmed,
+case-insensitive matching, creates missing areas with the active
+`organization_id`, and only then writes `role_profile_responsibility_areas`.
+Areas from another organization are never accepted as relation ids.
+Relation persistence is deterministic and relation-specific: desired
+committee and responsibility-area joins are upserted before stale joins are
+deleted, and new active role-holder assignments are inserted before removed
+assignments receive `ends_on`. API and service logs include only operation,
+entity ids, and relation counts, while repository errors include the Supabase
+table operation, code, message, details, and hint.
+Database scope validation also uses table-specific trigger functions for Job
+Card relation tables. `role_profile_responsibility_areas` validates only
+`role_profile_id`, `responsibility_area_id`, and `organization_id`;
+`role_profile_committees` and `task_templates` are the only Job Card relation
+triggers that reference `committee_id`. Annual Wheel links are updated through
+their existing event policy with `updated_by = auth.uid()`, while
+`role_profile_decisions` has its own organization-scope trigger and admin-only
+write policy.
 
 Task templates create ordinary tasks through the existing task authorization
 boundary. The resulting task retains `role_profile_id` and
@@ -1043,8 +1118,8 @@ boundary. The resulting task retains `role_profile_id` and
 and the current role holder is used only when one exists. Annual Wheel
 occurrences may also link to a role profile.
 
-The read model combines role data with accessible open tasks, Annual Wheel
-events, committee decisions, documents, and onboarding content. AI generation
+The read model combines role data with accessible open tasks, explicitly linked
+Annual Wheel events and decisions, documents, and onboarding content. AI generation
 is a manual, organization-admin-only draft workflow. It uses RLS-visible
 minutes, tasks, decisions, and planning history, logs no source text, validates
 Structured Output, and requires normal form submission before persistence.
@@ -1336,6 +1411,14 @@ Connects reusable responsibility areas to role profiles.
 #### `role_profile_committees`
 
 Connects a role profile to one or more committees.
+
+#### `role_profile_decisions`
+
+Connects role profiles to explicitly selected decisions. The relation repeats
+`organization_id`; a scope trigger requires both records to belong to that
+organization, RLS allows organization members to read relation metadata, and
+only organization administrators may write it. Annual Wheel relations continue
+to use the existing `annual_wheel_events.role_profile_id` foreign key.
 
 #### `task_templates`
 

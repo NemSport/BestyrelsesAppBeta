@@ -25,9 +25,45 @@ function logJobCardError(
   });
 }
 
+function summarizeJobCardPayload(payload: Record<string, unknown>) {
+  return {
+    organizationId: payload.organizationId,
+    hasTitle: typeof payload.title === "string" && payload.title.trim().length > 0,
+    responsibilityAreaIds: Array.isArray(payload.responsibilityAreaIds)
+      ? payload.responsibilityAreaIds.length
+      : "invalid",
+    responsibilityAreaNames: Array.isArray(payload.responsibilityAreaNames)
+      ? payload.responsibilityAreaNames.length
+      : "missing",
+    committeeIds: Array.isArray(payload.committeeIds)
+      ? payload.committeeIds.length
+      : "invalid",
+    assignedUserIds: Array.isArray(payload.assignedUserIds)
+      ? payload.assignedUserIds.length
+      : "invalid",
+    annualWheelEventIds: Array.isArray(payload.annualWheelEventIds)
+      ? payload.annualWheelEventIds.length
+      : "missing",
+    decisionIds: Array.isArray(payload.decisionIds)
+      ? payload.decisionIds.length
+      : "missing",
+    documents: Array.isArray(payload.documents) ? payload.documents.length : "invalid",
+    taskTemplates: Array.isArray(payload.taskTemplates)
+      ? payload.taskTemplates.length
+      : "invalid",
+  };
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ roleProfileId: string }> }) {
   const { roleProfileId } = await params;
-  try { return NextResponse.json(await new JobCardService(await createClient()).update({ ...(await request.json()), roleProfileId })); }
+  try {
+    const payload = await request.json();
+    console.info("[job-cards] Modtog jobkort-update", {
+      roleProfileId,
+      payload: summarizeJobCardPayload(payload),
+    });
+    return NextResponse.json(await new JobCardService(await createClient()).update({ ...payload, roleProfileId }));
+  }
   catch (error) {
     logJobCardError(error, { action: "update", roleProfileId });
     return apiError(error);

@@ -436,6 +436,41 @@ activity and agenda-item suggestions. Suggestions are advisory: choosing one
 only opens the normal activity form, and no record is created without human
 review and submission.
 
+The V1 database trigger fix keeps Job Card links on Annual Wheel activities
+scoped by `role_profile_id` and `organization_id` only. Task-template scope is
+validated by a separate task trigger, so Annual Wheel activity creation never
+evaluates `NEW.task_template_id` on `annual_wheel_events`.
+
+V1.1 turns Annual Wheel activities into repeatable work processes. Activities
+now have an explicit status, while "Forsinket" is a calculated badge based on
+the end date unless the activity is completed or cancelled. Each activity can
+own fixed task templates; activating a year creates ordinary tasks linked back
+to the activity/template/year and avoids duplicate activation for the same
+period. When all activated tasks for an activity/year are completed, the task
+service marks the activity as completed server-side unless the activity is
+cancelled.
+Annual Wheel activities can also store activity-specific key people in
+`annual_wheel_key_people`: optional organization member reference, displayed
+name, function, phone, and email. Linked users must be active members of the
+same organization; external/manual contacts are stored without a cross-tenant
+user link.
+Existing Annual Wheel activities open in a wide, read-first modal that
+summarizes status, period, ownership, key people, fixed tasks, and activated
+tasks before editing. `Rediger aktivitet` switches the same modal and draft
+into the existing edit flow; new activities still open directly in edit mode.
+The read view can export one authorized Annual Wheel activity as a branded PDF.
+The export uses the shared report foundation and includes public activity
+metadata, description, key people, fixed task templates, and activated tasks.
+The Annual Wheel page also exports the selected year in two landscape PDF
+formats. The matrix export maps activities to Jan-Dec columns for operational
+planning, while the visual export groups the year into four quarters with
+month panels, activities, meetings, and compact secondary deadline counts.
+Because tasks can now relate to Annual Wheel activities in both directions,
+read-model embeds use explicit PostgREST foreign-key hints: the legacy
+`annual_wheel_events.task_id` link uses
+`tasks!annual_wheel_events_task_id_fkey`, while activated tasks are read from
+the `tasks.annual_wheel_event_id` side.
+
 ### Job Cards
 
 Job Cards are the organization's digital role handbook. `role_profiles`
@@ -444,6 +479,11 @@ collaboration, meeting expectations, and contact knowledge. Reusable
 `responsibility_areas` connect common domains such as finance, members,
 sponsorship, communication, facilities, events, and sporting operations to
 multiple roles.
+Job Card editors can explicitly connect a role profile to Annual Wheel
+activities and decisions from the same organization. Annual Wheel links reuse
+`annual_wheel_events.role_profile_id`; decision links use the scoped
+`role_profile_decisions` join table. Job Card PDFs include these relations and
+document links only when the corresponding section contains data.
 
 Roles may be linked to multiple committees and active members. Assignment
 changes close the previous assignment with an end date instead of deleting
@@ -451,6 +491,23 @@ history. Documents are stored as validated HTTP(S) links in the first MVP.
 Each role may contain reusable task templates and one onboarding guide.
 Creating work from a template produces a normal task through existing
 committee authorization and RLS, optionally assigning the active role holder.
+Job Card updates replace editable relation sets through the service layer with
+deduplicated relation ids, organization-scope validation, and concrete Danish
+errors for role holder, committee, responsibility area, and permission
+failures.
+Responsibility areas in Job Card forms behave like organization-scoped
+autocomplete values: existing names are matched case-insensitively after
+trimming, and new names are created in the active organization during save
+before the role relation is written.
+The V1 blocker fix stabilizes relation persistence by logging relation counts
+at the API/service boundary, resolving responsibility areas before relation
+writes, upserting selected committee and responsibility-area relations before
+deleting stale rows, and adding new role holders before ending removed
+assignments.
+The follow-up database fix replaces the shared Job Card relation scope trigger
+with table-specific triggers, so responsibility-area joins never evaluate
+`NEW.committee_id` while committee and task-template joins still validate
+their own `committee_id` scope.
 
 The Job Card page combines the written role description with open related
 tasks, linked Annual Wheel occurrences, relevant committee decisions, role
@@ -813,6 +870,9 @@ meetings from tasks, decision deadlines, and Annual Wheel activities, and keep
 meetings and tasks actionable through their existing meeting routes and
 task-edit links. The month detail view is a presentation-only modal over the
 same RLS-visible overview data.
+The V1.1 UI bugfix keeps meetings and Annual Wheel activities visible in the
+month detail view, folds tasks and deadlines by default, and ensures completed
+tasks show as completed instead of overdue.
 
 Phase 7R.5 brings Job Cards and onboarding into the same admin workspace
 language. The Job Card register now uses flatter role-profile rows, keeps only
