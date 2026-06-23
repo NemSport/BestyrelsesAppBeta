@@ -87,6 +87,8 @@ export class EmailService {
             {
               title: occurrence.agenda_items.title,
               item_type: occurrence.agenda_items.item_type,
+              objective: occurrence.agenda_items.objective,
+              description: occurrence.agenda_items.description,
             },
           ]
         : [],

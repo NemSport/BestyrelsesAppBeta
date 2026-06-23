@@ -8,14 +8,26 @@ import {
   type RGB,
 } from "pdf-lib";
 
+import {
+  formatDanishDate,
+  formatDanishDateTime,
+} from "@/lib/date-format";
+
 export type PdfMetaItem = {
   label: string;
   value: string;
 };
 
+export type PdfTextRun = {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+
 export type PdfProseBlock = {
   type: "paragraph" | "heading" | "listItem" | "quote";
   text: string;
+  runs?: PdfTextRun[];
   ordered?: boolean;
   index?: number;
 };
@@ -27,6 +39,7 @@ export type PdfReportBranding = {
   logoMimeType?: "image/png" | "image/jpeg" | null;
   primaryColor?: string;
   accentColor?: string;
+  fontFamily?: string;
 };
 
 type PdfReportOptions = {
@@ -48,6 +61,7 @@ type TextOptions = {
   gapAfter?: number;
   maxWidth?: number;
   fallback?: string;
+  runs?: PdfTextRun[];
 };
 
 type TableColumn<T> = {
@@ -72,9 +86,16 @@ const palette = {
   danger: rgb(0.62, 0.16, 0.16),
 };
 
+function normalizeHexColor(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const hex = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  return /^[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
+}
+
 function rgbFromHex(value: string | null | undefined, fallback: RGB) {
-  if (!/^#[0-9a-fA-F]{6}$/.test(value ?? "")) return fallback;
-  const hex = value!.slice(1);
+  const hex = normalizeHexColor(value);
+  if (!hex) return fallback;
   return rgb(
     Number.parseInt(hex.slice(0, 2), 16) / 255,
     Number.parseInt(hex.slice(2, 4), 16) / 255,
@@ -82,15 +103,74 @@ function rgbFromHex(value: string | null | undefined, fallback: RGB) {
   );
 }
 
-function softRgbFromHex(value: string | null | undefined, fallback: RGB) {
-  if (!/^#[0-9a-fA-F]{6}$/.test(value ?? "")) return fallback;
-  const hex = value!.slice(1);
+function softRgbFromHex(
+  value: string | null | undefined,
+  fallback: RGB,
+  opacity = 0.25,
+) {
+  const hex = normalizeHexColor(value);
+  if (!hex) return fallback;
   const channels = [
     Number.parseInt(hex.slice(0, 2), 16),
     Number.parseInt(hex.slice(2, 4), 16),
     Number.parseInt(hex.slice(4, 6), 16),
-  ].map((channel) => (channel + (255 - channel) * 0.86) / 255);
+  ].map((channel) => (channel * opacity + 255 * (1 - opacity)) / 255);
   return rgb(channels[0], channels[1], channels[2]);
+}
+
+function resolvePdfFontNames(fontFamily: string | null | undefined) {
+  if (fontFamily === "Courier New") {
+    return {
+      regular: StandardFonts.Courier,
+      bold: StandardFonts.CourierBold,
+      italic: StandardFonts.CourierOblique,
+      boldItalic: StandardFonts.CourierBoldOblique,
+    };
+  }
+
+  if (
+    fontFamily === "Georgia" ||
+    fontFamily === "Merriweather" ||
+    fontFamily === "Times New Roman"
+  ) {
+    return {
+      regular: StandardFonts.TimesRoman,
+      bold: StandardFonts.TimesRomanBold,
+      italic: StandardFonts.TimesRomanItalic,
+      boldItalic: StandardFonts.TimesRomanBoldItalic,
+    };
+  }
+
+  return {
+    regular: StandardFonts.Helvetica,
+    bold: StandardFonts.HelveticaBold,
+    italic: StandardFonts.HelveticaOblique,
+    boldItalic: StandardFonts.HelveticaBoldOblique,
+  };
+}
+
+async function resolvePdfFonts(
+  document: PDFDocument,
+  fontFamily: string | null | undefined,
+) {
+  if (
+    fontFamily &&
+    fontFamily !== "Courier New" &&
+    fontFamily !== "Georgia" &&
+    fontFamily !== "Times New Roman"
+  ) {
+    console.warn(
+      `[pdf-report] Brandingfont '${fontFamily}' kan ikke embeddes sikkert i PDF og falder tilbage til en sikker PDF-standardfont.`,
+    );
+  }
+
+  const fontNames = resolvePdfFontNames(fontFamily);
+  return {
+    regular: await document.embedFont(fontNames.regular),
+    bold: await document.embedFont(fontNames.bold),
+    italic: await document.embedFont(fontNames.italic),
+    boldItalic: await document.embedFont(fontNames.boldItalic),
+  };
 }
 
 export function safePdfText(value: string) {
@@ -98,10 +178,9 @@ export function safePdfText(value: string) {
 }
 
 export function formatPdfDate(value: string | Date, withTime = false) {
-  return new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "long",
-    ...(withTime ? { timeStyle: "short" as const } : {}),
-  }).format(value instanceof Date ? value : new Date(value));
+  return withTime
+    ? formatDanishDateTime(value, "long")
+    : formatDanishDate(value, "long");
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
@@ -157,12 +236,15 @@ function clampLines(lines: string[], maxLines: number) {
 
 export async function createPdfReport(options: PdfReportOptions) {
   const document = await PDFDocument.create();
-  const regular = await document.embedFont(StandardFonts.Helvetica);
-  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const { regular, bold, italic, boldItalic } = await resolvePdfFonts(
+    document,
+    options.branding?.fontFamily,
+  );
   const reportPalette = {
     ...palette,
     brand: rgbFromHex(options.branding?.primaryColor, palette.brand),
     brandSoft: softRgbFromHex(options.branding?.primaryColor, palette.brandSoft),
+    brandHeader: softRgbFromHex(options.branding?.primaryColor, palette.subtle, 0.22),
     accent: rgbFromHex(options.branding?.accentColor, palette.brand),
   };
   let logoImage: PDFImage | null = null;
@@ -188,7 +270,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       y: pageSize[1] - headerHeight,
       width: pageSize[0],
       height: headerHeight,
-      color: reportPalette.subtle,
+      color: reportPalette.brandHeader,
     });
     page.drawRectangle({
       x: 0,
@@ -299,6 +381,111 @@ export async function createPdfReport(options: PdfReportOptions) {
     return false;
   };
 
+  const fontForRun = (run: PdfTextRun) => {
+    if (run.bold && run.italic) return boldItalic;
+    if (run.bold) return bold;
+    if (run.italic) return italic;
+    return regular;
+  };
+
+  const mergeRun = (runs: PdfTextRun[], run: PdfTextRun) => {
+    const text = safePdfText(run.text);
+    if (!text) return;
+    const next: PdfTextRun = {
+      text,
+      bold: run.bold || undefined,
+      italic: run.italic || undefined,
+    };
+    const last = runs[runs.length - 1];
+    if (last && last.bold === next.bold && last.italic === next.italic) {
+      last.text += next.text;
+      return;
+    }
+    runs.push(next);
+  };
+
+  const runLineWidth = (runs: PdfTextRun[], size: number) =>
+    runs.reduce(
+      (width, run) => width + fontForRun(run).widthOfTextAtSize(run.text, size),
+      0,
+    );
+
+  const wrapRuns = (runs: PdfTextRun[], size: number, maxWidth: number) => {
+    const lines: PdfTextRun[][] = [];
+    let line: PdfTextRun[] = [];
+
+    const pushLine = () => {
+      lines.push(line.length ? line : [{ text: "" }]);
+      line = [];
+    };
+
+    const appendToken = (token: string, source: PdfTextRun) => {
+      if (token === "\n") {
+        pushLine();
+        return;
+      }
+      const text = token.replace(/\s+/g, " ");
+      if (!text.trim() && !line.length) return;
+      const candidate = [...line];
+      mergeRun(candidate, { ...source, text });
+      if (!line.length || runLineWidth(candidate, size) <= maxWidth) {
+        line = candidate;
+        return;
+      }
+      pushLine();
+      const trimmed = text.trimStart();
+      if (fontForRun(source).widthOfTextAtSize(trimmed, size) <= maxWidth) {
+        mergeRun(line, { ...source, text: trimmed });
+        return;
+      }
+
+      let chunk = "";
+      for (const char of trimmed) {
+        const candidateChunk = `${chunk}${char}`;
+        if (
+          !chunk ||
+          fontForRun(source).widthOfTextAtSize(candidateChunk, size) <= maxWidth
+        ) {
+          chunk = candidateChunk;
+        } else {
+          mergeRun(line, { ...source, text: chunk });
+          pushLine();
+          chunk = char;
+        }
+      }
+      if (chunk) mergeRun(line, { ...source, text: chunk });
+    };
+
+    for (const run of runs.length ? runs : [{ text: "" }]) {
+      for (const token of safePdfText(run.text).split(/(\n|\s+)/).filter(Boolean)) {
+        appendToken(token, run);
+      }
+    }
+    if (line.length || !lines.length) pushLine();
+    return lines;
+  };
+
+  const drawRunLine = (
+    runs: PdfTextRun[],
+    x: number,
+    lineY: number,
+    size: number,
+    color: RGB,
+  ) => {
+    let cursor = x;
+    for (const run of runs) {
+      const font = fontForRun(run);
+      page.drawText(run.text, {
+        x: cursor,
+        y: lineY,
+        font,
+        size,
+        color,
+      });
+      cursor += font.widthOfTextAtSize(run.text, size);
+    }
+  };
+
   const addText = (text: string, textOptions: TextOptions = {}) => {
     const font = textOptions.font ?? regular;
     const size = textOptions.size ?? 10;
@@ -344,12 +531,10 @@ export async function createPdfReport(options: PdfReportOptions) {
       const indent = options.indent ?? 0;
       const bulletWidth = options.bullet ? 18 : 0;
       const lineHeight = size * 1.48;
-      const lines = wrapText(
-        text,
-        font,
-        size,
-        options.maxWidth ?? contentWidth - indent - bulletWidth,
-      );
+      const maxWidth = options.maxWidth ?? contentWidth - indent - bulletWidth;
+      const lines = options.runs?.length
+        ? wrapRuns(options.runs, size, maxWidth)
+        : wrapText(text, font, size, maxWidth).map((line) => [{ text: line }]);
       ensureSpace(lines.length * lineHeight + (options.gapAfter ?? 0));
       if (options.bullet) {
         page.drawText(safePdfText(options.bullet), {
@@ -361,13 +546,23 @@ export async function createPdfReport(options: PdfReportOptions) {
         });
       }
       for (const [index, line] of lines.entries()) {
-        page.drawText(line, {
-          x: margin + indent + bulletWidth,
-          y,
-          font,
-          size,
-          color: options.color ?? reportPalette.ink,
-        });
+        if (options.runs?.length) {
+          drawRunLine(
+            line,
+            margin + indent + bulletWidth,
+            y,
+            size,
+            options.color ?? reportPalette.ink,
+          );
+        } else {
+          page.drawText(line[0]?.text ?? "", {
+            x: margin + indent + bulletWidth,
+            y,
+            font,
+            size,
+            color: options.color ?? reportPalette.ink,
+          });
+        }
         y -= lineHeight;
         if (index === 0 && options.bullet) {
           // Subsequent wrapped lines align with the text, not the marker.
@@ -387,6 +582,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           bullet: block.ordered ? `${block.index ?? 1}.` : "-",
           indent: 12,
           gapAfter: 5,
+          runs: block.runs,
         });
         continue;
       }
@@ -404,6 +600,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           color: reportPalette.muted,
           indent: 12,
           gapAfter: 9,
+          runs: block.runs,
         });
         continue;
       }
@@ -427,7 +624,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         }
         y -= 3;
       } else {
-        addProseLine(block.text, { gapAfter: 10 });
+        addProseLine(block.text, { gapAfter: 10, runs: block.runs });
       }
     }
   };
@@ -469,6 +666,60 @@ export async function createPdfReport(options: PdfReportOptions) {
       color: reportPalette.ink,
     });
     y -= 15;
+  };
+
+  const addAgendaItemHeader = (input: {
+    number: number;
+    typeLabel: string;
+    title: string;
+    subtitle?: string;
+  }) => {
+    const title = `${input.number}. (${input.typeLabel}) ${input.title}`;
+    const titleLines = wrapText(title, bold, 11.2, contentWidth - 22);
+    const subtitleLines = input.subtitle
+      ? clampLines(wrapText(input.subtitle, regular, 8.6, contentWidth - 22), 2)
+      : [];
+    const boxHeight = 22 + titleLines.length * 13 + subtitleLines.length * 11;
+    ensureSpace(boxHeight + 12);
+    y -= 2;
+    page.drawRectangle({
+      x: margin,
+      y: y - boxHeight + 10,
+      width: contentWidth,
+      height: boxHeight,
+      color: reportPalette.brandSoft,
+      borderColor: reportPalette.line,
+      borderWidth: 0.45,
+    });
+    page.drawRectangle({
+      x: margin,
+      y: y - boxHeight + 10,
+      width: 3,
+      height: boxHeight,
+      color: reportPalette.brand,
+    });
+    let localY = y - 8;
+    for (const line of titleLines) {
+      page.drawText(line, {
+        x: margin + 12,
+        y: localY,
+        font: bold,
+        size: 11.2,
+        color: reportPalette.ink,
+      });
+      localY -= 13;
+    }
+    for (const line of subtitleLines) {
+      page.drawText(line, {
+        x: margin + 12,
+        y: localY,
+        font: regular,
+        size: 8.6,
+        color: reportPalette.muted,
+      });
+      localY -= 11;
+    }
+    y -= boxHeight + 6;
   };
 
   const addMetaGrid = (items: PdfMetaItem[]) => {
@@ -657,8 +908,9 @@ export async function createPdfReport(options: PdfReportOptions) {
 
   return {
     document,
-    fonts: { regular, bold },
+    fonts: { regular, bold, italic, boldItalic },
     palette: reportPalette,
+    addAgendaItemHeader,
     addBadge,
     addKeyValue,
     addMetaGrid,

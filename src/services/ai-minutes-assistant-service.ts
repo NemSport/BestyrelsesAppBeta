@@ -10,6 +10,7 @@ import {
   minutesAssistantInstructions,
   minutesAssistantPromptVersion,
 } from "@/lib/ai-minutes-assistant";
+import { formatDanishDate } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import {
   richTextToPlainText,
@@ -169,7 +170,7 @@ export class AiMinutesAssistantService {
             content: [
               `Handling: ${aiMinutesAssistantActionLabels[parsed.action]}`,
               `Møde: ${meeting.title}`,
-              `Mødedato: ${meeting.starts_at.slice(0, 10)}`,
+              `Mødedato: ${formatDanishDate(meeting.starts_at, "long")}`,
               agendaItem ? `Dagsordenspunkt: ${agendaItem.title}` : "",
               `Felt: ${parsed.field}`,
               "",

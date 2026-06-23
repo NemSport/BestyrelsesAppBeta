@@ -1,4 +1,8 @@
 import type { Database } from "@/types/database";
+import {
+  formatDanishDate,
+  formatDanishDateTime,
+} from "@/lib/date-format";
 
 type AgendaItemType = Database["public"]["Enums"]["agenda_item_type"];
 type MeetingStatus = Database["public"]["Enums"]["meeting_status"];
@@ -23,6 +27,15 @@ export const agendaItemTypeLabels: Record<
   decision: { short: "B", label: "Beslutning" },
   follow_up: { short: "F", label: "Opfølgning" },
 };
+export function getAgendaItemTypeLabel(
+  value: AgendaItemType | string | null | undefined,
+) {
+  if (value && value in agendaItemTypeLabels) {
+    return agendaItemTypeLabels[value as AgendaItemType];
+  }
+
+  return { short: "P", label: "Punkt" };
+}
 
 export const standardAgendaItemLabels = {
   agenda_approval: "Standardpunkt",
@@ -128,17 +141,15 @@ export const committeeRoleLabels = {
   viewer: "Observatør",
 } as const;
 
-export function formatDate(value: string) {
-  return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(
-    new Date(value),
-  );
+export function formatDate(value: string | Date) {
+  return formatDanishDate(value);
 }
 
-export function formatDateTime(value: string, dateStyle: "medium" | "full" = "medium") {
-  return new Intl.DateTimeFormat("da-DK", {
-    dateStyle,
-    timeStyle: "short",
-  }).format(new Date(value));
+export function formatDateTime(
+  value: string | Date,
+  dateStyle: "medium" | "full" = "medium",
+) {
+  return formatDanishDateTime(value, dateStyle);
 }
 
 export function toDateTimeLocal(value: string | null) {

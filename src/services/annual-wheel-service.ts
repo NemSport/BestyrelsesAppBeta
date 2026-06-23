@@ -4,6 +4,7 @@ import {
   buildAnnualWheelOccurrences,
   buildRRule,
 } from "@/lib/annual-wheel";
+import { formatDanishDateKey } from "@/lib/date-format";
 import { NotFoundError } from "@/lib/errors";
 import {
   annualWheelEventDeleteSchema,
@@ -86,16 +87,18 @@ export class AnnualWheelService {
       canEditOrganization,
       calendarItems: [
         ...meetings
-          .filter(
-            (meeting) =>
-              meeting.starts_at.slice(0, 10) >= yearStart &&
-              meeting.starts_at.slice(0, 10) <= yearEnd,
-          )
           .map((meeting) => ({
+            meeting,
+            localDate: formatDanishDateKey(meeting.starts_at),
+          }))
+          .filter(
+            ({ localDate }) => localDate >= yearStart && localDate <= yearEnd,
+          )
+          .map(({ meeting, localDate }) => ({
             id: `meeting:${meeting.id}`,
             kind: "meeting" as const,
             title: meeting.title,
-            date: meeting.starts_at.slice(0, 10),
+            date: localDate,
             committeeId: meeting.committee_id,
             responsibleUserId: null,
             priority: "medium" as const,

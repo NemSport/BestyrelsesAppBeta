@@ -177,6 +177,13 @@ follow-up and transfer logic. Secondary agenda-item actions share a single
 inline panel state, so only one follow-up or extra-fields panel is visible at a
 time and no action panel relies on floating layout inside the minutes editor.
 
+Meeting date/time display is centralized in `src/lib/date-format.ts`.
+Display helpers use `locale: da-DK` and `timeZone: Europe/Copenhagen`; storage
+still uses the existing UTC ISO values. UI, agenda email templates, AI context,
+Annual Wheel meeting date keys, and PDF report helpers should use these
+helpers for meeting timestamps, while datetime-local input conversion remains a
+separate form concern.
+
 Phase 1.6-A4 treats the meeting page as an interactive document rather than an
 administration dashboard. The header combines authoritative meeting metadata
 and minutes status in one surface. The agenda remains the primary work area:
@@ -250,13 +257,36 @@ Organization branding is an optional input to this foundation, not a separate
 PDF pipeline. Missing branding or failed logo loading falls back to the
 standard report palette.
 
+Agenda PDF export is available through a server-side meeting route and uses
+the same `MeetingService` access check as the meeting page. It does not depend
+on approved minutes and only includes public meeting and agenda-item content:
+title, committee, date/time, location, item order, type, objective, and
+description. Internal notes and private fields are intentionally excluded.
+Agenda and minutes PDFs use the shared agenda-item header helper for clearer
+separation between points.
+PDF branding includes the organization font family, but the `pdf-lib` renderer
+does not consume browser font stacks or CSS variables. The shared report
+foundation therefore resolves validated branding fonts server-side to safe
+built-in PDF families. Exact webfont embedding is intentionally avoided after
+WOFF-based embedding produced unreadable glyph boxes in generated PDFs.
+Unsupported brand fonts fall back with a small server-side diagnostic log
+rather than failing export or risking unreadable text. Primary brand color
+remains the accent color for borders and headings, while the report header and
+larger agenda-item backgrounds use a 20-30% brand-color tint blended toward
+white for print-safe contrast.
+Agenda PDF and agenda email consume `getAgendaItemTypeLabel` so user-facing
+output shows Danish point types and falls back to `Punkt` for unknown values.
+Agenda exports include public agenda-item objective and description when
+present, converted from sanitized rich text rather than emitted as raw HTML;
+internal notes remain excluded.
+
 Referat prose uses a shared rendering contract. On the website,
 `RichTextContent` applies document-style max-width, line height, paragraph
 spacing, heading spacing, and list spacing to sanitized TipTap HTML. In PDFs,
 `richTextToPdfBlocks` converts the same sanitized HTML into paragraph,
-heading, quote, and list blocks, and `pdf-report` renders those blocks with
-controlled line width, vertical rhythm, simple subpoint detection, and safe
-page breaks.
+heading, quote, list blocks, and inline bold/italic runs, and `pdf-report`
+renders those blocks with controlled line width, vertical rhythm, simple
+subpoint detection, and safe page breaks.
 
 Phase 7.1 extends the shared UI foundation without changing product behavior.
 `AppShell` and `OrganizationNav` define the calm authenticated frame. `PageHeader`,

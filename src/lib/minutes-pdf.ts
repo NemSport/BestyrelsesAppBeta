@@ -106,11 +106,13 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const minutes = minutesByAgendaItem.get(item.id);
-    const itemTitle = `${occurrence.position + 1}. (${
-      agendaItemTypeLabels[item.item_type].short
-    }) ${item.title}`;
 
-    report.addSubsection(itemTitle);
+    report.addAgendaItemHeader({
+      number: occurrence.position + 1,
+      typeLabel: agendaItemTypeLabels[item.item_type].short,
+      title: item.title,
+      subtitle: item.objective || item.description || undefined,
+    });
     if (!minutes) {
       report.addParagraph("Der er ikke gemt et punktreferat.");
       continue;

@@ -9,6 +9,7 @@ import {
   meetingOverviewInstructions,
   meetingOverviewPromptVersion,
 } from "@/lib/ai-meeting-overview";
+import { formatDanishDateTime } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { richTextToPlainText } from "@/lib/rich-text";
 import { DecisionRepository } from "@/repositories/decision-repository";
@@ -201,7 +202,7 @@ export class AiMeetingOverviewService {
 
     const meetingContext = [
       `Møde: ${meeting.title}`,
-      `Mødedato: ${meeting.starts_at}`,
+      `Mødedato: ${formatDanishDateTime(meeting.starts_at, "full")}`,
       formatLine("Mødebeskrivelse", meeting.description),
       "",
       "DAGSORDEN OG PUNKTREFERATER:",

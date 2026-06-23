@@ -15,9 +15,16 @@ const allowedTags = new Set([
   "u",
 ]);
 
+export type RichTextPdfRun = {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+
 export type RichTextPdfBlock = {
   type: "paragraph" | "heading" | "listItem" | "quote";
   text: string;
+  runs?: RichTextPdfRun[];
   ordered?: boolean;
   index?: number;
 };
@@ -55,6 +62,44 @@ function decodeHtmlEntities(value: string) {
 function safeHref(value: string) {
   const href = decodeHtmlEntities(value).trim();
   return /^(https?:\/\/|mailto:)/i.test(href) ? href : null;
+}
+
+function mergeRun(
+  runs: RichTextPdfRun[],
+  text: string,
+  style: Pick<RichTextPdfRun, "bold" | "italic">,
+) {
+  if (!text) return;
+  const next: RichTextPdfRun = {
+    text,
+    bold: style.bold || undefined,
+    italic: style.italic || undefined,
+  };
+  const last = runs[runs.length - 1];
+  if (last && last.bold === next.bold && last.italic === next.italic) {
+    last.text += next.text;
+    return;
+  }
+  runs.push(next);
+}
+
+function normalizeRuns(runs: RichTextPdfRun[]) {
+  const normalized: RichTextPdfRun[] = [];
+  for (const run of runs) {
+    mergeRun(normalized, run.text.replace(/[ \t]+/g, " "), run);
+  }
+
+  while (normalized.length && !normalized[0].text.trim()) normalized.shift();
+  while (normalized.length && !normalized[normalized.length - 1].text.trim()) {
+    normalized.pop();
+  }
+  if (normalized.length) {
+    normalized[0].text = normalized[0].text.replace(/^\s+/, "");
+    const last = normalized[normalized.length - 1];
+    last.text = last.text.replace(/\s+$/, "");
+  }
+
+  return normalized.filter((run) => run.text);
 }
 
 function sanitizeTag(token: string) {
@@ -131,14 +176,24 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
   const listCounters: number[] = [];
   let active: RichTextPdfBlock["type"] | null = null;
   let buffer = "";
+  let runs: RichTextPdfRun[] = [];
+  let boldDepth = 0;
+  let italicDepth = 0;
+
+  const currentStyle = () => ({
+    bold: boldDepth > 0,
+    italic: italicDepth > 0,
+  });
 
   const pushBuffer = () => {
+    const normalizedRuns = normalizeRuns(runs);
     const text = decodeHtmlEntities(buffer)
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
     if (!text) {
       buffer = "";
+      runs = [];
       return;
     }
     if (active === "listItem") {
@@ -148,18 +203,26 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
       blocks.push({
         type: "listItem",
         text,
+        runs: normalizedRuns,
         ordered,
         index: ordered ? listCounters[counterIndex] : undefined,
       });
     } else {
-      blocks.push({ type: active ?? "paragraph", text });
+      blocks.push({
+        type: active ?? "paragraph",
+        text,
+        runs: normalizedRuns,
+      });
     }
     buffer = "";
+    runs = [];
   };
 
   for (const token of sanitized.match(/<[^>]*>|[^<]+/g) ?? []) {
     if (!token.startsWith("<")) {
-      buffer += token;
+      const decoded = decodeHtmlEntities(token);
+      buffer += decoded;
+      mergeRun(runs, decoded, currentStyle());
       continue;
     }
 
@@ -170,6 +233,27 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
 
     if (tag === "br" && !closing) {
       buffer += "\n";
+      mergeRun(runs, "\n", currentStyle());
+      continue;
+    }
+
+    if (!closing && tag === "strong") {
+      boldDepth += 1;
+      continue;
+    }
+
+    if (closing && tag === "strong") {
+      boldDepth = Math.max(0, boldDepth - 1);
+      continue;
+    }
+
+    if (!closing && tag === "em") {
+      italicDepth += 1;
+      continue;
+    }
+
+    if (closing && tag === "em") {
+      italicDepth = Math.max(0, italicDepth - 1);
       continue;
     }
 

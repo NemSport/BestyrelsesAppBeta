@@ -7,6 +7,7 @@ import {
   StatusBadge,
   buttonClassName,
 } from "@/components/ui";
+import { formatDanishDateKey } from "@/lib/date-format";
 import { formatDateTime, meetingStatusLabels } from "@/lib/localization";
 import { canManageCommittee } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
@@ -16,15 +17,8 @@ import { MeetingService } from "@/services/meeting-service";
 
 type CommitteeMeeting = Awaited<ReturnType<MeetingService["list"]>>[number];
 
-const dateKeyFormatter = new Intl.DateTimeFormat("sv-SE", {
-  day: "2-digit",
-  month: "2-digit",
-  timeZone: "Europe/Copenhagen",
-  year: "numeric",
-});
-
 function dateKey(value: string) {
-  return dateKeyFormatter.format(new Date(value));
+  return formatDanishDateKey(value);
 }
 
 function isValidDateKey(value: string | undefined) {

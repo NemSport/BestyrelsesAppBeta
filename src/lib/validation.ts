@@ -570,6 +570,32 @@ export const annualWheelEventDeleteSchema = z.object({
 const jobCardText = (label: string, max = 20000) =>
   z.string().trim().max(max, `${label} må højst være ${max.toLocaleString("da-DK")} tegn`).default("");
 
+function compactJobCardDocuments(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.filter((item) => {
+    if (!item || typeof item !== "object") return true;
+    const record = item as Record<string, unknown>;
+    return Boolean(
+      String(record.title ?? "").trim() || String(record.url ?? "").trim(),
+    );
+  });
+}
+
+function compactJobCardTaskTemplates(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.filter((item) => {
+    if (!item || typeof item !== "object") return true;
+    const record = item as Record<string, unknown>;
+    return Boolean(
+      String(record.title ?? "").trim() ||
+        String(record.description ?? "").trim() ||
+        String(record.category ?? "").trim() ||
+        (record.defaultDeadlineDays !== null &&
+          record.defaultDeadlineDays !== undefined),
+    );
+  });
+}
+
 export const jobCardInputSchema = z.object({
   organizationId: uuidSchema,
   title: requiredName("Titel", 180),
@@ -584,34 +610,40 @@ export const jobCardInputSchema = z.object({
   responsibilityAreaIds: z.array(uuidSchema).max(30).default([]),
   committeeIds: z.array(uuidSchema).max(30).default([]),
   assignedUserIds: z.array(uuidSchema).max(30).default([]),
-  documents: z
-    .array(
-      z.object({
-        title: requiredName("Dokumenttitel", 180),
-        url: z
-          .string()
-          .url("Linket er ugyldigt")
-          .max(2048)
-          .refine(
-            (value) => value.startsWith("https://") || value.startsWith("http://"),
-            "Linket skal begynde med http:// eller https://",
-          ),
-      }),
-    )
-    .max(30)
-    .default([]),
-  taskTemplates: z
-    .array(
-      z.object({
-        committeeId: uuidSchema,
-        title: requiredName("Opgavetitel", 240),
-        description: jobCardText("Opgavebeskrivelse"),
-        category: optionalDecisionText("Kategori", 120),
-        defaultDeadlineDays: z.number().int().min(0).max(3650).nullable(),
-      }),
-    )
-    .max(50)
-    .default([]),
+  documents: z.preprocess(
+    compactJobCardDocuments,
+    z
+      .array(
+        z.object({
+          title: requiredName("Dokumenttitel", 180),
+          url: z
+            .string()
+            .url("Linket er ugyldigt")
+            .max(2048)
+            .refine(
+              (value) => value.startsWith("https://") || value.startsWith("http://"),
+              "Linket skal begynde med http:// eller https://",
+            ),
+        }),
+      )
+      .max(30)
+      .default([]),
+  ),
+  taskTemplates: z.preprocess(
+    compactJobCardTaskTemplates,
+    z
+      .array(
+        z.object({
+          committeeId: uuidSchema,
+          title: requiredName("Opgavetitel", 240),
+          description: jobCardText("Opgavebeskrivelse"),
+          category: optionalDecisionText("Kategori", 120),
+          defaultDeadlineDays: z.number().int().min(0).max(3650).nullable(),
+        }),
+      )
+      .max(50)
+      .default([]),
+  ),
   onboarding: z.object({
     introduction: jobCardText("Introduktion"),
     first30Days: jobCardText("De første 30 dage"),

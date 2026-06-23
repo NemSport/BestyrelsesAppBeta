@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { NotFoundError } from "@/lib/errors";
+import { AppError, NotFoundError } from "@/lib/errors";
 import {
   jobCardArchiveSchema,
   jobCardInputSchema,
@@ -17,6 +17,8 @@ import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
 import type { JobCardOverview, RoleProfileView } from "@/types/domain";
+
+type ParsedJobCardInput = typeof jobCardInputSchema["_output"];
 
 export class JobCardService {
   private readonly jobCards: JobCardRepository;
@@ -150,6 +152,7 @@ export class JobCardService {
       parsed.organizationId,
       user.id,
     );
+    await this.validateRelationScope(parsed);
     const role = await this.jobCards.createRole({
       organization_id: parsed.organizationId,
       title: parsed.title,
@@ -180,6 +183,7 @@ export class JobCardService {
       user.id,
     );
     await this.requireRole(parsed.organizationId, parsed.roleProfileId);
+    await this.validateRelationScope(parsed);
     const role = await this.jobCards.updateRole(parsed.roleProfileId, {
       title: parsed.title,
       purpose: parsed.purpose,
@@ -280,5 +284,64 @@ export class JobCardService {
       throw new NotFoundError("Jobkortet");
     }
     return role;
+  }
+
+  private async validateRelationScope(
+    parsed: ParsedJobCardInput & { roleProfileId?: string },
+  ) {
+    const [areas, committees, members] = await Promise.all([
+      this.jobCards.listResponsibilityAreas(parsed.organizationId),
+      this.committees.listByOrganization(parsed.organizationId),
+      this.members.listMembers(parsed.organizationId),
+    ]);
+    const areaIds = new Set(areas.map((area) => area.id));
+    const committeeIds = new Set(committees.map((committee) => committee.id));
+    const activeMemberIds = new Set(
+      members
+        .filter((member) => member.status === "active")
+        .map((member) => member.user_id),
+    );
+
+    const invalidArea = parsed.responsibilityAreaIds.find((id) => !areaIds.has(id));
+    if (invalidArea) {
+      throw new AppError(
+        "Det valgte ansvarsområde findes ikke i organisationen.",
+        422,
+        "JOB_CARD_AREA_SCOPE_INVALID",
+      );
+    }
+
+    const invalidCommittee = parsed.committeeIds.find(
+      (id) => !committeeIds.has(id),
+    );
+    if (invalidCommittee) {
+      throw new AppError(
+        "Det valgte udvalg findes ikke i organisationen.",
+        422,
+        "JOB_CARD_COMMITTEE_SCOPE_INVALID",
+      );
+    }
+
+    const invalidAssignment = parsed.assignedUserIds.find(
+      (id) => !activeMemberIds.has(id),
+    );
+    if (invalidAssignment) {
+      throw new AppError(
+        "Den valgte rolleholder er ikke et aktivt medlem af organisationen.",
+        422,
+        "JOB_CARD_ASSIGNMENT_SCOPE_INVALID",
+      );
+    }
+
+    const invalidTemplate = parsed.taskTemplates.find(
+      (template) => !committeeIds.has(template.committeeId),
+    );
+    if (invalidTemplate) {
+      throw new AppError(
+        "Vælg et gyldigt udvalg på alle opgaveskabeloner.",
+        422,
+        "JOB_CARD_TEMPLATE_SCOPE_INVALID",
+      );
+    }
   }
 }

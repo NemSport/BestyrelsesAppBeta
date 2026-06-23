@@ -1,5 +1,9 @@
-import type { EmailTemplateBranding } from "@/lib/email-branding";
-import { formatDateTime } from "@/lib/localization";
+﻿import type { EmailTemplateBranding } from "@/lib/email-branding";
+import {
+  formatDateTime,
+  getAgendaItemTypeLabel,
+} from "@/lib/localization";
+import { richTextToPlainText } from "@/lib/rich-text";
 import type { AgendaItem, Meeting } from "@/types/domain";
 
 type TemplateResult = {
@@ -46,7 +50,7 @@ function shell({
     `<div style="font-family:Inter,Arial,sans-serif;color:#172033;line-height:1.55;max-width:720px">`,
     `<div style="border-top:4px solid ${escapeHtml(primaryColor)};padding-top:18px;margin-bottom:20px">`,
     logo,
-    `<p style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:${escapeHtml(accentColor)};margin:0 0 8px">${escapeHtml(organizationName)} · ${escapeHtml(committeeName)}</p>`,
+    `<p style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:${escapeHtml(accentColor)};margin:0 0 8px">${escapeHtml(organizationName)} Â· ${escapeHtml(committeeName)}</p>`,
     `<h1 style="font-size:24px;line-height:1.2;margin:0 0 12px;color:${escapeHtml(primaryColor)}">${escapeHtml(title)}</h1>`,
     `<p style="font-size:15px;color:#293449;margin:0">${escapeHtml(intro)}</p>`,
     `</div>`,
@@ -70,7 +74,9 @@ export function meetingAgendaEmailTemplate({
   organizationName: string;
   committeeName: string;
   meeting: Meeting;
-  agendaItems: Array<Pick<AgendaItem, "title" | "item_type">>;
+  agendaItems: Array<
+    Pick<AgendaItem, "title" | "item_type" | "objective" | "description">
+  >;
   subject: string;
   message: string;
   meetingUrl: string;
@@ -78,18 +84,40 @@ export function meetingAgendaEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   const agendaText = agendaItems.length
     ? agendaItems
-        .map((item, index) => `${index + 1}. ${item.title}`)
+        .map((item, index) => {
+          const typeLabel = getAgendaItemTypeLabel(item.item_type).label;
+          const objective = richTextToPlainText(item.objective);
+          const description = richTextToPlainText(item.description);
+          return [
+            `${index + 1}. ${item.title} (${typeLabel})`,
+            objective ? `   Formål: ${objective}` : "",
+            description ? `   Baggrund: ${description}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+        })
         .join("\n")
     : "Der er endnu ikke dagsordenspunkter på mødet.";
   const htmlItems = agendaItems.length
     ? `<ol>${agendaItems
-        .map(
-          (item) =>
-            `<li><strong>${escapeHtml(item.title)}</strong><br /><span style="color:#657282">${escapeHtml(item.item_type)}</span></li>`,
-        )
+        .map((item) => {
+          const typeLabel = getAgendaItemTypeLabel(item.item_type).label;
+          const objective = richTextToPlainText(item.objective);
+          const description = richTextToPlainText(item.description);
+          const details = [
+            objective
+              ? `<p style="margin:8px 0 0"><strong>Formål:</strong> ${escapeHtml(objective)}</p>`
+              : "",
+            description
+              ? `<p style="margin:6px 0 0"><strong>Baggrund:</strong> ${escapeHtml(description)}</p>`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("");
+          return `<li style="margin-bottom:14px"><strong>${escapeHtml(item.title)}</strong><br /><span style="color:#657282">${escapeHtml(typeLabel)}</span>${details}</li>`;
+        })
         .join("")}</ol>`
     : `<p style="color:#657282">Der er endnu ikke dagsordenspunkter på mødet.</p>`;
-
   const intro =
     message ||
     `Her er dagsordenen for ${meeting.title} den ${formatDateTime(meeting.starts_at, "full")}.`;
@@ -97,19 +125,19 @@ export function meetingAgendaEmailTemplate({
   return {
     subject,
     text: [
-      `${organizationName} · ${committeeName}`,
+      `${organizationName} Â· ${committeeName}`,
       "",
       subject,
       "",
       intro,
       "",
-      `Møde: ${meeting.title}`,
+      `MÃ¸de: ${meeting.title}`,
       `Dato: ${formatDateTime(meeting.starts_at, "full")}`,
       "",
       "Dagsorden:",
       agendaText,
       "",
-      `Åbn møde: ${meetingUrl}`,
+      `Ã…bn mÃ¸de: ${meetingUrl}`,
       "",
       "Sendt fra BestyrelsesApp.",
     ].join("\n"),
@@ -120,11 +148,11 @@ export function meetingAgendaEmailTemplate({
       committeeName,
       branding,
       content: [
-        `<p><strong>Møde:</strong> ${escapeHtml(meeting.title)}<br />`,
+        `<p><strong>MÃ¸de:</strong> ${escapeHtml(meeting.title)}<br />`,
         `<strong>Dato:</strong> ${escapeHtml(formatDateTime(meeting.starts_at, "full"))}</p>`,
         `<h2 style="font-size:17px;margin-top:22px">Dagsorden</h2>`,
         htmlItems,
-        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn møde i BestyrelsesApp</a></p>`,
+        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Ã…bn mÃ¸de i BestyrelsesApp</a></p>`,
       ].join(""),
     }),
   };
@@ -145,14 +173,14 @@ export function approvedMinutesEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
     subject: `Godkendt referat: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nReferatet er godkendt.\n\nÅbn referat: ${url}\n\nSendt fra BestyrelsesApp.`,
+    text: `${organizationName} Â· ${committeeName}\n\nReferatet er godkendt.\n\nÃ…bn referat: ${url}\n\nSendt fra BestyrelsesApp.`,
     html: shell({
       title: `Godkendt referat: ${title}`,
-      intro: "Referatet er godkendt og kan læses i BestyrelsesApp.",
+      intro: "Referatet er godkendt og kan lÃ¦ses i BestyrelsesApp.",
       organizationName,
       committeeName,
       branding,
-      content: `<p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn referat</a></p>`,
+      content: `<p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Ã…bn referat</a></p>`,
     }),
   };
 }
@@ -173,15 +201,15 @@ export function taskReminderEmailTemplate({
 } & BrandingInput): TemplateResult {
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
-    subject: `Påmindelse: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nOpgave: ${title}\nDeadline: ${deadline || "Ingen deadline"}\n\nÅbn opgave: ${url}\n\nSendt fra BestyrelsesApp.`,
+    subject: `PÃ¥mindelse: ${title}`,
+    text: `${organizationName} Â· ${committeeName}\n\nOpgave: ${title}\nDeadline: ${deadline || "Ingen deadline"}\n\nÃ…bn opgave: ${url}\n\nSendt fra BestyrelsesApp.`,
     html: shell({
-      title: `Påmindelse: ${title}`,
-      intro: "Der er en opgave, som kræver opmærksomhed.",
+      title: `PÃ¥mindelse: ${title}`,
+      intro: "Der er en opgave, som krÃ¦ver opmÃ¦rksomhed.",
       organizationName,
       committeeName,
       branding,
-      content: `<p><strong>Deadline:</strong> ${escapeHtml(deadline || "Ingen deadline")}</p><p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn opgave</a></p>`,
+      content: `<p><strong>Deadline:</strong> ${escapeHtml(deadline || "Ingen deadline")}</p><p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Ã…bn opgave</a></p>`,
     }),
   };
 }
@@ -201,14 +229,14 @@ export function decisionsOverviewEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
     subject: `Beslutningsoversigt: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nBeslutningsoversigten kan læses i BestyrelsesApp.\n\nÅbn oversigt: ${url}\n\nSendt fra BestyrelsesApp.`,
+    text: `${organizationName} Â· ${committeeName}\n\nBeslutningsoversigten kan lÃ¦ses i BestyrelsesApp.\n\nÃ…bn oversigt: ${url}\n\nSendt fra BestyrelsesApp.`,
     html: shell({
       title: `Beslutningsoversigt: ${title}`,
-      intro: "Beslutningsoversigten kan læses i BestyrelsesApp.",
+      intro: "Beslutningsoversigten kan lÃ¦ses i BestyrelsesApp.",
       organizationName,
       committeeName,
       branding,
-      content: `<p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn beslutninger</a></p>`,
+      content: `<p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Ã…bn beslutninger</a></p>`,
     }),
   };
 }

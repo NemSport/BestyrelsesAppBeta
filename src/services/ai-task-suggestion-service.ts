@@ -14,6 +14,7 @@ import {
   taskSuggestionInstructions,
   taskSuggestionPromptVersion,
 } from "@/lib/ai-task-suggestions";
+import { formatDanishDate } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { richTextToPlainText } from "@/lib/rich-text";
 import { DecisionRepository } from "@/repositories/decision-repository";
@@ -292,7 +293,7 @@ export class AiTaskSuggestionService {
                   ? `Dagsordenspunkt-id: ${segment.agendaItemId}`
                   : "Dagsordenspunkt-id: ikke relevant",
                 `Kildetitel: ${segment.title}`,
-                `Mødedato: ${meeting.starts_at.slice(0, 10)}`,
+                `Mødedato: ${formatDanishDate(meeting.starts_at, "long")}`,
                 `Kendte udvalgsmedlemmer: ${
                   knownMembers.map((member) => member.name).join(", ") ||
                   "ingen tilgængelige"

@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, TableInsert, TableUpdate } from "@/types/database";
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
 export class JobCardRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
@@ -101,13 +105,18 @@ export class JobCardRepository {
       "task_templates",
     ] as const;
     for (const table of tables) {
-      const { error } = await this.db.from(table).delete().eq("role_profile_id", id);
+      const { error } = await this.db
+        .from(table)
+        .delete()
+        .eq("organization_id", input.organizationId)
+        .eq("role_profile_id", id);
       if (error) throw error;
     }
     const { data: activeAssignments, error: assignmentReadError } =
       await this.db
         .from("role_profile_assignments")
         .select("*")
+        .eq("organization_id", input.organizationId)
         .eq("role_profile_id", id)
         .is("ends_on", null);
     if (assignmentReadError) throw assignmentReadError;
@@ -128,6 +137,17 @@ export class JobCardRepository {
     const newAssignedUserIds = input.assignedUserIds.filter(
       (userId) => !existingUsers.has(userId),
     );
+    const documents = input.documents.filter(
+      (document) => hasText(document.title) || hasText(document.url),
+    );
+    const taskTemplates = input.taskTemplates.filter(
+      (template) =>
+        hasText(template.title) ||
+        hasText(template.description) ||
+        hasText(template.category) ||
+        template.defaultDeadlineDays !== null,
+    );
+
     const inserts = [
       input.responsibilityAreaIds.length
         ? this.db.from("role_profile_responsibility_areas").insert(input.responsibilityAreaIds.map((responsibilityAreaId) => ({ organization_id: input.organizationId, role_profile_id: id, responsibility_area_id: responsibilityAreaId })))
@@ -138,16 +158,29 @@ export class JobCardRepository {
       newAssignedUserIds.length
         ? this.db.from("role_profile_assignments").insert(newAssignedUserIds.map((userId) => ({ organization_id: input.organizationId, role_profile_id: id, user_id: userId, created_by: input.userId })))
         : null,
-      input.documents.length
-        ? this.db.from("role_documents").insert(input.documents.map((document) => ({ ...document, organization_id: input.organizationId, role_profile_id: id, created_by: input.userId })))
+      documents.length
+        ? this.db.from("role_documents").insert(documents.map((document) => ({ ...document, organization_id: input.organizationId, role_profile_id: id, created_by: input.userId })))
         : null,
-      input.taskTemplates.length
-        ? this.db.from("task_templates").insert(input.taskTemplates.map((template) => ({ organization_id: input.organizationId, role_profile_id: id, committee_id: template.committeeId, title: template.title, description: template.description, category: template.category ?? null, default_deadline_days: template.defaultDeadlineDays, created_by: input.userId })))
+      taskTemplates.length
+        ? this.db.from("task_templates").insert(taskTemplates.map((template) => ({ organization_id: input.organizationId, role_profile_id: id, committee_id: template.committeeId, title: template.title, description: template.description, category: template.category ?? null, default_deadline_days: template.defaultDeadlineDays, created_by: input.userId })))
         : null,
     ].filter(Boolean);
     const results = await Promise.all(inserts);
     const relationError = results.find((result) => result?.error)?.error;
     if (relationError) throw relationError;
+    const hasOnboarding =
+      hasText(input.onboarding.introduction) ||
+      hasText(input.onboarding.first30Days) ||
+      hasText(input.onboarding.practicalInformation);
+    if (!hasOnboarding) {
+      const { error: deleteGuideError } = await this.db
+        .from("onboarding_guides")
+        .delete()
+        .eq("organization_id", input.organizationId)
+        .eq("role_profile_id", id);
+      if (deleteGuideError) throw deleteGuideError;
+      return;
+    }
     const { error: guideError } = await this.db.from("onboarding_guides").upsert({
       organization_id: input.organizationId,
       role_profile_id: id,

@@ -1,4 +1,5 @@
 import type { PdfReportBranding } from "@/lib/pdf-report";
+import { organizationBrandFonts } from "@/lib/organization-branding";
 import type { OrganizationBranding } from "@/types/domain";
 
 const fallbackPrimary = "#12313e";
@@ -19,6 +20,14 @@ function safeRemoteLogoUrl(value: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+function safeFontFamily(value: string | null | undefined) {
+  return organizationBrandFonts.includes(
+    value as (typeof organizationBrandFonts)[number],
+  )
+    ? value!
+    : undefined;
 }
 
 async function loadLogo(logoUrl: string | null) {
@@ -72,5 +81,6 @@ export async function resolvePdfReportBranding(
     logoMimeType: logo?.mimeType ?? null,
     primaryColor: safeHexColor(branding?.primary_color, fallbackPrimary),
     accentColor: safeHexColor(branding?.accent_color, fallbackAccent),
+    fontFamily: safeFontFamily(branding?.font_family),
   };
 }

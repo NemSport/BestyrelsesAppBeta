@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
+import { formatDanishDateKey } from "@/lib/date-format";
 import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import { createClient } from "@/lib/supabase/server";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
@@ -40,7 +41,7 @@ export async function GET(
         .map((attendee) => attendee.user_id),
       branding,
     });
-    const fileName = `referat-${data.meeting.starts_at.slice(0, 10)}.pdf`;
+    const fileName = `referat-${formatDanishDateKey(data.meeting.starts_at)}.pdf`;
 
     return new NextResponse(Buffer.from(pdf), {
       headers: {

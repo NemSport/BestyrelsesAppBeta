@@ -13,6 +13,7 @@ import {
   defaultAgendaItemAssistantModel,
   getAiEnv,
 } from "@/lib/ai-env";
+import { formatDanishDate } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { richTextToPlainText } from "@/lib/rich-text";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
@@ -171,7 +172,10 @@ export class AgendaItemAssistantService {
       ...sortedMinutes.slice(0, 8).map((minutes) => ({
         id: `minutes:${minutes.id}`,
         label: minutes.meetings
-          ? `${minutes.meetings.title} · ${minutes.meetings.starts_at.slice(0, 10)}`
+          ? `${minutes.meetings.title} · ${formatDanishDate(
+              minutes.meetings.starts_at,
+              "long",
+            )}`
           : "Tidligere punktreferat",
         href: minutes.meetings
           ? `/organizations/${parsed.organizationId}/committees/${parsed.committeeId}/meetings/${minutes.meetings.id}`

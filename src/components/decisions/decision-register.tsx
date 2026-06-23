@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
+import { formatDanishDate } from "@/lib/date-format";
 import {
   decisionStatusLabels,
   decisionStatusOptions,
@@ -69,9 +70,7 @@ function memberName(member: OrganizationMemberDirectoryEntry) {
 
 function formatDate(value: string | null) {
   if (!value) return "Ikke angivet";
-  return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(
-    new Date(`${value}T00:00:00`),
-  );
+  return formatDanishDate(value);
 }
 
 const emptyFilters = (): DecisionRegisterFilters => ({
@@ -457,7 +456,7 @@ export function DecisionRegister({
                 <option value="">Alle møder</option>
                 {meetingFilterOptions.map((meeting) => (
                   <option key={meeting.id} value={meeting.id}>
-                    {meeting.title} · {formatDate(meeting.starts_at.slice(0, 10))}
+                    {meeting.title} · {formatDate(meeting.starts_at)}
                   </option>
                 ))}
               </Select>
@@ -965,7 +964,7 @@ export function DecisionRegister({
                   <option value="">Intet møde</option>
                   {meetingOptions.map((meeting) => (
                     <option key={meeting.id} value={meeting.id}>
-                      {meeting.title} · {formatDate(meeting.starts_at.slice(0, 10))}
+                      {meeting.title} · {formatDate(meeting.starts_at)}
                     </option>
                   ))}
                 </Select>

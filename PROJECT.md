@@ -615,6 +615,12 @@ compact always-visible control, and use one shared inline action panel for
 follow-up or extra fields. This keeps transfer/status behavior visible while
 avoiding multiple floating action panels.
 
+Timezone display is centralized around `Europe/Copenhagen` and `da-DK` in the
+shared date-format helpers. Meeting times in UI, agenda emails, AI context,
+Annual Wheel meeting placement, and PDF exports should use those helpers so a
+stored UTC value such as `2026-06-26T15:00:00.000Z` is displayed as Danish
+local time, for example `fredag den 26. juni 2026 kl. 17.00`.
+
 Phase 1.6-A3 defines the shared composition layer in `src/components/ui`.
 Pages use `PageHeader` and `PageSection` for hierarchy, `ContentPanel` only
 when a bounded surface adds meaning, and `DocumentPanel` for minutes and other
@@ -686,12 +692,32 @@ branding or logo. Future agenda, decision, task, Annual Wheel, onboarding, and
 Job Card exports should reuse this foundation before adding module-specific
 content.
 
+V1 PDF polish adds a dedicated agenda PDF download for meetings. The agenda
+PDF can be downloaded before minutes are written or approved and includes the
+meeting context plus agenda items in occurrence order without internal notes.
+Minutes and agenda PDFs share the same branded report foundation and use
+clearer agenda-item headers so long agendas and minutes are easier to scan.
+PDF branding now carries the organization font choice into the report
+foundation, but PDF readability takes priority over exact webfont matching.
+Because the `pdf-lib` renderer cannot safely use browser CSS font stacks and
+WOFF embedding produced unreadable glyph boxes in PDF readers, generated
+agenda and minutes PDFs use safe built-in PDF fonts. Unsupported brand fonts
+fall back server-side with a small diagnostic log instead of risking broken
+text. The report header and agenda-item backgrounds still use the primary
+brand color as a light print-friendly tint with a solid brand accent line
+instead of the old default header surface.
+Agenda PDF and agenda email use the shared Danish agenda-item type labels
+instead of raw database values such as `decision` or `discussion`. Agenda
+items include public purpose and background text when present, rendered through
+the rich-text/plain-text helpers so HTML is not exposed and internal notes stay
+out of the invitation/export.
+
 Referattekst uses document prose styling in both the web UI and PDF exports.
 Sanitized TipTap content is rendered with constrained line length, generous
 line height, paragraph spacing, readable lists, and clearer subpoints. PDF
 generators convert rich text into structured prose blocks so paragraphs,
-line breaks, headings, list items, and simple a/b/c subpoints remain readable
-across page breaks.
+line breaks, headings, list items, bold/italic text, and simple a/b/c
+subpoints remain readable across page breaks.
 
 Phase 7.1 establishes the next shared frontend design foundation. The app
 shell, organization navigation, page headers, panels, action rows, filter

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button, EmptyState, StatusBadge } from "@/components/ui";
+import { formatDanishDate } from "@/lib/date-format";
 import { decisionStatusLabels, decisionStatusTones } from "@/lib/decisions";
 import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
 import type { Database } from "@/types/database";
@@ -51,9 +52,7 @@ type AssistantResult = {
 };
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("da-DK", { dateStyle: "long" }).format(
-    new Date(value),
-  );
+  return formatDanishDate(value, "long");
 }
 
 export function AgendaItemAssistant({

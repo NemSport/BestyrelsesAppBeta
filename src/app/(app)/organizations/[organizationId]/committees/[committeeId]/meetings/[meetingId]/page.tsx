@@ -12,7 +12,12 @@ import { TransferredAgendaItemsSection } from "@/components/meetings/transferred
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
-import { ActionMenu, PageSection, StatusBadge } from "@/components/ui";
+import {
+  ActionMenu,
+  PageSection,
+  StatusBadge,
+  buttonClassName,
+} from "@/components/ui";
 import {
   agendaItemMinutesStatusLabels,
   agendaItemTransferReasonLabels,
@@ -360,6 +365,12 @@ export default async function MeetingPage({
               meetingId={meetingId}
               organizationId={organizationId}
             />
+            <a
+              className={buttonClassName({ variant: "secondary" })}
+              href={`/api/meetings/${meetingId}/agenda/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
+            >
+              Download dagsorden
+            </a>
             {canEditMeeting ? (
               <>
                 <EditMeetingModal

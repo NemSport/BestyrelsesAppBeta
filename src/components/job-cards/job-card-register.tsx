@@ -120,6 +120,38 @@ function toggle(values: string[], value: string) {
     : [...values, value];
 }
 
+function compactFieldErrors(payload: { fieldErrors?: Record<string, string[]> }) {
+  return [
+    ...new Set(
+      Object.values(payload.fieldErrors ?? {})
+        .flatMap((messages) => messages)
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function payloadForSubmit(organizationId: string, draft: RoleDraft) {
+  return {
+    organizationId,
+    ...draft,
+    documents: draft.documents.filter(
+      (document) => document.title.trim() || document.url.trim(),
+    ),
+    taskTemplates: draft.taskTemplates
+      .filter(
+        (template) =>
+          template.title.trim() ||
+          template.description.trim() ||
+          template.category.trim() ||
+          template.defaultDeadlineDays !== null,
+      )
+      .map((template) => ({
+        ...template,
+        category: template.category || null,
+      })),
+  };
+}
+
 export function JobCardRegister({
   organizationId,
   data,
@@ -150,20 +182,18 @@ export function JobCardRegister({
       {
         method: draft.id ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          ...draft,
-          taskTemplates: draft.taskTemplates.map((template) => ({
-            ...template,
-            category: template.category || null,
-          })),
-        }),
+        body: JSON.stringify(payloadForSubmit(organizationId, draft)),
       },
     );
     const payload = await response.json().catch(() => ({}));
     setSaving(false);
     if (!response.ok) {
-      setError(payload.error ?? "Jobkortet kunne ikke gemmes.");
+      const fieldMessages = compactFieldErrors(payload);
+      setError(
+        fieldMessages.length
+          ? fieldMessages.join(" ")
+          : payload.error ?? "Jobkortet kunne ikke gemmes.",
+      );
       return;
     }
     setDraft(null);
