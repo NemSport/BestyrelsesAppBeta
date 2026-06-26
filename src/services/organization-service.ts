@@ -9,6 +9,7 @@ import {
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
+import { MeetingMinutesGovernanceRepository } from "@/repositories/meeting-minutes-governance-repository";
 import { OrganizationRepository } from "@/repositories/organization-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { TaskRepository } from "@/repositories/task-repository";
@@ -22,6 +23,7 @@ export class OrganizationService {
   private readonly organizations: OrganizationRepository;
   private readonly committees: CommitteeRepository;
   private readonly meetings: MeetingRepository;
+  private readonly meetingMinutesGovernance: MeetingMinutesGovernanceRepository;
   private readonly agendaItems: AgendaItemRepository;
   private readonly decisions: DecisionRepository;
   private readonly tasks: TaskRepository;
@@ -32,6 +34,7 @@ export class OrganizationService {
     this.organizations = new OrganizationRepository(db);
     this.committees = new CommitteeRepository(db);
     this.meetings = new MeetingRepository(db);
+    this.meetingMinutesGovernance = new MeetingMinutesGovernanceRepository(db);
     this.agendaItems = new AgendaItemRepository(db);
     this.decisions = new DecisionRepository(db);
     this.tasks = new TaskRepository(db);
@@ -65,6 +68,7 @@ export class OrganizationService {
       decisions,
       tasks,
       myTasks,
+      pendingMinutesApprovals,
     ] = await Promise.all([
       this.committees.listByOrganization(organizationId),
       this.meetings.listByOrganization(organizationId),
@@ -75,13 +79,19 @@ export class OrganizationService {
       this.decisions.listByOrganization(organizationId),
       this.tasks.listByOrganization(organizationId),
       this.tasks.listByResponsible(organizationId, user.id),
+      this.meetingMinutesGovernance.listPendingApprovalReminders(
+        organizationId,
+        user.id,
+      ),
     ]);
 
     const now = Date.now();
     const committeesById = new Map(
       committees.map((committee) => [committee.id, committee]),
     );
-    const meetingsById = new Map(meetings.map((meeting) => [meeting.id, meeting]));
+    const meetingsById = new Map(
+      meetings.map((meeting) => [meeting.id, meeting]),
+    );
     const agendaItemsById = new Map(
       agendaItems.map((agendaItem) => [agendaItem.id, agendaItem]),
     );
@@ -222,11 +232,10 @@ export class OrganizationService {
       }),
       upcomingMeetings: upcomingMeetings.slice(0, 8).flatMap((meeting) => {
         const committee = committeesById.get(meeting.committee_id);
-        return committee
-          ? [{ ...meeting, committeeName: committee.name }]
-          : [];
+        return committee ? [{ ...meeting, committeeName: committee.name }] : [];
       }),
       recentMinutes: visibleRecentMinutes,
+      pendingMinutesApprovals,
       actionItems: actionItems.slice(0, 12),
       activeDecisions: activeDecisions.slice(0, 5),
       openTasks: openTasks.slice(0, 5),
@@ -265,14 +274,22 @@ export class OrganizationService {
   async update(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = organizationUpdateSchema.parse(input);
-    await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
-    return this.organizations.update(parsed.organizationId, { name: parsed.name });
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+    );
+    return this.organizations.update(parsed.organizationId, {
+      name: parsed.name,
+    });
   }
 
   async moveToTrash(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = organizationTrashActionSchema.parse(input);
-    await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+    );
     return this.organizations.softDelete(parsed.organizationId);
   }
 

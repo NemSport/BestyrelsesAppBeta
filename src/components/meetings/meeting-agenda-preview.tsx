@@ -8,9 +8,9 @@ export function MeetingAgendaPreview({
 }: {
   occurrences: MeetingWithAgendaPreview["agenda_item_occurrences"];
 }) {
-  const agendaItems = occurrences.flatMap((occurrence) =>
+  const agendaItems = occurrences.flatMap((occurrence, index) =>
     occurrence.agenda_items
-      ? [{ ...occurrence.agenda_items, position: occurrence.position }]
+      ? [{ ...occurrence.agenda_items, displayNumber: index + 1 }]
       : [],
   );
   const decisionCount = agendaItems.filter(
@@ -49,7 +49,7 @@ export function MeetingAgendaPreview({
                 className="grid grid-cols-[1.4rem_minmax(0,1fr)] text-xs leading-5 sm:text-sm"
                 key={item.id}
               >
-                <span className="text-muted">{item.position + 1}.</span>
+                <span className="text-muted">{item.displayNumber}.</span>
                 <AgendaItemDocumentTitle
                   className="min-w-0 truncate"
                   markerClassName="text-muted"

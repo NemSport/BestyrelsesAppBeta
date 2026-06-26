@@ -9,6 +9,8 @@ const emailEnvSchema = z.object({
 });
 
 export function getEmailEnv() {
+  const requestedDeliveryMode =
+    process.env.EMAIL_DELIVERY_MODE === "resend" ? "resend" : "stub";
   const env = emailEnvSchema.parse({
     EMAIL_DELIVERY_MODE: process.env.EMAIL_DELIVERY_MODE || undefined,
     EMAIL_FROM: process.env.EMAIL_FROM || undefined,
@@ -17,6 +19,9 @@ export function getEmailEnv() {
 
   return {
     ...env,
+    EMAIL_DELIVERY_MODE_REQUESTED: requestedDeliveryMode,
+    EMAIL_FROM_CONFIGURED: Boolean(process.env.EMAIL_FROM),
+    RESEND_API_KEY_CONFIGURED: Boolean(process.env.RESEND_API_KEY),
     EMAIL_DELIVERY_MODE:
       env.EMAIL_DELIVERY_MODE === "resend" && env.RESEND_API_KEY
         ? "resend"

@@ -73,6 +73,7 @@ export function SendMeetingAgendaEmailModal({
       const result = (await response.json()) as {
         error?: string;
         recipientCount?: number;
+        status?: "sent" | "stubbed" | "failed" | "skipped_missing_config";
         mode?: "stub" | "resend";
       };
       if (!response.ok) {
@@ -80,9 +81,11 @@ export function SendMeetingAgendaEmailModal({
         return;
       }
       setStatus(
-        result.mode === "stub"
-          ? `Emailen blev klargjort i stub-mode til ${result.recipientCount ?? 0} modtagere.`
-          : `Emailen blev sendt til ${result.recipientCount ?? 0} modtagere.`,
+        result.status === "skipped_missing_config"
+          ? "Emailen blev ikke sendt, fordi Resend-konfiguration mangler."
+          : result.status === "stubbed" || result.mode === "stub"
+            ? `Emailen blev klargjort i stub-mode til ${result.recipientCount ?? 0} modtagere.`
+            : `Emailen blev sendt til ${result.recipientCount ?? 0} modtagere.`,
       );
     } catch {
       setError(
@@ -154,7 +157,9 @@ export function SendMeetingAgendaEmailModal({
                   onChange={(event) => {
                     setIncludeCommittee(event.target.checked);
                     if (event.target.checked) {
-                      setSelectedIds(recipients.map((recipient) => recipient.userId));
+                      setSelectedIds(
+                        recipients.map((recipient) => recipient.userId),
+                      );
                     }
                   }}
                   type="checkbox"
@@ -170,7 +175,10 @@ export function SendMeetingAgendaEmailModal({
                     key={recipient.userId}
                   >
                     <input
-                      checked={includeCommittee || selectedIds.includes(recipient.userId)}
+                      checked={
+                        includeCommittee ||
+                        selectedIds.includes(recipient.userId)
+                      }
                       disabled={includeCommittee}
                       onChange={() => toggleRecipient(recipient.userId)}
                       type="checkbox"

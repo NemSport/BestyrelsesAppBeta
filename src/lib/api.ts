@@ -6,6 +6,12 @@ import { AppError, toErrorMessage } from "@/lib/errors";
 export function apiError(error: unknown) {
   if (error instanceof ZodError) {
     const issues = error.flatten();
+    if (process.env.NODE_ENV !== "production") {
+      console.error("API validation failed", {
+        fieldErrors: issues.fieldErrors,
+        formErrors: issues.formErrors,
+      });
+    }
     return NextResponse.json(
       {
         error: "Ret de markerede felter, og prøv igen.",

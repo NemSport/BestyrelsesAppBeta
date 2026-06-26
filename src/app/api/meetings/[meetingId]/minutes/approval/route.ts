@@ -4,6 +4,31 @@ import { apiError } from "@/lib/api";
 import { createClient } from "@/lib/supabase/server";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 
+function minutesApprovalMessage(email: {
+  status?: string;
+  warning?: string | null;
+  successfulCount?: number;
+  recipientCount?: number;
+}) {
+  if (email.warning) return email.warning;
+  if (email.status === "sent") {
+    const count = email.successfulCount ?? email.recipientCount ?? 0;
+    return count > 0
+      ? `Referatet er sendt til godkendelse, og email er sendt til ${count} ${count === 1 ? "medlem" : "medlemmer"}.`
+      : "Referatet er sendt til godkendelse, og email er sendt til medlemmerne.";
+  }
+  if (email.status === "stubbed") {
+    return "Referatet er sendt til godkendelse. Email er kun forberedt i testtilstand og er ikke sendt rigtigt.";
+  }
+  if (email.status === "skipped_missing_config") {
+    return "Referatet er sendt til godkendelse, men email blev ikke sendt, fordi Resend-konfiguration mangler.";
+  }
+  if (email.status === "failed") {
+    return "Referatet er sendt til godkendelse, men email kunne ikke sendes.";
+  }
+  return "Referatet er sendt til godkendelse.";
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ meetingId: string }> },
@@ -16,12 +41,17 @@ export async function POST(
     };
     const service = new MeetingMinutesService(await createClient());
     const meetingId = (await params).meetingId;
+    const url = new URL(request.url);
 
     if (body.action === "send") {
-      const minutes = await service.sendForApproval({ ...body, meetingId });
+      const result = await service.sendForApproval(
+        { ...body, meetingId },
+        { appUrl: url.origin },
+      );
       return NextResponse.json({
-        minutes,
-        message: "Referatet er sendt til godkendelse.",
+        minutes: result.minutes,
+        email: result.email,
+        message: minutesApprovalMessage(result.email),
       });
     }
     if (body.action === "respond") {

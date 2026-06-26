@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getEmailEnv } from "@/lib/email-env";
-import { meetingAgendaEmailTemplate } from "@/lib/email-templates";
+import {
+  meetingAgendaEmailTemplate,
+  meetingMinutesApprovalEmailTemplate,
+  type MinutesApprovalEmailTask,
+} from "@/lib/email-templates";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { sendMeetingAgendaEmailSchema } from "@/lib/validation";
 import { MeetingRepository } from "@/repositories/meeting-repository";
@@ -18,6 +22,26 @@ type EmailPayload = {
   subject: string;
   text: string;
   html: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+  }>;
+};
+
+export type EmailDeliveryStatus =
+  | "sent"
+  | "stubbed"
+  | "failed"
+  | "skipped_missing_config";
+
+export type EmailDeliveryResult = {
+  status: EmailDeliveryStatus;
+  sent: boolean;
+  mode: "stub" | "resend";
+  recipientCount: number;
+  successfulCount: number;
+  failedCount: number;
+  error?: string;
 };
 
 export class EmailService {
@@ -56,7 +80,9 @@ export class EmailService {
       throw new NotFoundError("Mødet");
     }
 
-    const memberDirectory = await this.members.listMembers(parsed.organizationId);
+    const memberDirectory = await this.members.listMembers(
+      parsed.organizationId,
+    );
     const recipients = this.resolveCommitteeRecipients({
       members: memberDirectory,
       committeeId: parsed.committeeId,
@@ -118,8 +144,7 @@ export class EmailService {
     });
 
     return {
-      sent: delivery.sent,
-      mode: delivery.mode,
+      ...delivery,
       recipientCount: recipients.length,
       recipients: recipients.map((recipient) => ({
         userId: recipient.user_id,
@@ -127,6 +152,47 @@ export class EmailService {
         email: recipient.email,
       })),
     };
+  }
+
+  async sendMeetingMinutesApprovalEmail(input: {
+    to: string;
+    recipientName: string;
+    organizationName: string;
+    committeeName: string;
+    meetingTitle: string;
+    meetingDate: string;
+    approvalUrl: string;
+    personalTasks: MinutesApprovalEmailTask[];
+    unassignedTasks: MinutesApprovalEmailTask[];
+    pdf: Uint8Array;
+    pdfFileName: string;
+    branding?: Awaited<
+      ReturnType<OrganizationBrandingService["getEmailBranding"]>
+    >;
+  }) {
+    const template = meetingMinutesApprovalEmailTemplate({
+      organizationName: input.organizationName,
+      committeeName: input.committeeName,
+      meetingTitle: input.meetingTitle,
+      meetingDate: input.meetingDate,
+      approvalUrl: input.approvalUrl,
+      recipientName: input.recipientName,
+      personalTasks: input.personalTasks,
+      unassignedTasks: input.unassignedTasks,
+      branding: input.branding,
+    });
+
+    return this.deliver({
+      from: getEmailEnv().EMAIL_FROM,
+      to: [input.to],
+      ...template,
+      attachments: [
+        {
+          filename: input.pdfFileName,
+          content: Buffer.from(input.pdf).toString("base64"),
+        },
+      ],
+    });
   }
 
   private resolveCommitteeRecipients({
@@ -153,14 +219,47 @@ export class EmailService {
     return [...unique.values()];
   }
 
-  private async deliver(payload: EmailPayload) {
+  private async deliver(payload: EmailPayload): Promise<EmailDeliveryResult> {
     const env = getEmailEnv();
-    if (env.EMAIL_DELIVERY_MODE === "stub") {
+    const recipientCount = payload.to.length;
+    if (env.EMAIL_DELIVERY_MODE_REQUESTED === "resend") {
+      const missingConfig = [
+        !env.RESEND_API_KEY_CONFIGURED ? "RESEND_API_KEY" : null,
+        !env.EMAIL_FROM_CONFIGURED ? "EMAIL_FROM" : null,
+      ].filter(Boolean);
+      if (missingConfig.length > 0) {
+        console.warn("[email] Resend email skipped: missing config", {
+          missingConfig,
+          toCount: recipientCount,
+          subject: payload.subject,
+          attachmentCount: payload.attachments?.length ?? 0,
+        });
+        return {
+          status: "skipped_missing_config",
+          sent: false,
+          mode: "stub",
+          recipientCount,
+          successfulCount: 0,
+          failedCount: 0,
+          error: `Manglende email-konfiguration: ${missingConfig.join(", ")}`,
+        };
+      }
+    }
+
+    if (env.EMAIL_DELIVERY_MODE !== "resend") {
       console.info("[email] Stub email prepared", {
-        toCount: payload.to.length,
+        toCount: recipientCount,
         subject: payload.subject,
+        attachmentCount: payload.attachments?.length ?? 0,
       });
-      return { sent: false, mode: "stub" as const };
+      return {
+        status: "stubbed",
+        sent: false,
+        mode: "stub",
+        recipientCount,
+        successfulCount: 0,
+        failedCount: 0,
+      };
     }
 
     const response = await fetch("https://api.resend.com/emails", {
@@ -176,6 +275,8 @@ export class EmailService {
       console.error("[email] Resend delivery failed", {
         status: response.status,
         detail: detail.slice(0, 500),
+        toCount: recipientCount,
+        subject: payload.subject,
       });
       throw new AppError(
         "Emailen kunne ikke sendes lige nu. Prøv igen senere.",
@@ -183,6 +284,13 @@ export class EmailService {
         "EMAIL_PROVIDER_FAILED",
       );
     }
-    return { sent: true, mode: "resend" as const };
+    return {
+      status: "sent",
+      sent: true,
+      mode: "resend",
+      recipientCount,
+      successfulCount: recipientCount,
+      failedCount: 0,
+    };
   }
 }

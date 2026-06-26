@@ -46,12 +46,15 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     report.addParagraph("Der er endnu ikke oprettet dagsordenspunkter.");
   }
 
-  for (const occurrence of input.meeting.agenda_item_occurrences) {
+  for (const [
+    occurrenceIndex,
+    occurrence,
+  ] of input.meeting.agenda_item_occurrences.entries()) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const typeLabel = getAgendaItemTypeLabel(item.item_type);
     report.addAgendaItemHeader({
-      number: occurrence.position + 1,
+      number: occurrenceIndex + 1,
       typeLabel: typeLabel.short,
       title: item.title,
       subtitle: typeLabel.label,

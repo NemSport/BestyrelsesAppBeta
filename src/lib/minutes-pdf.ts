@@ -51,8 +51,17 @@ function statusTone(status: MeetingMinuteApprovalView["status"]) {
   return "neutral" as const;
 }
 
+function approvedDate(approvals: MeetingMinuteApprovalView[]) {
+  const approvedResponses = approvals
+    .filter((approval) => approval.status === "approved" && approval.responded_at)
+    .map((approval) => approval.responded_at!)
+    .sort();
+  return approvedResponses.at(-1) ?? null;
+}
+
 export async function generateMeetingMinutesPdf(input: PdfInput) {
   const meetingDate = formatPdfDate(input.meeting.starts_at, true);
+  const finalApprovalDate = approvedDate(input.approvals);
   const report = await createPdfReport({
     documentType: "Mødereferat",
     title: input.meeting.title,
@@ -77,6 +86,23 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
       { label: "Godkendelse", value: approvalSummary(input.approvals) },
     ],
   });
+
+  if (input.meetingMinutes.status === "approved") {
+    report.addBadge(
+      finalApprovalDate
+        ? `Godkendt referat - godkendt ${formatPdfDate(finalApprovalDate)}`
+        : "Godkendt referat",
+      "success",
+    );
+  } else if (input.meetingMinutes.status === "ready_for_approval") {
+    report.addBadge(
+      "Foreløbigt referat - afventer godkendelse",
+      "warning",
+    );
+    report.addParagraph(
+      "Dette referat er sendt til godkendelse, men er endnu ikke endeligt godkendt af alle relevante medlemmer.",
+    );
+  }
 
   const attendeeNames = input.attendeeIds
     .map((id) => input.responsiblePeople.find((person) => person.id === id)?.name)
@@ -104,13 +130,16 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     input.agendaItemMinutes.map((minutes) => [minutes.agenda_item_id, minutes]),
   );
 
-  for (const occurrence of input.meeting.agenda_item_occurrences) {
+  for (const [
+    occurrenceIndex,
+    occurrence,
+  ] of input.meeting.agenda_item_occurrences.entries()) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const minutes = minutesByAgendaItem.get(item.id);
 
     report.addAgendaItemHeader({
-      number: occurrence.position + 1,
+      number: occurrenceIndex + 1,
       typeLabel: agendaItemTypeLabels[item.item_type].short,
       title: item.title,
       subtitle: item.objective || item.description || undefined,

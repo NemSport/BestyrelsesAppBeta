@@ -593,6 +593,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      agenda_item_private_notes: {
+        Row: {
+          id: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          agenda_item_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          agenda_item_id: string;
+          user_id: string;
+          content?: string;
+        };
+        Update: {
+          content?: string;
+        };
+        Relationships: [];
+      };
       meeting_minute_approvals: {
         Row: {
           id: string;
@@ -1082,48 +1108,105 @@ export type Database = {
       };
       responsibility_areas: {
         Row: {
-          id: string; organization_id: string; name: string; description: string;
-          created_by: string; created_at: string; updated_at: string; archived_at: string | null;
+          id: string;
+          organization_id: string;
+          name: string;
+          description: string;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
         };
         Insert: {
-          id?: string; organization_id: string; name: string; description?: string;
-          created_by: string; archived_at?: string | null;
+          id?: string;
+          organization_id: string;
+          name: string;
+          description?: string;
+          created_by: string;
+          archived_at?: string | null;
         };
-        Update: { name?: string; description?: string; archived_at?: string | null };
+        Update: {
+          name?: string;
+          description?: string;
+          archived_at?: string | null;
+        };
         Relationships: [];
       };
       role_profiles: {
         Row: {
-          id: string; organization_id: string; title: string; purpose: string;
-          description: string; responsibilities: string; exclusions: string;
-          competencies: string; collaboration: string; meeting_expectations: string;
-          contact_people: string; created_by: string; updated_by: string;
-          created_at: string; updated_at: string; archived_at: string | null;
+          id: string;
+          organization_id: string;
+          title: string;
+          purpose: string;
+          description: string;
+          responsibilities: string;
+          exclusions: string;
+          competencies: string;
+          collaboration: string;
+          meeting_expectations: string;
+          contact_people: string;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
         };
         Insert: {
-          id?: string; organization_id: string; title: string; purpose?: string;
-          description?: string; responsibilities?: string; exclusions?: string;
-          competencies?: string; collaboration?: string; meeting_expectations?: string;
-          contact_people?: string; created_by: string; updated_by: string;
+          id?: string;
+          organization_id: string;
+          title: string;
+          purpose?: string;
+          description?: string;
+          responsibilities?: string;
+          exclusions?: string;
+          competencies?: string;
+          collaboration?: string;
+          meeting_expectations?: string;
+          contact_people?: string;
+          created_by: string;
+          updated_by: string;
           archived_at?: string | null;
         };
         Update: {
-          title?: string; purpose?: string; description?: string; responsibilities?: string;
-          exclusions?: string; competencies?: string; collaboration?: string;
-          meeting_expectations?: string; contact_people?: string; updated_by?: string;
+          title?: string;
+          purpose?: string;
+          description?: string;
+          responsibilities?: string;
+          exclusions?: string;
+          competencies?: string;
+          collaboration?: string;
+          meeting_expectations?: string;
+          contact_people?: string;
+          updated_by?: string;
           archived_at?: string | null;
         };
         Relationships: [];
       };
       role_profile_responsibility_areas: {
-        Row: { role_profile_id: string; responsibility_area_id: string; organization_id: string };
-        Insert: { role_profile_id: string; responsibility_area_id: string; organization_id: string };
+        Row: {
+          role_profile_id: string;
+          responsibility_area_id: string;
+          organization_id: string;
+        };
+        Insert: {
+          role_profile_id: string;
+          responsibility_area_id: string;
+          organization_id: string;
+        };
         Update: Record<string, never>;
         Relationships: [];
       };
       role_profile_committees: {
-        Row: { role_profile_id: string; committee_id: string; organization_id: string };
-        Insert: { role_profile_id: string; committee_id: string; organization_id: string };
+        Row: {
+          role_profile_id: string;
+          committee_id: string;
+          organization_id: string;
+        };
+        Insert: {
+          role_profile_id: string;
+          committee_id: string;
+          organization_id: string;
+        };
         Update: Record<string, never>;
         Relationships: [];
       };
@@ -1147,58 +1230,112 @@ export type Database = {
       };
       role_profile_assignments: {
         Row: {
-          id: string; role_profile_id: string; organization_id: string; user_id: string;
-          starts_on: string; ends_on: string | null; created_by: string; created_at: string;
+          id: string;
+          role_profile_id: string;
+          organization_id: string;
+          user_id: string;
+          starts_on: string;
+          ends_on: string | null;
+          created_by: string;
+          created_at: string;
         };
         Insert: {
-          id?: string; role_profile_id: string; organization_id: string; user_id: string;
-          starts_on?: string; ends_on?: string | null; created_by: string;
+          id?: string;
+          role_profile_id: string;
+          organization_id: string;
+          user_id: string;
+          starts_on?: string;
+          ends_on?: string | null;
+          created_by: string;
         };
         Update: { starts_on?: string; ends_on?: string | null };
         Relationships: [];
       };
       task_templates: {
         Row: {
-          id: string; organization_id: string; role_profile_id: string; committee_id: string;
-          title: string; description: string; category: string | null;
-          default_deadline_days: number | null; created_by: string; created_at: string;
-          updated_at: string; archived_at: string | null;
+          id: string;
+          organization_id: string;
+          role_profile_id: string;
+          committee_id: string;
+          title: string;
+          description: string;
+          category: string | null;
+          default_deadline_days: number | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
         };
         Insert: {
-          id?: string; organization_id: string; role_profile_id: string; committee_id: string;
-          title: string; description?: string; category?: string | null;
-          default_deadline_days?: number | null; created_by: string; archived_at?: string | null;
+          id?: string;
+          organization_id: string;
+          role_profile_id: string;
+          committee_id: string;
+          title: string;
+          description?: string;
+          category?: string | null;
+          default_deadline_days?: number | null;
+          created_by: string;
+          archived_at?: string | null;
         };
         Update: {
-          committee_id?: string; title?: string; description?: string; category?: string | null;
-          default_deadline_days?: number | null; archived_at?: string | null;
+          committee_id?: string;
+          title?: string;
+          description?: string;
+          category?: string | null;
+          default_deadline_days?: number | null;
+          archived_at?: string | null;
         };
         Relationships: [];
       };
       role_documents: {
         Row: {
-          id: string; organization_id: string; role_profile_id: string; title: string;
-          url: string; created_by: string; created_at: string;
+          id: string;
+          organization_id: string;
+          role_profile_id: string;
+          title: string;
+          url: string;
+          created_by: string;
+          created_at: string;
         };
         Insert: {
-          id?: string; organization_id: string; role_profile_id: string; title: string;
-          url: string; created_by: string;
+          id?: string;
+          organization_id: string;
+          role_profile_id: string;
+          title: string;
+          url: string;
+          created_by: string;
         };
         Update: { title?: string; url?: string };
         Relationships: [];
       };
       onboarding_guides: {
         Row: {
-          id: string; organization_id: string; role_profile_id: string; introduction: string;
-          first_30_days: string; practical_information: string; created_by: string;
-          updated_by: string; created_at: string; updated_at: string;
+          id: string;
+          organization_id: string;
+          role_profile_id: string;
+          introduction: string;
+          first_30_days: string;
+          practical_information: string;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
         };
         Insert: {
-          id?: string; organization_id: string; role_profile_id: string; introduction?: string;
-          first_30_days?: string; practical_information?: string; created_by: string; updated_by: string;
+          id?: string;
+          organization_id: string;
+          role_profile_id: string;
+          introduction?: string;
+          first_30_days?: string;
+          practical_information?: string;
+          created_by: string;
+          updated_by: string;
         };
         Update: {
-          introduction?: string; first_30_days?: string; practical_information?: string;
+          introduction?: string;
+          first_30_days?: string;
+          practical_information?: string;
           updated_by?: string;
         };
         Relationships: [];
@@ -1378,14 +1515,42 @@ export type Database = {
         Args: { target_occurrence_id: string };
         Returns: Database["public"]["Tables"]["agenda_item_occurrences"]["Row"];
       };
+      normalize_agenda_item_occurrence_positions: {
+        Args: { target_meeting_id: string };
+        Returns: undefined;
+      };
+      reorder_agenda_item_occurrence: {
+        Args: {
+          target_occurrence_id: string;
+          move_direction: "up" | "down";
+        };
+        Returns: Database["public"]["Tables"]["agenda_item_occurrences"]["Row"][];
+      };
+      reorder_agenda_item_occurrences: {
+        Args: {
+          target_meeting_id: string;
+          ordered_occurrence_ids: string[];
+        };
+        Returns: Database["public"]["Tables"]["agenda_item_occurrences"]["Row"][];
+      };
     };
     Enums: {
       ai_activity_status: "generated" | "applied" | "dismissed" | "failed";
       organization_role: "owner" | "admin" | "member" | "viewer";
       membership_status: "active" | "suspended";
       committee_role: "chair" | "secretary" | "member" | "viewer";
-      meeting_status: "draft" | "scheduled" | "in_progress" | "completed" | "cancelled";
-      attendance_status: "invited" | "accepted" | "declined" | "attended" | "absent";
+      meeting_status:
+        | "draft"
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled";
+      attendance_status:
+        | "invited"
+        | "accepted"
+        | "declined"
+        | "attended"
+        | "absent";
       meeting_role: "chair" | "secretary" | "member" | "guest";
       agenda_item_type: "information" | "discussion" | "decision" | "follow_up";
       agenda_item_status:
@@ -1397,7 +1562,12 @@ export type Database = {
         | "resolved"
         | "archived";
       agenda_item_source: "manual" | "meeting";
-      occurrence_status: "planned" | "discussed" | "deferred" | "decided" | "skipped";
+      occurrence_status:
+        | "planned"
+        | "discussed"
+        | "deferred"
+        | "decided"
+        | "skipped";
       invitation_status: "pending" | "accepted" | "revoked";
       meeting_minutes_status: "draft" | "ready_for_approval" | "approved";
       meeting_minute_approval_status:

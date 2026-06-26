@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { NotFoundError } from "@/lib/errors";
+import { AppError, NotFoundError } from "@/lib/errors";
 import {
   agendaItemInputSchema,
+  agendaItemOccurrenceBatchReorderSchema,
+  agendaItemOccurrenceReorderSchema,
   agendaItemOccurrenceTrashActionSchema,
   agendaItemRemoveSchema,
   agendaItemTrashActionSchema,
@@ -30,13 +32,21 @@ export class AgendaItemService {
 
   async list(organizationId: string, committeeId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(organizationId, committeeId, user.id);
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
     return this.agendaItems.listByCommittee(committeeId);
   }
 
   async get(organizationId: string, committeeId: string, agendaItemId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(organizationId, committeeId, user.id);
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
     const agendaItem = await this.agendaItems.findWithHistory(agendaItemId);
     if (
       !agendaItem ||
@@ -93,7 +103,9 @@ export class AgendaItemService {
       parsed.committeeId,
       user.id,
     );
-    const agendaItem = await this.agendaItems.findWithHistory(parsed.agendaItemId);
+    const agendaItem = await this.agendaItems.findWithHistory(
+      parsed.agendaItemId,
+    );
     if (
       !agendaItem ||
       agendaItem.organization_id !== parsed.organizationId ||
@@ -210,6 +222,74 @@ export class AgendaItemService {
       throw new NotFoundError("Dagsordensforekomsten");
     }
     return this.agendaItems.softDeleteOccurrence(parsed.occurrenceId);
+  }
+
+  async reorderOccurrence(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemOccurrenceReorderSchema.parse(input);
+    await this.authorization.requireCommitteeManager(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+    const occurrence = await this.agendaItems.findOccurrenceIncludingDeleted(
+      parsed.occurrenceId,
+    );
+    if (
+      !occurrence ||
+      occurrence.organization_id !== parsed.organizationId ||
+      occurrence.committee_id !== parsed.committeeId ||
+      occurrence.deleted_at
+    ) {
+      throw new NotFoundError("Dagsordensforekomsten");
+    }
+    return this.agendaItems.reorderOccurrence(
+      parsed.occurrenceId,
+      parsed.direction,
+    );
+  }
+
+  async reorderMeetingOccurrences(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemOccurrenceBatchReorderSchema.parse(input);
+    await this.authorization.requireCommitteeManager(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+    const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
+    if (
+      !meeting ||
+      meeting.organization_id !== parsed.organizationId ||
+      meeting.committee_id !== parsed.committeeId
+    ) {
+      throw new NotFoundError("Mødet");
+    }
+
+    const activeOccurrenceIds = new Set(
+      meeting.agenda_item_occurrences
+        .filter((occurrence) => !occurrence.deleted_at)
+        .map((occurrence) => occurrence.id),
+    );
+    const requestedOccurrenceIds = new Set(parsed.occurrenceIds);
+    if (
+      activeOccurrenceIds.size !== parsed.occurrenceIds.length ||
+      requestedOccurrenceIds.size !== parsed.occurrenceIds.length ||
+      parsed.occurrenceIds.some(
+        (occurrenceId) => !activeOccurrenceIds.has(occurrenceId),
+      )
+    ) {
+      throw new AppError(
+        "Rækkefølgen skal indeholde alle aktive dagsordenspunkter præcis én gang.",
+        422,
+        "INVALID_AGENDA_ORDER",
+      );
+    }
+
+    return this.agendaItems.reorderMeetingOccurrences(
+      parsed.meetingId,
+      parsed.occurrenceIds,
+    );
   }
 
   async restoreOccurrence(input: unknown) {

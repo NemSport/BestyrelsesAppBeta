@@ -188,8 +188,8 @@ export class MeetingRepository {
   private activePreviews(meetings: MeetingWithAgendaPreview[]) {
     return meetings.map((meeting) => ({
       ...meeting,
-      agenda_item_occurrences: meeting.agenda_item_occurrences.filter(
-        (occurrence) => {
+      agenda_item_occurrences: meeting.agenda_item_occurrences
+        .filter((occurrence) => {
           const value = occurrence as typeof occurrence & {
             deleted_at?: string | null;
             agenda_items:
@@ -199,8 +199,8 @@ export class MeetingRepository {
               | null;
           };
           return !value.deleted_at && !value.agenda_items?.deleted_at;
-        },
-      ),
+        })
+        .sort((left, right) => left.position - right.position),
     }));
   }
 
@@ -208,10 +208,12 @@ export class MeetingRepository {
     if (!meeting) return null;
     return {
       ...meeting,
-      agenda_item_occurrences: meeting.agenda_item_occurrences.filter(
-        (occurrence) =>
-          !occurrence.deleted_at && !occurrence.agenda_items?.deleted_at,
-      ),
+      agenda_item_occurrences: meeting.agenda_item_occurrences
+        .filter(
+          (occurrence) =>
+            !occurrence.deleted_at && !occurrence.agenda_items?.deleted_at,
+        )
+        .sort((left, right) => left.position - right.position),
     };
   }
 }

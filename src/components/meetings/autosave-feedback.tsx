@@ -8,10 +8,11 @@ import type {
 const statusLabels: Record<AutosaveStatus, string> = {
   idle: "",
   saving: "Gemmer...",
-  saved: "Gemt for få sekunder siden",
-  error: "Kunne ikke gemme",
-  offline: "Offline – ændringer gemmes lokalt",
-  pending: "Lokale ændringer venter på synkronisering",
+  saved: "Gemt på serveren",
+  error: "Fejl ved gemning",
+  offline: "Kun gemt lokalt - du er offline",
+  pending: "Kun gemt lokalt - afventer synkronisering",
+  conflict: "Konflikt - din lokale kladde er ikke overskrevet",
 };
 
 export function AutosaveStatusLine({
@@ -24,7 +25,7 @@ export function AutosaveStatusLine({
   onRetry: () => void;
 }) {
   if (status === "idle") return null;
-  const isError = status === "error";
+  const isError = status === "error" || status === "conflict";
   const isWarning = status === "offline" || status === "pending";
 
   return (

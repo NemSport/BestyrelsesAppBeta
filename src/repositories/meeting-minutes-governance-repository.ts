@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, TableInsert } from "@/types/database";
+import type { PendingMinutesApprovalReminder } from "@/types/domain";
 
 const attachmentBucket = "meeting-minute-attachments";
 
@@ -23,6 +24,88 @@ export class MeetingMinutesGovernanceRepository {
       .order("created_at");
     if (error) throw error;
     return data;
+  }
+
+  async listPendingApprovalReminders(
+    organizationId: string,
+    userId: string,
+  ): Promise<PendingMinutesApprovalReminder[]> {
+    const { data: approvals, error: approvalsError } = await this.db
+      .from("meeting_minute_approvals")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .in("status", ["pending", "change_requested"])
+      .order("updated_at", { ascending: true });
+    if (approvalsError) throw approvalsError;
+    if (!approvals.length) return [];
+
+    const minutesIds = [
+      ...new Set(approvals.map((approval) => approval.meeting_minutes_id)),
+    ];
+    const { data: minutesRows, error: minutesError } = await this.db
+      .from("meeting_minutes")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .in("id", minutesIds)
+      .eq("status", "ready_for_approval");
+    if (minutesError) throw minutesError;
+    if (!minutesRows.length) return [];
+
+    const minutesById = new Map(
+      minutesRows.map((minutes) => [minutes.id, minutes]),
+    );
+    const meetingIds = [
+      ...new Set(minutesRows.map((minutes) => minutes.meeting_id)),
+    ];
+    const { data: meetings, error: meetingsError } = await this.db
+      .from("meetings")
+      .select("id, title, starts_at, committee_id, deleted_at")
+      .eq("organization_id", organizationId)
+      .in("id", meetingIds)
+      .is("deleted_at", null);
+    if (meetingsError) throw meetingsError;
+    if (!meetings.length) return [];
+
+    const meetingsById = new Map(
+      meetings.map((meeting) => [meeting.id, meeting]),
+    );
+    const committeeIds = [
+      ...new Set(meetings.map((meeting) => meeting.committee_id)),
+    ];
+    const { data: committees, error: committeesError } = await this.db
+      .from("committees")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .in("id", committeeIds);
+    if (committeesError) throw committeesError;
+    const committeesById = new Map(
+      (committees ?? []).map((committee) => [committee.id, committee]),
+    );
+
+    return approvals.flatMap((approval) => {
+      const minutes = minutesById.get(approval.meeting_minutes_id);
+      if (!minutes) return [];
+      const meeting = meetingsById.get(minutes.meeting_id);
+      if (!meeting) return [];
+      const committee = committeesById.get(meeting.committee_id);
+      if (!committee) return [];
+
+      return [
+        {
+          id: approval.id,
+          meetingMinutesId: minutes.id,
+          meetingId: meeting.id,
+          meetingTitle: meeting.title,
+          meetingStartsAt: meeting.starts_at,
+          committeeId: committee.id,
+          committeeName: committee.name,
+          status: approval.status,
+          approvalDeadline: minutes.approval_deadline,
+          updatedAt: approval.updated_at,
+        },
+      ];
+    });
   }
 
   async sendForApproval(meetingMinutesId: string, deadline: string) {

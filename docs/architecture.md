@@ -264,6 +264,17 @@ title, committee, date/time, location, item order, type, objective, and
 description. Internal notes and private fields are intentionally excluded.
 Agenda and minutes PDFs use the shared agenda-item header helper for clearer
 separation between points.
+Agenda item occurrence `position` is the persisted sort key, not the public
+point number. When agenda item occurrences are soft-deleted or restored, the
+database normalizes positions for the affected meeting. UI and PDF point
+numbers are derived from the current sorted active occurrence list so deleted
+points do not leave visible gaps.
+Committee managers may reorder active meeting agenda occurrences through a
+compact drag-and-drop modal on the meeting minutes page. The route calls a
+scoped PostgreSQL batch reorder function, which locks the affected meeting
+occurrences, validates that the submitted list contains every active occurrence
+exactly once, and normalizes positions so duplicate sort values and numbering
+gaps are avoided.
 PDF branding includes the organization font family, but the `pdf-lib` renderer
 does not consume browser font stacks or CSS variables. The shared report
 foundation therefore resolves validated branding fonts server-side to safe
@@ -294,6 +305,16 @@ managers may delete the metadata row for a meeting or agenda-item attachment
 in their scope, after which the unique Storage object is removed best-effort.
 Since PDF exports read current attachment metadata, deleted attachments are not
 included in later agenda or minutes PDFs.
+
+Meeting and agenda-item minutes autosave uses a user-scoped browser draft plus
+optimistic version checks. Client saves include the latest known `updated_at`
+for the target minutes row. Repository updates add that timestamp to the update
+predicate, and the service returns a 409 conflict if another client has saved a
+newer version first. The local draft remains in browser storage until a server
+save succeeds or the user explicitly keeps the server version. The shared
+offline autosave hook stores before network writes, retries on reconnect,
+flushes on blur/visibility/pagehide where possible, and exposes status labels
+for saving, saved on server, local-only, failed, and conflicted states.
 
 Referat prose uses a shared rendering contract. On the website,
 `RichTextContent` applies document-style max-width, line height, paragraph
@@ -551,6 +572,13 @@ provider delivery. Resend is the prepared provider, but `EMAIL_DELIVERY_MODE`
 defaults to `stub`; in stub mode the application prepares the message and logs
 only operational metadata, not message bodies. Real delivery requires
 `EMAIL_DELIVERY_MODE=resend`, `RESEND_API_KEY`, and `EMAIL_FROM`.
+Email delivery results are explicit: `sent` means Resend accepted delivery,
+`stubbed` means the message was prepared in test mode, `skipped_missing_config`
+means real delivery was requested but required Resend configuration is missing,
+and `failed` means provider delivery failed. Minutes approval treats email as
+best-effort after the approval state is saved, so the UI can report that the
+referat was sent for approval while also saying whether email was actually
+sent, stubbed, skipped, or failed.
 
 The first active route is
 `POST /api/meetings/[meetingId]/email/agenda`. It requires the sender to pass
@@ -780,6 +808,12 @@ link attributes. Legacy plain text is escaped and wrapped while preserving line
 breaks. Autosave and local drafts continue to serialize the field values as
 strings.
 
+Private agenda-item notes use the same local draft and optimistic version
+pattern, but they are stored separately in `agenda_item_private_notes` and are
+owned by a single user. They are personal working notes only: other members
+cannot read them, and they are excluded from official minutes, PDFs, email,
+AI prompts, and shared meeting read models.
+
 ### Minutes Approval, Attachments, and PDF
 
 Sending minutes for approval runs through a protected PostgreSQL function. It
@@ -791,6 +825,21 @@ convert pending responses to `no_response` only after the deadline. The
 database marks the minutes approved when no pending or change-requested rows
 remain.
 
+After that protected state change succeeds, the application service prepares
+approval notifications server-side. Each approver receives an individual email
+with the branded minutes PDF attached, a meeting/minutes link, tasks from the
+meeting assigned to that user, and unassigned meeting tasks. Email delivery is
+best-effort after the approval state is set: failures are logged with meeting
+context and surfaced to the UI as a warning, but the database approval round is
+not rolled back.
+
+The organization dashboard also includes a user-scoped pending approval
+read-model. It lists minutes that are `ready_for_approval` where the current
+user has not approved yet, and links directly to the meeting's approval panel.
+Closing the dashboard reminder is client-local and temporary; it never updates
+the approval row and the reminder returns on a later page load until the user
+approves or the approval round changes.
+
 Minutes attachments use the private `meeting-minute-attachments` Supabase
 Storage bucket. Relational metadata is split between meeting-level and
 agenda-item-minute attachments. Uploads and metadata writes require committee
@@ -799,10 +848,13 @@ rules as the associated minutes. HTML, SVG, scripts, and executable file types
 are rejected.
 
 Approved minutes are rendered primarily as a readable document; authorized
-managers can explicitly return to edit mode. PDF generation runs on the server
-from an RLS-authorized read model, excludes `internal_note`, and composes the
+managers can explicitly return to edit mode. Minutes PDFs run on the server
+from an RLS-authorized read model, exclude `internal_note`, and compose the
 shared PDF report foundation for header/footer, metadata, agenda sections,
-status badges, attachment tables, export date, and page numbers.
+status badges, attachment tables, export date, and page numbers. PDFs are
+available once minutes are sent for approval; `ready_for_approval` exports are
+marked as preliminary/awaiting approval, while fully approved exports are
+marked as approved.
 
 ### Notes
 
@@ -1272,6 +1324,14 @@ local workflow status, authors, and timestamps. Database triggers verify that th
 committee, meeting, agenda item, occurrence, and responsible member share a
 valid scope. Viewers may read these records only when the associated general
 meeting minutes are approved.
+
+#### `agenda_item_private_notes`
+
+Stores one private note per user per meeting agenda item. The table carries
+organization, committee, meeting, agenda item, user, content, and timestamps.
+RLS allows only the owning authenticated user to read, insert, update, or
+delete the note, and trigger validation ensures the user is an active member of
+the same committee and that the agenda item is active on the meeting.
 
 #### `agenda_items`
 

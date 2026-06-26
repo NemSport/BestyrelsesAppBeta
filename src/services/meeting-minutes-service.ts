@@ -2,9 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
 import { getAgendaItemTransferRule } from "@/lib/agenda-item-minutes";
+import { formatDanishDateKey, formatDanishDateTime } from "@/lib/date-format";
+import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import type { PdfReportAttachment } from "@/lib/pdf-report";
 import { sanitizeRichText } from "@/lib/rich-text";
 import {
+  agendaItemPrivateNoteInputSchema,
   agendaItemMinutesInputSchema,
   markNoResponseSchema,
   meetingMinutesInputSchema,
@@ -16,15 +19,35 @@ import { MeetingMinutesRepository } from "@/repositories/meeting-minutes-reposit
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { OrganizationRepository } from "@/repositories/organization-repository";
+import { TaskRepository } from "@/repositories/task-repository";
 import { TransferredAgendaItemRepository } from "@/repositories/transferred-agenda-item-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
+import {
+  EmailService,
+  type EmailDeliveryStatus,
+} from "@/services/email-service";
+import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import type { Database } from "@/types/database";
-import type { MeetingWithAgenda } from "@/types/domain";
+import type { MeetingWithAgenda, TaskView } from "@/types/domain";
 
 type RawMinuteAttachment =
   | Database["public"]["Tables"]["meeting_minute_attachments"]["Row"]
   | Database["public"]["Tables"]["agenda_item_minute_attachments"]["Row"];
+
+type ApprovalEmailResult = {
+  status: EmailDeliveryStatus;
+  mode: "stub" | "resend";
+  recipientCount: number;
+  sent: number;
+  successfulCount: number;
+  failed: number;
+  failedCount: number;
+  stubbed: number;
+  skippedMissingConfig: number;
+  warning: string | null;
+  errors: string[];
+};
 
 function attachmentEmbedType(fileName: string, mimeType: string) {
   const normalizedMimeType = mimeType.toLowerCase();
@@ -54,16 +77,18 @@ export class MeetingMinutesService {
   private readonly meetings: MeetingRepository;
   private readonly members: OrganizationMemberRepository;
   private readonly organizations: OrganizationRepository;
+  private readonly tasks: TaskRepository;
   private readonly transfers: TransferredAgendaItemRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
-  constructor(db: SupabaseClient<Database>) {
+  constructor(private readonly db: SupabaseClient<Database>) {
     this.minutes = new MeetingMinutesRepository(db);
     this.governance = new MeetingMinutesGovernanceRepository(db);
     this.meetings = new MeetingRepository(db);
     this.members = new OrganizationMemberRepository(db);
     this.organizations = new OrganizationRepository(db);
+    this.tasks = new TaskRepository(db);
     this.transfers = new TransferredAgendaItemRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
@@ -110,11 +135,13 @@ export class MeetingMinutesService {
     );
     await this.requireMeeting(organizationId, committeeId, meetingId);
 
-    const [meetingMinutes, agendaItemMinutes, members] = await Promise.all([
-      this.minutes.findMeetingMinutes(meetingId),
-      this.minutes.listAgendaItemMinutes(meetingId),
-      this.members.listMembers(organizationId),
-    ]);
+    const [meetingMinutes, agendaItemMinutes, privateAgendaItemNotes, members] =
+      await Promise.all([
+        this.minutes.findMeetingMinutes(meetingId),
+        this.minutes.listAgendaItemMinutes(meetingId),
+        this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
+        this.members.listMembers(organizationId),
+      ]);
 
     const [approvals, meetingAttachments, agendaItemAttachments, canApprove] =
       meetingMinutes
@@ -151,6 +178,7 @@ export class MeetingMinutesService {
     return {
       meetingMinutes,
       agendaItemMinutes,
+      privateAgendaItemNotes,
       responsiblePeople: members
         .filter((member) => member.status === "active")
         .map((member) => ({
@@ -230,11 +258,11 @@ export class MeetingMinutesService {
           if (!item || !minutes) return [];
           return [
             {
-               id: minutes.id,
-               position: occurrence.position,
-               title: item.title,
-               itemType: item.item_type,
-               notes: minutes.notes,
+              id: minutes.id,
+              position: occurrence.position,
+              title: item.title,
+              itemType: item.item_type,
+              notes: minutes.notes,
               decision: minutes.decision,
               followUp: minutes.follow_up,
             },
@@ -277,7 +305,19 @@ export class MeetingMinutesService {
     };
 
     if (existing) {
-      return this.minutes.updateMeetingMinutes(existing.id, values);
+      const updated = await this.minutes.updateMeetingMinutes(
+        existing.id,
+        values,
+        parsed.expectedUpdatedAt ?? undefined,
+      );
+      if (!updated) {
+        throw new AppError(
+          "Referatet er ændret af en anden bruger. Din lokale tekst er ikke overskrevet. Genindlæs eller sammenlign versionerne, før du gemmer igen.",
+          409,
+          "MINUTES_VERSION_CONFLICT",
+        );
+      }
+      return updated;
     }
 
     return this.minutes.createMeetingMinutes({
@@ -348,7 +388,11 @@ export class MeetingMinutesService {
     };
 
     const savedMinutes = existing
-      ? await this.minutes.updateAgendaItemMinutes(existing.id, values)
+      ? await this.minutes.updateAgendaItemMinutes(
+          existing.id,
+          values,
+          parsed.expectedUpdatedAt ?? undefined,
+        )
       : await this.minutes.createAgendaItemMinutes({
           organization_id: parsed.organizationId,
           committee_id: parsed.committeeId,
@@ -358,12 +402,21 @@ export class MeetingMinutesService {
           created_by: user.id,
         });
 
+    if (!savedMinutes) {
+      throw new AppError(
+        "Punktreferatet er ændret af en anden bruger. Din lokale tekst er ikke overskrevet. Genindlæs eller sammenlign versionerne, før du gemmer igen.",
+        409,
+        "AGENDA_MINUTES_VERSION_CONFLICT",
+      );
+    }
+
     const transferRule = getAgendaItemTransferRule(
       parsed.itemType,
       parsed.status,
     );
-    const pendingTransfers =
-      await this.transfers.listPendingBySourceMinutes(savedMinutes.id);
+    const pendingTransfers = await this.transfers.listPendingBySourceMinutes(
+      savedMinutes.id,
+    );
     await this.transfers.deleteByIds(
       pendingTransfers
         .filter(
@@ -394,7 +447,57 @@ export class MeetingMinutesService {
     return savedMinutes;
   }
 
-  async sendForApproval(input: unknown) {
+  async savePrivateAgendaItemNote(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemPrivateNoteInputSchema.parse(input);
+    await this.authorization.requireCommitteeMember(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+    const meeting = await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+    this.requireOccurrence(meeting, parsed.agendaItemId, null);
+
+    const existing = await this.minutes.findPrivateAgendaItemNote(
+      parsed.meetingId,
+      parsed.agendaItemId,
+      user.id,
+    );
+    const values = {
+      content: sanitizeRichText(parsed.content),
+    };
+
+    const savedNote = existing
+      ? await this.minutes.updatePrivateAgendaItemNote(
+          existing.id,
+          values,
+          parsed.expectedUpdatedAt ?? undefined,
+        )
+      : await this.minutes.createPrivateAgendaItemNote({
+          organization_id: parsed.organizationId,
+          committee_id: parsed.committeeId,
+          meeting_id: parsed.meetingId,
+          agenda_item_id: parsed.agendaItemId,
+          user_id: user.id,
+          ...values,
+        });
+
+    if (!savedNote) {
+      throw new AppError(
+        "Din interne note er ændret i en anden fane. Den lokale tekst er ikke overskrevet.",
+        409,
+        "PRIVATE_NOTE_VERSION_CONFLICT",
+      );
+    }
+
+    return savedNote;
+  }
+
+  async sendForApproval(input: unknown, options: { appUrl?: string } = {}) {
     const user = await this.auth.requireUser();
     const parsed = sendMinutesForApprovalSchema.parse(input);
     await this.authorization.requireCommitteeManager(
@@ -416,7 +519,41 @@ export class MeetingMinutesService {
         "INVALID_APPROVAL_DEADLINE",
       );
     }
-    return this.governance.sendForApproval(minutes.id, parsed.deadline);
+    const updatedMinutes = await this.governance.sendForApproval(
+      minutes.id,
+      parsed.deadline,
+    );
+
+    const emailResult = await this.sendApprovalEmails({
+      organizationId: parsed.organizationId,
+      committeeId: parsed.committeeId,
+      meetingId: parsed.meetingId,
+      appUrl: options.appUrl,
+    }).catch((error) => {
+      console.error("[meeting-minutes] Referatmail kunne ikke sendes.", {
+        organizationId: parsed.organizationId,
+        committeeId: parsed.committeeId,
+        meetingId: parsed.meetingId,
+        minutesId: minutes.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        status: "failed" as const,
+        sent: 0,
+        successfulCount: 0,
+        failed: 1,
+        failedCount: 1,
+        stubbed: 0,
+        skippedMissingConfig: 0,
+        mode: "stub" as const,
+        recipientCount: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        warning:
+          "Referatet blev sendt til godkendelse, men emailen kunne ikke sendes.",
+      };
+    });
+
+    return { minutes: updatedMinutes, email: emailResult };
   }
 
   async respondToApproval(input: unknown) {
@@ -496,11 +633,7 @@ export class MeetingMinutesService {
       throw new AppError("Vælg en fil, der skal vedhæftes.", 422, "EMPTY_FILE");
     }
     if (input.file.size > 25 * 1024 * 1024) {
-      throw new AppError(
-        "Filen må højst fylde 25 MB.",
-        422,
-        "FILE_TOO_LARGE",
-      );
+      throw new AppError("Filen må højst fylde 25 MB.", 422, "FILE_TOO_LARGE");
     }
     const blockedExtensions = /\.(?:html?|svg|js|mjs|exe|com|bat|cmd|ps1)$/i;
     const blockedMimeTypes = new Set([
@@ -595,7 +728,6 @@ export class MeetingMinutesService {
       throw error;
     }
   }
-
   async getAttachmentDownload(attachmentId: string, download = false) {
     await this.auth.requireUser();
     const attachment = await this.governance.findAttachment(attachmentId);
@@ -637,16 +769,22 @@ export class MeetingMinutesService {
       await this.governance.deleteMeetingAttachment(attachment.id);
     }
 
-    await this.governance.removeUpload(attachment.storage_path).catch((error) => {
-      console.warn("[meeting-minutes] Bilag blev fjernet fra databasen, men storage-filen kunne ikke slettes.", {
-        meetingId: attachment.meeting_id,
-        agendaItemId: "agenda_item_id" in attachment ? attachment.agenda_item_id : null,
-        attachmentId: attachment.id,
-        fileName: attachment.file_name,
-        mimeType: attachment.mime_type,
-        error: error instanceof Error ? error.message : String(error),
+    await this.governance
+      .removeUpload(attachment.storage_path)
+      .catch((error) => {
+        console.warn(
+          "[meeting-minutes] Bilag blev fjernet fra databasen, men storage-filen kunne ikke slettes.",
+          {
+            meetingId: attachment.meeting_id,
+            agendaItemId:
+              "agenda_item_id" in attachment ? attachment.agenda_item_id : null,
+            attachmentId: attachment.id,
+            fileName: attachment.file_name,
+            mimeType: attachment.mime_type,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
       });
-    });
 
     return { id: attachment.id, fileName: attachment.file_name };
   }
@@ -677,9 +815,9 @@ export class MeetingMinutesService {
     ]);
 
     const occurrenceByAgendaItemId = new Map(
-      meeting.agenda_item_occurrences.map((occurrence) => [
+      meeting.agenda_item_occurrences.map((occurrence, index) => [
         occurrence.agenda_item_id,
-        occurrence,
+        { occurrence, displayNumber: index + 1 },
       ]),
     );
 
@@ -695,13 +833,13 @@ export class MeetingMinutesService {
           occurrenceByAgendaItemId.has(attachment.agenda_item_id),
         )
         .map((attachment) => {
-          const occurrence = occurrenceByAgendaItemId.get(
+          const occurrenceEntry = occurrenceByAgendaItemId.get(
             attachment.agenda_item_id,
           )!;
           return {
             attachment,
-            sortPosition: occurrence.position,
-            pointLabel: `Punkt ${occurrence.position + 1}`,
+            sortPosition: occurrenceEntry.occurrence.position,
+            pointLabel: `Punkt ${occurrenceEntry.displayNumber}`,
             agendaItemId: attachment.agenda_item_id,
           };
         }),
@@ -755,10 +893,218 @@ export class MeetingMinutesService {
     return result;
   }
 
+  private toApprovalEmailTask(
+    task: TaskView,
+    organizationId: string,
+    fallbackUrl: string,
+  ) {
+    const relation = task.agendaItem?.title
+      ? `Punkt: ${task.agendaItem.title}`
+      : task.decision?.title
+        ? `Beslutning: ${task.decision.title}`
+        : task.meeting?.title
+          ? `Møde: ${task.meeting.title}`
+          : null;
+    return {
+      id: task.id,
+      title: task.title,
+      deadline: task.deadline,
+      status: task.status,
+      relation,
+      url: `${fallbackUrl.replace(/\/committees\/[^/]+\/meetings\/[^/]+$/, "")}/tasks?editTask=${task.id}#task-${task.id}`,
+    };
+  }
+
+  private async sendApprovalEmails({
+    organizationId,
+    committeeId,
+    meetingId,
+    appUrl,
+  }: {
+    organizationId: string;
+    committeeId: string;
+    meetingId: string;
+    appUrl?: string;
+  }) {
+    const data = await this.getApprovedPdfData(
+      organizationId,
+      committeeId,
+      meetingId,
+      {
+        allowReadyForApproval: true,
+      },
+    );
+    const root = (appUrl || process.env.NEXT_PUBLIC_APP_URL || "").replace(
+      /\/$/,
+      "",
+    );
+    const meetingUrl = root
+      ? `${root}/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`
+      : `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`;
+    const brandingService = new OrganizationBrandingService(this.db);
+    const [pdfBranding, emailBranding, attachmentsForPdf, meetingTasks] =
+      await Promise.all([
+        brandingService.getPdfBranding(
+          data.organization.id,
+          data.organization.name,
+        ),
+        brandingService.getEmailBranding(
+          data.organization.id,
+          data.organization.name,
+        ),
+        this.getPdfAttachments(organizationId, committeeId, meetingId, {
+          includeMeetingAttachments: true,
+        }),
+        this.tasks.listByMeeting(meetingId),
+      ]);
+
+    const pdf = await generateMeetingMinutesPdf({
+      meeting: data.meeting,
+      committeeName: data.committee.name,
+      meetingMinutes: data.meetingMinutes!,
+      agendaItemMinutes: data.agendaItemMinutes,
+      approvals: data.approvals,
+      attachments: [...data.meetingAttachments, ...data.agendaItemAttachments],
+      responsiblePeople: data.responsiblePeople,
+      attendeeIds: data.attendees
+        .filter((attendee) =>
+          ["accepted", "attended"].includes(attendee.attendance_status),
+        )
+        .map((attendee) => attendee.user_id),
+      branding: pdfBranding,
+      attachmentsForPdf,
+    });
+    const pdfFileName = `referat-${formatDanishDateKey(
+      data.meeting.starts_at,
+    )}.pdf`;
+    const unassignedTasks = meetingTasks
+      .filter((task) => !task.responsible_user_id)
+      .map((task) =>
+        this.toApprovalEmailTask(task, organizationId, meetingUrl),
+      );
+
+    const emailService = new EmailService(this.db);
+    const deliveries = await Promise.allSettled(
+      data.approvals
+        .filter((approval) => approval.memberEmail)
+        .map((approval) =>
+          emailService.sendMeetingMinutesApprovalEmail({
+            to: approval.memberEmail,
+            recipientName: approval.memberName,
+            organizationName: data.organization.name,
+            committeeName: data.committee.name,
+            meetingTitle: data.meeting.title,
+            meetingDate: formatDanishDateTime(data.meeting.starts_at, "full"),
+            approvalUrl: meetingUrl,
+            personalTasks: meetingTasks
+              .filter((task) => task.responsible_user_id === approval.user_id)
+              .map((task) =>
+                this.toApprovalEmailTask(task, organizationId, meetingUrl),
+              ),
+            unassignedTasks,
+            pdf,
+            pdfFileName,
+            branding: emailBranding,
+          }),
+        ),
+    );
+    const failedDeliveries = deliveries.filter(
+      (delivery) => delivery.status === "rejected",
+    );
+    for (const delivery of deliveries) {
+      if (delivery.status === "rejected") {
+        console.error("[meeting-minutes] Referatmail fejlede for modtager.", {
+          organizationId,
+          committeeId,
+          meetingId,
+          error:
+            delivery.reason instanceof Error
+              ? delivery.reason.message
+              : String(delivery.reason),
+        });
+      }
+    }
+    const fulfilled = deliveries.flatMap((delivery) =>
+      delivery.status === "fulfilled" ? [delivery.value] : [],
+    );
+    const errors = [
+      ...fulfilled.flatMap((delivery) =>
+        delivery.error ? [delivery.error] : [],
+      ),
+      ...failedDeliveries.map((delivery) =>
+        delivery.reason instanceof Error
+          ? delivery.reason.message
+          : String(delivery.reason),
+      ),
+    ];
+    const recipientCount =
+      fulfilled.reduce((sum, delivery) => sum + delivery.recipientCount, 0) +
+      failedDeliveries.length;
+    const successfulCount = fulfilled.reduce(
+      (sum, delivery) => sum + delivery.successfulCount,
+      0,
+    );
+    const failedCount =
+      failedDeliveries.length +
+      fulfilled.reduce((sum, delivery) => sum + delivery.failedCount, 0);
+    const stubbed = fulfilled
+      .filter((delivery) => delivery.status === "stubbed")
+      .reduce((sum, delivery) => sum + delivery.recipientCount, 0);
+    const skippedMissingConfig = fulfilled
+      .filter((delivery) => delivery.status === "skipped_missing_config")
+      .reduce((sum, delivery) => sum + delivery.recipientCount, 0);
+    const status: ApprovalEmailResult["status"] =
+      failedCount > 0
+        ? "failed"
+        : successfulCount > 0
+          ? "sent"
+          : skippedMissingConfig > 0
+            ? "skipped_missing_config"
+            : "stubbed";
+    const mode =
+      fulfilled.find((delivery) => delivery.mode === "resend")?.mode ?? "stub";
+    const warning =
+      status === "sent"
+        ? null
+        : status === "stubbed"
+          ? "Referatet blev sendt til godkendelse. Email er kun forberedt i testtilstand og er ikke sendt rigtigt."
+          : status === "skipped_missing_config"
+            ? "Referatet blev sendt til godkendelse, men email blev ikke sendt, fordi Resend-konfiguration mangler."
+            : "Referatet blev sendt til godkendelse, men emailen kunne ikke sendes.";
+
+    if (status === "skipped_missing_config") {
+      console.warn(
+        "[meeting-minutes] Referatmail blev ikke sendt: manglende email-konfiguration.",
+        {
+          organizationId,
+          committeeId,
+          meetingId,
+          recipientCount,
+          errors,
+        },
+      );
+    }
+
+    return {
+      status,
+      mode,
+      recipientCount,
+      sent: successfulCount,
+      successfulCount,
+      failed: failedCount,
+      failedCount,
+      stubbed,
+      skippedMissingConfig,
+      warning,
+      errors,
+    } satisfies ApprovalEmailResult;
+  }
+
   async getApprovedPdfData(
     organizationId: string,
     committeeId: string,
     meetingId: string,
+    options: { allowReadyForApproval?: boolean } = {},
   ) {
     const user = await this.auth.requireUser();
     const context = await this.authorization.requireCommitteeMember(
@@ -767,18 +1113,31 @@ export class MeetingMinutesService {
       user.id,
     );
     const organizationContext =
-      await this.authorization.requireOrganizationMember(organizationId, user.id);
+      await this.authorization.requireOrganizationMember(
+        organizationId,
+        user.id,
+      );
     const meeting = await this.requireMeeting(
       organizationId,
       committeeId,
       meetingId,
     );
     const bundle = await this.get(organizationId, committeeId, meetingId);
-    if (!bundle.meetingMinutes || bundle.meetingMinutes.status !== "approved") {
+    const allowedStatuses = options.allowReadyForApproval
+      ? ["approved", "ready_for_approval"]
+      : ["approved"];
+    if (
+      !bundle.meetingMinutes ||
+      !allowedStatuses.includes(bundle.meetingMinutes.status)
+    ) {
       throw new AppError(
-        "Kun godkendte referater kan downloades som PDF.",
+        options.allowReadyForApproval
+          ? "Referatet skal være sendt til godkendelse, før det kan downloades som PDF."
+          : "Kun godkendte referater kan downloades som PDF.",
         422,
-        "MINUTES_NOT_APPROVED",
+        options.allowReadyForApproval
+          ? "MINUTES_NOT_READY_FOR_PDF"
+          : "MINUTES_NOT_APPROVED",
       );
     }
     const attendees = await this.meetings.listAttendees(meetingId);

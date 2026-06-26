@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
 import { RelatedDecisions } from "@/components/decisions/related-decisions";
+import { PendingMinutesApprovalReminder } from "@/components/meetings/pending-minutes-approval-reminder";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
@@ -43,12 +44,13 @@ const meetingStatusTones = {
 
 function getActionStatus(item: OrganizationOverviewActionItem) {
   if (item.kind === "transfer") {
-    return transferredAgendaItemStatusLabels[item.status as
-      | "pending"
-      | "scheduled"
-      | "dismissed"];
+    return transferredAgendaItemStatusLabels[
+      item.status as "pending" | "scheduled" | "dismissed"
+    ];
   }
-  return agendaItemMinutesStatusLabels[item.status as keyof typeof agendaItemMinutesStatusLabels];
+  return agendaItemMinutesStatusLabels[
+    item.status as keyof typeof agendaItemMinutesStatusLabels
+  ];
 }
 
 function getActionLabel(item: OrganizationOverviewActionItem) {
@@ -89,7 +91,9 @@ export default async function OrganizationPage({
     .catch(() => null);
   if (!context) notFound();
 
-  const overview = await new OrganizationService(db).getOverview(organizationId);
+  const overview = await new OrganizationService(db).getOverview(
+    organizationId,
+  );
   const canManage = ["owner", "admin"].includes(context.membership.role);
   const organizationRoot = `/organizations/${organizationId}`;
   const nextMeeting = overview.upcomingMeetings[0] ?? null;
@@ -122,429 +126,438 @@ export default async function OrganizationPage({
   return (
     <div className="space-y-7">
       <PageHeader
-          actions={
-            canManage ? (
-              <ActionMenu>
-                <Link
-                  className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
-                  href={`${organizationRoot}/edit`}
-                >
-                  Rediger organisation
-                </Link>
-                <TrashActionButton
-                  confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
-                  endpoint={`/api/organizations/${organizationId}`}
-                  label="Flyt til papirkurv"
-                  pendingLabel="Flytter..."
-                  redirectTo={`${organizationRoot}/trash`}
-                />
-              </ActionMenu>
-            ) : null
-          }
-          description="Få hurtigt overblik over egne opgaver, kommende møder, beslutninger og punkter, der kræver opmærksomhed."
-          eyebrow={
-            <Link className="text-muted transition hover:text-brand" href="/organizations">
-              ← Organisationer
-            </Link>
-          }
-          title={context.organization.name}
-        />
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
-          <ContentPanel className="border-x-0 bg-transparent p-0 shadow-none">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Først
-                </p>
-                <h2 className="mt-1 text-xl font-semibold">
-                  Kræver opmærksomhed
-                </h2>
-                <p className="mt-1 text-sm text-muted">
-                  {attentionCount
-                    ? `${attentionCount} ting bør ses først.`
-                    : "Der er ikke noget kritisk lige nu."}
-                </p>
-              </div>
+        actions={
+          canManage ? (
+            <ActionMenu>
               <Link
-                className="text-sm font-semibold text-brand hover:underline"
-                href={`${organizationRoot}/tasks/my`}
+                className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
+                href={`${organizationRoot}/edit`}
               >
-                Mine opgaver
+                Rediger organisation
               </Link>
-            </div>
-
-            {deadlineBuckets.overdue.length ||
-            deadlineBuckets.dueSoon.length ? (
-              <div className="mb-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[var(--radius-control)] border border-danger/20 bg-danger/5 p-3">
-                  <p className="text-xs font-semibold text-danger">
-                    Overskredne deadlines
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold">
-                    {deadlineBuckets.overdue.length}
-                  </p>
-                </div>
-                <div className="rounded-[var(--radius-control)] border border-warning/20 bg-warning/5 p-3">
-                  <p className="text-xs font-semibold text-warning">
-                    Deadline inden 7 dage
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold">
-                    {deadlineBuckets.dueSoon.length}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            {attentionTasks.length ? (
-              <RelatedTasks
-                compact
-                organizationId={organizationId}
-                tasks={attentionTasks}
+              <TrashActionButton
+                confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                endpoint={`/api/organizations/${organizationId}`}
+                label="Flyt til papirkurv"
+                pendingLabel="Flytter..."
+                redirectTo={`${organizationRoot}/trash`}
               />
-            ) : (
-              <EmptyState
-                compact
-                description="Når du eller organisationen får åbne opgaver, vises de her."
-                title="Der er ingen åbne opgaver lige nu."
-              />
-            )}
-          </ContentPanel>
+            </ActionMenu>
+          ) : null
+        }
+        description="Få hurtigt overblik over egne opgaver, kommende møder, beslutninger og punkter, der kræver opmærksomhed."
+        eyebrow={
+          <Link
+            className="text-muted transition hover:text-brand"
+            href="/organizations"
+          >
+            ← Organisationer
+          </Link>
+        }
+        title={context.organization.name}
+      />
 
-          <ContentPanel className="border-x-0 bg-transparent p-0 shadow-none">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Næste
-                </p>
-                <h2 className="mt-1 text-xl font-semibold">Mødeforberedelse</h2>
-              </div>
-              <Link
-                className="text-sm font-semibold text-brand hover:underline"
-                href={`${organizationRoot}/meetings`}
-              >
-                Se møder
-              </Link>
-            </div>
-            {nextMeeting ? (
-              <div>
-                <Link
-                  className="text-lg font-semibold hover:text-brand hover:underline"
-                  href={`${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
-                >
-                  {nextMeeting.title}
-                </Link>
-                <p className="mt-1 text-sm text-muted">
-                  {formatDateTime(nextMeeting.starts_at)} ·{" "}
-                  {nextMeeting.committeeName}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <StatusBadge tone={meetingStatusTones[nextMeeting.status]}>
-                    {meetingStatusLabels[nextMeeting.status]}
-                  </StatusBadge>
-                  <StatusBadge>
-                    {nextMeeting.agenda_item_occurrences.length}{" "}
-                    {nextMeeting.agenda_item_occurrences.length === 1
-                      ? "punkt"
-                      : "punkter"}
-                  </StatusBadge>
-                </div>
-                <p className="mt-4 text-xs leading-5 text-muted">
-                  Her er det naturlige sted til en fremtidig “Hurtigt møde”-
-                  handling, uden at den implementeres i denne fase.
-                </p>
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                description="Opret et møde, når organisationen er klar til næste dagsorden."
-                title="Der er ingen kommende møder."
-              />
-            )}
-          </ContentPanel>
-        </div>
+      <PendingMinutesApprovalReminder
+        organizationId={organizationId}
+        reminders={overview.pendingMinutesApprovals}
+      />
 
-        <section className="border-y border-line py-4">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+        <ContentPanel className="border-x-0 bg-transparent p-0 shadow-none">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                Mine udvalg
+                Først
               </p>
               <h2 className="mt-1 text-xl font-semibold">
-                Åbn dit udvalg med ét klik
+                Kræver opmærksomhed
               </h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted">
-                Se de udvalg du har adgang til, og prioritér dem med kommende
-                møder, åbne opgaver eller aktive beslutninger.
+              <p className="mt-1 text-sm text-muted">
+                {attentionCount
+                  ? `${attentionCount} ting bør ses først.`
+                  : "Der er ikke noget kritisk lige nu."}
               </p>
             </div>
+            <Link
+              className="text-sm font-semibold text-brand hover:underline"
+              href={`${organizationRoot}/tasks/my`}
+            >
+              Mine opgaver
+            </Link>
           </div>
 
-          {committeeHighlights.length > 0 ? (
-            <div className="divide-y divide-line border-y border-line">
-              {committeeHighlights.map(
-                ({
-                  committee,
-                  nextMeeting: committeeNextMeeting,
-                  upcomingMeetingCount,
-                  openFollowUpCount,
-                  openTaskCount,
-                  activeDecisionCount,
-                }) => {
-                  const committeeRoot = `${organizationRoot}/committees/${committee.id}`;
-                  const attentionTotal =
-                    openTaskCount + activeDecisionCount + openFollowUpCount;
-                  return (
-                    <article
-                      className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
-                      key={committee.id}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            className="text-base font-semibold hover:text-brand hover:underline"
-                            href={committeeRoot}
-                          >
-                            {committee.name}
-                          </Link>
-                          {attentionTotal > 0 ? (
-                            <StatusBadge tone="warning">
-                              {attentionTotal} kræver opmærksomhed
-                            </StatusBadge>
-                          ) : (
-                            <StatusBadge tone="neutral">Roligt</StatusBadge>
-                          )}
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-sm text-muted">
-                          {committee.description ||
-                            "Der er endnu ingen beskrivelse."}
-                        </p>
-                        <p className="mt-2 text-xs text-muted">
-                          Næste møde:{" "}
-                          {committeeNextMeeting
-                            ? formatDateTime(committeeNextMeeting.starts_at)
-                            : "Ikke planlagt"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <StatusBadge>{upcomingMeetingCount} møder</StatusBadge>
-                        <StatusBadge tone={openTaskCount ? "warning" : "neutral"}>
-                          {openTaskCount} opgaver
-                        </StatusBadge>
-                        <StatusBadge
-                          tone={activeDecisionCount ? "info" : "neutral"}
-                        >
-                          {activeDecisionCount} beslutninger
-                        </StatusBadge>
-                        <Link
-                          className="ml-0 text-sm font-semibold text-brand hover:underline lg:ml-2"
-                          href={committeeRoot}
-                        >
-                          Åbn udvalg
-                        </Link>
-                      </div>
-                    </article>
-                  );
-                },
-              )}
+          {deadlineBuckets.overdue.length || deadlineBuckets.dueSoon.length ? (
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[var(--radius-control)] border border-danger/20 bg-danger/5 p-3">
+                <p className="text-xs font-semibold text-danger">
+                  Overskredne deadlines
+                </p>
+                <p className="mt-1 text-2xl font-semibold">
+                  {deadlineBuckets.overdue.length}
+                </p>
+              </div>
+              <div className="rounded-[var(--radius-control)] border border-warning/20 bg-warning/5 p-3">
+                <p className="text-xs font-semibold text-warning">
+                  Deadline inden 7 dage
+                </p>
+                <p className="mt-1 text-2xl font-semibold">
+                  {deadlineBuckets.dueSoon.length}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {attentionTasks.length ? (
+            <RelatedTasks
+              compact
+              organizationId={organizationId}
+              tasks={attentionTasks}
+            />
+          ) : (
+            <EmptyState
+              compact
+              description="Når du eller organisationen får åbne opgaver, vises de her."
+              title="Der er ingen åbne opgaver lige nu."
+            />
+          )}
+        </ContentPanel>
+
+        <ContentPanel className="border-x-0 bg-transparent p-0 shadow-none">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                Næste
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">Mødeforberedelse</h2>
+            </div>
+            <Link
+              className="text-sm font-semibold text-brand hover:underline"
+              href={`${organizationRoot}/meetings`}
+            >
+              Se møder
+            </Link>
+          </div>
+          {nextMeeting ? (
+            <div>
+              <Link
+                className="text-lg font-semibold hover:text-brand hover:underline"
+                href={`${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
+              >
+                {nextMeeting.title}
+              </Link>
+              <p className="mt-1 text-sm text-muted">
+                {formatDateTime(nextMeeting.starts_at)} ·{" "}
+                {nextMeeting.committeeName}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <StatusBadge tone={meetingStatusTones[nextMeeting.status]}>
+                  {meetingStatusLabels[nextMeeting.status]}
+                </StatusBadge>
+                <StatusBadge>
+                  {nextMeeting.agenda_item_occurrences.length}{" "}
+                  {nextMeeting.agenda_item_occurrences.length === 1
+                    ? "punkt"
+                    : "punkter"}
+                </StatusBadge>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-muted">
+                Her er det naturlige sted til en fremtidig “Hurtigt møde”-
+                handling, uden at den implementeres i denne fase.
+              </p>
             </div>
           ) : (
             <EmptyState
               compact
-              description="Når du bliver tilknyttet et udvalg, får du en hurtig vej ind til møder, opgaver og beslutninger her."
-              title="Du er endnu ikke tilknyttet et udvalg."
+              description="Opret et møde, når organisationen er klar til næste dagsorden."
+              title="Der er ingen kommende møder."
             />
           )}
-        </section>
+        </ContentPanel>
+      </div>
 
-        <details className="group border-y border-line bg-transparent">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-            <span>Mere overblik</span>
-            <span className="text-xs font-semibold text-brand">
-              <span className="group-open:hidden">
-                Vis beslutninger og møder
-              </span>
-              <span className="hidden group-open:inline">Skjul</span>
-            </span>
-          </summary>
-          <div className="space-y-3 border-t border-line p-3 sm:p-4">
-            <details className="group border-b border-line pb-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                <span>Beslutninger og punkter</span>
-                <span className="text-xs text-brand">
-                  <span className="group-open:hidden">Åbn</span>
-                  <span className="hidden group-open:inline">Skjul</span>
-                </span>
-              </summary>
-        <div className="grid gap-6 pt-3 xl:grid-cols-2">
-          <PageSection
-            description="De vigtigste beslutninger, som stadig er aktive."
-            title="Aktive beslutninger"
-          >
-            {overview.activeDecisions.length ? (
-              <RelatedDecisions
-                compact
-                decisions={overview.activeDecisions}
-                organizationId={organizationId}
-              />
-            ) : (
-              <EmptyState
-                compact
-                description="Når beslutninger oprettes fra møder eller registeret, vises aktive beslutninger her."
-                title="Der er ingen aktive beslutninger."
-              />
-            )}
-          </PageSection>
-
-          <PageSection
-            description="Opfølgning, beslutningsbehov og overførte punkter."
-            title="Punkter der kræver handling"
-          >
-            {overview.actionItems.length > 0 ? (
-              <div className="divide-y divide-line border-y border-line">
-                {overview.actionItems.slice(0, 6).map((item) => {
-                  const committeeRoot = `${organizationRoot}/committees/${item.committeeId}`;
-                  return (
-                    <article
-                      className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                      key={`${item.kind}-${item.id}`}
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          className="font-semibold hover:text-brand hover:underline"
-                          href={`${committeeRoot}/agenda-items/${item.agendaItemId}`}
-                        >
-                          <AgendaItemDocumentTitle
-                            title={item.title}
-                            type={item.itemType}
-                          />
-                        </Link>
-                        <p className="mt-1 text-xs text-muted">
-                          {item.committeeName} ·{" "}
-                          <Link
-                            className="hover:text-brand hover:underline"
-                            href={`${committeeRoot}/meetings/${item.meetingId}`}
-                          >
-                            {item.meetingTitle}
-                          </Link>
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge
-                          tone={item.kind === "transfer" ? "info" : "warning"}
-                        >
-                          {getActionLabel(item)}
-                        </StatusBadge>
-                        <span className="text-xs text-muted">
-                          {getActionStatus(item)}
-                        </span>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                description="Når opfølgninger eller beslutningspunkter opstår i referater, samles de her."
-                title="Der er ingen punkter, der kræver handling."
-              />
-            )}
-          </PageSection>
+      <section className="border-y border-line py-4">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Mine udvalg
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">
+              Åbn dit udvalg med ét klik
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Se de udvalg du har adgang til, og prioritér dem med kommende
+              møder, åbne opgaver eller aktive beslutninger.
+            </p>
+          </div>
         </div>
-            </details>
 
-            <details className="group border-b border-line pb-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                <span>Møder og referater</span>
-                <span className="text-xs text-brand">
-                  <span className="group-open:hidden">Åbn</span>
-                  <span className="hidden group-open:inline">Skjul</span>
-                </span>
-              </summary>
-        <div className="grid gap-6 pt-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.75fr)]">
-          <PageSection
-            description="Næste møder på tværs af de udvalg, du har adgang til."
-            title="Kommende møder"
-          >
-            {overview.upcomingMeetings.length > 0 ? (
-              <div className="divide-y divide-line border-y border-line">
-                {overview.upcomingMeetings.slice(0, 5).map((meeting) => (
+        {committeeHighlights.length > 0 ? (
+          <div className="divide-y divide-line border-y border-line">
+            {committeeHighlights.map(
+              ({
+                committee,
+                nextMeeting: committeeNextMeeting,
+                upcomingMeetingCount,
+                openFollowUpCount,
+                openTaskCount,
+                activeDecisionCount,
+              }) => {
+                const committeeRoot = `${organizationRoot}/committees/${committee.id}`;
+                const attentionTotal =
+                  openTaskCount + activeDecisionCount + openFollowUpCount;
+                return (
                   <article
-                    className="flex flex-wrap items-center justify-between gap-3 py-3"
-                    key={meeting.id}
+                    className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                    key={committee.id}
                   >
                     <div className="min-w-0">
-                      <Link
-                        className="font-semibold hover:text-brand hover:underline"
-                        href={`${organizationRoot}/committees/${meeting.committee_id}/meetings/${meeting.id}`}
-                      >
-                        {meeting.title}
-                      </Link>
-                      <p className="mt-0.5 text-xs text-muted">
-                        {formatDateTime(meeting.starts_at)} ·{" "}
-                        {meeting.committeeName} ·{" "}
-                        {meeting.agenda_item_occurrences.length}{" "}
-                        {meeting.agenda_item_occurrences.length === 1
-                          ? "punkt"
-                          : "punkter"}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          className="text-base font-semibold hover:text-brand hover:underline"
+                          href={committeeRoot}
+                        >
+                          {committee.name}
+                        </Link>
+                        {attentionTotal > 0 ? (
+                          <StatusBadge tone="warning">
+                            {attentionTotal} kræver opmærksomhed
+                          </StatusBadge>
+                        ) : (
+                          <StatusBadge tone="neutral">Roligt</StatusBadge>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted">
+                        {committee.description ||
+                          "Der er endnu ingen beskrivelse."}
+                      </p>
+                      <p className="mt-2 text-xs text-muted">
+                        Næste møde:{" "}
+                        {committeeNextMeeting
+                          ? formatDateTime(committeeNextMeeting.starts_at)
+                          : "Ikke planlagt"}
                       </p>
                     </div>
-                    <StatusBadge tone={meetingStatusTones[meeting.status]}>
-                      {meetingStatusLabels[meeting.status]}
-                    </StatusBadge>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                description="Når der oprettes møder i udvalg, får du et samlet overblik her."
-                title="Der er ingen kommende møder."
-              />
-            )}
-          </PageSection>
-
-          <PageSection
-            description="Senest opdaterede referater."
-            title="Seneste referater"
-          >
-            {overview.recentMinutes.length > 0 ? (
-              <div className="divide-y divide-line border-y border-line">
-                {overview.recentMinutes.slice(0, 4).map((minutes) => (
-                  <article className="py-3" key={minutes.id}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <Link
-                          className="font-semibold hover:text-brand hover:underline"
-                          href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
-                        >
-                          {minutes.meetingTitle}
-                        </Link>
-                        <p className="mt-0.5 text-xs text-muted">
-                          {formatDateTime(minutes.meetingStartsAt)} ·{" "}
-                          {minutes.committeeName}
-                        </p>
-                      </div>
-                      <StatusBadge tone={minutesStatusTones[minutes.status]}>
-                        {meetingMinutesStatusLabels[minutes.status]}
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <StatusBadge>{upcomingMeetingCount} møder</StatusBadge>
+                      <StatusBadge tone={openTaskCount ? "warning" : "neutral"}>
+                        {openTaskCount} opgaver
                       </StatusBadge>
+                      <StatusBadge
+                        tone={activeDecisionCount ? "info" : "neutral"}
+                      >
+                        {activeDecisionCount} beslutninger
+                      </StatusBadge>
+                      <Link
+                        className="ml-0 text-sm font-semibold text-brand hover:underline lg:ml-2"
+                        href={committeeRoot}
+                      >
+                        Åbn udvalg
+                      </Link>
                     </div>
                   </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                description="Når møder får referater, vises de seneste her."
-                title="Der er ingen nyere referater."
-              />
+                );
+              },
             )}
-          </PageSection>
-        </div>
-            </details>
           </div>
-        </details>
+        ) : (
+          <EmptyState
+            compact
+            description="Når du bliver tilknyttet et udvalg, får du en hurtig vej ind til møder, opgaver og beslutninger her."
+            title="Du er endnu ikke tilknyttet et udvalg."
+          />
+        )}
+      </section>
+
+      <details className="group border-y border-line bg-transparent">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <span>Mere overblik</span>
+          <span className="text-xs font-semibold text-brand">
+            <span className="group-open:hidden">Vis beslutninger og møder</span>
+            <span className="hidden group-open:inline">Skjul</span>
+          </span>
+        </summary>
+        <div className="space-y-3 border-t border-line p-3 sm:p-4">
+          <details className="group border-b border-line pb-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <span>Beslutninger og punkter</span>
+              <span className="text-xs text-brand">
+                <span className="group-open:hidden">Åbn</span>
+                <span className="hidden group-open:inline">Skjul</span>
+              </span>
+            </summary>
+            <div className="grid gap-6 pt-3 xl:grid-cols-2">
+              <PageSection
+                description="De vigtigste beslutninger, som stadig er aktive."
+                title="Aktive beslutninger"
+              >
+                {overview.activeDecisions.length ? (
+                  <RelatedDecisions
+                    compact
+                    decisions={overview.activeDecisions}
+                    organizationId={organizationId}
+                  />
+                ) : (
+                  <EmptyState
+                    compact
+                    description="Når beslutninger oprettes fra møder eller registeret, vises aktive beslutninger her."
+                    title="Der er ingen aktive beslutninger."
+                  />
+                )}
+              </PageSection>
+
+              <PageSection
+                description="Opfølgning, beslutningsbehov og overførte punkter."
+                title="Punkter der kræver handling"
+              >
+                {overview.actionItems.length > 0 ? (
+                  <div className="divide-y divide-line border-y border-line">
+                    {overview.actionItems.slice(0, 6).map((item) => {
+                      const committeeRoot = `${organizationRoot}/committees/${item.committeeId}`;
+                      return (
+                        <article
+                          className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                          key={`${item.kind}-${item.id}`}
+                        >
+                          <div className="min-w-0">
+                            <Link
+                              className="font-semibold hover:text-brand hover:underline"
+                              href={`${committeeRoot}/agenda-items/${item.agendaItemId}`}
+                            >
+                              <AgendaItemDocumentTitle
+                                title={item.title}
+                                type={item.itemType}
+                              />
+                            </Link>
+                            <p className="mt-1 text-xs text-muted">
+                              {item.committeeName} ·{" "}
+                              <Link
+                                className="hover:text-brand hover:underline"
+                                href={`${committeeRoot}/meetings/${item.meetingId}`}
+                              >
+                                {item.meetingTitle}
+                              </Link>
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge
+                              tone={
+                                item.kind === "transfer" ? "info" : "warning"
+                              }
+                            >
+                              {getActionLabel(item)}
+                            </StatusBadge>
+                            <span className="text-xs text-muted">
+                              {getActionStatus(item)}
+                            </span>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    compact
+                    description="Når opfølgninger eller beslutningspunkter opstår i referater, samles de her."
+                    title="Der er ingen punkter, der kræver handling."
+                  />
+                )}
+              </PageSection>
+            </div>
+          </details>
+
+          <details className="group border-b border-line pb-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <span>Møder og referater</span>
+              <span className="text-xs text-brand">
+                <span className="group-open:hidden">Åbn</span>
+                <span className="hidden group-open:inline">Skjul</span>
+              </span>
+            </summary>
+            <div className="grid gap-6 pt-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.75fr)]">
+              <PageSection
+                description="Næste møder på tværs af de udvalg, du har adgang til."
+                title="Kommende møder"
+              >
+                {overview.upcomingMeetings.length > 0 ? (
+                  <div className="divide-y divide-line border-y border-line">
+                    {overview.upcomingMeetings.slice(0, 5).map((meeting) => (
+                      <article
+                        className="flex flex-wrap items-center justify-between gap-3 py-3"
+                        key={meeting.id}
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold hover:text-brand hover:underline"
+                            href={`${organizationRoot}/committees/${meeting.committee_id}/meetings/${meeting.id}`}
+                          >
+                            {meeting.title}
+                          </Link>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {formatDateTime(meeting.starts_at)} ·{" "}
+                            {meeting.committeeName} ·{" "}
+                            {meeting.agenda_item_occurrences.length}{" "}
+                            {meeting.agenda_item_occurrences.length === 1
+                              ? "punkt"
+                              : "punkter"}
+                          </p>
+                        </div>
+                        <StatusBadge tone={meetingStatusTones[meeting.status]}>
+                          {meetingStatusLabels[meeting.status]}
+                        </StatusBadge>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    compact
+                    description="Når der oprettes møder i udvalg, får du et samlet overblik her."
+                    title="Der er ingen kommende møder."
+                  />
+                )}
+              </PageSection>
+
+              <PageSection
+                description="Senest opdaterede referater."
+                title="Seneste referater"
+              >
+                {overview.recentMinutes.length > 0 ? (
+                  <div className="divide-y divide-line border-y border-line">
+                    {overview.recentMinutes.slice(0, 4).map((minutes) => (
+                      <article className="py-3" key={minutes.id}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <Link
+                              className="font-semibold hover:text-brand hover:underline"
+                              href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
+                            >
+                              {minutes.meetingTitle}
+                            </Link>
+                            <p className="mt-0.5 text-xs text-muted">
+                              {formatDateTime(minutes.meetingStartsAt)} ·{" "}
+                              {minutes.committeeName}
+                            </p>
+                          </div>
+                          <StatusBadge
+                            tone={minutesStatusTones[minutes.status]}
+                          >
+                            {meetingMinutesStatusLabels[minutes.status]}
+                          </StatusBadge>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    compact
+                    description="Når møder får referater, vises de seneste her."
+                    title="Der er ingen nyere referater."
+                  />
+                )}
+              </PageSection>
+            </div>
+          </details>
+        </div>
+      </details>
     </div>
   );
 }

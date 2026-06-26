@@ -133,6 +133,18 @@ empty. Selecting a date keeps the item unscheduled in the backlog and stores
 the date in `target_date`. The application and PostgreSQL function reject
 requests with neither destination or both destinations.
 
+Update 13.6 keeps meeting agenda numbering contiguous after a point is removed.
+`agenda_item_occurrences.position` remains the persisted sort key, but soft
+delete/restore functions now normalize occurrence positions for the meeting so
+active agenda points do not leave gaps. UI and PDF numbering is calculated from
+the current sorted active list rather than displaying a stale stored sequence.
+Update 13.7 adds a compact agenda reorder modal on the meeting minutes page.
+Committee managers drag active agenda points into the final order and save the
+full order in one operation. Reorder runs through a scoped PostgreSQL function
+that locks the meeting occurrences, validates that every active occurrence is
+included exactly once, normalizes positions, and persists the new order for UI,
+email, and PDF consumers.
+
 ### Meeting Minutes
 
 Each meeting has one general minutes record and may have one minutes record per
@@ -788,6 +800,36 @@ attachment surface after confirmation. Removal deletes the attachment metadata
 and best-effort removes the unique Storage object, so removed attachments no
 longer appear in agenda or minutes PDFs.
 
+Update 13.1 hardens live minutes autosave. General meeting minutes and
+agenda-item minutes continue to keep user-scoped browser drafts, but autosave
+now sends the latest known `updated_at` version with each write. Server-side
+updates only apply when that version still matches; otherwise the save returns
+a conflict and the local draft remains available instead of being overwritten.
+Autosave status distinguishes server-saved content from local-only drafts,
+offline/pending sync, save errors, and version conflicts, and the client flushes
+pending text on blur, reconnect, visibility change, and page hide where the
+browser permits it.
+
+Update 13.2 adds private internal notes per agenda item. Each active committee
+member can keep one user-scoped note per meeting agenda point; the note uses
+the same local-draft autosave pattern as minutes, but is stored in a separate
+RLS-protected table and is never included in official minutes, PDFs, emails,
+AI context, or other members' views.
+
+Update 13.4 expands minutes approval into a handlingsorienteret notification
+flow. When a manager sends minutes for approval, the server prepares one email
+per approver with a link to the meeting, the minutes PDF attached, the
+recipient's own meeting tasks, and unassigned meeting tasks. The PDF route now
+allows minutes that are `ready_for_approval`; those exports are clearly marked
+as preliminary until all approvals are complete, while fully approved exports
+are marked as approved.
+
+Update 13.8 surfaces minutes that still need the current user's approval on
+the organization dashboard. The reminder is based on the server-side approval
+read model, links directly to the meeting approval section, and can only be
+closed temporarily in the current page view. It disappears permanently for the
+user only when that user's approval row is no longer awaiting approval.
+
 Referattekst uses document prose styling in both the web UI and PDF exports.
 Sanitized TipTap content is rendered with constrained line length, generous
 line height, paragraph spacing, readable lists, and clearer subpoints. PDF
@@ -1023,6 +1065,14 @@ committee members, review the subject and a short message, and send manually.
 Recipients are validated again on the server against organization and
 committee membership before delivery. Internal notes, AI drafts, and private
 minutes fields are not included.
+
+Hotfix 13.4 makes the minutes-approval email result explicit. Sending minutes
+for approval can succeed even when email does not leave the system; the API
+now returns whether email was actually `sent`, only `stubbed`, skipped because
+Resend config is missing, or failed. The UI only says email was sent when
+Resend accepts delivery. Real delivery requires `EMAIL_DELIVERY_MODE=resend`,
+`RESEND_API_KEY`, and `EMAIL_FROM`; stub mode remains the default and clearly
+reports that messages were prepared but not sent.
 
 The email template layer includes simple Danish templates for agendas,
 approved minutes, task reminders, and decision overviews, but only agenda

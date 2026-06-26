@@ -125,10 +125,10 @@ export function PreviousMinutesReference({
               <section className="minutes-document-section">
                 <p className="minutes-document-label">Punktreferater</p>
                 <div className="mt-4 divide-y divide-line border-y border-line">
-                  {reference.agendaItemMinutes.map((item) => (
+                  {reference.agendaItemMinutes.map((item, index) => (
                     <article className="py-6" key={item.id}>
                       <h3 className="text-lg font-semibold">
-                        {item.position + 1}.{" "}
+                        {index + 1}.{" "}
                         <AgendaItemDocumentTitle
                           title={item.title}
                           type={item.itemType}

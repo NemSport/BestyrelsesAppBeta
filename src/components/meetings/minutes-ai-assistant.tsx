@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import clsx from "clsx";
 
 import { RichTextContent } from "@/components/forms/rich-text-content";
 import { Button, Modal, StatusBadge } from "@/components/ui";
@@ -40,6 +41,7 @@ export function MinutesAiAssistant({
   meetingId,
   onApply,
   organizationId,
+  prominent = false,
   source,
   value,
 }: {
@@ -50,6 +52,7 @@ export function MinutesAiAssistant({
   meetingId: string;
   onApply: (value: string) => void;
   organizationId: string;
+  prominent?: boolean;
   source: AiMinutesAssistantSource;
   value: string;
 }) {
@@ -79,7 +82,8 @@ export function MinutesAiAssistant({
             organizationId,
             committeeId,
             source,
-            agendaItemId: source === "agenda_item_minutes" ? agendaItemId : null,
+            agendaItemId:
+              source === "agenda_item_minutes" ? agendaItemId : null,
             field,
             action,
             text: value,
@@ -161,16 +165,29 @@ export function MinutesAiAssistant({
   }
 
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+    <div
+      className={clsx(
+        "flex flex-wrap items-center gap-2",
+        !prominent && "mt-1.5",
+      )}
+    >
       <details className="group relative">
-        <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-accent/55 hover:bg-mist/65 hover:text-ink [&::-webkit-details-marker]:hidden">
-          AI-hjælp
+        <summary
+          className={clsx(
+            "inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border font-semibold transition [&::-webkit-details-marker]:hidden",
+            prominent
+              ? "min-h-9 border-brand bg-brand px-3 py-2 text-sm text-white shadow-sm hover:bg-brand-hover"
+              : "min-h-8 border-line bg-surface px-2.5 py-1.5 text-xs text-muted hover:border-accent/55 hover:bg-mist/65 hover:text-ink",
+          )}
+        >
+          AI-Hjælp
           <span
             aria-hidden="true"
-            className="text-[0.65rem] transition group-open:rotate-180"
-          >
-            ▾
-          </span>
+            className={clsx(
+              "ml-0.5 h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent transition group-open:rotate-180",
+              prominent ? "border-t-white" : "border-t-muted",
+            )}
+          />
         </summary>
         <div className="absolute left-0 z-30 mt-1.5 w-64 max-w-[calc(100vw-2rem)] border border-line bg-surface p-1.5 shadow-dialog">
           {actions.map(([action, label]) => (
@@ -192,9 +209,7 @@ export function MinutesAiAssistant({
         </p>
       ) : null}
       {appliedMessage ? (
-        <span className="text-xs font-medium text-muted">
-          {appliedMessage}
-        </span>
+        <span className="text-xs font-medium text-muted">{appliedMessage}</span>
       ) : null}
       <Modal
         description="Gennemgå forslaget, før du anvender det. Original tekst ændres ikke automatisk."

@@ -8,7 +8,8 @@ export type AutosaveStatus =
   | "saved"
   | "error"
   | "offline"
-  | "pending";
+  | "pending"
+  | "conflict";
 
 export type StoredLocalDraft<T> = {
   version: 1;
@@ -30,16 +31,18 @@ export function useOfflineAutosave<T, TResult>({
   restore,
   onSaved,
   onError,
+  getSavedServerUpdatedAt,
   debounceMs = 1400,
 }: {
   storageKey: string;
   data: T;
   serverUpdatedAt: string | null;
   enabled: boolean;
-  save: (data: T) => Promise<TResult>;
+  save: (data: T, expectedServerUpdatedAt: string | null) => Promise<TResult>;
   restore: (data: T) => void;
   onSaved?: (result: TResult) => void;
   onError?: (error: unknown) => void;
+  getSavedServerUpdatedAt?: (result: TResult) => string | null | undefined;
   debounceMs?: number;
 }) {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
@@ -52,6 +55,8 @@ export function useOfflineAutosave<T, TResult>({
   const restoreRef = useRef(restore);
   const onSavedRef = useRef(onSaved);
   const onErrorRef = useRef(onError);
+  const getSavedServerUpdatedAtRef = useRef(getSavedServerUpdatedAt);
+  const serverUpdatedAtRef = useRef(serverUpdatedAt);
   const lastSavedSerializedRef = useRef(serialize(data));
   const lastObservedSerializedRef = useRef(serialize(data));
   const changeVersionRef = useRef(0);
@@ -69,7 +74,12 @@ export function useOfflineAutosave<T, TResult>({
   restoreRef.current = restore;
   onSavedRef.current = onSaved;
   onErrorRef.current = onError;
+  getSavedServerUpdatedAtRef.current = getSavedServerUpdatedAt;
   conflictRef.current = conflict;
+
+  useEffect(() => {
+    serverUpdatedAtRef.current = serverUpdatedAt;
+  }, [serverUpdatedAt]);
 
   const storeDraft = useCallback(
     (draftData: T) => {
@@ -77,18 +87,26 @@ export function useOfflineAutosave<T, TResult>({
         version: 1,
         data: draftData,
         updatedAt: new Date().toISOString(),
-        serverUpdatedAt,
+        serverUpdatedAt: serverUpdatedAtRef.current,
       };
       localStorage.setItem(storageKey, JSON.stringify(draft));
       return draft;
     },
-    [serverUpdatedAt, storageKey],
+    [storageKey],
   );
 
   const saveNow = useCallback(
     async (override?: T) => {
       if (!enabled || conflictRef.current) return null;
       const payload = override ?? dataRef.current;
+      const serializedPayload = serialize(payload);
+      const hasLocalDraft = Boolean(localStorage.getItem(storageKey));
+      if (
+        serializedPayload === lastSavedSerializedRef.current &&
+        !hasLocalDraft
+      ) {
+        return null;
+      }
       storeDraft(payload);
 
       if (savingRef.current) {
@@ -107,9 +125,13 @@ export function useOfflineAutosave<T, TResult>({
       setStatus("saving");
       setErrorMessage(null);
       try {
-        const result = await saveRef.current(payload);
-        const savedSerialized = serialize(payload);
-        lastSavedSerializedRef.current = savedSerialized;
+        const result = await saveRef.current(payload, serverUpdatedAtRef.current);
+        lastSavedSerializedRef.current = serializedPayload;
+        const savedServerUpdatedAt =
+          getSavedServerUpdatedAtRef.current?.(result) ?? null;
+        if (savedServerUpdatedAt) {
+          serverUpdatedAtRef.current = savedServerUpdatedAt;
+        }
         setLastSavedAt(new Date());
         onSavedRef.current?.(result);
         if (
@@ -129,7 +151,11 @@ export function useOfflineAutosave<T, TResult>({
         setErrorMessage(
           error instanceof Error ? error.message : "Kunne ikke gemme",
         );
-        setStatus("error");
+        const code =
+          typeof error === "object" && error && "code" in error
+            ? String((error as { code?: unknown }).code)
+            : "";
+        setStatus(code.includes("VERSION_CONFLICT") ? "conflict" : "error");
         return null;
       } finally {
         savingRef.current = false;
@@ -210,6 +236,31 @@ export function useOfflineAutosave<T, TResult>({
     };
   }, [enabled, saveNow, storageKey]);
 
+  useEffect(() => {
+    if (!enabled) return;
+
+    function flushIfNeeded() {
+      if (conflictRef.current) return;
+      if (
+        serialize(dataRef.current) !== lastSavedSerializedRef.current ||
+        localStorage.getItem(storageKey)
+      ) {
+        void saveNow();
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") flushIfNeeded();
+    }
+
+    window.addEventListener("pagehide", flushIfNeeded);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", flushIfNeeded);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [enabled, saveNow, storageKey]);
+
   function restoreLocalDraft() {
     if (!conflict) return;
     restoreRef.current(conflict.data);
@@ -231,6 +282,7 @@ export function useOfflineAutosave<T, TResult>({
     lastSavedAt,
     errorMessage,
     saveNow,
+    flush: saveNow,
     retry: saveNow,
     restoreLocalDraft,
     keepServerVersion,

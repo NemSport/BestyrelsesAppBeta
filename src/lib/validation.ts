@@ -7,6 +7,16 @@ import {
 } from "@/lib/agenda-item-minutes";
 
 export const uuidSchema = z.string().uuid("Ugyldigt id");
+const optionalUpdatedAtSchema = z
+  .string({
+    invalid_type_error: "Versionen er ugyldig",
+  })
+  .trim()
+  .refine((value) => !Number.isNaN(Date.parse(value)), {
+    message: "Versionen er ugyldig",
+  })
+  .nullable()
+  .optional();
 
 const requiredName = (label: string, max: number) =>
   z
@@ -300,6 +310,7 @@ export const meetingMinutesInputSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
   meetingId: uuidSchema,
+  expectedUpdatedAt: optionalUpdatedAtSchema,
   minutesText: optionalMinutesText("Referattekst", 100000),
   decisions: optionalMinutesText("Beslutninger", 50000),
   internalNote: z
@@ -321,6 +332,7 @@ export const agendaItemMinutesInputSchema = z
     meetingId: uuidSchema,
     agendaItemId: uuidSchema,
     agendaItemOccurrenceId: uuidSchema.nullable().optional(),
+    expectedUpdatedAt: optionalUpdatedAtSchema,
     itemType: z.enum(["information", "discussion", "decision", "follow_up"]),
     notes: optionalMinutesText("Noter", 50000),
     decision: optionalMinutesText("Beslutning", 50000),
@@ -333,7 +345,9 @@ export const agendaItemMinutesInputSchema = z
     }),
   })
   .superRefine((value, context) => {
-    if (!agendaItemMinutesStatusOptions[value.itemType].includes(value.status)) {
+    if (
+      !agendaItemMinutesStatusOptions[value.itemType].includes(value.status)
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Status passer ikke til dagsordenspunktets type.",
@@ -343,11 +357,7 @@ export const agendaItemMinutesInputSchema = z
     }
 
     if (
-      agendaItemMinutesNeedsAction(
-        value.itemType,
-        value.status,
-        value.followUp,
-      )
+      agendaItemMinutesNeedsAction(value.itemType, value.status, value.followUp)
     ) {
       if (!value.responsibleUserId) {
         context.addIssue({
@@ -365,6 +375,15 @@ export const agendaItemMinutesInputSchema = z
       }
     }
   });
+
+export const agendaItemPrivateNoteInputSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  agendaItemId: uuidSchema,
+  expectedUpdatedAt: optionalUpdatedAtSchema,
+  content: optionalMinutesText("Intern note", 50000),
+});
 
 export const sendMinutesForApprovalSchema = z.object({
   organizationId: uuidSchema,
@@ -551,9 +570,9 @@ export const annualWheelEventInputSchema = z
       .int("Intervallet skal være et helt tal")
       .min(1, "Intervallet skal være mindst 1")
       .max(120, "Intervallet må højst være 120 måneder"),
-      taskTemplates: z
-        .array(
-          z.object({
+    taskTemplates: z
+      .array(
+        z.object({
           id: uuidSchema.optional(),
           title: requiredName("Fast opgave", 240),
           description: z
@@ -571,41 +590,41 @@ export const annualWheelEventInputSchema = z
             .nullable()
             .optional(),
         }),
-        )
-        .max(50, "Der kan højst være 50 faste opgaver")
-        .default([]),
-      keyPeople: z
-        .preprocess(
-          compactAnnualWheelKeyPeople,
-          z
-            .array(
-              z.object({
-                id: uuidSchema.optional(),
-                userId: uuidSchema.nullable().optional(),
-                name: requiredName("Navn", 180),
-                roleTitle: requiredName("Funktion", 180),
-                phone: z
-                  .string()
-                  .trim()
-                  .max(80, "Telefon må højst være 80 tegn")
-                  .nullable()
-                  .optional()
-                  .transform((value) => value || null),
-                email: z
-                  .string()
-                  .trim()
-                  .toLowerCase()
-                  .email("Indtast en gyldig e-mailadresse")
-                  .max(254, "E-mail må højst være 254 tegn")
-                  .nullable()
-                  .optional()
-                  .or(z.literal("").transform(() => null)),
-              }),
-            )
-            .max(50, "Der kan højst være 50 nøglepersoner"),
-        )
-        .default([]),
-    })
+      )
+      .max(50, "Der kan højst være 50 faste opgaver")
+      .default([]),
+    keyPeople: z
+      .preprocess(
+        compactAnnualWheelKeyPeople,
+        z
+          .array(
+            z.object({
+              id: uuidSchema.optional(),
+              userId: uuidSchema.nullable().optional(),
+              name: requiredName("Navn", 180),
+              roleTitle: requiredName("Funktion", 180),
+              phone: z
+                .string()
+                .trim()
+                .max(80, "Telefon må højst være 80 tegn")
+                .nullable()
+                .optional()
+                .transform((value) => value || null),
+              email: z
+                .string()
+                .trim()
+                .toLowerCase()
+                .email("Indtast en gyldig e-mailadresse")
+                .max(254, "E-mail må højst være 254 tegn")
+                .nullable()
+                .optional()
+                .or(z.literal("").transform(() => null)),
+            }),
+          )
+          .max(50, "Der kan højst være 50 nøglepersoner"),
+      )
+      .default([]),
+  })
   .superRefine((value, context) => {
     if (value.endsOn < value.startsOn) {
       context.addIssue({
@@ -616,8 +635,9 @@ export const annualWheelEventInputSchema = z
     }
   });
 
-export const annualWheelEventUpdateSchema =
-  annualWheelEventInputSchema.and(z.object({ eventId: uuidSchema }));
+export const annualWheelEventUpdateSchema = annualWheelEventInputSchema.and(
+  z.object({ eventId: uuidSchema }),
+);
 
 export const annualWheelEventDeleteSchema = z.object({
   organizationId: uuidSchema,
@@ -631,7 +651,7 @@ export const annualWheelTaskActivationSchema = z.object({
     .number({ required_error: "År skal vælges" })
     .int("År skal være et helt tal")
     .min(2000, "År er for lavt")
-      .max(2100, "År er for højt"),
+    .max(2100, "År er for højt"),
 });
 
 function compactAnnualWheelKeyPeople(value: unknown) {
@@ -641,16 +661,20 @@ function compactAnnualWheelKeyPeople(value: unknown) {
     const record = item as Record<string, unknown>;
     return Boolean(
       String(record.userId ?? "").trim() ||
-        String(record.name ?? "").trim() ||
-        String(record.roleTitle ?? "").trim() ||
-        String(record.phone ?? "").trim() ||
-        String(record.email ?? "").trim(),
+      String(record.name ?? "").trim() ||
+      String(record.roleTitle ?? "").trim() ||
+      String(record.phone ?? "").trim() ||
+      String(record.email ?? "").trim(),
     );
   });
 }
 
 const jobCardText = (label: string, max = 20000) =>
-  z.string().trim().max(max, `${label} må højst være ${max.toLocaleString("da-DK")} tegn`).default("");
+  z
+    .string()
+    .trim()
+    .max(max, `${label} må højst være ${max.toLocaleString("da-DK")} tegn`)
+    .default("");
 
 function compactJobCardDocuments(value: unknown) {
   if (!Array.isArray(value)) return value;
@@ -670,10 +694,10 @@ function compactJobCardTaskTemplates(value: unknown) {
     const record = item as Record<string, unknown>;
     return Boolean(
       String(record.title ?? "").trim() ||
-        String(record.description ?? "").trim() ||
-        String(record.category ?? "").trim() ||
-        (record.defaultDeadlineDays !== null &&
-          record.defaultDeadlineDays !== undefined),
+      String(record.description ?? "").trim() ||
+      String(record.category ?? "").trim() ||
+      (record.defaultDeadlineDays !== null &&
+        record.defaultDeadlineDays !== undefined),
     );
   });
 }
@@ -690,7 +714,10 @@ export const jobCardInputSchema = z.object({
   meetingExpectations: jobCardText("Mødedeltagelse"),
   contactPeople: jobCardText("Kontaktpersoner"),
   responsibilityAreaIds: z.array(uuidSchema).max(30).default([]),
-  responsibilityAreaNames: z.array(requiredName("Ansvarsområde", 120)).max(30).default([]),
+  responsibilityAreaNames: z
+    .array(requiredName("Ansvarsområde", 120))
+    .max(30)
+    .default([]),
   committeeIds: z.array(uuidSchema).max(30).default([]),
   assignedUserIds: z.array(uuidSchema).max(30).default([]),
   annualWheelEventIds: z.array(uuidSchema).max(100).default([]),
@@ -706,7 +733,8 @@ export const jobCardInputSchema = z.object({
             .url("Linket er ugyldigt")
             .max(2048)
             .refine(
-              (value) => value.startsWith("https://") || value.startsWith("http://"),
+              (value) =>
+                value.startsWith("https://") || value.startsWith("http://"),
               "Linket skal begynde med http:// eller https://",
             ),
         }),
@@ -777,6 +805,24 @@ export const agendaItemOccurrenceTrashActionSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
   occurrenceId: uuidSchema,
+});
+
+export const agendaItemOccurrenceReorderSchema =
+  agendaItemOccurrenceTrashActionSchema.extend({
+    direction: z.enum(["up", "down"], {
+      required_error: "Vælg om punktet skal flyttes op eller ned",
+      invalid_type_error: "Flytteretningen er ugyldig",
+    }),
+  });
+
+export const agendaItemOccurrenceBatchReorderSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  occurrenceIds: z
+    .array(uuidSchema)
+    .min(1, "Vælg mindst ét dagsordenspunkt")
+    .max(200, "Der kan højst omrokeres 200 dagsordenspunkter ad gangen"),
 });
 
 export const organizationTrashRestoreSchema = z.object({

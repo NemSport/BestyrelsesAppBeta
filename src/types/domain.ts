@@ -14,6 +14,7 @@ export type AgendaItem = TableRow<"agenda_items">;
 export type AgendaItemOccurrence = TableRow<"agenda_item_occurrences">;
 export type MeetingMinutes = TableRow<"meeting_minutes">;
 export type AgendaItemMinutes = TableRow<"agenda_item_minutes">;
+export type AgendaItemPrivateNote = TableRow<"agenda_item_private_notes">;
 export type MeetingMinuteApproval = TableRow<"meeting_minute_approvals">;
 export type MeetingMinuteAttachment = TableRow<"meeting_minute_attachments">;
 export type AgendaItemMinuteAttachment =
@@ -23,10 +24,8 @@ export type Decision = TableRow<"decisions">;
 export type Task = TableRow<"tasks">;
 export type TaskComment = TableRow<"task_comments">;
 export type AnnualWheelEvent = TableRow<"annual_wheel_events">;
-export type AnnualWheelKeyPerson =
-  TableRow<"annual_wheel_key_people">;
-export type AnnualWheelTaskTemplate =
-  TableRow<"annual_wheel_task_templates">;
+export type AnnualWheelKeyPerson = TableRow<"annual_wheel_key_people">;
+export type AnnualWheelTaskTemplate = TableRow<"annual_wheel_task_templates">;
 export type RoleProfile = TableRow<"role_profiles">;
 export type ResponsibilityArea = TableRow<"responsibility_areas">;
 export type TaskTemplate = TableRow<"task_templates">;
@@ -208,9 +207,20 @@ export type OrganizationOverviewActionItem = {
   committeeName: string;
   title: string;
   itemType: AgendaItem["item_type"];
-  status:
-    | AgendaItemMinutes["status"]
-    | TransferredAgendaItem["status"];
+  status: AgendaItemMinutes["status"] | TransferredAgendaItem["status"];
+};
+
+export type PendingMinutesApprovalReminder = {
+  id: string;
+  meetingMinutesId: string;
+  meetingId: string;
+  meetingTitle: string;
+  meetingStartsAt: string;
+  committeeId: string;
+  committeeName: string;
+  status: MeetingMinuteApproval["status"];
+  approvalDeadline: string | null;
+  updatedAt: string;
 };
 
 export type OrganizationOverview = {
@@ -237,6 +247,7 @@ export type OrganizationOverview = {
     status: MeetingMinutes["status"];
     updatedAt: string;
   }>;
+  pendingMinutesApprovals: PendingMinutesApprovalReminder[];
   actionItems: OrganizationOverviewActionItem[];
   activeDecisions: DecisionView[];
   openTasks: TaskView[];
@@ -262,6 +273,7 @@ export type MinutesResponsiblePerson = {
 export type MeetingMinutesBundle = {
   meetingMinutes: MeetingMinutes | null;
   agendaItemMinutes: AgendaItemMinutes[];
+  privateAgendaItemNotes: AgendaItemPrivateNote[];
   responsiblePeople: MinutesResponsiblePerson[];
   approvals: MeetingMinuteApprovalView[];
   meetingAttachments: MinuteAttachmentView[];
@@ -288,10 +300,7 @@ export type MinuteAttachmentView = {
 
 export type PreviousMeetingMinutesReference = {
   meeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
-  minutes: Pick<
-    MeetingMinutes,
-    "status" | "minutes_text" | "decisions"
-  > | null;
+  minutes: Pick<MeetingMinutes, "status" | "minutes_text" | "decisions"> | null;
   agendaItemMinutes: Array<{
     id: string;
     position: number;
@@ -380,7 +389,11 @@ export type MyTasksData = {
   editableCommitteeIds: string[];
 };
 
-export type TrashItemType = "organization" | "committee" | "meeting" | "agenda_item";
+export type TrashItemType =
+  | "organization"
+  | "committee"
+  | "meeting"
+  | "agenda_item";
 
 export type OrganizationTrashItem = {
   id: string;

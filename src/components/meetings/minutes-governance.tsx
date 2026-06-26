@@ -142,104 +142,107 @@ export function MinuteAttachments({
         </span>
       </summary>
       <div className="border-t border-line p-3">
-      <section>
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <div className="hidden">
-          <h4 className="font-semibold">Vedhæftninger</h4>
-          <p className="mt-1 text-xs text-slate-500">
-            Dokumenter gemmes sikkert og kan åbnes af medlemmer med adgang til
-            referatet.
-          </p>
-        </div>
-        {canEdit ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="button-secondary cursor-pointer">
-              <span>Vedhæft fil</span>
-              <input
-                className="sr-only"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] ?? null);
-                  setError(null);
-                }}
-                type="file"
-              />
-            </label>
-            {file ? (
-              <Button
-                disabled={uploading}
-                onClick={upload}
-                type="button"
-              >
-                {uploading ? "Uploader..." : "Upload"}
-              </Button>
+        <section>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="hidden">
+              <h4 className="font-semibold">Vedhæftninger</h4>
+              <p className="mt-1 text-xs text-slate-500">
+                Dokumenter gemmes sikkert og kan åbnes af medlemmer med adgang
+                til referatet.
+              </p>
+            </div>
+            {canEdit ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="button-secondary cursor-pointer">
+                  <span>Vedhæft fil</span>
+                  <input
+                    className="sr-only"
+                    onChange={(event) => {
+                      setFile(event.target.files?.[0] ?? null);
+                      setError(null);
+                    }}
+                    type="file"
+                  />
+                </label>
+                {file ? (
+                  <Button disabled={uploading} onClick={upload} type="button">
+                    {uploading ? "Uploader..." : "Upload"}
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
-      {file ? (
-        <p className="mt-2 text-xs text-slate-600">
-          Valgt fil: <span className="font-medium">{file.name}</span>
-        </p>
-      ) : null}
-      {message ? (
-        <p className="mt-2 text-sm text-emerald-700" role="status">
-          {message}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="mt-2 text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="mt-4 space-y-2">
-        {attachments.map((attachment) => (
-          <article
-            className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-1 py-3 first:border-t-0"
-            key={attachment.id}
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
-                {attachment.fileName}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {attachment.mimeType} · Uploadet af {attachment.uploadedByName} ·{" "}
-                {formatDateTime(attachment.createdAt)}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <a
-                className={buttonClassName({ size: "sm", variant: "secondary" })}
-                href={`/api/minutes-attachments/${attachment.id}/download`}
-                rel="noopener noreferrer"
-                target="_blank"
+          {file ? (
+            <p className="mt-2 text-xs text-slate-600">
+              Valgt fil: <span className="font-medium">{file.name}</span>
+            </p>
+          ) : null}
+          {message ? (
+            <p className="mt-2 text-sm text-emerald-700" role="status">
+              {message}
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 text-sm text-red-700" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="mt-4 space-y-2">
+            {attachments.map((attachment) => (
+              <article
+                className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-1 py-3 first:border-t-0"
+                key={attachment.id}
               >
-                Åbn
-              </a>
-              <a
-                className={buttonClassName({ size: "sm", variant: "secondary" })}
-                href={`/api/minutes-attachments/${attachment.id}/download?download=1`}
-              >
-                Download
-              </a>
-              {canEdit ? (
-                <Button
-                  disabled={removingId === attachment.id}
-                  onClick={() => removeAttachment(attachment)}
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  {removingId === attachment.id ? "Fjerner..." : "Fjern"}
-                </Button>
-              ) : null}
-            </div>
-          </article>
-        ))}
-        {attachments.length === 0 ? (
-          <EmptyState compact title="Der er endnu ingen vedhæftninger." />
-        ) : null}
-      </div>
-      </section>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {attachment.fileName}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {attachment.mimeType} · Uploadet af{" "}
+                    {attachment.uploadedByName} ·{" "}
+                    {formatDateTime(attachment.createdAt)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`/api/minutes-attachments/${attachment.id}/download`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Åbn
+                  </a>
+                  <a
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`/api/minutes-attachments/${attachment.id}/download?download=1`}
+                  >
+                    Download
+                  </a>
+                  {canEdit ? (
+                    <Button
+                      disabled={removingId === attachment.id}
+                      onClick={() => removeAttachment(attachment)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {removingId === attachment.id ? "Fjerner..." : "Fjern"}
+                    </Button>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            {attachments.length === 0 ? (
+              <EmptyState compact title="Der er endnu ingen vedhæftninger." />
+            ) : null}
+          </div>
+        </section>
       </div>
     </details>
   );
@@ -329,10 +332,13 @@ export function MinutesApprovalPanel({
   async function downloadPdf() {
     setError(null);
     setMessage(null);
-    if (minutes?.status !== "approved") {
+    if (
+      !minutes ||
+      !["approved", "ready_for_approval"].includes(minutes.status)
+    ) {
       setShowDetails(true);
       setError(
-        "Referatet kan først downloades som PDF, når det er godkendt.",
+        "Referatet kan f\u00f8rst downloades som PDF, n\u00e5r det er sendt til godkendelse.",
       );
       return;
     }
@@ -348,9 +354,11 @@ export function MinutesApprovalPanel({
           code?: string;
         } | null;
         throw new Error(
-          result?.code === "MINUTES_NOT_APPROVED"
-            ? "Referatet kan først downloades som PDF, når det er godkendt."
-            : result?.error || "PDF-filen kunne ikke downloades. Prøv igen.",
+          result?.code === "MINUTES_NOT_APPROVED" ||
+            result?.code === "MINUTES_NOT_READY_FOR_PDF"
+            ? "Referatet kan f\u00f8rst downloades som PDF, n\u00e5r det er sendt til godkendelse."
+            : result?.error ||
+                "PDF-filen kunne ikke downloades. Pr\u00f8v igen.",
         );
       }
 
@@ -371,7 +379,7 @@ export function MinutesApprovalPanel({
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "PDF-filen kunne ikke downloades. Prøv igen.",
+          : "PDF-filen kunne ikke downloades. Pr\u00f8v igen.",
       );
     } finally {
       setDownloadingPdf(false);
@@ -384,15 +392,42 @@ export function MinutesApprovalPanel({
       : approvals.length > 0
         ? `${counts.approved} af ${approvals.length} har godkendt`
         : "Referatet er endnu ikke sendt til godkendelse";
+  const approvalStatusLabel =
+    !minutes || minutes.status === "draft"
+      ? "Kladde"
+      : minutes.status === "approved"
+        ? "Godkendt"
+        : counts.approved > 0 ||
+            counts.change_requested > 0 ||
+            counts.no_response > 0
+          ? "Delvist godkendt"
+          : "Sendt til godkendelse";
+  const missingApprovals = approvals.filter(
+    (approval) => approval.status === "pending",
+  );
 
   return (
     <section
+      id="minutes-approval"
       className={`overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Godkendelse</p>
-        <p className="mt-0.5 text-xs text-muted sm:text-sm">
+          <p className="mt-1">
+            <StatusBadge
+              tone={
+                approvalStatusLabel === "Godkendt"
+                  ? "success"
+                  : approvalStatusLabel === "Kladde"
+                    ? "neutral"
+                    : "warning"
+              }
+            >
+              {approvalStatusLabel}
+            </StatusBadge>
+          </p>
+          <p className="mt-0.5 text-xs text-muted sm:text-sm">
             {approvalSummary}
             {minutes?.approval_deadline
               ? ` · Frist ${formatDate(minutes.approval_deadline)}`
@@ -404,13 +439,23 @@ export function MinutesApprovalPanel({
               ønskes
             </p>
           ) : null}
+          {missingApprovals.length > 0 ? (
+            <p className="mt-0.5 text-xs text-muted">
+              Mangler:{" "}
+              {missingApprovals
+                .map((approval) => approval.memberName)
+                .join(", ")}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="text-right">
             <p className="hidden text-xs text-muted sm:block">
               {minutes?.status === "approved"
                 ? "Godkendt referat kan downloades som PDF"
-                : "PDF kan downloades når referatet er godkendt"}
+                : minutes?.status === "ready_for_approval"
+                  ? "Forel\u00f8bigt referat kan downloades som PDF"
+                  : "PDF kan downloades n\u00e5r referatet er sendt til godkendelse"}
             </p>
             <Button
               disabled={downloadingPdf}
@@ -437,182 +482,182 @@ export function MinutesApprovalPanel({
         className="border-t border-line px-3 pb-3 sm:px-4 sm:pb-4"
         hidden={!showDetails}
       >
-      <div className="hidden">
-        <div>
-          <p className="page-eyebrow">
-            Godkendelsesstatus
-          </p>
-          <h3 className="section-title mt-1">Referatgodkendelse</h3>
-          {minutes?.approval_deadline ? (
-            <p className="mt-2 text-sm text-slate-600">
-              Godkendelsesfrist: {formatDate(minutes.approval_deadline)}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-600">
-              Referatet er endnu ikke sendt til godkendelse.
-            </p>
-          )}
-        </div>
-        <Button
-          disabled={downloadingPdf}
-          onClick={downloadPdf}
-          type="button"
-        >
-          {downloadingPdf ? "Henter PDF..." : "Download PDF"}
-        </Button>
-      </div>
-
-      {approvals.length > 0 ? (
-        <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-control)] border border-line bg-line sm:grid-cols-4">
-          <div className="bg-surface px-3 py-2.5">
-            <dt className="text-xs text-muted">Afventer</dt>
-            <dd className="mt-0.5 text-lg font-semibold">{counts.pending}</dd>
-          </div>
-          <div className="bg-surface px-3 py-2.5">
-            <dt className="text-xs text-muted">Godkendt</dt>
-            <dd className="mt-0.5 text-lg font-semibold">{counts.approved}</dd>
-          </div>
-          <div className="bg-surface px-3 py-2.5">
-            <dt className="text-xs text-muted">Ændringer ønskes</dt>
-            <dd className="mt-0.5 text-lg font-semibold">
-              {counts.change_requested}
-            </dd>
-          </div>
-          <div className="bg-surface px-3 py-2.5">
-            <dt className="text-xs text-muted">Ingen respons</dt>
-            <dd className="mt-0.5 text-lg font-semibold">{counts.no_response}</dd>
-          </div>
-        </dl>
-      ) : null}
-
-      {message ? (
-        <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {message}
-        </p>
-      ) : null}
-      {error ? (
-        <p
-          className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
-      {canEdit && minutes ? (
-        <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-line pt-5">
+        <div className="hidden">
           <div>
-            <label className="label" htmlFor="approval-deadline">
-              Godkendelsesfrist
-            </label>
-            <Input
-              id="approval-deadline"
-              min={new Date().toISOString().slice(0, 10)}
-              onChange={(event) => setDeadline(event.target.value)}
-              type="date"
-              value={deadline}
-            />
+            <p className="page-eyebrow">Godkendelsesstatus</p>
+            <h3 className="section-title mt-1">Referatgodkendelse</h3>
+            {minutes?.approval_deadline ? (
+              <p className="mt-2 text-sm text-slate-600">
+                Godkendelsesfrist: {formatDate(minutes.approval_deadline)}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-slate-600">
+                Referatet er endnu ikke sendt til godkendelse.
+              </p>
+            )}
           </div>
-          <Button
-            disabled={working || !deadline}
-            onClick={() => act({ action: "send", deadline })}
-            type="button"
-          >
-            Send til godkendelse
+          <Button disabled={downloadingPdf} onClick={downloadPdf} type="button">
+            {downloadingPdf ? "Henter PDF..." : "Download PDF"}
           </Button>
-          {deadlineExpired && counts.pending > 0 ? (
-            <Button
-              disabled={working}
-              onClick={() => act({ action: "mark_no_response" })}
-              type="button"
-              variant="secondary"
-            >
-              Markér manglende svar som ingen respons
-            </Button>
-          ) : null}
         </div>
-      ) : null}
 
-      {canApprove && ownApproval ? (
-        <div className="mt-5 rounded-[var(--radius-control)] border border-accent/25 bg-mist/60 p-4">
-          <p className="font-semibold">Dit svar</p>
-          <p className="mt-1 text-sm text-slate-600">
-            Nuværende status:{" "}
-            {meetingMinuteApprovalStatusLabels[ownApproval.status]}
+        {approvals.length > 0 ? (
+          <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-control)] border border-line bg-line sm:grid-cols-4">
+            <div className="bg-surface px-3 py-2.5">
+              <dt className="text-xs text-muted">Afventer</dt>
+              <dd className="mt-0.5 text-lg font-semibold">{counts.pending}</dd>
+            </div>
+            <div className="bg-surface px-3 py-2.5">
+              <dt className="text-xs text-muted">Godkendt</dt>
+              <dd className="mt-0.5 text-lg font-semibold">
+                {counts.approved}
+              </dd>
+            </div>
+            <div className="bg-surface px-3 py-2.5">
+              <dt className="text-xs text-muted">Ændringer ønskes</dt>
+              <dd className="mt-0.5 text-lg font-semibold">
+                {counts.change_requested}
+              </dd>
+            </div>
+            <div className="bg-surface px-3 py-2.5">
+              <dt className="text-xs text-muted">Ingen respons</dt>
+              <dd className="mt-0.5 text-lg font-semibold">
+                {counts.no_response}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {message ? (
+          <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {message}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              disabled={working}
-              onClick={() => act({ action: "respond", status: "approved" })}
-              type="button"
-            >
-              Godkend referat
-            </Button>
-            <Button
-              disabled={working}
-              onClick={() => setShowChangeRequest((visible) => !visible)}
-              type="button"
-              variant="secondary"
-            >
-              Anmod om ændringer
-            </Button>
-          </div>
-          {showChangeRequest ? (
-            <div className="mt-4">
-              <label className="label" htmlFor="approval-comment">
-                Begrundelse for ændringer
+        ) : null}
+        {error ? (
+          <p
+            className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            {error}
+          </p>
+        ) : null}
+
+        {canEdit && minutes ? (
+          <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-line pt-5">
+            <div>
+              <label className="label" htmlFor="approval-deadline">
+                Godkendelsesfrist
               </label>
-              <Textarea
-                id="approval-comment"
-                onChange={(event) => setComment(event.target.value)}
-                placeholder="Beskriv hvilke ændringer der ønskes..."
-                value={comment}
+              <Input
+                id="approval-deadline"
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setDeadline(event.target.value)}
+                type="date"
+                value={deadline}
               />
+            </div>
+            <Button
+              disabled={working || !deadline}
+              onClick={() => act({ action: "send", deadline })}
+              type="button"
+            >
+              Send til godkendelse
+            </Button>
+            {deadlineExpired && counts.pending > 0 ? (
               <Button
-                className="mt-3"
-                disabled={working || !comment.trim()}
-                onClick={() =>
-                  act({
-                    action: "respond",
-                    status: "change_requested",
-                    comment,
-                  })
-                }
+                disabled={working}
+                onClick={() => act({ action: "mark_no_response" })}
+                type="button"
+                variant="secondary"
+              >
+                Markér manglende svar som ingen respons
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {canApprove && ownApproval ? (
+          <div className="mt-5 rounded-[var(--radius-control)] border border-accent/25 bg-mist/60 p-4">
+            <p className="font-semibold">Dit svar</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Nuværende status:{" "}
+              {meetingMinuteApprovalStatusLabels[ownApproval.status]}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                disabled={working}
+                onClick={() => act({ action: "respond", status: "approved" })}
                 type="button"
               >
-                Send ændringsønske
+                Godkend referat
+              </Button>
+              <Button
+                disabled={working}
+                onClick={() => setShowChangeRequest((visible) => !visible)}
+                type="button"
+                variant="secondary"
+              >
+                Anmod om ændringer
               </Button>
             </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="mt-5 divide-y divide-line border-y border-line">
-        {approvals.map((approval) => (
-          <article className="py-4" key={approval.id}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-semibold">{approval.memberName}</p>
-                <p className="text-xs text-slate-500">{approval.memberEmail}</p>
-              </div>
-              <StatusBadge tone={approvalStatusTones[approval.status]}>
-                {meetingMinuteApprovalStatusLabels[approval.status]}
-              </StatusBadge>
-            </div>
-            {approval.comment ? (
-              <div className="mt-3 rounded-lg border-l-4 border-warning/40 bg-warning-soft p-3 text-sm text-warning">
-                <p className="text-xs font-semibold uppercase tracking-wide">
-                  Kommentar
-                </p>
-                <p className="mt-1 whitespace-pre-wrap">{approval.comment}</p>
+            {showChangeRequest ? (
+              <div className="mt-4">
+                <label className="label" htmlFor="approval-comment">
+                  Begrundelse for ændringer
+                </label>
+                <Textarea
+                  id="approval-comment"
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Beskriv hvilke ændringer der ønskes..."
+                  value={comment}
+                />
+                <Button
+                  className="mt-3"
+                  disabled={working || !comment.trim()}
+                  onClick={() =>
+                    act({
+                      action: "respond",
+                      status: "change_requested",
+                      comment,
+                    })
+                  }
+                  type="button"
+                >
+                  Send ændringsønske
+                </Button>
               </div>
             ) : null}
-          </article>
-        ))}
-        {approvals.length === 0 ? (
-          <EmptyState compact title="Ingen medlemmer afventer godkendelse." />
+          </div>
         ) : null}
-      </div>
+
+        <div className="mt-5 divide-y divide-line border-y border-line">
+          {approvals.map((approval) => (
+            <article className="py-4" key={approval.id}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold">{approval.memberName}</p>
+                  <p className="text-xs text-slate-500">
+                    {approval.memberEmail}
+                  </p>
+                </div>
+                <StatusBadge tone={approvalStatusTones[approval.status]}>
+                  {meetingMinuteApprovalStatusLabels[approval.status]}
+                </StatusBadge>
+              </div>
+              {approval.comment ? (
+                <div className="mt-3 rounded-lg border-l-4 border-warning/40 bg-warning-soft p-3 text-sm text-warning">
+                  <p className="text-xs font-semibold uppercase tracking-wide">
+                    Kommentar
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap">{approval.comment}</p>
+                </div>
+              ) : null}
+            </article>
+          ))}
+          {approvals.length === 0 ? (
+            <EmptyState compact title="Ingen medlemmer afventer godkendelse." />
+          ) : null}
+        </div>
       </div>
     </section>
   );

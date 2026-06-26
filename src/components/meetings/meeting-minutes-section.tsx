@@ -32,6 +32,7 @@ import {
   DocumentPanel,
   EmptyState,
   Input,
+  Modal,
   Select,
   StatusBadge,
   type StatusTone,
@@ -53,6 +54,7 @@ import { firstRichTextToPlainText } from "@/lib/rich-text";
 import type { Database } from "@/types/database";
 import type {
   AgendaItemMinutes,
+  AgendaItemPrivateNote,
   DecisionView,
   MeetingMinutes,
   MeetingWithAgenda,
@@ -68,7 +70,7 @@ type AgendaMinutesStatus =
   Database["public"]["Enums"]["agenda_item_minutes_status"];
 type AgendaOccurrence = MeetingWithAgenda["agenda_item_occurrences"][number];
 type FieldErrors = Record<string, string[] | undefined>;
-type AgendaActionPanel = "followUp" | "more" | null;
+type AgendaActionPanel = "followUp" | "privateNote" | "more" | null;
 type AgendaMinutesDraft = {
   notes: string;
   decision: string;
@@ -76,6 +78,10 @@ type AgendaMinutesDraft = {
   responsibleUserId: string;
   deadline: string;
   status: AgendaMinutesStatus;
+};
+
+type AgendaPrivateNoteDraft = {
+  content: string;
 };
 
 type MeetingMinutesDraft = {
@@ -114,8 +120,7 @@ const agendaMinutesFieldGuidance = {
   follow_up: {
     notes: "Hvad blev der fulgt op på?",
     decision: "Skriv resultatet eller status på opfølgningen.",
-    followUp:
-      "Skriv hvad der stadig mangler, eller hvad der skal videreføres.",
+    followUp: "Skriv hvad der stadig mangler, eller hvad der skal videreføres.",
   },
 } as const;
 
@@ -148,12 +153,13 @@ const agendaStatusTones: Record<AgendaMinutesStatus, StatusTone> = {
 async function readResponse<T>(response: Response) {
   const result = (await response.json()) as T & {
     error?: string;
+    code?: string;
     fieldErrors?: FieldErrors;
   };
   if (!response.ok) {
     throw Object.assign(
       new Error(result.error || "Referatet kunne ikke gemmes."),
-      { fieldErrors: result.fieldErrors || {} },
+      { code: result.code, fieldErrors: result.fieldErrors || {} },
     );
   }
   return result;
@@ -172,6 +178,301 @@ function MinutesSectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AgendaPrivateNoteEditor({
+  organizationId,
+  userId,
+  committeeId,
+  meetingId,
+  agendaItemId,
+  initialPrivateNote,
+}: {
+  organizationId: string;
+  userId: string;
+  committeeId: string;
+  meetingId: string;
+  agendaItemId: string;
+  initialPrivateNote: AgendaItemPrivateNote | null;
+}) {
+  const [privateNote, setPrivateNote] = useState(initialPrivateNote);
+  const [content, setContent] = useState(initialPrivateNote?.content ?? "");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const privateNoteDraft: AgendaPrivateNoteDraft = { content };
+
+  async function persistPrivateNote(
+    draft: AgendaPrivateNoteDraft,
+    expectedUpdatedAt: string | null,
+  ) {
+    return readResponse<{
+      note: AgendaItemPrivateNote;
+      message: string;
+    }>(
+      await fetch(
+        `/api/meetings/${meetingId}/agenda-items/${agendaItemId}/private-note`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizationId,
+            committeeId,
+            expectedUpdatedAt,
+            content: draft.content,
+          }),
+        },
+      ),
+    );
+  }
+
+  const autosave = useOfflineAutosave({
+    storageKey: `agenda-private-note:v1:${userId}:${organizationId}:${committeeId}:${meetingId}:agenda:${agendaItemId}`,
+    data: privateNoteDraft,
+    serverUpdatedAt: privateNote?.updated_at ?? null,
+    enabled: true,
+    save: persistPrivateNote,
+    restore: (draft) => setContent(draft.content),
+    onSaved: (result) => {
+      setPrivateNote(result.note);
+      setMessage(result.message);
+      setError(null);
+    },
+    onError: (caughtError) => {
+      setMessage(null);
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Din interne note kunne ikke gemmes.",
+      );
+    },
+    getSavedServerUpdatedAt: (result) => result.note.updated_at,
+    debounceMs: 1200,
+  });
+
+  return (
+    <div
+      className="space-y-3 rounded-[var(--radius-control)] border border-line bg-subtle/40 p-3"
+      onBlurCapture={() => void autosave.flush()}
+    >
+      <div>
+        <p className="text-sm font-semibold">Intern note</p>
+        <p className="mt-1 text-xs text-muted">
+          Kun du kan se denne note. Den bliver ikke en del af referatet, PDF
+          eller mails.
+        </p>
+      </div>
+      <LocalDraftConflict
+        draft={autosave.conflict}
+        onKeepServer={autosave.keepServerVersion}
+        onRestore={autosave.restoreLocalDraft}
+      />
+      {error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {message}
+        </p>
+      ) : null}
+      <RichTextEditor
+        id={`private-note-${agendaItemId}`}
+        minHeightClass="min-h-24"
+        onChange={setContent}
+        value={content}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AutosaveStatusLine
+          errorMessage={autosave.errorMessage}
+          onRetry={() => void autosave.retry()}
+          status={autosave.status}
+        />
+        <Button
+          disabled={autosave.status === "saving"}
+          onClick={() => void autosave.saveNow()}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          {autosave.status === "saving" ? "Gemmer..." : "Gem intern note"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AgendaReorderModal({
+  organizationId,
+  committeeId,
+  meetingId,
+  occurrences,
+}: {
+  organizationId: string;
+  committeeId: string;
+  meetingId: string;
+  occurrences: AgendaOccurrence[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [orderedIds, setOrderedIds] = useState<string[]>(
+    occurrences.map((occurrence) => occurrence.id),
+  );
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const occurrencesById = new Map(
+    occurrences.map((occurrence) => [occurrence.id, occurrence]),
+  );
+  const orderedOccurrences = orderedIds.flatMap((occurrenceId) => {
+    const occurrence = occurrencesById.get(occurrenceId);
+    return occurrence ? [occurrence] : [];
+  });
+  const hasChanges = orderedIds.some(
+    (occurrenceId, index) => occurrenceId !== occurrences[index]?.id,
+  );
+
+  function openModal() {
+    setOrderedIds(occurrences.map((occurrence) => occurrence.id));
+    setDraggedId(null);
+    setError(null);
+    setOpen(true);
+  }
+
+  function closeModal() {
+    if (saving) return;
+    setOpen(false);
+    setDraggedId(null);
+    setError(null);
+  }
+
+  function moveDraggedOccurrence(targetId: string) {
+    if (!draggedId || draggedId === targetId) return;
+    setOrderedIds((currentIds) => {
+      const nextIds = currentIds.filter(
+        (occurrenceId) => occurrenceId !== draggedId,
+      );
+      const targetIndex = nextIds.indexOf(targetId);
+      if (targetIndex === -1) return currentIds;
+      nextIds.splice(targetIndex, 0, draggedId);
+      return nextIds;
+    });
+  }
+
+  async function saveOrder() {
+    setSaving(true);
+    setError(null);
+    try {
+      await readResponse<{ message: string }>(
+        await fetch(
+          `/api/meetings/${meetingId}/agenda-items/reorder?organizationId=${organizationId}&committeeId=${committeeId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ occurrenceIds: orderedIds }),
+          },
+        ),
+      );
+      setOpen(false);
+      router.refresh();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Rækkefølgen kunne ikke gemmes.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (occurrences.length < 2) return null;
+
+  return (
+    <>
+      <Button onClick={openModal} size="sm" type="button" variant="secondary">
+        Ændr rækkefølge
+      </Button>
+      <Modal
+        description="Træk punkterne til den ønskede rækkefølge. Ændringer gemmes først, når du vælger Gem rækkefølge."
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {error ? (
+              <p className="text-sm font-medium text-danger" role="alert">
+                {error}
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                PDF og punktnumre følger den gemte rækkefølge.
+              </p>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                disabled={saving}
+                onClick={closeModal}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                Annuller
+              </Button>
+              <Button
+                disabled={saving || !hasChanges}
+                onClick={() => void saveOrder()}
+                size="sm"
+                type="button"
+              >
+                {saving ? "Gemmer..." : "Gem rækkefølge"}
+              </Button>
+            </div>
+          </div>
+        }
+        maxWidth="lg"
+        onClose={closeModal}
+        open={open}
+        title="Ændr rækkefølge"
+      >
+        <div className="divide-y divide-line border-y border-line">
+          {orderedOccurrences.map((occurrence, index) => {
+            const item = occurrence.agenda_items;
+            return (
+              <div
+                className={clsx(
+                  "grid cursor-grab grid-cols-[2rem_minmax(0,1fr)] items-center gap-2 bg-surface px-2 py-2 text-sm transition active:cursor-grabbing",
+                  draggedId === occurrence.id && "bg-brand-soft/60",
+                )}
+                draggable
+                key={occurrence.id}
+                onDragEnd={() => setDraggedId(null)}
+                onDragOver={(event) => event.preventDefault()}
+                onDragStart={(event) => {
+                  setDraggedId(occurrence.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", occurrence.id);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  moveDraggedOccurrence(occurrence.id);
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex items-center gap-1 text-xs font-semibold text-muted"
+                >
+                  <span className="text-base leading-none">::</span>
+                  {index + 1}.
+                </span>
+                <span className="min-w-0 truncate font-medium text-ink">
+                  {item?.title ?? "Dagsordenspunkt uden titel"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 function AgendaMinutesCard({
   organizationId,
   userId,
@@ -179,7 +480,9 @@ function AgendaMinutesCard({
   meetingId,
   root,
   occurrence,
+  displayNumber,
   initialMinutes,
+  initialPrivateNote,
   responsiblePeople,
   previousMeetingMinutes,
   attachments,
@@ -200,7 +503,9 @@ function AgendaMinutesCard({
   meetingId: string;
   root: string;
   occurrence: AgendaOccurrence;
+  displayNumber: number;
   initialMinutes: AgendaItemMinutes | null;
+  initialPrivateNote: AgendaItemPrivateNote | null;
   responsiblePeople: MinutesResponsiblePerson[];
   previousMeetingMinutes: PreviousMeetingMinutesReference;
   attachments: MinuteAttachmentView[];
@@ -281,7 +586,10 @@ function AgendaMinutesCard({
     }
   }
 
-  async function persistDraft(draft: AgendaMinutesDraft) {
+  async function persistDraft(
+    draft: AgendaMinutesDraft,
+    expectedUpdatedAt: string | null,
+  ) {
     validateDraft(draft);
     return readResponse<{
       minutes: AgendaItemMinutes;
@@ -296,6 +604,7 @@ function AgendaMinutesCard({
             organizationId,
             committeeId,
             agendaItemOccurrenceId: occurrence.id,
+            expectedUpdatedAt,
             itemType,
             notes: draft.notes,
             decision: draft.decision,
@@ -346,6 +655,7 @@ function AgendaMinutesCard({
       setError(typedError.message);
       setFieldErrors(typedError.fieldErrors || {});
     },
+    getSavedServerUpdatedAt: (result) => result.minutes.updated_at,
   });
 
   useEffect(() => {
@@ -450,7 +760,7 @@ function AgendaMinutesCard({
         )}
       >
         <span className="font-document flex h-7 w-7 shrink-0 items-center justify-center border-r border-line text-base font-semibold text-brand">
-          {occurrence.position + 1}
+          {displayNumber}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -487,10 +797,7 @@ function AgendaMinutesCard({
               isAnyOtherBusiness && "italic",
             )}
           >
-            <AgendaItemDocumentTitle
-              title={item.title}
-              type={item.item_type}
-            />
+            <AgendaItemDocumentTitle title={item.title} type={item.item_type} />
           </h4>
           {item.objective || item.description ? (
             <p className="mt-1 line-clamp-1 text-xs text-muted">
@@ -519,7 +826,11 @@ function AgendaMinutesCard({
       ) : null}
 
       {canEdit ? (
-        <form className="space-y-3.5 border-t border-line p-3" onSubmit={save}>
+        <form
+          className="space-y-3.5 border-t border-line p-3"
+          onBlurCapture={() => void autosave.flush()}
+          onSubmit={save}
+        >
           <LocalDraftConflict
             draft={autosave.conflict}
             onKeepServer={autosave.keepServerVersion}
@@ -588,8 +899,8 @@ function AgendaMinutesCard({
                   Noter/referat
                 </label>
                 <p className="mt-0.5 text-xs text-muted">
-                  Skriv det væsentlige fra punktet her. Beslutninger og
-                  opgaver oprettes som handlinger bagefter.
+                  Skriv det væsentlige fra punktet her. Beslutninger og opgaver
+                  oprettes som handlinger bagefter.
                 </p>
               </div>
             </div>
@@ -604,17 +915,19 @@ function AgendaMinutesCard({
                 Skrivehjælp
               </summary>
               <div className="mt-1.5 space-y-1">
-            <p className="mt-1.5 text-xs leading-4 text-slate-500">
-              Skriv det væsentlige fra behandlingen af punktet. Brug feltet til
-              orienteringer, drøftelser, baggrund og vigtige pointer.
-            </p>
-            <p className="mt-1 text-xs font-medium leading-4 text-slate-600">
-              {fieldGuidance.notes}
-            </p>
+                <p className="mt-1.5 text-xs leading-4 text-slate-500">
+                  Skriv det væsentlige fra behandlingen af punktet. Brug feltet
+                  til orienteringer, drøftelser, baggrund og vigtige pointer.
+                </p>
+                <p className="mt-1 text-xs font-medium leading-4 text-slate-600">
+                  {fieldGuidance.notes}
+                </p>
               </div>
             </details>
             {fieldErrors.notes?.[0] ? (
-              <p className="mt-1 text-sm text-red-700">{fieldErrors.notes[0]}</p>
+              <p className="mt-1 text-sm text-red-700">
+                {fieldErrors.notes[0]}
+              </p>
             ) : null}
           </div>
           <div className="space-y-3 rounded-[var(--radius-panel)] bg-surface/75 p-2.5">
@@ -671,9 +984,23 @@ function AgendaMinutesCard({
                 meetingId={meetingId}
                 onApply={setNotes}
                 organizationId={organizationId}
+                prominent
                 source="agenda_item_minutes"
                 value={notes}
               />
+              <button
+                aria-expanded={activeActionPanel === "privateNote"}
+                className={clsx(
+                  "min-h-9 rounded-[var(--radius-control)] border px-3 py-2 text-sm font-semibold transition",
+                  activeActionPanel === "privateNote"
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-line bg-surface text-muted hover:bg-subtle hover:text-ink",
+                )}
+                onClick={() => toggleActionPanel("privateNote")}
+                type="button"
+              >
+                Interne noter
+              </button>
               <button
                 aria-expanded={activeActionPanel === "followUp"}
                 className={clsx(
@@ -701,6 +1028,18 @@ function AgendaMinutesCard({
                 Mere
               </button>
             </div>
+            {activeActionPanel === "privateNote" ? (
+              <div className="border-t border-line pt-3">
+                <AgendaPrivateNoteEditor
+                  agendaItemId={item.id}
+                  committeeId={committeeId}
+                  initialPrivateNote={initialPrivateNote}
+                  meetingId={meetingId}
+                  organizationId={organizationId}
+                  userId={userId}
+                />
+              </div>
+            ) : null}
             {activeActionPanel === "followUp" ? (
               <div className="space-y-3 border-t border-line pt-3">
                 <div className="grid gap-2 text-xs text-muted sm:grid-cols-3">
@@ -837,93 +1176,93 @@ function AgendaMinutesCard({
             ) : null}
             {activeActionPanel === "more" ? (
               <div className="space-y-3 border-t border-line pt-3">
-                  <div>
-                    <label
-                      className="label"
-                      htmlFor={`decision-${occurrence.id}`}
+                <div>
+                  <label
+                    className="label"
+                    htmlFor={`decision-${occurrence.id}`}
+                  >
+                    Gammelt beslutningsfelt
+                  </label>
+                  <RichTextEditor
+                    describedBy={
+                      fieldErrors.decision?.[0]
+                        ? `decision-${occurrence.id}-error`
+                        : undefined
+                    }
+                    id={`decision-${occurrence.id}`}
+                    invalid={Boolean(fieldErrors.decision?.[0])}
+                    minHeightClass="min-h-10"
+                    onChange={setDecision}
+                    value={decision}
+                  />
+                  <p className="mt-1 text-xs text-muted">
+                    Brug primært + Beslutning. Feltet bevares for ældre
+                    referater og intern struktur.
+                  </p>
+                  <MinutesAiAssistant
+                    agendaItemId={item.id}
+                    committeeId={committeeId}
+                    field="decision"
+                    meetingId={meetingId}
+                    onApply={setDecision}
+                    organizationId={organizationId}
+                    source="agenda_item_minutes"
+                    value={decision}
+                  />
+                  {fieldErrors.decision?.[0] ? (
+                    <p
+                      className="mt-1 text-sm text-red-700"
+                      id={`decision-${occurrence.id}-error`}
                     >
-                      Gammelt beslutningsfelt
-                    </label>
-                    <RichTextEditor
-                      describedBy={
-                        fieldErrors.decision?.[0]
-                          ? `decision-${occurrence.id}-error`
-                          : undefined
-                      }
-                      id={`decision-${occurrence.id}`}
-                      invalid={Boolean(fieldErrors.decision?.[0])}
-                      minHeightClass="min-h-10"
-                      onChange={setDecision}
-                      value={decision}
-                    />
-                    <p className="mt-1 text-xs text-muted">
-                      Brug primært + Beslutning. Feltet bevares for ældre
-                      referater og intern struktur.
+                      {fieldErrors.decision[0]}
                     </p>
-                    <MinutesAiAssistant
+                  ) : null}
+                </div>
+                {canEditTasks ? (
+                  <div className="border-t border-line pt-3">
+                    <p className="mb-2 text-xs text-muted">
+                      Analysér kun dette punkt med AI.
+                    </p>
+                    <AiTaskReviewModal
                       agendaItemId={item.id}
+                      categorySource={taskCategorySource}
                       committeeId={committeeId}
-                      field="decision"
+                      decisions={meetingDecisions}
+                      existingTasks={relatedTasks}
                       meetingId={meetingId}
-                      onApply={setDecision}
+                      minutesStatus={minutesStatus}
                       organizationId={organizationId}
+                      responsiblePeople={responsiblePeople}
                       source="agenda_item_minutes"
-                      value={decision}
+                      sourceLabel={`punktreferatet “${item.title}”`}
                     />
-                    {fieldErrors.decision?.[0] ? (
-                      <p
-                        className="mt-1 text-sm text-red-700"
-                        id={`decision-${occurrence.id}-error`}
-                      >
-                        {fieldErrors.decision[0]}
-                      </p>
-                    ) : null}
                   </div>
-                  {canEditTasks ? (
-                    <div className="border-t border-line pt-3">
-                      <p className="mb-2 text-xs text-muted">
-                        Analysér kun dette punkt med AI.
-                      </p>
-                      <AiTaskReviewModal
-                        agendaItemId={item.id}
-                        categorySource={taskCategorySource}
-                        committeeId={committeeId}
-                        decisions={meetingDecisions}
-                        existingTasks={relatedTasks}
-                        meetingId={meetingId}
-                        minutesStatus={minutesStatus}
-                        organizationId={organizationId}
-                        responsiblePeople={responsiblePeople}
-                        source="agenda_item_minutes"
-                        sourceLabel={`punktreferatet “${item.title}”`}
-                      />
-                    </div>
-                  ) : null}
-                  {canEdit ? (
-                    <div className="space-y-2 border-t border-line pt-3">
-                      <p className="text-xs text-muted">
-                        Fjern kun dette mødes forekomst, eller flyt hele
-                        dagsordenspunktet til papirkurven.
-                      </p>
-                      <TrashActionButton
-                        confirmMessage="Vil du fjerne punktet fra dette møde? Selve dagsordenspunktet og dets historik bevares."
-                        endpoint={`/api/agenda-item-occurrences/${occurrence.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
-                        label="Fjern punkt fra dette møde"
-                        pendingLabel="Fjerner..."
-                        variant="secondary"
-                      />
-                      <button
-                        className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
-                        disabled={deleting || autosave.status === "saving"}
-                        onClick={removeAgendaItem}
-                        type="button"
-                      >
-                        {deleting
-                          ? "Flytter..."
-                          : "Flyt dagsordenspunkt til papirkurv"}
-                      </button>
-                    </div>
-                  ) : null}
+                ) : null}
+                {canEdit ? (
+                  <div className="space-y-2 border-t border-line pt-3">
+                    <p className="text-xs text-muted">
+                      Fjern kun dette mødes forekomst, eller flyt hele
+                      dagsordenspunktet til papirkurven.
+                    </p>
+                    <TrashActionButton
+                      confirmMessage="Vil du fjerne punktet fra dette møde? Selve dagsordenspunktet og dets historik bevares."
+                      endpoint={`/api/agenda-item-occurrences/${occurrence.id}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                      label="Fjern punkt fra dette møde"
+                      pendingLabel="Fjerner..."
+                      variant="secondary"
+                    />
+                    <button
+                      className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
+                      disabled={deleting || autosave.status === "saving"}
+                      onClick={removeAgendaItem}
+                      type="button"
+                    >
+                      {deleting
+                        ? "Flytter..."
+                        : "Flyt dagsordenspunkt til papirkurv"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -1017,6 +1356,25 @@ function AgendaMinutesCard({
               </div>
             </details>
           ) : null}
+          <details className="group rounded-[var(--radius-control)] border border-line bg-subtle/30 md:col-span-2">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <span>Interne noter</span>
+              <span className="text-xs font-semibold text-brand">
+                <span className="group-open:hidden">Åbn</span>
+                <span className="hidden group-open:inline">Skjul</span>
+              </span>
+            </summary>
+            <div className="border-t border-line p-3">
+              <AgendaPrivateNoteEditor
+                agendaItemId={item.id}
+                committeeId={committeeId}
+                initialPrivateNote={initialPrivateNote}
+                meetingId={meetingId}
+                organizationId={organizationId}
+                userId={userId}
+              />
+            </div>
+          </details>
           <div className="md:col-span-2">
             <div className="flex flex-wrap items-center gap-3">
               <Link
@@ -1038,9 +1396,7 @@ function AgendaMinutesCard({
                     minutes?.notes,
                     minutes?.follow_up,
                   )}
-                  initialResponsibleUserId={
-                    minutes?.responsible_user_id ?? ""
-                  }
+                  initialResponsibleUserId={minutes?.responsible_user_id ?? ""}
                   initialTitle={item.title}
                   meetingDate={meetingDate}
                   meetingId={meetingId}
@@ -1237,6 +1593,7 @@ export function MeetingMinutesSection({
   occurrences,
   initialMeetingMinutes,
   initialAgendaItemMinutes,
+  privateAgendaItemNotes,
   responsiblePeople,
   previousMeetingMinutes,
   approvals,
@@ -1261,6 +1618,7 @@ export function MeetingMinutesSection({
   occurrences: AgendaOccurrence[];
   initialMeetingMinutes: MeetingMinutes | null;
   initialAgendaItemMinutes: AgendaItemMinutes[];
+  privateAgendaItemNotes: AgendaItemPrivateNote[];
   responsiblePeople: MinutesResponsiblePerson[];
   previousMeetingMinutes: PreviousMeetingMinutesReference;
   approvals: MeetingMinuteApprovalView[];
@@ -1313,7 +1671,10 @@ export function MeetingMinutesSection({
     status: meetingStatus,
   };
 
-  async function persistMeetingDraft(draft: MeetingMinutesDraft) {
+  async function persistMeetingDraft(
+    draft: MeetingMinutesDraft,
+    expectedUpdatedAt: string | null,
+  ) {
     return readResponse<{
       minutes: MeetingMinutes;
       message: string;
@@ -1324,6 +1685,7 @@ export function MeetingMinutesSection({
         body: JSON.stringify({
           organizationId,
           committeeId,
+          expectedUpdatedAt,
           minutesText: draft.minutesText,
           decisions: draft.decisions,
           internalNote: draft.internalNote || null,
@@ -1356,6 +1718,7 @@ export function MeetingMinutesSection({
       setError(typedError.message);
       setFieldErrors(typedError.fieldErrors || {});
     },
+    getSavedServerUpdatedAt: (result) => result.minutes.updated_at,
   });
 
   useEffect(() => {
@@ -1456,7 +1819,10 @@ export function MeetingMinutesSection({
           id="general-minutes-content"
         >
           {effectiveCanEdit ? (
-            <div className="space-y-3.5">
+            <div
+              className="space-y-3.5"
+              onBlurCapture={() => void meetingAutosave.flush()}
+            >
               <LocalDraftConflict
                 draft={meetingAutosave.conflict}
                 onKeepServer={meetingAutosave.keepServerVersion}
@@ -1641,8 +2007,8 @@ export function MeetingMinutesSection({
           {canEditTasks ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="text-xs text-muted">
-                Lad AI foreslå konkrete opgaver. Du gennemgår og redigerer
-                hvert forslag før oprettelse.
+                Lad AI foreslå konkrete opgaver. Du gennemgår og redigerer hvert
+                forslag før oprettelse.
               </p>
               <AiTaskReviewModal
                 categorySource={taskCategorySource}
@@ -1685,19 +2051,27 @@ export function MeetingMinutesSection({
       <section aria-labelledby="agenda-minutes-heading" className="order-1">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-2.5">
           <div>
-          <p className="page-eyebrow">Dagsorden</p>
-          <h3 className="section-title mt-1" id="agenda-minutes-heading">
-            Referat pr. dagsordenspunkt
-          </h3>
-          <p className="metadata mt-1">
-            Åbn et punkt for at læse eller redigere dets referat.
-          </p>
+            <p className="page-eyebrow">Dagsorden</p>
+            <h3 className="section-title mt-1" id="agenda-minutes-heading">
+              Referat pr. dagsordenspunkt
+            </h3>
+            <p className="metadata mt-1">
+              Åbn et punkt for at læse eller redigere dets referat.
+            </p>
           </div>
           <div className="flex flex-wrap items-end justify-end gap-3">
             <span className="text-sm font-medium text-muted">
               {occurrences.length}{" "}
               {occurrences.length === 1 ? "punkt" : "punkter"}
             </span>
+            {effectiveCanEdit && occurrences.length > 1 ? (
+              <AgendaReorderModal
+                committeeId={committeeId}
+                meetingId={meetingId}
+                occurrences={occurrences}
+                organizationId={organizationId}
+              />
+            ) : null}
             {canEditTasks ? (
               <AiTaskReviewModal
                 categorySource={taskCategorySource}
@@ -1716,7 +2090,7 @@ export function MeetingMinutesSection({
           </div>
         </div>
         <div className="mt-3 space-y-2">
-          {occurrences.map((occurrence) => (
+          {occurrences.map((occurrence, index) => (
             <AgendaMinutesCard
               canEdit={effectiveCanEdit}
               canEditDecisions={canEditDecisions}
@@ -1735,6 +2109,12 @@ export function MeetingMinutesSection({
                     candidate.agenda_item_id === occurrence.agenda_item_id,
                 ) ?? null
               }
+              initialPrivateNote={
+                privateAgendaItemNotes.find(
+                  (candidate) =>
+                    candidate.agenda_item_id === occurrence.agenda_item_id,
+                ) ?? null
+              }
               key={occurrence.id}
               meetingId={meetingId}
               meetingDate={meetingDate}
@@ -1742,6 +2122,7 @@ export function MeetingMinutesSection({
               meetingTasks={meetingTasks}
               minutesStatus={meetingStatus}
               occurrence={occurrence}
+              displayNumber={index + 1}
               organizationId={organizationId}
               previousMeetingMinutes={previousMeetingMinutes}
               attachments={agendaItemAttachments.filter(

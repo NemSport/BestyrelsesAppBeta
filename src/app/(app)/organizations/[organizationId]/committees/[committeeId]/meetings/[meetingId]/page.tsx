@@ -58,11 +58,13 @@ function isActiveDecision(decision: {
   );
 }
 
-function hasAgendaMinutesText(minutes: {
-  notes?: string | null;
-  decision?: string | null;
-  follow_up?: string | null;
-} | null) {
+function hasAgendaMinutesText(
+  minutes: {
+    notes?: string | null;
+    decision?: string | null;
+    follow_up?: string | null;
+  } | null,
+) {
   if (!minutes) return false;
   return Boolean(
     firstRichTextToPlainText(
@@ -91,14 +93,29 @@ function MeetingWorkOverview({
   const items = [
     { label: "Dagsordenspunkter", value: agendaItemCount },
     { label: "Overført hertil", value: incomingTransferCount },
-    { label: "Mangler referat", value: missingMinutesCount, attention: missingMinutesCount > 0 },
-    { label: "Beslutning/opfølgning", value: actionPointCount, attention: actionPointCount > 0 },
+    {
+      label: "Mangler referat",
+      value: missingMinutesCount,
+      attention: missingMinutesCount > 0,
+    },
+    {
+      label: "Beslutning/opfølgning",
+      value: actionPointCount,
+      attention: actionPointCount > 0,
+    },
     { label: "Aktive beslutninger", value: openDecisionCount },
-    { label: "Åbne opgaver", value: openTaskCount, attention: openTaskCount > 0 },
+    {
+      label: "Åbne opgaver",
+      value: openTaskCount,
+      attention: openTaskCount > 0,
+    },
   ];
 
   return (
-    <section className="mt-5 border-y border-line py-3" aria-label="Mødeoverblik">
+    <section
+      className="mt-5 border-y border-line py-3"
+      aria-label="Mødeoverblik"
+    >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="page-eyebrow">Mødeoverblik</p>
@@ -115,9 +132,13 @@ function MeetingWorkOverview({
           >
             <dt className="text-xs font-medium text-muted">{item.label}</dt>
             <dd className="mt-1 flex items-baseline gap-2">
-              <span className="text-xl font-semibold text-ink">{item.value}</span>
+              <span className="text-xl font-semibold text-ink">
+                {item.value}
+              </span>
               {item.attention ? (
-                <span className="text-xs font-semibold text-warning">Kræver blik</span>
+                <span className="text-xs font-semibold text-warning">
+                  Kræver blik
+                </span>
               ) : null}
             </dd>
           </div>
@@ -140,7 +161,9 @@ function IncomingTransferredItems({
 }) {
   const transfersByTargetAgendaItem = new Map(
     incomingTransfers.flatMap((transfer) =>
-      transfer.targetAgendaItemId ? [[transfer.targetAgendaItemId, transfer] as const] : [],
+      transfer.targetAgendaItemId
+        ? [[transfer.targetAgendaItemId, transfer] as const]
+        : [],
     ),
   );
   const transferredOccurrences = occurrences.filter((occurrence) => {
@@ -261,30 +284,30 @@ export default async function MeetingPage({
     taskContext,
     memberDirectory,
   ] = await Promise.all([
-      minutesService.get(organizationId, committeeId, meetingId),
-      minutesService.getPreviousMeetingReference(
-        organizationId,
-        committeeId,
-        meetingId,
-      ),
-      new TransferredAgendaItemService(db).listForMeeting(
-        organizationId,
-        committeeId,
-        meetingId,
-      ),
-      meetingService.listAttendees(organizationId, committeeId, meetingId),
-      new DecisionService(db).getMeetingContext(
-        organizationId,
-        committeeId,
-        meetingId,
-      ),
-      new TaskService(db).getMeetingContext(
-        organizationId,
-        committeeId,
-        meetingId,
-      ),
-      new OrganizationMemberRepository(db).listMembers(organizationId),
-    ]);
+    minutesService.get(organizationId, committeeId, meetingId),
+    minutesService.getPreviousMeetingReference(
+      organizationId,
+      committeeId,
+      meetingId,
+    ),
+    new TransferredAgendaItemService(db).listForMeeting(
+      organizationId,
+      committeeId,
+      meetingId,
+    ),
+    meetingService.listAttendees(organizationId, committeeId, meetingId),
+    new DecisionService(db).getMeetingContext(
+      organizationId,
+      committeeId,
+      meetingId,
+    ),
+    new TaskService(db).getMeetingContext(
+      organizationId,
+      committeeId,
+      meetingId,
+    ),
+    new OrganizationMemberRepository(db).listMembers(organizationId),
+  ]);
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const organizationRole = context.organizationMembership.role;
   const committeeRole = context.membership?.role ?? null;
@@ -316,8 +339,7 @@ export default async function MeetingPage({
     (occurrence) =>
       occurrence.agenda_items?.parent_id ||
       transferredAgendaItems.incomingItems.some(
-        (transfer) =>
-          transfer.targetAgendaItemId === occurrence.agenda_item_id,
+        (transfer) => transfer.targetAgendaItemId === occurrence.agenda_item_id,
       ),
   ).length;
   const missingMinutesCount = meeting.agenda_item_occurrences.filter(
@@ -349,8 +371,8 @@ export default async function MeetingPage({
       );
     },
   ).length;
-  const openDecisionCount = decisionContext.decisions.filter(isActiveDecision)
-    .length;
+  const openDecisionCount =
+    decisionContext.decisions.filter(isActiveDecision).length;
   const openTaskCount = taskContext.tasks.filter((task) =>
     isOpenTask(task.status, task.archived_at),
   ).length;
@@ -420,58 +442,58 @@ export default async function MeetingPage({
       <PageSection
         actions={
           <div className="flex flex-wrap gap-2">
-            {(decisionContext.canEdit || taskContext.canEdit) ? (
+            {decisionContext.canEdit || taskContext.canEdit ? (
               <ActionMenu className="order-2">
-            {decisionContext.canEdit ? (
-              <DecisionCreateModal
-                agendaItems={meeting.agenda_item_occurrences.flatMap(
-                  (occurrence) =>
-                    occurrence.agenda_items
-                      ? [
-                          {
-                            id: occurrence.agenda_items.id,
-                            title: occurrence.agenda_items.title,
-                          },
-                        ]
-                      : [],
-                )}
-                categorySource={decisionContext.categorySource}
-                committeeId={committeeId}
-                meetingDate={meeting.starts_at}
-                meetingId={meetingId}
-                organizationId={organizationId}
-                responsiblePeople={decisionContext.responsiblePeople}
-              />
-            ) : null}
-            {taskContext.canEdit ? (
-              <TaskCreateModal
-                agendaItems={meeting.agenda_item_occurrences.flatMap(
-                  (occurrence) =>
-                    occurrence.agenda_items
-                      ? [
-                          {
-                            id: occurrence.agenda_items.id,
-                            title: occurrence.agenda_items.title,
-                          },
-                        ]
-                      : [],
-                )}
-                categorySource={taskContext.categorySource}
-                committeeId={committeeId}
-                initialMeetingId={meetingId}
-                instanceId="meeting-task"
-                meetings={[
-                  {
-                    id: meeting.id,
-                    title: meeting.title,
-                    starts_at: meeting.starts_at,
-                  },
-                ]}
-                organizationId={organizationId}
-                responsiblePeople={taskContext.responsiblePeople}
-                triggerLabel="Opret opgave"
-              />
-            ) : null}
+                {decisionContext.canEdit ? (
+                  <DecisionCreateModal
+                    agendaItems={meeting.agenda_item_occurrences.flatMap(
+                      (occurrence) =>
+                        occurrence.agenda_items
+                          ? [
+                              {
+                                id: occurrence.agenda_items.id,
+                                title: occurrence.agenda_items.title,
+                              },
+                            ]
+                          : [],
+                    )}
+                    categorySource={decisionContext.categorySource}
+                    committeeId={committeeId}
+                    meetingDate={meeting.starts_at}
+                    meetingId={meetingId}
+                    organizationId={organizationId}
+                    responsiblePeople={decisionContext.responsiblePeople}
+                  />
+                ) : null}
+                {taskContext.canEdit ? (
+                  <TaskCreateModal
+                    agendaItems={meeting.agenda_item_occurrences.flatMap(
+                      (occurrence) =>
+                        occurrence.agenda_items
+                          ? [
+                              {
+                                id: occurrence.agenda_items.id,
+                                title: occurrence.agenda_items.title,
+                              },
+                            ]
+                          : [],
+                    )}
+                    categorySource={taskContext.categorySource}
+                    committeeId={committeeId}
+                    initialMeetingId={meetingId}
+                    instanceId="meeting-task"
+                    meetings={[
+                      {
+                        id: meeting.id,
+                        title: meeting.title,
+                        starts_at: meeting.starts_at,
+                      },
+                    ]}
+                    organizationId={organizationId}
+                    responsiblePeople={taskContext.responsiblePeople}
+                    triggerLabel="Opret opgave"
+                  />
+                ) : null}
               </ActionMenu>
             ) : null}
             {canEditMeeting ? (
@@ -507,7 +529,8 @@ export default async function MeetingPage({
           occurrences={meeting.agenda_item_occurrences}
           root={root}
         />
-        {decisionContext.decisions.length > 0 || taskContext.tasks.length > 0 ? (
+        {decisionContext.decisions.length > 0 ||
+        taskContext.tasks.length > 0 ? (
           <details className="group mb-4 rounded-[var(--radius-panel)] border border-line bg-subtle/20">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-4">
               <span>
@@ -571,6 +594,7 @@ export default async function MeetingPage({
           initialAgendaItemMinutes={minutes.agendaItemMinutes}
           initialMeetingMinutes={minutes.meetingMinutes}
           meetingAttachments={minutes.meetingAttachments}
+          privateAgendaItemNotes={minutes.privateAgendaItemNotes}
           meetingId={meetingId}
           meetingDate={meeting.starts_at}
           meetingDecisions={decisionContext.decisions}

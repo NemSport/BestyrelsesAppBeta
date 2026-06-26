@@ -9,7 +9,9 @@ export class AgendaItemRepository {
   async listByCommittee(committeeId: string) {
     const { data, error } = await this.db
       .from("agenda_items")
-      .select("*, agenda_item_occurrences(*, meetings(id, title, starts_at, status))")
+      .select(
+        "*, agenda_item_occurrences(*, meetings(id, title, starts_at, status))",
+      )
       .eq("committee_id", committeeId)
       .is("deleted_at", null)
       .order("updated_at", { ascending: false });
@@ -33,7 +35,9 @@ export class AgendaItemRepository {
   async findWithHistory(agendaItemId: string) {
     const { data, error } = await this.db
       .from("agenda_items")
-      .select("*, agenda_item_occurrences(*, meetings(id, title, starts_at, status))")
+      .select(
+        "*, agenda_item_occurrences(*, meetings(id, title, starts_at, status))",
+      )
       .eq("id", agendaItemId)
       .is("deleted_at", null)
       .order("created_at", {
@@ -151,6 +155,30 @@ export class AgendaItemRepository {
     const { data, error } = await this.db.rpc(
       "restore_agenda_item_occurrence",
       { target_occurrence_id: occurrenceId },
+    );
+    if (error) throw error;
+    return data;
+  }
+
+  async reorderOccurrence(occurrenceId: string, direction: "up" | "down") {
+    const { data, error } = await this.db.rpc(
+      "reorder_agenda_item_occurrence",
+      {
+        target_occurrence_id: occurrenceId,
+        move_direction: direction,
+      },
+    );
+    if (error) throw error;
+    return data;
+  }
+
+  async reorderMeetingOccurrences(meetingId: string, occurrenceIds: string[]) {
+    const { data, error } = await this.db.rpc(
+      "reorder_agenda_item_occurrences",
+      {
+        target_meeting_id: meetingId,
+        ordered_occurrence_ids: occurrenceIds,
+      },
     );
     if (error) throw error;
     return data;

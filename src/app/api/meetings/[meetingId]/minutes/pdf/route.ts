@@ -17,22 +17,23 @@ export async function GET(
     const organizationId = searchParams.get("organizationId") ?? "";
     const committeeId = searchParams.get("committeeId") ?? "";
     const db = await createClient();
-    const data = await new MeetingMinutesService(db).getApprovedPdfData(
+    const service = new MeetingMinutesService(db);
+    const data = await service.getApprovedPdfData(
       organizationId,
       committeeId,
       meetingId,
+      { allowReadyForApproval: true },
     );
     const branding = await new OrganizationBrandingService(db).getPdfBranding(
       data.organization.id,
       data.organization.name,
     );
-    const attachmentsForPdf =
-      await new MeetingMinutesService(db).getPdfAttachments(
-        organizationId,
-        committeeId,
-        meetingId,
-        { includeMeetingAttachments: true },
-      );
+    const attachmentsForPdf = await service.getPdfAttachments(
+      organizationId,
+      committeeId,
+      meetingId,
+      { includeMeetingAttachments: true },
+    );
     const pdf = await generateMeetingMinutesPdf({
       meeting: data.meeting,
       committeeName: data.committee.name,

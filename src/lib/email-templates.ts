@@ -4,6 +4,8 @@ import {
   getAgendaItemTypeLabel,
 } from "@/lib/localization";
 import { richTextToPlainText } from "@/lib/rich-text";
+import { taskStatusLabels } from "@/lib/tasks";
+import { formatDanishDate } from "@/lib/date-format";
 import type { AgendaItem, Meeting } from "@/types/domain";
 
 type TemplateResult = {
@@ -14,6 +16,15 @@ type TemplateResult = {
 
 type BrandingInput = {
   branding?: EmailTemplateBranding;
+};
+
+export type MinutesApprovalEmailTask = {
+  id: string;
+  title: string;
+  deadline: string | null;
+  status: keyof typeof taskStatusLabels;
+  relation: string | null;
+  url: string;
 };
 
 function escapeHtml(value: string) {
@@ -181,6 +192,110 @@ export function approvedMinutesEmailTemplate({
       committeeName,
       branding,
       content: `<p><a href="${escapeHtml(url)}" style="color:${escapeHtml(linkColor)};font-weight:700">Ã…bn referat</a></p>`,
+    }),
+  };
+}
+
+function taskText(task: MinutesApprovalEmailTask) {
+  return [
+    `- ${task.title}`,
+    task.deadline ? `  Deadline: ${formatDanishDate(task.deadline)}` : "",
+    `  Status: ${taskStatusLabels[task.status] ?? task.status}`,
+    task.relation ? `  Relation: ${task.relation}` : "",
+    `  Link: ${task.url}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function taskHtml(task: MinutesApprovalEmailTask, linkColor: string) {
+  return [
+    `<li style="margin-bottom:12px">`,
+    `<a href="${escapeHtml(task.url)}" style="color:${escapeHtml(linkColor)};font-weight:700">${escapeHtml(task.title)}</a>`,
+    `<div style="font-size:13px;color:#657282;margin-top:3px">`,
+    task.deadline
+      ? `Deadline: ${escapeHtml(formatDanishDate(task.deadline))} · `
+      : "",
+    `Status: ${escapeHtml(taskStatusLabels[task.status] ?? task.status)}`,
+    task.relation ? ` · ${escapeHtml(task.relation)}` : "",
+    `</div>`,
+    `</li>`,
+  ].join("");
+}
+
+export function meetingMinutesApprovalEmailTemplate({
+  organizationName,
+  committeeName,
+  meetingTitle,
+  meetingDate,
+  approvalUrl,
+  recipientName,
+  personalTasks,
+  unassignedTasks,
+  branding,
+}: {
+  organizationName: string;
+  committeeName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  approvalUrl: string;
+  recipientName: string;
+  personalTasks: MinutesApprovalEmailTask[];
+  unassignedTasks: MinutesApprovalEmailTask[];
+} & BrandingInput): TemplateResult {
+  const linkColor = branding?.primaryColor ?? "#0f4c81";
+  const personalText = personalTasks.length
+    ? personalTasks.map(taskText).join("\n\n")
+    : "Du har ingen opgaver tildelt fra dette møde.";
+  const unassignedText = unassignedTasks.length
+    ? unassignedTasks.map(taskText).join("\n\n")
+    : "Der er ingen opgaver uden ansvarlig.";
+  const personalHtml = personalTasks.length
+    ? `<ul style="padding-left:20px;margin:8px 0 0">${personalTasks
+        .map((task) => taskHtml(task, linkColor))
+        .join("")}</ul>`
+    : `<p style="color:#657282;margin:8px 0 0">Du har ingen opgaver tildelt fra dette møde.</p>`;
+  const unassignedHtml = unassignedTasks.length
+    ? `<ul style="padding-left:20px;margin:8px 0 0">${unassignedTasks
+        .map((task) => taskHtml(task, linkColor))
+        .join("")}</ul>`
+    : `<p style="color:#657282;margin:8px 0 0">Der er ingen opgaver uden ansvarlig.</p>`;
+
+  return {
+    subject: `Referat klar til godkendelse: ${meetingTitle}`,
+    text: [
+      `${organizationName} · ${committeeName}`,
+      "",
+      `Hej ${recipientName}`,
+      "",
+      `Referatet for ${meetingTitle} (${meetingDate}) er klar til godkendelse.`,
+      "PDF-referatet er vedhæftet denne mail.",
+      "",
+      `Åbn referat og godkend: ${approvalUrl}`,
+      "",
+      "Dine opgaver",
+      personalText,
+      "",
+      "Opgaver uden ansvarlig",
+      unassignedText,
+      "",
+      "Sendt fra BestyrelsesApp.",
+    ].join("\n"),
+    html: shell({
+      title: `Referat klar til godkendelse`,
+      intro: `Referatet for ${meetingTitle} er klar til godkendelse. PDF-referatet er vedhæftet.`,
+      organizationName,
+      committeeName,
+      branding,
+      content: [
+        `<p><strong>Møde:</strong> ${escapeHtml(meetingTitle)}<br />`,
+        `<strong>Dato:</strong> ${escapeHtml(meetingDate)}</p>`,
+        `<p><a href="${escapeHtml(approvalUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn referat og godkend</a></p>`,
+        `<h2 style="font-size:17px;margin-top:22px">Dine opgaver</h2>`,
+        personalHtml,
+        `<h2 style="font-size:17px;margin-top:22px">Opgaver uden ansvarlig</h2>`,
+        unassignedHtml,
+      ].join(""),
     }),
   };
 }
