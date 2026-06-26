@@ -95,28 +95,28 @@ function MeetingRows({
 }
 
 function findNearbyMeetings(meetings: CommitteeMeeting[], selectedDate: string) {
-  const selected = new Date(`${selectedDate}T12:00:00+01:00`).getTime();
   const sameDay = meetings.filter((meeting) => dateKey(meeting.starts_at) === selectedDate);
-  const before = [...meetings]
-    .filter((meeting) => new Date(meeting.starts_at).getTime() < selected)
-    .sort(
-      (a, b) =>
-        new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime(),
-    )
+  const before = meetings
+    .filter((meeting) => dateKey(meeting.starts_at) < selectedDate)
     .slice(0, 2);
   const after = [...meetings]
-    .filter((meeting) => new Date(meeting.starts_at).getTime() >= selected)
-    .sort(
-      (a, b) =>
-        new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
-    )
+    .filter((meeting) => dateKey(meeting.starts_at) > selectedDate)
+    .reverse()
     .slice(0, 2);
   const seen = new Set<string>();
-  return [...sameDay, ...before, ...after].filter((meeting) => {
-    if (seen.has(meeting.id)) return false;
-    seen.add(meeting.id);
-    return true;
-  });
+  return [...sameDay, ...before, ...after]
+    .sort(
+      (left, right) =>
+        new Date(right.starts_at).getTime() -
+          new Date(left.starts_at).getTime() ||
+        new Date(right.created_at).getTime() -
+          new Date(left.created_at).getTime(),
+    )
+    .filter((meeting) => {
+      if (seen.has(meeting.id)) return false;
+      seen.add(meeting.id);
+      return true;
+    });
 }
 
 export default async function MeetingsPage({
@@ -136,9 +136,15 @@ export default async function MeetingsPage({
     committeeId,
     user.id,
   );
-  const meetings = await new MeetingService(db).list(
+  const meetings = [...await new MeetingService(db).list(
     organizationId,
     committeeId,
+  )].sort(
+    (left, right) =>
+      new Date(right.starts_at).getTime() -
+        new Date(left.starts_at).getTime() ||
+      new Date(right.created_at).getTime() -
+        new Date(left.created_at).getTime(),
   );
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const canEdit = canManageCommittee(

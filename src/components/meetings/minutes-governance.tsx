@@ -57,6 +57,7 @@ export function MinuteAttachments({
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +92,34 @@ export function MinuteAttachments({
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function removeAttachment(attachment: MinuteAttachmentView) {
+    const confirmed = window.confirm(
+      `Er du sikker på, at du vil fjerne bilaget "${attachment.fileName}"? Det fjernes også fra kommende PDF-eksporter.`,
+    );
+    if (!confirmed) return;
+
+    setRemovingId(attachment.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await readResponse<{ message: string }>(
+        await fetch(`/api/minutes-attachments/${attachment.id}/download`, {
+          method: "DELETE",
+        }),
+      );
+      setMessage(result.message);
+      router.refresh();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Bilaget kunne ikke fjernes.",
+      );
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -192,6 +221,17 @@ export function MinuteAttachments({
               >
                 Download
               </a>
+              {canEdit ? (
+                <Button
+                  disabled={removingId === attachment.id}
+                  onClick={() => removeAttachment(attachment)}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  {removingId === attachment.id ? "Fjerner..." : "Fjern"}
+                </Button>
+              ) : null}
             </div>
           </article>
         ))}

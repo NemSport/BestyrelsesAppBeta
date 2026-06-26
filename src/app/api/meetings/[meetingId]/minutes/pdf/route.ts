@@ -13,16 +13,26 @@ export async function GET(
 ) {
   try {
     const { searchParams } = new URL(request.url);
+    const meetingId = (await params).meetingId;
+    const organizationId = searchParams.get("organizationId") ?? "";
+    const committeeId = searchParams.get("committeeId") ?? "";
     const db = await createClient();
     const data = await new MeetingMinutesService(db).getApprovedPdfData(
-      searchParams.get("organizationId") ?? "",
-      searchParams.get("committeeId") ?? "",
-      (await params).meetingId,
+      organizationId,
+      committeeId,
+      meetingId,
     );
     const branding = await new OrganizationBrandingService(db).getPdfBranding(
       data.organization.id,
       data.organization.name,
     );
+    const attachmentsForPdf =
+      await new MeetingMinutesService(db).getPdfAttachments(
+        organizationId,
+        committeeId,
+        meetingId,
+        { includeMeetingAttachments: true },
+      );
     const pdf = await generateMeetingMinutesPdf({
       meeting: data.meeting,
       committeeName: data.committee.name,
@@ -40,6 +50,7 @@ export async function GET(
         )
         .map((attendee) => attendee.user_id),
       branding,
+      attachmentsForPdf,
     });
     const fileName = `referat-${formatDanishDateKey(data.meeting.starts_at)}.pdf`;
 

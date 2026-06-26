@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const items = [
   { label: "Overblik", suffix: "" },
+  { label: "Udvalg", suffix: "/committees" },
   { label: "Møder", suffix: "/meetings" },
   { label: "Beslutninger", suffix: "/decisions" },
   { label: "Opgaver", match: "exact", suffix: "/tasks" },
@@ -31,6 +32,14 @@ export function OrganizationNav({
     const suffix = item.suffix;
     const href = `${root}${suffix}`;
     if (suffix === "") return pathname === root;
+    if (item.label === "Udvalg") {
+      if (pathname === href || pathname === `${href}/new`) return true;
+      if (!pathname.startsWith(`${href}/`)) return false;
+      return (
+        !pathname.includes("/meetings") &&
+        !pathname.includes("/annual-wheel")
+      );
+    }
     if (item.label === "Møder") {
       return (
         pathname === href ||

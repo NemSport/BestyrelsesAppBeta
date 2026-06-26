@@ -244,6 +244,24 @@ export class OrganizationService {
     };
   }
 
+  async listMeetings(organizationId: string) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationMember(organizationId, user.id);
+
+    const [committees, meetings] = await Promise.all([
+      this.committees.listByOrganization(organizationId),
+      this.meetings.listByOrganization(organizationId),
+    ]);
+    const committeesById = new Map(
+      committees.map((committee) => [committee.id, committee]),
+    );
+
+    return meetings.flatMap((meeting) => {
+      const committee = committeesById.get(meeting.committee_id);
+      return committee ? [{ ...meeting, committeeName: committee.name }] : [];
+    });
+  }
+
   async update(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = organizationUpdateSchema.parse(input);

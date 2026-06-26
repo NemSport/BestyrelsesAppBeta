@@ -125,6 +125,22 @@ export class MeetingMinutesGovernanceRepository {
     return agendaResult.data;
   }
 
+  async deleteMeetingAttachment(attachmentId: string) {
+    const { error } = await this.db
+      .from("meeting_minute_attachments")
+      .delete()
+      .eq("id", attachmentId);
+    if (error) throw error;
+  }
+
+  async deleteAgendaItemAttachment(attachmentId: string) {
+    const { error } = await this.db
+      .from("agenda_item_minute_attachments")
+      .delete()
+      .eq("id", attachmentId);
+    if (error) throw error;
+  }
+
   async upload(storagePath: string, file: File) {
     const { error } = await this.db.storage
       .from(attachmentBucket)
@@ -155,5 +171,13 @@ export class MeetingMinutesGovernanceRepository {
       );
     if (error) throw error;
     return data.signedUrl;
+  }
+
+  async download(storagePath: string) {
+    const { data, error } = await this.db.storage
+      .from(attachmentBucket)
+      .download(storagePath);
+    if (error) throw error;
+    return new Uint8Array(await data.arrayBuffer());
   }
 }

@@ -20,3 +20,20 @@ export async function GET(
     return apiError(error);
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ attachmentId: string }> },
+) {
+  try {
+    const result = await new MeetingMinutesService(
+      await createClient(),
+    ).removeAttachment((await params).attachmentId);
+    return NextResponse.json({
+      attachment: result,
+      message: "Bilaget er fjernet.",
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}

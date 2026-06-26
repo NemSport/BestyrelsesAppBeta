@@ -6,6 +6,7 @@ import {
 import {
   createPdfReport,
   formatPdfDate,
+  type PdfReportAttachment,
   type PdfReportBranding,
 } from "@/lib/pdf-report";
 import { richTextToPdfBlocks } from "@/lib/rich-text";
@@ -25,6 +26,7 @@ type PdfInput = {
   agendaItemMinutes: AgendaItemMinutes[];
   approvals: MeetingMinuteApprovalView[];
   attachments: MinuteAttachmentView[];
+  attachmentsForPdf?: PdfReportAttachment[];
   responsiblePeople: MinutesResponsiblePerson[];
   attendeeIds: string[];
   branding?: PdfReportBranding;
@@ -186,6 +188,8 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     input.attachments,
     "Ingen vedhæftninger.",
   );
+
+  await report.addAttachments(input.attachmentsForPdf ?? []);
 
   return report.save();
 }

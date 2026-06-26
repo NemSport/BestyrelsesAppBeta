@@ -646,6 +646,12 @@ color variables, active navigation treatment, and font. Uploaded logos remain
 available for the branding editor preview, PDF exports, and email templates,
 but they are not used as large decorative sidebar elements.
 
+The V1 sidebar font bugfix makes that font contract explicit in the shared
+sidebar styles. Organization name, current-page metadata, eyebrow text, and
+navigation links now resolve directly from the organization workspace
+`--font-sans` variable instead of depending only on inherited grid typography.
+Colors, density, layout, and active navigation treatment are unchanged.
+
 Update 12 makes the meeting page more usable as a live meeting workspace. The
 meeting header is followed by a compact meeting overview with agenda count,
 incoming transferred points, missing minutes, decision/follow-up indicators,
@@ -769,6 +775,19 @@ items include public purpose and background text when present, rendered through
 the rich-text/plain-text helpers so HTML is not exposed and internal notes stay
 out of the invitation/export.
 
+V1.1 PDF polish adds appendix handling for agenda and minutes PDFs. Authorized
+exports can append supported agenda/minutes attachments after the main report
+under a clear `Bilag` section, numbered by agenda order and point reference.
+PDF, PNG, and JPG/JPEG attachments are embedded best-effort through the shared
+PDF foundation; unsupported files such as Word, Excel, PowerPoint, and WEBP are
+listed as non-embedded appendices instead of being rendered. A failed
+attachment download or embed logs server-side context and must not fail the
+whole PDF export.
+Managers can remove meeting and agenda-item attachments from the same
+attachment surface after confirmation. Removal deletes the attachment metadata
+and best-effort removes the unique Storage object, so removed attachments no
+longer appear in agenda or minutes PDFs.
+
 Referattekst uses document prose styling in both the web UI and PDF exports.
 Sanitized TipTap content is rendered with constrained line length, generous
 line height, paragraph spacing, readable lists, and clearer subpoints. PDF
@@ -819,6 +838,12 @@ smaller summaries and editor surfaces, and governance, attachment, PDF,
 transfer, decision, task, and AI actions remain available through the existing
 components.
 
+The V1 meeting-list bugfix adds the compact date finder to both organization
+and committee meeting routes. Complete RLS-visible meeting lists are sorted
+deterministically by meeting time and creation time with newest first, while a
+selected Danish calendar date shows exact and nearby meetings without changing
+meeting creation, minutes, or export workflows.
+
 Phase 7.5 applies the same compact admin direction to Decisions and Tasks.
 The decision register, Task View, My Tasks, task cards, filters, edit modals,
 and task comments use quieter module surfaces, tighter metadata, and clearer
@@ -863,6 +888,13 @@ handlinger" menu pattern, while primary creation actions remain visible. The
 committee overview, meeting detail, agenda-item detail, organization edit, and
 organization dashboard adopt the same action hierarchy without changing the
 underlying routes, services, permissions, or mutation behavior.
+
+The V1 committee navigation fix adds `Udvalg` as a first-class organization
+sidebar destination. `/organizations/[organizationId]/committees` lists the
+RLS-visible committees, while administrators can use the visible `Nyt udvalg`
+action and the existing validated committee service/RPC flow to create one.
+Deep meeting and Annual Wheel routes retain their existing sidebar active
+states.
 
 Phase 7R.4 makes the Annual Wheel easier to scan without changing its read
 model. Month cards and the month detail view now order meetings first, separate

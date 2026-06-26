@@ -42,6 +42,15 @@ export type PdfReportBranding = {
   fontFamily?: string;
 };
 
+export type PdfReportAttachment = {
+  appendixNumber: number;
+  pointLabel: string;
+  fileName: string;
+  mimeType: string;
+  bytes?: Uint8Array | null;
+  embedType: "pdf" | "png" | "jpg" | "unsupported";
+};
+
 type PdfReportOptions = {
   documentType: string;
   title: string;
@@ -895,6 +904,132 @@ export async function createPdfReport(options: PdfReportOptions) {
     y -= 8;
   };
 
+  const addAttachmentTitle = (attachment: PdfReportAttachment) => {
+    const title = `Bilag ${attachment.appendixNumber} - ${attachment.pointLabel}: ${attachment.fileName}`;
+    ensureSpace(46);
+    page.drawRectangle({
+      x: margin,
+      y: y - 25,
+      width: contentWidth,
+      height: 32,
+      color: reportPalette.brandSoft,
+      borderColor: reportPalette.line,
+      borderWidth: 0.35,
+    });
+    page.drawRectangle({
+      x: margin,
+      y: y - 25,
+      width: 3,
+      height: 32,
+      color: reportPalette.brand,
+    });
+    const titleLines = clampLines(wrapText(title, bold, 10.2, contentWidth - 22), 2);
+    let titleY = y - 6;
+    for (const line of titleLines) {
+      page.drawText(line, {
+        x: margin + 12,
+        y: titleY,
+        font: bold,
+        size: 10.2,
+        color: reportPalette.ink,
+      });
+      titleY -= 11.5;
+    }
+    y -= 42;
+  };
+
+  const addImageAttachment = async (attachment: PdfReportAttachment) => {
+    if (!attachment.bytes) {
+      addParagraph("Bilaget kunne ikke hentes og er derfor ikke indlejret.");
+      return;
+    }
+
+    let image: PDFImage;
+    try {
+      image =
+        attachment.embedType === "png"
+          ? await document.embedPng(attachment.bytes)
+          : await document.embedJpg(attachment.bytes);
+    } catch (error) {
+      console.warn("[pdf-report] Billedbilag kunne ikke indlejres.", {
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      addParagraph("Billedet kunne ikke indlejres i PDF'en.");
+      return;
+    }
+
+    const availableHeight = y - (footerHeight + margin);
+    const maxHeight = Math.max(120, availableHeight);
+    const scale = Math.min(contentWidth / image.width, maxHeight / image.height, 1);
+    const width = image.width * scale;
+    const height = image.height * scale;
+    if (height > availableHeight) {
+      newPage();
+      addAttachmentTitle(attachment);
+    }
+    page.drawImage(image, {
+      x: margin + (contentWidth - width) / 2,
+      y: y - height,
+      width,
+      height,
+    });
+    y -= height + 16;
+  };
+
+  const addPdfAttachment = async (
+    attachment: PdfReportAttachment,
+    hasMoreAttachments: boolean,
+  ) => {
+    if (!attachment.bytes) {
+      addParagraph("PDF-bilaget kunne ikke hentes og er derfor ikke indlejret.");
+      return;
+    }
+
+    try {
+      const source = await PDFDocument.load(attachment.bytes, {
+        ignoreEncryption: true,
+      });
+      const copiedPages = await document.copyPages(source, source.getPageIndices());
+      addParagraph("PDF-bilaget er indsat på de følgende sider.");
+      for (const copiedPage of copiedPages) {
+        document.addPage(copiedPage);
+      }
+      pageNumber = document.getPageCount();
+      if (hasMoreAttachments) {
+        newPage();
+      }
+    } catch (error) {
+      console.warn("[pdf-report] PDF-bilag kunne ikke indlejres.", {
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      addParagraph("PDF-bilaget kunne ikke indlejres. Se den originale fil i appen.");
+    }
+  };
+
+  const addAttachments = async (attachments: PdfReportAttachment[]) => {
+    if (!attachments.length) return;
+    addSection("Bilag");
+
+    for (const [index, attachment] of attachments.entries()) {
+      addAttachmentTitle(attachment);
+      if (attachment.embedType === "pdf") {
+        await addPdfAttachment(attachment, index < attachments.length - 1);
+        continue;
+      }
+      if (attachment.embedType === "png" || attachment.embedType === "jpg") {
+        await addImageAttachment(attachment);
+        continue;
+      }
+      addParagraph(
+        "Bilaget er ikke indlejret, fordi filtypen ikke understøttes i PDF-eksporten.",
+      );
+    }
+  };
+
   const save = async () => {
     if (!finalized) {
       drawFooter();
@@ -919,6 +1054,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     addSection,
     addSubsection,
     addTable,
+    addAttachments,
     addText,
     save,
   };

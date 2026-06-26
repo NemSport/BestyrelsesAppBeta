@@ -280,6 +280,21 @@ Agenda exports include public agenda-item objective and description when
 present, converted from sanitized rich text rather than emitted as raw HTML;
 internal notes remain excluded.
 
+Agenda and minutes PDF exports may append meeting-minute attachments after the
+main report. The route/service layer reuses the existing meeting and committee
+authorization before reading attachment metadata and downloading Storage
+objects through the authenticated Supabase client. `pdf-report` owns appendix
+rendering: PDF pages and PNG/JPG images are embedded best-effort, while
+unsupported formats such as Word, Excel, PowerPoint, and WEBP are listed as
+non-embedded appendices. Attachment failures are logged with meeting,
+agenda-item, attachment, file-name, and MIME context, but never fail the whole
+export or expose internal notes/private fields.
+Attachment removal uses the same authenticated attachment boundary. Committee
+managers may delete the metadata row for a meeting or agenda-item attachment
+in their scope, after which the unique Storage object is removed best-effort.
+Since PDF exports read current attachment metadata, deleted attachments are not
+included in later agenda or minutes PDFs.
+
 Referat prose uses a shared rendering contract. On the website,
 `RichTextContent` applies document-style max-width, line height, paragraph
 spacing, heading spacing, and list spacing to sanitized TipTap HTML. In PDFs,
@@ -333,6 +348,13 @@ decisions/tasks, and AI entry points are visually tightened while keeping the
 same component boundaries, autosave hooks, API routes, and authorization
 checks.
 
+Organization and committee meeting indexes use complete meeting collections
+from their existing authorized service boundaries. Both indexes sort by
+`starts_at desc, created_at desc` and expose a compact date query that compares
+Europe/Copenhagen date keys, returning meetings on the selected date plus
+nearby context. This remains a read-only presentation pattern over existing
+RLS-scoped meeting data.
+
 Phase 7.5 applies the compact module pattern to decisions and tasks. Decision
 and task filters use shared module filter surfaces, registers use lightweight
 module cards instead of heavy divided panels, Task View columns are denser,
@@ -379,6 +401,14 @@ secondary, administrative, and destructive actions move into the shared
 `ActionMenu`/"Flere handlinger" pattern. This is a UI composition contract
 only: feature components still call the same modals, API routes, services, and
 RLS-protected mutations.
+
+The organization workspace exposes committees through the dedicated
+`/organizations/[organizationId]/committees` route and the `Udvalg` sidebar
+item. The index is a server-rendered presentation over `CommitteeService.list`;
+creation remains an administrator-only POST through the existing organization
+committee API, service authorization, and `create_committee_with_chair` RPC.
+The sidebar matcher excludes deep meeting and Annual Wheel paths so those
+modules preserve their own active navigation state.
 
 Phase 7R.4 applies the same selective-disclosure principle to the Annual Wheel.
 The shared annual-wheel component still consumes the existing RLS-scoped

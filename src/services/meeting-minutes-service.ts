@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
 import { getAgendaItemTransferRule } from "@/lib/agenda-item-minutes";
+import type { PdfReportAttachment } from "@/lib/pdf-report";
 import { sanitizeRichText } from "@/lib/rich-text";
 import {
   agendaItemMinutesInputSchema,
@@ -20,6 +21,32 @@ import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
 import type { MeetingWithAgenda } from "@/types/domain";
+
+type RawMinuteAttachment =
+  | Database["public"]["Tables"]["meeting_minute_attachments"]["Row"]
+  | Database["public"]["Tables"]["agenda_item_minute_attachments"]["Row"];
+
+function attachmentEmbedType(fileName: string, mimeType: string) {
+  const normalizedMimeType = mimeType.toLowerCase();
+  const normalizedName = fileName.toLowerCase();
+  if (
+    normalizedMimeType === "application/pdf" ||
+    normalizedName.endsWith(".pdf")
+  ) {
+    return "pdf" as const;
+  }
+  if (normalizedMimeType === "image/png" || normalizedName.endsWith(".png")) {
+    return "png" as const;
+  }
+  if (
+    ["image/jpeg", "image/jpg", "image/pjpeg"].includes(normalizedMimeType) ||
+    normalizedName.endsWith(".jpg") ||
+    normalizedName.endsWith(".jpeg")
+  ) {
+    return "jpg" as const;
+  }
+  return "unsupported" as const;
+}
 
 export class MeetingMinutesService {
   private readonly minutes: MeetingMinutesRepository;
@@ -580,6 +607,152 @@ export class MeetingMinutesService {
       ),
       fileName: attachment.file_name,
     };
+  }
+
+  async removeAttachment(attachmentId: string) {
+    const user = await this.auth.requireUser();
+    const attachment = await this.governance.findAttachment(attachmentId);
+    if (!attachment) throw new NotFoundError("Vedhæftningen");
+
+    await this.authorization.requireCommitteeManager(
+      attachment.organization_id,
+      attachment.committee_id,
+      user.id,
+    );
+    await this.requireMeeting(
+      attachment.organization_id,
+      attachment.committee_id,
+      attachment.meeting_id,
+    );
+
+    if ("agenda_item_id" in attachment) {
+      const meeting = await this.requireMeeting(
+        attachment.organization_id,
+        attachment.committee_id,
+        attachment.meeting_id,
+      );
+      this.requireOccurrence(meeting, attachment.agenda_item_id, null);
+      await this.governance.deleteAgendaItemAttachment(attachment.id);
+    } else {
+      await this.governance.deleteMeetingAttachment(attachment.id);
+    }
+
+    await this.governance.removeUpload(attachment.storage_path).catch((error) => {
+      console.warn("[meeting-minutes] Bilag blev fjernet fra databasen, men storage-filen kunne ikke slettes.", {
+        meetingId: attachment.meeting_id,
+        agendaItemId: "agenda_item_id" in attachment ? attachment.agenda_item_id : null,
+        attachmentId: attachment.id,
+        fileName: attachment.file_name,
+        mimeType: attachment.mime_type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return { id: attachment.id, fileName: attachment.file_name };
+  }
+
+  async getPdfAttachments(
+    organizationId: string,
+    committeeId: string,
+    meetingId: string,
+    options: { includeMeetingAttachments?: boolean } = {},
+  ): Promise<PdfReportAttachment[]> {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
+    const meeting = await this.requireMeeting(
+      organizationId,
+      committeeId,
+      meetingId,
+    );
+    const meetingMinutes = await this.minutes.findMeetingMinutes(meetingId);
+    const [meetingAttachments, agendaItemAttachments] = await Promise.all([
+      options.includeMeetingAttachments && meetingMinutes
+        ? this.governance.listMeetingAttachments(meetingMinutes.id)
+        : Promise.resolve([]),
+      this.governance.listAgendaItemAttachments(meetingId),
+    ]);
+
+    const occurrenceByAgendaItemId = new Map(
+      meeting.agenda_item_occurrences.map((occurrence) => [
+        occurrence.agenda_item_id,
+        occurrence,
+      ]),
+    );
+
+    const ordered = [
+      ...meetingAttachments.map((attachment) => ({
+        attachment,
+        sortPosition: -1,
+        pointLabel: "Møde",
+        agendaItemId: null as string | null,
+      })),
+      ...agendaItemAttachments
+        .filter((attachment) =>
+          occurrenceByAgendaItemId.has(attachment.agenda_item_id),
+        )
+        .map((attachment) => {
+          const occurrence = occurrenceByAgendaItemId.get(
+            attachment.agenda_item_id,
+          )!;
+          return {
+            attachment,
+            sortPosition: occurrence.position,
+            pointLabel: `Punkt ${occurrence.position + 1}`,
+            agendaItemId: attachment.agenda_item_id,
+          };
+        }),
+    ].sort((left, right) => {
+      if (left.sortPosition !== right.sortPosition) {
+        return left.sortPosition - right.sortPosition;
+      }
+      const nameComparison = left.attachment.file_name.localeCompare(
+        right.attachment.file_name,
+        "da-DK",
+      );
+      if (nameComparison !== 0) return nameComparison;
+      return left.attachment.created_at.localeCompare(
+        right.attachment.created_at,
+      );
+    });
+
+    const result: PdfReportAttachment[] = [];
+    for (const entry of ordered) {
+      const attachment = entry.attachment as RawMinuteAttachment;
+      const embedType = attachmentEmbedType(
+        attachment.file_name,
+        attachment.mime_type,
+      );
+      let bytes: Uint8Array | null = null;
+      if (embedType !== "unsupported") {
+        try {
+          bytes = await this.governance.download(attachment.storage_path);
+        } catch (error) {
+          console.warn("[meeting-minutes] Bilag kunne ikke hentes til PDF.", {
+            meetingId,
+            agendaItemId: entry.agendaItemId,
+            attachmentId: attachment.id,
+            fileName: attachment.file_name,
+            mimeType: attachment.mime_type,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      result.push({
+        appendixNumber: result.length + 1,
+        pointLabel: entry.pointLabel,
+        fileName: attachment.file_name,
+        mimeType: attachment.mime_type,
+        bytes,
+        embedType,
+      });
+    }
+
+    return result;
   }
 
   async getApprovedPdfData(

@@ -6,6 +6,7 @@ import { formatDanishDateKey } from "@/lib/date-format";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
+import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 import { MeetingService } from "@/services/meeting-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
 
@@ -34,11 +35,18 @@ export async function GET(
       organizationContext.organization.id,
       organizationContext.organization.name,
     );
+    const attachments = await new MeetingMinutesService(db).getPdfAttachments(
+      organizationId,
+      committeeId,
+      meetingId,
+      { includeMeetingAttachments: false },
+    );
     const pdf = await generateMeetingAgendaPdf({
       meeting,
       committeeName: committeeContext.committee.name,
       organizationName: organizationContext.organization.name,
       branding,
+      attachments,
     });
     const fileName = `dagsorden-${formatDanishDateKey(meeting.starts_at)}.pdf`;
 

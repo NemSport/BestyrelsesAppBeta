@@ -19,6 +19,7 @@ export class MeetingRepository {
       .eq("committee_id", committeeId)
       .is("deleted_at", null)
       .order("starts_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("position", {
         referencedTable: "agenda_item_occurrences",
         ascending: true,
@@ -36,6 +37,7 @@ export class MeetingRepository {
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("starts_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("position", {
         referencedTable: "agenda_item_occurrences",
         ascending: true,

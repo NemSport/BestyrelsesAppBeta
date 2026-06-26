@@ -290,6 +290,7 @@ a {
       linear-gradient(180deg, rgb(var(--brand-primary) / 0.98), rgb(var(--brand-primary-hover) / 0.98)),
       rgb(var(--brand-primary));
     color: rgb(var(--brand-on-primary));
+    font-family: var(--font-sans);
     padding: 0.8rem 0.65rem;
   }
 
@@ -301,14 +302,17 @@ a {
 
   .org-sidebar-kicker {
     color: rgb(var(--brand-on-primary-muted));
+    font-family: inherit;
   }
 
   .org-sidebar-title {
     color: rgb(var(--brand-on-primary-active));
+    font-family: inherit;
   }
 
   .org-sidebar-current {
     color: rgb(var(--brand-on-primary-muted));
+    font-family: inherit;
   }
 
   .org-sidebar-current span {
@@ -328,6 +332,7 @@ a {
     border: 1px solid transparent;
     padding: 0.42rem 0.6rem;
     color: rgb(var(--brand-on-primary-muted));
+    font-family: inherit;
     font-size: 0.8125rem;
     font-weight: 550;
     line-height: 1.25rem;

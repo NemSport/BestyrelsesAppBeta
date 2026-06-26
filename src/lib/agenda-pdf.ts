@@ -3,6 +3,7 @@ import {
   createPdfReport,
   formatPdfDate,
   type PdfReportBranding,
+  type PdfReportAttachment,
 } from "@/lib/pdf-report";
 import { richTextToPdfBlocks } from "@/lib/rich-text";
 import type { MeetingWithAgenda } from "@/types/domain";
@@ -12,6 +13,7 @@ type PdfInput = {
   committeeName: string;
   organizationName: string;
   branding?: PdfReportBranding;
+  attachments?: PdfReportAttachment[];
 };
 
 export async function generateMeetingAgendaPdf(input: PdfInput) {
@@ -27,14 +29,14 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     meta: [
       { label: "Organisation", value: input.organizationName },
       { label: "Udvalg", value: input.committeeName },
-      { label: "MÃ¸dedato", value: meetingDate },
+      { label: "Mødedato", value: meetingDate },
       { label: "Sted", value: input.meeting.location ?? "" },
       { label: "Status", value: meetingStatusLabels[input.meeting.status] },
     ],
   });
 
   if (input.meeting.description) {
-    report.addSection("MÃ¸debeskrivelse");
+    report.addSection("Mødebeskrivelse");
     report.addProse(richTextToPdfBlocks(input.meeting.description));
   }
 
@@ -67,6 +69,8 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
       report.addProse(descriptionBlocks);
     }
   }
+
+  await report.addAttachments(input.attachments ?? []);
 
   return report.save();
 }
