@@ -595,6 +595,7 @@ export default async function MeetingPage({
           initialMeetingMinutes={minutes.meetingMinutes}
           meetingAttachments={minutes.meetingAttachments}
           privateAgendaItemNotes={minutes.privateAgendaItemNotes}
+          referentLock={minutes.referentLock}
           meetingId={meetingId}
           meetingDate={meeting.starts_at}
           meetingDecisions={decisionContext.decisions}

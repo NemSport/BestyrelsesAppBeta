@@ -385,6 +385,16 @@ export const agendaItemPrivateNoteInputSchema = z.object({
   content: optionalMinutesText("Intern note", 50000),
 });
 
+export const meetingMinutesReferentActionSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  action: z.enum(["claim", "heartbeat", "release"], {
+    required_error: "Vælg en referenthandling",
+    invalid_type_error: "Referenthandlingen er ugyldig",
+  }),
+});
+
 export const sendMinutesForApprovalSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,

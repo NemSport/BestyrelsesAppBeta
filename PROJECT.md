@@ -144,6 +144,10 @@ full order in one operation. Reorder runs through a scoped PostgreSQL function
 that locks the meeting occurrences, validates that every active occurrence is
 included exactly once, normalizes positions, and persists the new order for UI,
 email, and PDF consumers.
+Update 13.5 highlights `+ Opfølgning` when point notes or status indicate that
+the topic continues to the next meeting. The prompt is advisory only: it never
+creates follow-up text, tasks, transfer intents, or agenda items without the
+user opening the follow-up action and saving the existing minutes flow.
 
 ### Meeting Minutes
 
@@ -815,6 +819,20 @@ member can keep one user-scoped note per meeting agenda point; the note uses
 the same local-draft autosave pattern as minutes, but is stored in a separate
 RLS-protected table and is never included in official minutes, PDFs, emails,
 AI context, or other members' views.
+
+Update 13.9 adds a single active meeting referent lock for official minutes.
+Managers can take or release the referent role on the meeting page; while the
+lock is active, only that user may save the general meeting minutes and
+agenda-item minutes. The lock is enforced server-side, renewed by heartbeat,
+and expires if the browser disappears. Private agenda-item notes remain
+user-owned and continue to save independently of the official minutes lock.
+
+Update 13.10 makes the minutes PDF a more complete printed work document.
+Each agenda point now keeps the ordinary minutes text under `Referat` and, when
+data exists, adds separate print-friendly `Beslutninger` and `Opfølgninger`
+tables. The PDF combines legacy point decision/follow-up fields with linked
+decisions and tasks for the same agenda point, while private notes remain
+excluded.
 
 Update 13.4 expands minutes approval into a handlingsorienteret notification
 flow. When a manager sends minutes for approval, the server prepares one email

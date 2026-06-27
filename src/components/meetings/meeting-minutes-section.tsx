@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
@@ -57,6 +57,7 @@ import type {
   AgendaItemPrivateNote,
   DecisionView,
   MeetingMinutes,
+  MeetingMinutesReferentLock,
   MeetingWithAgenda,
   MinutesResponsiblePerson,
   MeetingMinuteApprovalView,
@@ -89,6 +90,14 @@ type MeetingMinutesDraft = {
   decisions: string;
   internalNote: string;
   status: MinutesStatus;
+};
+
+type MeetingMinutesReferentLockView = MeetingMinutesReferentLock & {
+  memberName: string;
+  memberEmail: string;
+  isCurrentUser: boolean;
+  isExpired: boolean;
+  claimed?: boolean;
 };
 
 function isNewerServerVersion(
@@ -169,6 +178,179 @@ function EmptyValue() {
   return <span className="text-slate-500">Ikke angivet</span>;
 }
 
+function isActiveReferentLock(
+  lock: MeetingMinutesReferentLockView | null,
+  now = Date.now(),
+) {
+  return Boolean(lock && !lock.isExpired && Date.parse(lock.expires_at) > now);
+}
+
+function ReferentRoleControl({
+  organizationId,
+  committeeId,
+  meetingId,
+  canEdit,
+  referentLock,
+  onChange,
+}: {
+  organizationId: string;
+  committeeId: string;
+  meetingId: string;
+  canEdit: boolean;
+  referentLock: MeetingMinutesReferentLockView | null;
+  onChange: (lock: MeetingMinutesReferentLockView | null) => void;
+}) {
+  const [pendingAction, setPendingAction] = useState<
+    "claim" | "release" | null
+  >(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const activeLock = isActiveReferentLock(referentLock, now)
+    ? referentLock
+    : null;
+  const isCurrentReferent = Boolean(activeLock?.isCurrentUser);
+
+  const sendReferentAction = useCallback(async (action: "claim" | "heartbeat" | "release") => {
+    const result = await readResponse<{
+      lock: MeetingMinutesReferentLockView | null;
+      claimed: boolean;
+      message: string;
+    }>(
+      await fetch(`/api/meetings/${meetingId}/minutes/referent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          committeeId,
+          action,
+        }),
+      }),
+    );
+    onChange(result.lock);
+    return result;
+  }, [committeeId, meetingId, onChange, organizationId]);
+
+  async function handleAction(action: "claim" | "release") {
+    setPendingAction(action);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await sendReferentAction(action);
+      setMessage(result.message);
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Referentrollen kunne ikke opdateres.",
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!referentLock) return;
+
+    const interval = window.setInterval(() => setNow(Date.now()), 5000);
+    return () => window.clearInterval(interval);
+  }, [referentLock]);
+
+  useEffect(() => {
+    if (!canEdit || !isCurrentReferent) return;
+
+    let cancelled = false;
+    async function heartbeat() {
+      try {
+        const result = await sendReferentAction("heartbeat");
+        if (!cancelled) {
+          onChange(result.lock);
+          setError(null);
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          onChange(null);
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Referentrollen kunne ikke fornyes.",
+          );
+        }
+      }
+    }
+
+    const interval = window.setInterval(() => void heartbeat(), 30000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void heartbeat();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [canEdit, isCurrentReferent, onChange, sendReferentAction]);
+
+  return (
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface px-3 py-2.5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="page-eyebrow">Referent</p>
+          <p className="mt-1 text-sm font-semibold text-ink">
+            {activeLock
+              ? activeLock.isCurrentUser
+                ? "Du er referent"
+                : `${activeLock.memberName} er referent`
+              : "Ingen aktiv referent"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {activeLock
+              ? activeLock.isCurrentUser
+                ? "Du kan redigere de officielle referatfelter. Andre kan stadig skrive interne noter og oprette opgaver."
+                : `Referatfelter er låst, fordi ${activeLock.memberName} er referent. Du kan stadig skrive interne noter og oprette opgaver.`
+              : "Tag rollen som referent for at skrive i de officielle referatfelter."}
+          </p>
+        </div>
+        {canEdit ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {isCurrentReferent ? (
+              <Button
+                disabled={pendingAction !== null}
+                onClick={() => void handleAction("release")}
+                type="button"
+                variant="secondary"
+              >
+                {pendingAction === "release"
+                  ? "Afgiver..."
+                  : "Afgiv referentrolle"}
+              </Button>
+            ) : (
+              <Button
+                disabled={pendingAction !== null || Boolean(activeLock)}
+                onClick={() => void handleAction("claim")}
+                type="button"
+              >
+                {pendingAction === "claim"
+                  ? "Tager rolle..."
+                  : "Tag rolle som referent"}
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </div>
+      {message ? (
+        <p className="mt-2 text-xs font-medium text-success">{message}</p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-danger">{error}</p>
+      ) : null}
+    </section>
+  );
+}
+
 function MinutesSectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
@@ -176,6 +358,23 @@ function MinutesSectionLabel({ children }: { children: React.ReactNode }) {
       <span className="h-px flex-1 bg-line" />
     </div>
   );
+}
+
+function normalizeContinuationText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "oe")
+    .replace(/å/g, "aa")
+    .replace(/é/g, "e")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function mentionsContinuationToNextMeeting(...values: string[]) {
+  const text = normalizeContinuationText(firstRichTextToPlainText(...values));
+  return /\bforts?aette(?:r)? til naeste moede\b/.test(text);
 }
 
 function AgendaPrivateNoteEditor({
@@ -735,6 +934,13 @@ function AgendaMinutesCard({
   const relatedTasks = meetingTasks.filter(
     (relatedTask) => relatedTask.agenda_item_id === item.id,
   );
+  const followUpText = firstRichTextToPlainText(followUp).trim();
+  const hasFollowUpCaptured = Boolean(followUpText || relatedTasks.length > 0);
+  const continuationIndicated =
+    mentionsContinuationToNextMeeting(notes, decision) ||
+    shouldSuggestAgendaItemTransfer(itemType, status);
+  const shouldHighlightFollowUp = continuationIndicated && !hasFollowUpCaptured;
+  const shouldConfirmFollowUp = continuationIndicated && hasFollowUpCaptured;
   const hasMinutesContent = Boolean(
     firstRichTextToPlainText(notes, decision, followUp).trim(),
   );
@@ -1003,16 +1209,30 @@ function AgendaMinutesCard({
               </button>
               <button
                 aria-expanded={activeActionPanel === "followUp"}
+                aria-label={
+                  shouldHighlightFollowUp
+                    ? "Punktet ser ud til at fortsætte. Opret opfølgning."
+                    : undefined
+                }
                 className={clsx(
                   "min-h-9 rounded-[var(--radius-control)] border px-3 py-2 text-sm font-semibold transition",
                   activeActionPanel === "followUp"
                     ? "border-brand bg-brand-soft text-brand"
-                    : "border-line bg-surface text-ink hover:bg-subtle",
+                    : shouldHighlightFollowUp
+                      ? "border-brand bg-brand text-white shadow-sm ring-2 ring-brand/20 hover:bg-brand-hover"
+                      : shouldConfirmFollowUp
+                        ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
+                        : "border-line bg-surface text-ink hover:bg-subtle",
                 )}
                 onClick={() => toggleActionPanel("followUp")}
                 type="button"
               >
                 + Opfølgning
+                {shouldHighlightFollowUp ? (
+                  <span className="ml-2 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide">
+                    anbefalet
+                  </span>
+                ) : null}
               </button>
               <button
                 aria-expanded={activeActionPanel === "more"}
@@ -1028,6 +1248,15 @@ function AgendaMinutesCard({
                 Mere
               </button>
             </div>
+            {shouldHighlightFollowUp ? (
+              <p className="rounded-[var(--radius-control)] border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-medium text-brand">
+                Punktet ser ud til at fortsætte. Opret en opfølgning?
+              </p>
+            ) : shouldConfirmFollowUp ? (
+              <p className="rounded-[var(--radius-control)] border border-success/20 bg-success/10 px-3 py-2 text-sm font-medium text-success">
+                Opfølgning er registreret for dette punkt.
+              </p>
+            ) : null}
             {activeActionPanel === "privateNote" ? (
               <div className="border-t border-line pt-3">
                 <AgendaPrivateNoteEditor
@@ -1594,6 +1823,7 @@ export function MeetingMinutesSection({
   initialMeetingMinutes,
   initialAgendaItemMinutes,
   privateAgendaItemNotes,
+  referentLock: initialReferentLock,
   responsiblePeople,
   previousMeetingMinutes,
   approvals,
@@ -1619,6 +1849,7 @@ export function MeetingMinutesSection({
   initialMeetingMinutes: MeetingMinutes | null;
   initialAgendaItemMinutes: AgendaItemMinutes[];
   privateAgendaItemNotes: AgendaItemPrivateNote[];
+  referentLock: MeetingMinutesReferentLockView | null;
   responsiblePeople: MinutesResponsiblePerson[];
   previousMeetingMinutes: PreviousMeetingMinutesReference;
   approvals: MeetingMinuteApprovalView[];
@@ -1661,8 +1892,22 @@ export function MeetingMinutesSection({
       window.location.hash === "#general-minutes-content",
   );
   const [isEditingApproved, setIsEditingApproved] = useState(false);
+  const [referentLock, setReferentLock] = useState(initialReferentLock);
+  useEffect(() => {
+    setReferentLock(initialReferentLock);
+  }, [initialReferentLock]);
+  const activeReferentLock = isActiveReferentLock(referentLock)
+    ? referentLock
+    : null;
+  const isCurrentReferent = Boolean(activeReferentLock?.isCurrentUser);
   const effectiveCanEdit =
     canEdit && (meetingStatus !== "approved" || isEditingApproved);
+  const canEditOfficialMinutes = effectiveCanEdit && isCurrentReferent;
+  const officialMinutesLockedMessage = activeReferentLock
+    ? activeReferentLock.isCurrentUser
+      ? null
+      : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
+    : "Tag rollen som referent for at redigere de officielle referatfelter.";
 
   const meetingDraft: MeetingMinutesDraft = {
     minutesText,
@@ -1699,7 +1944,7 @@ export function MeetingMinutesSection({
     storageKey: `committee-minutes:v1:${userId}:${organizationId}:${committeeId}:${meetingId}:meeting`,
     data: meetingDraft,
     serverUpdatedAt: initialMeetingMinutes?.updated_at ?? null,
-    enabled: canEdit,
+    enabled: canEditOfficialMinutes,
     save: persistMeetingDraft,
     restore: (draft) => {
       setMinutesText(draft.minutesText);
@@ -1744,6 +1989,14 @@ export function MeetingMinutesSection({
   }, [initialMeetingMinutes, minutes?.updated_at]);
 
   async function saveMeetingMinutes(status: MinutesStatus) {
+    if (!canEditOfficialMinutes) {
+      setIsGeneralMinutesOpen(true);
+      setError(
+        officialMinutesLockedMessage ??
+          "Tag rollen som referent for at gemme referatet.",
+      );
+      return;
+    }
     setSavingStatus(status);
     setMessage(null);
     setError(null);
@@ -1767,6 +2020,14 @@ export function MeetingMinutesSection({
 
   return (
     <div className="flex flex-col gap-4">
+      <ReferentRoleControl
+        canEdit={effectiveCanEdit}
+        committeeId={committeeId}
+        meetingId={meetingId}
+        onChange={setReferentLock}
+        organizationId={organizationId}
+        referentLock={referentLock}
+      />
       <section
         className="order-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
         aria-labelledby="general-minutes-heading"
@@ -1800,7 +2061,7 @@ export function MeetingMinutesSection({
             </span>
           </button>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {canEdit ? (
+            {effectiveCanEdit ? (
               <AutosaveStatusLine
                 errorMessage={meetingAutosave.errorMessage}
                 onRetry={() => void meetingAutosave.retry()}
@@ -1818,7 +2079,7 @@ export function MeetingMinutesSection({
           hidden={!isGeneralMinutesOpen}
           id="general-minutes-content"
         >
-          {effectiveCanEdit ? (
+          {canEditOfficialMinutes ? (
             <div
               className="space-y-3.5"
               onBlurCapture={() => void meetingAutosave.flush()}
@@ -1940,6 +2201,14 @@ export function MeetingMinutesSection({
             </div>
           ) : minutes ? (
             <DocumentPanel className="minutes-document space-y-6 border-0 p-0 shadow-none">
+              {effectiveCanEdit && officialMinutesLockedMessage ? (
+                <div
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                  role="status"
+                >
+                  {officialMinutesLockedMessage}
+                </div>
+              ) : null}
               <section className="minutes-document-section">
                 <p className="minutes-document-label">Referat</p>
                 <RichTextContent
@@ -1956,7 +2225,7 @@ export function MeetingMinutesSection({
                   value={minutes.decisions}
                 />
               </section>
-              {canEdit && meetingStatus === "approved" ? (
+              {canEditOfficialMinutes && meetingStatus === "approved" ? (
                 <Button
                   onClick={() => setIsEditingApproved(true)}
                   type="button"
@@ -1967,9 +2236,14 @@ export function MeetingMinutesSection({
               ) : null}
             </DocumentPanel>
           ) : (
-            <p className="text-sm text-slate-600">
-              Der er endnu ikke et referat, som du har adgang til at se.
-            </p>
+            <div className="space-y-2 text-sm text-slate-600">
+              {effectiveCanEdit && officialMinutesLockedMessage ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                  {officialMinutesLockedMessage}
+                </p>
+              ) : null}
+              <p>Der er endnu ikke et referat, som du har adgang til at se.</p>
+            </div>
           )}
           {canEditDecisions ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
@@ -2027,7 +2301,7 @@ export function MeetingMinutesSection({
           <div className="mt-4 border-t border-line pt-4">
             <MinuteAttachments
               attachments={meetingAttachments}
-              canEdit={effectiveCanEdit}
+              canEdit={canEditOfficialMinutes}
               committeeId={committeeId}
               meetingId={meetingId}
               organizationId={organizationId}
@@ -2092,7 +2366,7 @@ export function MeetingMinutesSection({
         <div className="mt-3 space-y-2">
           {occurrences.map((occurrence, index) => (
             <AgendaMinutesCard
-              canEdit={effectiveCanEdit}
+              canEdit={canEditOfficialMinutes}
               canEditDecisions={canEditDecisions}
               canEditTasks={canEditTasks}
               committeeId={committeeId}

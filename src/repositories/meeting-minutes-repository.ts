@@ -5,7 +5,15 @@ import type {
   AgendaItemMinutes,
   AgendaItemPrivateNote,
   MeetingMinutes,
+  MeetingMinutesReferentLock,
 } from "@/types/domain";
+
+export type MeetingMinutesReferentLockRecord = MeetingMinutesReferentLock & {
+  profiles: {
+    id: string;
+    full_name: string | null;
+  } | null;
+};
 
 export class MeetingMinutesRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
@@ -39,6 +47,49 @@ export class MeetingMinutesRepository {
       .order("updated_at", { ascending: false });
     if (error) throw error;
     return data as AgendaItemPrivateNote[];
+  }
+
+  async findReferentLock(meetingId: string) {
+    const { data, error } = await this.db
+      .from("meeting_minutes_referent_locks")
+      .select("*, profiles(id, full_name)")
+      .eq("meeting_id", meetingId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as MeetingMinutesReferentLockRecord | null;
+  }
+
+  async claimReferent(meetingId: string, leaseSeconds: number) {
+    const { data, error } = await this.db
+      .rpc("claim_meeting_minutes_referent", {
+        target_meeting_id: meetingId,
+        lease_seconds: leaseSeconds,
+      })
+      .single();
+    if (error) throw error;
+    return data as MeetingMinutesReferentLock & { claimed: boolean };
+  }
+
+  async heartbeatReferent(meetingId: string, leaseSeconds: number) {
+    const { data, error } = await this.db
+      .rpc("heartbeat_meeting_minutes_referent", {
+        target_meeting_id: meetingId,
+        lease_seconds: leaseSeconds,
+      })
+      .maybeSingle();
+    if (error) throw error;
+    return data as MeetingMinutesReferentLock | null;
+  }
+
+  async releaseReferent(meetingId: string) {
+    const { data, error } = await this.db.rpc(
+      "release_meeting_minutes_referent",
+      {
+        target_meeting_id: meetingId,
+      },
+    );
+    if (error) throw error;
+    return Boolean(data);
   }
 
   async findAgendaItemMinutes(meetingId: string, agendaItemId: string) {

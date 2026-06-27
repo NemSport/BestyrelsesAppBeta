@@ -11,11 +11,13 @@ import {
   agendaItemMinutesInputSchema,
   markNoResponseSchema,
   meetingMinutesInputSchema,
+  meetingMinutesReferentActionSchema,
   minutesApprovalResponseSchema,
   sendMinutesForApprovalSchema,
 } from "@/lib/validation";
 import { MeetingMinutesGovernanceRepository } from "@/repositories/meeting-minutes-governance-repository";
 import { MeetingMinutesRepository } from "@/repositories/meeting-minutes-repository";
+import { DecisionRepository } from "@/repositories/decision-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { OrganizationRepository } from "@/repositories/organization-repository";
@@ -29,7 +31,13 @@ import {
 } from "@/services/email-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import type { Database } from "@/types/database";
-import type { MeetingWithAgenda, TaskView } from "@/types/domain";
+import type {
+  MeetingMinutesReferentLock,
+  MeetingWithAgenda,
+  TaskView,
+} from "@/types/domain";
+
+const REFERENT_LEASE_SECONDS = 90;
 
 type RawMinuteAttachment =
   | Database["public"]["Tables"]["meeting_minute_attachments"]["Row"]
@@ -47,6 +55,14 @@ type ApprovalEmailResult = {
   skippedMissingConfig: number;
   warning: string | null;
   errors: string[];
+};
+
+type MeetingMinutesReferentLockView = MeetingMinutesReferentLock & {
+  memberName: string;
+  memberEmail: string;
+  isCurrentUser: boolean;
+  isExpired: boolean;
+  claimed?: boolean;
 };
 
 function attachmentEmbedType(fileName: string, mimeType: string) {
@@ -77,6 +93,7 @@ export class MeetingMinutesService {
   private readonly meetings: MeetingRepository;
   private readonly members: OrganizationMemberRepository;
   private readonly organizations: OrganizationRepository;
+  private readonly decisions: DecisionRepository;
   private readonly tasks: TaskRepository;
   private readonly transfers: TransferredAgendaItemRepository;
   private readonly auth: AuthService;
@@ -88,6 +105,7 @@ export class MeetingMinutesService {
     this.meetings = new MeetingRepository(db);
     this.members = new OrganizationMemberRepository(db);
     this.organizations = new OrganizationRepository(db);
+    this.decisions = new DecisionRepository(db);
     this.tasks = new TaskRepository(db);
     this.transfers = new TransferredAgendaItemRepository(db);
     this.auth = new AuthService(db);
@@ -126,6 +144,39 @@ export class MeetingMinutesService {
     return occurrence;
   }
 
+  private toReferentLockView(
+    lock: Awaited<ReturnType<MeetingMinutesRepository["findReferentLock"]>>,
+    currentUserId: string,
+    claimed?: boolean,
+  ): MeetingMinutesReferentLockView | null {
+    if (!lock) return null;
+    const { profiles: profile, ...lockFields } = lock;
+    return {
+      ...lockFields,
+      memberName:
+        profile?.full_name || "Ukendt referent",
+	memberEmail: "",
+      isCurrentUser: lock.user_id === currentUserId,
+      isExpired: new Date(lock.expires_at).getTime() <= Date.now(),
+      claimed,
+    };
+  }
+
+  private async requireActiveReferent(meetingId: string, userId: string) {
+    const lock = await this.minutes.findReferentLock(meetingId);
+    const view = this.toReferentLockView(lock, userId);
+    if (!view || view.isExpired) {
+      throw new AuthorizationError(
+        "Tag rollen som referent, før du redigerer de officielle referatfelter.",
+      );
+    }
+    if (!view.isCurrentUser) {
+      throw new AuthorizationError(
+        `Referatfelterne er låst, fordi ${view.memberName} er referent.`,
+      );
+    }
+  }
+
   async get(organizationId: string, committeeId: string, meetingId: string) {
     const user = await this.auth.requireUser();
     await this.authorization.requireCommitteeMember(
@@ -135,12 +186,18 @@ export class MeetingMinutesService {
     );
     await this.requireMeeting(organizationId, committeeId, meetingId);
 
-    const [meetingMinutes, agendaItemMinutes, privateAgendaItemNotes, members] =
-      await Promise.all([
+    const [
+      meetingMinutes,
+      agendaItemMinutes,
+      privateAgendaItemNotes,
+      members,
+      referentLock,
+    ] = await Promise.all([
         this.minutes.findMeetingMinutes(meetingId),
         this.minutes.listAgendaItemMinutes(meetingId),
         this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
         this.members.listMembers(organizationId),
+        this.minutes.findReferentLock(meetingId),
       ]);
 
     const [approvals, meetingAttachments, agendaItemAttachments, canApprove] =
@@ -177,6 +234,7 @@ export class MeetingMinutesService {
 
     return {
       meetingMinutes,
+      referentLock: this.toReferentLockView(referentLock, user.id),
       agendaItemMinutes,
       privateAgendaItemNotes,
       responsiblePeople: members
@@ -285,6 +343,7 @@ export class MeetingMinutesService {
       parsed.committeeId,
       parsed.meetingId,
     );
+    await this.requireActiveReferent(parsed.meetingId, user.id);
 
     const existing = await this.minutes.findMeetingMinutes(parsed.meetingId);
     if (parsed.status === "approved" && existing?.status !== "approved") {
@@ -347,6 +406,7 @@ export class MeetingMinutesService {
       parsed.agendaItemId,
       parsed.agendaItemOccurrenceId ?? null,
     );
+    await this.requireActiveReferent(parsed.meetingId, user.id);
     if (
       !occurrence.agenda_items ||
       occurrence.agenda_items.item_type !== parsed.itemType
@@ -445,6 +505,64 @@ export class MeetingMinutesService {
     }
 
     return savedMinutes;
+  }
+
+  async updateReferentLock(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = meetingMinutesReferentActionSchema.parse(input);
+    await this.authorization.requireCommitteeManager(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+    await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+
+    if (parsed.action === "claim") {
+      const result = await this.minutes.claimReferent(
+        parsed.meetingId,
+        REFERENT_LEASE_SECONDS,
+      );
+      const lock = await this.minutes.findReferentLock(parsed.meetingId);
+      const view = this.toReferentLockView(lock, user.id, result.claimed);
+      return {
+        lock: view,
+        claimed: result.claimed,
+        message: result.claimed
+          ? "Du er nu referent."
+          : `${view?.memberName ?? "En anden bruger"} er allerede referent.`,
+      };
+    }
+
+    if (parsed.action === "heartbeat") {
+      const renewed = await this.minutes.heartbeatReferent(
+        parsed.meetingId,
+        REFERENT_LEASE_SECONDS,
+      );
+      if (!renewed) {
+        return {
+          lock: null,
+          claimed: false,
+          message: "Referentrollen kunne ikke fornyes.",
+        };
+      }
+      const lock = await this.minutes.findReferentLock(parsed.meetingId);
+      return {
+        lock: this.toReferentLockView(lock, user.id, true),
+        claimed: true,
+        message: "Referentrollen er fornyet.",
+      };
+    }
+
+    await this.minutes.releaseReferent(parsed.meetingId);
+    return {
+      lock: null,
+      claimed: false,
+      message: "Referentrollen er afgivet.",
+    };
   }
 
   async savePrivateAgendaItemNote(input: unknown) {
@@ -942,7 +1060,7 @@ export class MeetingMinutesService {
       ? `${root}/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`
       : `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`;
     const brandingService = new OrganizationBrandingService(this.db);
-    const [pdfBranding, emailBranding, attachmentsForPdf, meetingTasks] =
+    const [pdfBranding, emailBranding, attachmentsForPdf] =
       await Promise.all([
         brandingService.getPdfBranding(
           data.organization.id,
@@ -955,7 +1073,6 @@ export class MeetingMinutesService {
         this.getPdfAttachments(organizationId, committeeId, meetingId, {
           includeMeetingAttachments: true,
         }),
-        this.tasks.listByMeeting(meetingId),
       ]);
 
     const pdf = await generateMeetingMinutesPdf({
@@ -963,6 +1080,8 @@ export class MeetingMinutesService {
       committeeName: data.committee.name,
       meetingMinutes: data.meetingMinutes!,
       agendaItemMinutes: data.agendaItemMinutes,
+      decisions: data.decisions,
+      tasks: data.tasks,
       approvals: data.approvals,
       attachments: [...data.meetingAttachments, ...data.agendaItemAttachments],
       responsiblePeople: data.responsiblePeople,
@@ -977,7 +1096,7 @@ export class MeetingMinutesService {
     const pdfFileName = `referat-${formatDanishDateKey(
       data.meeting.starts_at,
     )}.pdf`;
-    const unassignedTasks = meetingTasks
+    const unassignedTasks = data.tasks
       .filter((task) => !task.responsible_user_id)
       .map((task) =>
         this.toApprovalEmailTask(task, organizationId, meetingUrl),
@@ -996,7 +1115,7 @@ export class MeetingMinutesService {
             meetingTitle: data.meeting.title,
             meetingDate: formatDanishDateTime(data.meeting.starts_at, "full"),
             approvalUrl: meetingUrl,
-            personalTasks: meetingTasks
+            personalTasks: data.tasks
               .filter((task) => task.responsible_user_id === approval.user_id)
               .map((task) =>
                 this.toApprovalEmailTask(task, organizationId, meetingUrl),
@@ -1140,12 +1259,18 @@ export class MeetingMinutesService {
           : "MINUTES_NOT_APPROVED",
       );
     }
-    const attendees = await this.meetings.listAttendees(meetingId);
+    const [attendees, decisions, tasks] = await Promise.all([
+      this.meetings.listAttendees(meetingId),
+      this.decisions.listByMeeting(meetingId),
+      this.tasks.listByMeeting(meetingId),
+    ]);
     return {
       organization: organizationContext.organization,
       committee: context.committee,
       meeting,
       attendees,
+      decisions,
+      tasks,
       ...bundle,
     };
   }

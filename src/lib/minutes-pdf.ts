@@ -3,20 +3,24 @@ import {
   agendaItemTypeLabels,
   meetingMinuteApprovalStatusLabels,
 } from "@/lib/localization";
+import { decisionStatusLabels } from "@/lib/decisions";
 import {
   createPdfReport,
   formatPdfDate,
   type PdfReportAttachment,
   type PdfReportBranding,
 } from "@/lib/pdf-report";
-import { richTextToPdfBlocks } from "@/lib/rich-text";
+import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
+import { taskStatusLabels } from "@/lib/tasks";
 import type {
   AgendaItemMinutes,
+  DecisionView,
   MeetingMinuteApprovalView,
   MeetingMinutes,
   MeetingWithAgenda,
   MinuteAttachmentView,
   MinutesResponsiblePerson,
+  TaskView,
 } from "@/types/domain";
 
 type PdfInput = {
@@ -24,6 +28,8 @@ type PdfInput = {
   committeeName: string;
   meetingMinutes: MeetingMinutes;
   agendaItemMinutes: AgendaItemMinutes[];
+  decisions: DecisionView[];
+  tasks: TaskView[];
   approvals: MeetingMinuteApprovalView[];
   attachments: MinuteAttachmentView[];
   attachmentsForPdf?: PdfReportAttachment[];
@@ -57,6 +63,88 @@ function approvedDate(approvals: MeetingMinuteApprovalView[]) {
     .map((approval) => approval.responded_at!)
     .sort();
   return approvedResponses.at(-1) ?? null;
+}
+
+type PointDecisionRow = {
+  text: string;
+  status: string;
+  category: string;
+  responsible: string;
+  deadline: string;
+};
+
+type PointFollowUpRow = {
+  text: string;
+  status: string;
+  responsible: string;
+  deadline: string;
+};
+
+function personName(
+  people: MinutesResponsiblePerson[],
+  userId: string | null | undefined,
+) {
+  if (!userId) return "";
+  return people.find((person) => person.id === userId)?.name ?? "Ukendt medlem";
+}
+
+function compactText(...values: Array<string | null | undefined>) {
+  return values
+    .map((value) => richTextToPlainText(value).trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function pointDecisionRows(
+  minutes: AgendaItemMinutes,
+  decisions: DecisionView[],
+  responsiblePeople: MinutesResponsiblePerson[],
+): PointDecisionRow[] {
+  const rows = decisions.map((decision) => ({
+    text: compactText(decision.title, decision.description),
+    status: decisionStatusLabels[decision.status],
+    category: decision.category ?? "",
+    responsible:
+      decision.responsible?.full_name ||
+      personName(responsiblePeople, decision.responsible_user_id),
+    deadline: decision.deadline ? formatPdfDate(decision.deadline) : "",
+  }));
+  const legacyDecision = compactText(minutes.decision);
+  if (legacyDecision) {
+    rows.unshift({
+      text: legacyDecision,
+      status: agendaItemMinutesStatusLabels[minutes.status],
+      category: "",
+      responsible: personName(responsiblePeople, minutes.responsible_user_id),
+      deadline: minutes.deadline ? formatPdfDate(minutes.deadline) : "",
+    });
+  }
+  return rows;
+}
+
+function pointFollowUpRows(
+  minutes: AgendaItemMinutes,
+  tasks: TaskView[],
+  responsiblePeople: MinutesResponsiblePerson[],
+): PointFollowUpRow[] {
+  const rows = tasks.map((task) => ({
+    text: compactText(task.title, task.description),
+    status: taskStatusLabels[task.status],
+    responsible:
+      task.responsible?.full_name ||
+      personName(responsiblePeople, task.responsible_user_id),
+    deadline: task.deadline ? formatPdfDate(task.deadline) : "",
+  }));
+  const legacyFollowUp = compactText(minutes.follow_up);
+  if (legacyFollowUp) {
+    rows.unshift({
+      text: legacyFollowUp,
+      status: agendaItemMinutesStatusLabels[minutes.status],
+      responsible: personName(responsiblePeople, minutes.responsible_user_id),
+      deadline: minutes.deadline ? formatPdfDate(minutes.deadline) : "",
+    });
+  }
+  return rows;
 }
 
 export async function generateMeetingMinutesPdf(input: PdfInput) {
@@ -129,6 +217,27 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
   const minutesByAgendaItem = new Map(
     input.agendaItemMinutes.map((minutes) => [minutes.agenda_item_id, minutes]),
   );
+  const decisionsByAgendaItem = new Map<string, DecisionView[]>();
+  const agendaItemIdByDecisionId = new Map<string, string>();
+  for (const decision of input.decisions) {
+    if (!decision.agenda_item_id) continue;
+    const current = decisionsByAgendaItem.get(decision.agenda_item_id) ?? [];
+    current.push(decision);
+    decisionsByAgendaItem.set(decision.agenda_item_id, current);
+    agendaItemIdByDecisionId.set(decision.id, decision.agenda_item_id);
+  }
+  const tasksByAgendaItem = new Map<string, TaskView[]>();
+  for (const task of input.tasks) {
+    const agendaItemId =
+      task.agenda_item_id ||
+      (task.decision_id
+        ? agendaItemIdByDecisionId.get(task.decision_id) ?? null
+        : null);
+    if (!agendaItemId) continue;
+    const current = tasksByAgendaItem.get(agendaItemId) ?? [];
+    current.push(task);
+    tasksByAgendaItem.set(agendaItemId, current);
+  }
 
   for (const [
     occurrenceIndex,
@@ -164,19 +273,82 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     ]);
 
     const notes = richTextToPdfBlocks(minutes.notes);
-    const decision = richTextToPdfBlocks(minutes.decision);
-    const followUp = richTextToPdfBlocks(minutes.follow_up);
+    const pointDecisions = pointDecisionRows(
+      minutes,
+      decisionsByAgendaItem.get(item.id) ?? [],
+      input.responsiblePeople,
+    );
+    const pointFollowUps = pointFollowUpRows(
+      minutes,
+      tasksByAgendaItem.get(item.id) ?? [],
+      input.responsiblePeople,
+    );
     if (notes.length) {
-      report.addSubsection("Noter");
+      report.addSubsection("Referat");
       report.addProse(notes);
     }
-    if (decision.length) {
-      report.addSubsection("Beslutning");
-      report.addProse(decision);
+    if (pointDecisions.length) {
+      report.addSubsection("Beslutninger");
+      report.addTable(
+        [
+          {
+            label: "Beslutning",
+            width: 210,
+            getValue: (row: PointDecisionRow) => row.text,
+          },
+          {
+            label: "Status",
+            width: 70,
+            getValue: (row: PointDecisionRow) => row.status,
+          },
+          {
+            label: "Kategori",
+            width: 65,
+            getValue: (row: PointDecisionRow) => row.category,
+          },
+          {
+            label: "Ansvarlig",
+            width: 85,
+            getValue: (row: PointDecisionRow) => row.responsible,
+          },
+          {
+            label: "Deadline",
+            width: 65,
+            getValue: (row: PointDecisionRow) => row.deadline,
+          },
+        ],
+        pointDecisions,
+        "",
+      );
     }
-    if (followUp.length) {
-      report.addSubsection("Opfølgning");
-      report.addProse(followUp);
+    if (pointFollowUps.length) {
+      report.addSubsection("Opfølgninger");
+      report.addTable(
+        [
+          {
+            label: "Opfølgning",
+            width: 250,
+            getValue: (row: PointFollowUpRow) => row.text,
+          },
+          {
+            label: "Status",
+            width: 75,
+            getValue: (row: PointFollowUpRow) => row.status,
+          },
+          {
+            label: "Ansvarlig",
+            width: 95,
+            getValue: (row: PointFollowUpRow) => row.responsible,
+          },
+          {
+            label: "Deadline",
+            width: 70,
+            getValue: (row: PointFollowUpRow) => row.deadline,
+          },
+        ],
+        pointFollowUps,
+        "",
+      );
     }
   }
 

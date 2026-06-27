@@ -39,6 +39,8 @@ export async function GET(
       committeeName: data.committee.name,
       meetingMinutes: data.meetingMinutes!,
       agendaItemMinutes: data.agendaItemMinutes,
+      decisions: data.decisions,
+      tasks: data.tasks,
       approvals: data.approvals,
       attachments: [
         ...data.meetingAttachments,

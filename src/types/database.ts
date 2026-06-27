@@ -546,6 +546,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      meeting_minutes_referent_locks: {
+        Row: {
+          id: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          user_id: string;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          user_id: string;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          organization_id?: string;
+          committee_id?: string;
+          meeting_id?: string;
+          user_id?: string;
+          expires_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       agenda_item_minutes: {
         Row: {
           id: string;
@@ -1482,6 +1513,30 @@ export type Database = {
       mark_missing_approval_responses: {
         Args: { target_meeting_minutes_id: string };
         Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"][];
+      };
+      claim_meeting_minutes_referent: {
+        Args: {
+          target_meeting_id: string;
+          lease_seconds?: number;
+        };
+        Returns: Array<
+          Database["public"]["Tables"]["meeting_minutes_referent_locks"]["Row"] & {
+            claimed: boolean;
+          }
+        >;
+      };
+      heartbeat_meeting_minutes_referent: {
+        Args: {
+          target_meeting_id: string;
+          lease_seconds?: number;
+        };
+        Returns:
+          | Database["public"]["Tables"]["meeting_minutes_referent_locks"]["Row"]
+          | null;
+      };
+      release_meeting_minutes_referent: {
+        Args: { target_meeting_id: string };
+        Returns: boolean;
       };
       soft_delete_committee: {
         Args: { target_committee_id: string };

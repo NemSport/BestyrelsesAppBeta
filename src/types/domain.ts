@@ -13,6 +13,8 @@ export type Meeting = TableRow<"meetings">;
 export type AgendaItem = TableRow<"agenda_items">;
 export type AgendaItemOccurrence = TableRow<"agenda_item_occurrences">;
 export type MeetingMinutes = TableRow<"meeting_minutes">;
+export type MeetingMinutesReferentLock =
+  TableRow<"meeting_minutes_referent_locks">;
 export type AgendaItemMinutes = TableRow<"agenda_item_minutes">;
 export type AgendaItemPrivateNote = TableRow<"agenda_item_private_notes">;
 export type MeetingMinuteApproval = TableRow<"meeting_minute_approvals">;

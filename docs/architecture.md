@@ -176,6 +176,12 @@ status is intentionally kept visible as a compact control because it drives
 follow-up and transfer logic. Secondary agenda-item actions share a single
 inline panel state, so only one follow-up or extra-fields panel is visible at a
 time and no action panel relies on floating layout inside the minutes editor.
+Update 13.5 adds a local UX hint on agenda-item minute cards. If the current
+notes or selected status indicate that the point continues to the next meeting,
+the existing `+ Opfølgning` action is highlighted with a short prompt. This is
+pure presentation: no follow-up, task, transfer, decision, or agenda item is
+created until the user chooses an existing action and saves through the normal
+service/API path.
 
 Meeting date/time display is centralized in `src/lib/date-format.ts`.
 Display helpers use `locale: da-DK` and `timeZone: Europe/Copenhagen`; storage
@@ -814,7 +820,24 @@ owned by a single user. They are personal working notes only: other members
 cannot read them, and they are excluded from official minutes, PDFs, email,
 AI prompts, and shared meeting read models.
 
+Official minutes editing is guarded by `meeting_minutes_referent_locks`.
+Only one active referent lock exists per meeting. Committee managers can claim
+or release the role through a protected route backed by PostgreSQL functions;
+the browser renews the short lease while the page is active. Meeting-minutes
+and agenda-item-minutes saves still use optimistic `updated_at` checks, but
+the service also requires the current user to hold the active referent lock.
+Private notes and task creation do not depend on the referent lock and must not
+update official minutes versions.
+
 ### Minutes Approval, Attachments, and PDF
+
+Minutes PDFs are generated from the approved/ready meeting-minutes read model
+plus meeting-scoped decisions and tasks. Each agenda point renders ordinary
+point notes as `Referat`; linked decisions and legacy point decision text are
+rendered separately as `Beslutninger`; linked tasks and legacy follow-up text
+are rendered separately as `Opfølgninger`. Empty decision/follow-up sections
+are omitted. Private agenda-item notes are never included in the PDF read
+model.
 
 Sending minutes for approval runs through a protected PostgreSQL function. It
 sets the deadline, changes the meeting-minutes workflow to
