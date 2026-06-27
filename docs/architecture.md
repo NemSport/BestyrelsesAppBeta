@@ -275,6 +275,14 @@ point number. When agenda item occurrences are soft-deleted or restored, the
 database normalizes positions for the affected meeting. UI and PDF point
 numbers are derived from the current sorted active occurrence list so deleted
 points do not leave visible gaps.
+Creating or scheduling a new occurrence appends after `max(position) + 1`
+across all occurrences for the target meeting, including rows that still occupy
+the unique position space. The database functions take a meeting-level lock
+before calculating the next position, and the repository retries the specific
+duplicate-position conflict once before returning a user-facing 409 response.
+The former `agenda_occurrences_keep_eventual_last` insert trigger is no longer
+allowed to mutate occurrence positions; Eventuelt can be repositioned through
+the same explicit reorder flow as other agenda points.
 Committee managers may reorder active meeting agenda occurrences through a
 compact drag-and-drop modal on the meeting minutes page. The route calls a
 scoped PostgreSQL batch reorder function, which locks the affected meeting
@@ -745,10 +753,11 @@ Meeting scheduling retains its stronger committee-manager permission, while
 date-based backlog creation retains the existing agenda-item-editor
 permission.
 
-When `create_agenda_item` schedules a new item immediately, it invokes the same
-agenda normalization used by transferred items. Opening standard items remain
-first, transferred items follow, ordinary items come next, and Eventuelt
-remains last.
+When `create_agenda_item` schedules a new item immediately, it appends the
+meeting occurrence after the current highest occurrence position while holding
+the meeting lock. It does not compact or reorder the existing agenda as part of
+creation; delete/restore and explicit reorder flows remain responsible for
+normalizing the active list.
 
 ### Meeting Minutes
 

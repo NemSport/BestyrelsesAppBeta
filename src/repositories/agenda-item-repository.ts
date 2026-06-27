@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { AppError } from "@/lib/errors";
 import type { Database, TableInsert, TableUpdate } from "@/types/database";
 import type { AgendaItem, AgendaItemWithOccurrences } from "@/types/domain";
 
@@ -81,18 +82,37 @@ export class AgendaItemRepository {
     targetDate: string | null;
     meetingId: string | null;
   }) {
-    const { data, error } = await this.db.rpc("create_agenda_item", {
-      target_organization_id: input.organizationId,
-      target_committee_id: input.committeeId,
-      agenda_title: input.title,
-      agenda_description: input.description,
-      agenda_objective: input.objective,
-      agenda_type: input.itemType,
-      // Legacy database compatibility: lifecycle_status is no longer a user workflow.
-      agenda_status: input.meetingId ? "scheduled" : "backlog",
-      agenda_target_date: input.targetDate,
-      target_meeting_id: input.meetingId,
-    });
+    const createAgendaItem = () =>
+      this.db.rpc("create_agenda_item", {
+        target_organization_id: input.organizationId,
+        target_committee_id: input.committeeId,
+        agenda_title: input.title,
+        agenda_description: input.description,
+        agenda_objective: input.objective,
+        agenda_type: input.itemType,
+        // Legacy database compatibility: lifecycle_status is no longer a user workflow.
+        agenda_status: input.meetingId ? "scheduled" : "backlog",
+        agenda_target_date: input.targetDate,
+        target_meeting_id: input.meetingId,
+      });
+
+    let { data, error } = await createAgendaItem();
+    if (this.isAgendaPositionConflict(error)) {
+      console.warn("Retrying agenda item creation after position conflict", {
+        operation: "create_agenda_item",
+        organizationId: input.organizationId,
+        committeeId: input.committeeId,
+        meetingId: input.meetingId,
+      });
+      ({ data, error } = await createAgendaItem());
+      if (this.isAgendaPositionConflict(error)) {
+        throw new AppError(
+          "Dagsordenspunktet kunne ikke placeres i mødet, fordi rækkefølgen blev ændret samtidig. Prøv igen.",
+          409,
+          "AGENDA_POSITION_CONFLICT",
+        );
+      }
+    }
     if (error) throw error;
     return data;
   }
@@ -104,13 +124,33 @@ export class AgendaItemRepository {
     meetingId: string;
     durationMinutes: number | null;
   }) {
-    const { data, error } = await this.db.rpc("schedule_agenda_item", {
-      target_organization_id: input.organizationId,
-      target_committee_id: input.committeeId,
-      target_agenda_item_id: input.agendaItemId,
-      target_meeting_id: input.meetingId,
-      target_duration_minutes: input.durationMinutes,
-    });
+    const scheduleAgendaItem = () =>
+      this.db.rpc("schedule_agenda_item", {
+        target_organization_id: input.organizationId,
+        target_committee_id: input.committeeId,
+        target_agenda_item_id: input.agendaItemId,
+        target_meeting_id: input.meetingId,
+        target_duration_minutes: input.durationMinutes,
+      });
+
+    let { data, error } = await scheduleAgendaItem();
+    if (this.isAgendaPositionConflict(error)) {
+      console.warn("Retrying agenda item scheduling after position conflict", {
+        operation: "schedule_agenda_item",
+        organizationId: input.organizationId,
+        committeeId: input.committeeId,
+        meetingId: input.meetingId,
+        agendaItemId: input.agendaItemId,
+      });
+      ({ data, error } = await scheduleAgendaItem());
+      if (this.isAgendaPositionConflict(error)) {
+        throw new AppError(
+          "Dagsordenspunktet kunne ikke planlægges, fordi rækkefølgen blev ændret samtidig. Prøv igen.",
+          409,
+          "AGENDA_POSITION_CONFLICT",
+        );
+      }
+    }
     if (error) throw error;
     return data;
   }
@@ -201,5 +241,19 @@ export class AgendaItemRepository {
         (occurrence) => !occurrence.deleted_at,
       ),
     };
+  }
+
+  private isAgendaPositionConflict(error: unknown) {
+    if (!error || typeof error !== "object") {
+      return false;
+    }
+
+    const candidate = error as { code?: string; message?: string };
+    return (
+      candidate.code === "23505" &&
+      (candidate.message ?? "").includes(
+        "agenda_item_occurrences_meeting_id_position_key",
+      )
+    );
   }
 }

@@ -133,6 +133,15 @@ empty. Selecting a date keeps the item unscheduled in the backlog and stores
 the date in `target_date`. The application and PostgreSQL function reject
 requests with neither destination or both destinations.
 
+Creating or scheduling an agenda item on a meeting appends it after the
+highest existing occurrence position for that meeting. The PostgreSQL
+functions lock the meeting before calculating `max(position) + 1`, and the
+repository retries the specific duplicate-position conflict once before
+returning a 409. This avoids reusing positions when prior deletion or manual
+ordering has left gaps. The older `agenda_occurrences_keep_eventual_last`
+trigger is disabled because it could rewrite `NEW.position` during insert and
+reuse an occupied position when the agenda had already been manually reordered.
+
 Update 13.6 keeps meeting agenda numbering contiguous after a point is removed.
 `agenda_item_occurrences.position` remains the persisted sort key, but soft
 delete/restore functions now normalize occurrence positions for the meeting so
