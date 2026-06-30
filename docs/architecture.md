@@ -572,13 +572,18 @@ app while avoiding duplicated business logic in React Native components.
 
 The mobile API is intentionally narrow: organizations, organization overview,
 my tasks, task status, task comments, meeting detail, quick meetings, AI meeting
-overview, and a source-oriented mobile AI Assistant. The AI Assistant uses the
-RLS-scoped organization overview as bounded context and returns structured
-answers with sources; it does not create or update authoritative records. Expo
-push permissions and token retrieval are prepared client-side, but token
-storage, server dispatch, and reminder scheduling remain future work. Offline
-behavior is companion-grade only: cached reads are returned when available, and
-Danish error messages explain missing connectivity.
+overview, AI minutes assistance, and a source-oriented mobile AI Assistant. The
+AI Assistant uses the RLS-scoped organization overview as bounded context and
+returns structured answers with sources; it does not create or update
+authoritative records. Mobile meeting overview reuses
+`AiMeetingOverviewService`. Mobile minutes assistance is a bearer-auth wrapper
+around `AiMinutesAssistantService` and is review-only in the React Native app:
+users can inspect the original text and suggestion, but the mobile client does
+not insert, save, or overwrite official minutes. Expo push permissions and
+token retrieval are prepared client-side, but token storage, server dispatch,
+and reminder scheduling remain future work. Offline behavior is companion-grade
+only: cached reads are returned when available, and Danish error messages
+explain missing connectivity.
 
 Update 11 introduces a narrow server-side email boundary. `EmailService`
 orchestrates authorization, recipient validation, template selection, and
@@ -848,14 +853,23 @@ are rendered separately as `Opfølgninger`. Empty decision/follow-up sections
 are omitted. Private agenda-item notes are never included in the PDF read
 model.
 
+Meeting participants are registered on the meeting page before or during the
+meeting. Internal participants are stored in `meeting_attendees` with status
+`attended`, `absent`, or `excused`; external guests are stored separately in
+`meeting_external_attendees` with optional contact details. External attendees
+are meeting context, not approval identities, unless a later flow explicitly
+adds them to a separate approval mechanism.
+
 Sending minutes for approval runs through a protected PostgreSQL function. It
 sets the deadline, changes the meeting-minutes workflow to
-`ready_for_approval`, and creates or resets one approval row for every active,
-voting committee member with role chair, secretary, or member. Members may
-approve or request changes; change requests require a comment. Managers may
-convert pending responses to `no_response` only after the deadline. The
-database marks the minutes approved when no pending or change-requested rows
-remain.
+`ready_for_approval`, and creates or resets approval rows. If internal
+participants have been registered, only active voting committee members marked
+`attended` receive approval rows. If no participants are registered, the
+function falls back to every active, voting committee member with role chair,
+secretary, or member. Members may approve or request changes; change requests
+require a comment. Managers may convert pending responses to `no_response`
+only after the deadline. The database marks the minutes approved when no
+pending or change-requested rows remain.
 
 After that protected state change succeeds, the application service prepares
 approval notifications server-side. Each approver receives an individual email
@@ -1321,7 +1335,18 @@ creator.
 
 #### `meeting_attendees`
 
-Connects users to meetings with attendance status and meeting role.
+Connects internal committee members to meetings with attendance status and
+meeting role. The meeting page uses `attended`, `absent`, and `excused` as the
+explicit registration states; `attended` drives the default minutes approval
+recipient list when participants are registered.
+
+#### `meeting_external_attendees`
+
+Stores external meeting attendees with name, optional email, optional mobile,
+and optional role/note. Rows are scoped to organization, committee, and
+meeting, protected by committee-member read access and committee-manager write
+access. External attendees are shown in meeting participant details but are not
+ordinary minutes approvers by default.
 
 #### `meeting_minutes`
 

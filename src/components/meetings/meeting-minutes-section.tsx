@@ -1839,6 +1839,7 @@ export function MeetingMinutesSection({
   decisionCategorySource,
   taskCategorySource,
   decisionHistoryByAgendaItem,
+  approvalRecipientInfo,
 }: {
   organizationId: string;
   userId: string;
@@ -1868,6 +1869,13 @@ export function MeetingMinutesSection({
     string,
     { categories: string[]; decisions: DecisionView[] }
   >;
+  approvalRecipientInfo: {
+    mode: "participants" | "fallback";
+    eligibleCount: number;
+    fallbackMemberCount: number;
+    registeredInternalCount: number;
+    externalCount: number;
+  };
 }) {
   const [minutes, setMinutes] = useState(initialMeetingMinutes);
   const [minutesText, setMinutesText] = useState(
@@ -2312,6 +2320,7 @@ export function MeetingMinutesSection({
 
       <MinutesApprovalPanel
         className="order-3"
+        approvalRecipientInfo={approvalRecipientInfo}
         approvals={approvals}
         canApprove={canApprove}
         canEdit={canEdit}

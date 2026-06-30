@@ -851,6 +851,17 @@ allows minutes that are `ready_for_approval`; those exports are clearly marked
 as preliminary until all approvals are complete, while fully approved exports
 are marked as approved.
 
+Meeting participant registration uses the existing `meeting_attendees` table
+for internal committee members and `meeting_external_attendees` for guests,
+advisers, auditors, and other external attendees. The meeting page shows a
+compact participant summary and lets committee managers mark internal members
+as present, absent, or excused, plus add external attendee contact details.
+Minutes approval now prefers internal participants marked present; when no
+participants have been registered, it falls back to the existing active
+committee-member approval list and warns the user in the approval panel.
+External attendees are recorded for the meeting but are not approval recipients
+by default.
+
 Update 13.8 surfaces minutes that still need the current user's approval on
 the organization dashboard. The reminder is based on the server-side approval
 read model, links directly to the meeting approval section, and can only be
@@ -1082,6 +1093,14 @@ server-side token registration and notification dispatch are deferred. Offline
 support is limited to friendly Danish error messages plus simple cached reads
 for the latest organizations, overview, tasks, meetings, comments, and meeting
 detail data.
+
+Mobile Update 7 connects AI to the meeting detail screen. `AI-overblik` uses
+the existing bearer-protected mobile meeting overview route and displays a
+compact summary, decision points, follow-up, preparation, and attention points.
+Mobile referat help uses a new bearer-protected mobile wrapper around the
+existing minutes assistant service. It is review-only in this version: the app
+shows original text and the AI suggestion, but does not insert, save, or
+overwrite official minutes from mobile.
 
 Update 11 adds an explicit email foundation. Email delivery is server-side only
 through `EmailService`, with Resend prepared as the first real provider and

@@ -255,6 +255,7 @@ export function MinutesApprovalPanel({
   userId,
   minutes,
   approvals,
+  approvalRecipientInfo,
   canEdit,
   canApprove,
   className,
@@ -265,6 +266,13 @@ export function MinutesApprovalPanel({
   userId: string;
   minutes: MeetingMinutes | null;
   approvals: MeetingMinuteApprovalView[];
+  approvalRecipientInfo: {
+    mode: "participants" | "fallback";
+    eligibleCount: number;
+    fallbackMemberCount: number;
+    registeredInternalCount: number;
+    externalCount: number;
+  };
   canEdit: boolean;
   canApprove: boolean;
   className?: string;
@@ -302,23 +310,64 @@ export function MinutesApprovalPanel({
     setWorking(true);
     setError(null);
     setMessage(null);
+    const isSendApprovalAction = body.action === "send";
+    const requestBody = {
+      organizationId,
+      committeeId,
+      ...body,
+    };
+    if (isSendApprovalAction) {
+      console.info("[minutes-approval] Send til godkendelse klik", {
+        organizationId,
+        committeeId,
+        meetingId,
+        registeredParticipantsCount:
+          approvalRecipientInfo.registeredInternalCount +
+          approvalRecipientInfo.externalCount,
+        presentInternalCount:
+          approvalRecipientInfo.mode === "participants"
+            ? approvalRecipientInfo.eligibleCount
+            : 0,
+        fallbackMemberCount: approvalRecipientInfo.fallbackMemberCount,
+        finalRecipientCount: approvalRecipientInfo.eligibleCount,
+      });
+    }
+    let responseStatus: number | null = null;
     try {
-      const result = await readResponse<{ message: string }>(
-        await fetch(`/api/meetings/${meetingId}/minutes/approval`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            organizationId,
-            committeeId,
-            ...body,
-          }),
-        }),
-      );
+      const response = await fetch(`/api/meetings/${meetingId}/minutes/approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      responseStatus = response.status;
+      const result = await readResponse<{ message: string }>(response);
+      if (isSendApprovalAction) {
+        console.info("[minutes-approval] Send til godkendelse API response", {
+          organizationId,
+          committeeId,
+          meetingId,
+          status: response.status,
+          ok: response.ok,
+          message: result.message,
+        });
+      }
       setMessage(result.message);
       setComment("");
       setShowChangeRequest(false);
       router.refresh();
     } catch (caughtError) {
+      if (isSendApprovalAction) {
+        console.warn("[minutes-approval] Send til godkendelse API fejl", {
+          organizationId,
+          committeeId,
+          meetingId,
+          status: responseStatus,
+          error:
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Ukendt fejl",
+        });
+      }
       setError(
         caughtError instanceof Error
           ? caughtError.message
@@ -327,6 +376,18 @@ export function MinutesApprovalPanel({
     } finally {
       setWorking(false);
     }
+  }
+
+  function sendForApproval() {
+    if (approvalRecipientInfo.eligibleCount <= 0) {
+      setShowDetails(true);
+      setMessage(null);
+      setError(
+        "Ingen interne deltagere markeret som til stede, og ingen aktive udvalgsmedlemmer fundet.",
+      );
+      return;
+    }
+    void act({ action: "send", deadline });
   }
 
   async function downloadPdf() {
@@ -405,6 +466,19 @@ export function MinutesApprovalPanel({
   const missingApprovals = approvals.filter(
     (approval) => approval.status === "pending",
   );
+  const hasApprovalRound =
+    minutes?.status === "ready_for_approval" || minutes?.status === "approved";
+  const canSendForApproval =
+    canEdit && Boolean(minutes) && approvalRecipientInfo.eligibleCount > 0;
+  const canStartApproval = canEdit;
+  const approvalRecipientHelp =
+    approvalRecipientInfo.mode === "participants"
+      ? approvalRecipientInfo.eligibleCount > 0
+        ? `Sendes til ${approvalRecipientInfo.eligibleCount} interne deltagere markeret som til stede.`
+        : "Ingen interne deltagere er markeret som til stede. Registrer deltagere før referatet sendes til godkendelse."
+      : approvalRecipientInfo.eligibleCount > 0
+        ? `Ingen deltagere er registreret endnu. Ved afsendelse bruges fallback til ${approvalRecipientInfo.eligibleCount} aktive udvalgsmedlemmer.`
+        : "Der findes ingen mulige godkendere. Registrer deltagere eller opdater udvalgets medlemmer.";
 
   return (
     <section
@@ -433,13 +507,13 @@ export function MinutesApprovalPanel({
               ? ` · Frist ${formatDate(minutes.approval_deadline)}`
               : ""}
           </p>
-          {approvals.length > 0 ? (
+          {hasApprovalRound && approvals.length > 0 ? (
             <p className="mt-0.5 text-xs text-muted">
               {counts.pending} afventer · {counts.change_requested} ændringer
               ønskes
             </p>
           ) : null}
-          {missingApprovals.length > 0 ? (
+          {hasApprovalRound && missingApprovals.length > 0 ? (
             <p className="mt-0.5 text-xs text-muted">
               Mangler:{" "}
               {missingApprovals
@@ -478,6 +552,45 @@ export function MinutesApprovalPanel({
           </Button>
         </div>
       </div>
+      {!hasApprovalRound && canStartApproval ? (
+        <div className="border-t border-line bg-subtle/25 px-3 py-3 sm:px-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="label" htmlFor="approval-deadline-primary">
+                Godkendelsesfrist
+              </label>
+              <Input
+                id="approval-deadline-primary"
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setDeadline(event.target.value)}
+                type="date"
+                value={deadline}
+              />
+            </div>
+            <div className="min-w-[220px] flex-1">
+              <p
+                className={`text-sm ${
+                  approvalRecipientInfo.eligibleCount > 0
+                    ? "text-muted"
+                    : "text-warning"
+                }`}
+              >
+                {approvalRecipientHelp}
+                {approvalRecipientInfo.externalCount > 0
+                  ? " Eksterne deltagere f\u00e5r ikke godkendelsesopgaver automatisk."
+                  : ""}
+              </p>
+            </div>
+            <Button
+              disabled={working || !deadline}
+              onClick={sendForApproval}
+              type="button"
+            >
+              Send til godkendelse
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div
         className="border-t border-line px-3 pb-3 sm:px-4 sm:pb-4"
         hidden={!showDetails}
@@ -542,7 +655,7 @@ export function MinutesApprovalPanel({
           </p>
         ) : null}
 
-        {canEdit && minutes ? (
+        {canEdit && minutes && hasApprovalRound ? (
           <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-line pt-5">
             <div>
               <label className="label" htmlFor="approval-deadline">
@@ -556,9 +669,21 @@ export function MinutesApprovalPanel({
                 value={deadline}
               />
             </div>
+            <p
+              className={`max-w-xl text-sm ${
+                approvalRecipientInfo.eligibleCount > 0
+                  ? "text-muted"
+                  : "text-warning"
+              }`}
+            >
+              {approvalRecipientHelp}
+              {approvalRecipientInfo.externalCount > 0
+                ? " Eksterne deltagere får ikke godkendelsesopgaver automatisk."
+                : ""}
+            </p>
             <Button
-              disabled={working || !deadline}
-              onClick={() => act({ action: "send", deadline })}
+              disabled={working || !deadline || !canSendForApproval}
+              onClick={sendForApproval}
               type="button"
             >
               Send til godkendelse
@@ -631,7 +756,7 @@ export function MinutesApprovalPanel({
         ) : null}
 
         <div className="mt-5 divide-y divide-line border-y border-line">
-          {approvals.map((approval) => (
+          {hasApprovalRound && approvals.map((approval) => (
             <article className="py-4" key={approval.id}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -654,8 +779,16 @@ export function MinutesApprovalPanel({
               ) : null}
             </article>
           ))}
-          {approvals.length === 0 ? (
-            <EmptyState compact title="Ingen medlemmer afventer godkendelse." />
+          {!hasApprovalRound ? (
+            <EmptyState
+              compact
+              title="Referatet er ikke sendt til godkendelse endnu."
+            />
+          ) : approvals.length === 0 ? (
+            <EmptyState
+              compact
+              title="Der er ikke oprettet godkendelsesmodtagere."
+            />
           ) : null}
         </div>
       </div>

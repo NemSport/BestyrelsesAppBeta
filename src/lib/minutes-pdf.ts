@@ -17,6 +17,7 @@ import type {
   DecisionView,
   MeetingMinuteApprovalView,
   MeetingMinutes,
+  MeetingExternalAttendee,
   MeetingWithAgenda,
   MinuteAttachmentView,
   MinutesResponsiblePerson,
@@ -35,6 +36,7 @@ type PdfInput = {
   attachmentsForPdf?: PdfReportAttachment[];
   responsiblePeople: MinutesResponsiblePerson[];
   attendeeIds: string[];
+  externalAttendees: MeetingExternalAttendee[];
   branding?: PdfReportBranding;
 };
 
@@ -195,10 +197,29 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
   const attendeeNames = input.attendeeIds
     .map((id) => input.responsiblePeople.find((person) => person.id === id)?.name)
     .filter((name): name is string => Boolean(name));
+  const externalAttendeeLines = input.externalAttendees.map((attendee) =>
+    [
+      attendee.name,
+      attendee.role_note,
+      attendee.email,
+      attendee.mobile,
+    ]
+      .filter(Boolean)
+      .join(" - "),
+  );
 
-  if (attendeeNames.length > 0) {
+  if (attendeeNames.length > 0 || externalAttendeeLines.length > 0) {
     report.addSection("Deltagere");
-    report.addParagraph(attendeeNames.join(", "));
+    if (attendeeNames.length > 0) {
+      report.addSubsection("Interne deltagere");
+      report.addParagraph(attendeeNames.join(", "));
+    }
+    if (externalAttendeeLines.length > 0) {
+      report.addSubsection("Eksterne deltagere");
+      for (const line of externalAttendeeLines) {
+        report.addParagraph(`- ${line}`);
+      }
+    }
   }
 
   report.addSection("Generelt referat");

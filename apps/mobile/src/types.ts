@@ -8,7 +8,9 @@ export type Status =
 export type Organization = {
   id: string;
   name: string;
+  committeeCount?: number;
   committees: Committee[];
+  role?: string | null;
 };
 
 export type Committee = {
@@ -59,10 +61,15 @@ export type Task = {
 export type Decision = {
   id: string;
   title: string;
+  description?: string | null;
+  decision_date?: string | null;
   status: Status;
   deadline: string | null;
   category: string | null;
   committee?: { id: string; name: string } | null;
+  meeting?: { id: string; title: string; starts_at: string } | null;
+  agendaItem?: { id: string; title: string; item_type: string } | null;
+  responsible?: { id: string; full_name: string | null } | null;
 };
 
 export type OrganizationOverview = {
@@ -119,4 +126,24 @@ export type AiMeetingOverview = {
     risks_or_attention_points: string[];
     confidence_note: string;
   } | null;
+};
+
+export type AiMinutesAssistantAction =
+  | "fix_language"
+  | "make_formal"
+  | "shorten"
+  | "make_neutral"
+  | "make_decision_ready"
+  | "professional_board_style";
+
+export type AiMinutesAssistantSuggestion = {
+  action: AiMinutesAssistantAction;
+  originalHtml: string;
+  originalText: string;
+  suggestionHtml: string;
+  suggestionText: string;
+  summary: string;
+  activityLogId?: string | null;
+  model?: string | null;
+  promptVersion?: string | null;
 };

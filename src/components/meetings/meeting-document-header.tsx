@@ -29,20 +29,30 @@ const minutesStatusTones: Record<MinutesStatus, StatusTone> = {
 export function MeetingDocumentHeader({
   meeting,
   committeeName,
-  attendeeCount,
   minutesStatus,
   agendaItemCount,
   transferredItemCount,
+  participantSummary,
   actions,
 }: {
   meeting: Meeting;
   committeeName: string;
-  attendeeCount: number;
   minutesStatus: MinutesStatus | null;
   agendaItemCount: number;
   transferredItemCount: number;
+  participantSummary?: {
+    registeredCount: number;
+    presentInternalCount: number;
+    externalCount: number;
+    action?: ReactNode;
+  };
   actions?: ReactNode;
 }) {
+  const participantCountLabel =
+    participantSummary && participantSummary.registeredCount > 0
+      ? `${participantSummary.registeredCount} deltagere registreret`
+      : "Ikke registreret";
+
   return (
     <header className="meeting-document-header border-b border-line pb-5">
       <div>
@@ -91,16 +101,35 @@ export function MeetingDocumentHeader({
           <dd>{meeting.location || "Ikke angivet"}</dd>
         </div>
         <div>
-          <dt>Deltagere</dt>
-          <dd>{attendeeCount > 0 ? attendeeCount : "Ikke registreret"}</dd>
-        </div>
-        <div>
           <dt>Dagsordenspunkter</dt>
           <dd>{agendaItemCount}</dd>
         </div>
         <div>
           <dt>Overførte punkter</dt>
           <dd>{transferredItemCount}</dd>
+        </div>
+        <div>
+          <dt>Deltagere</dt>
+          <dd className="space-y-1">
+            <span className="block">{participantCountLabel}</span>
+            {participantSummary ? (
+              <span className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted">
+                <StatusBadge
+                  tone={
+                    participantSummary.presentInternalCount > 0
+                      ? "success"
+                      : "neutral"
+                  }
+                >
+                  {participantSummary.presentInternalCount} interne til stede
+                </StatusBadge>
+                {participantSummary.externalCount > 0 ? (
+                  <StatusBadge>{participantSummary.externalCount} eksterne</StatusBadge>
+                ) : null}
+                {participantSummary.action}
+              </span>
+            ) : null}
+          </dd>
         </div>
       </dl>
 

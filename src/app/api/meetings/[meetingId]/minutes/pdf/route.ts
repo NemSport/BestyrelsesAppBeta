@@ -52,6 +52,7 @@ export async function GET(
           ["accepted", "attended"].includes(attendee.attendance_status),
         )
         .map((attendee) => attendee.user_id),
+      externalAttendees: data.externalAttendees,
       branding,
       attachmentsForPdf,
     });

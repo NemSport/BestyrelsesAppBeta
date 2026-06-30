@@ -8,6 +8,7 @@ import { EditMeetingModal } from "@/components/meetings/edit-meeting-modal";
 import { MeetingAiOverview } from "@/components/meetings/meeting-ai-overview";
 import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-header";
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
+import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
@@ -279,7 +280,7 @@ export default async function MeetingPage({
     minutes,
     previousMeetingMinutes,
     transferredAgendaItems,
-    attendees,
+    participants,
     decisionContext,
     taskContext,
     memberDirectory,
@@ -295,7 +296,7 @@ export default async function MeetingPage({
       committeeId,
       meetingId,
     ),
-    meetingService.listAttendees(organizationId, committeeId, meetingId),
+    meetingService.getParticipants(organizationId, committeeId, meetingId),
     new DecisionService(db).getMeetingContext(
       organizationId,
       committeeId,
@@ -312,9 +313,20 @@ export default async function MeetingPage({
   const organizationRole = context.organizationMembership.role;
   const committeeRole = context.membership?.role ?? null;
   const canEditMeeting = canManageCommittee(organizationRole, committeeRole);
-  const attendeeCount = attendees.filter((attendee) =>
-    ["accepted", "attended"].includes(attendee.attendance_status),
-  ).length;
+  const registeredInternalParticipantCount =
+    participants.internalParticipants.filter((attendee) =>
+      ["accepted", "attended", "absent", "excused"].includes(
+        attendee.attendance_status,
+      ),
+    ).length;
+  const presentInternalParticipantCount =
+    participants.internalParticipants.filter(
+      (attendee) =>
+        attendee.attendance_status === "accepted" ||
+        attendee.attendance_status === "attended",
+    ).length;
+  const registeredParticipantCount =
+    registeredInternalParticipantCount + participants.externalAttendees.length;
   const activeTransfers = transferredAgendaItems.items.filter(
     (item) => item.status !== "dismissed",
   ).length;
@@ -329,6 +341,19 @@ export default async function MeetingPage({
       name: member.full_name || member.email,
       email: member.email,
     }));
+  const approvalRecipientInfo = {
+    mode:
+      registeredInternalParticipantCount > 0
+        ? ("participants" as const)
+        : ("fallback" as const),
+    eligibleCount:
+      registeredInternalParticipantCount > 0
+        ? presentInternalParticipantCount
+        : emailRecipients.length,
+    fallbackMemberCount: emailRecipients.length,
+    registeredInternalCount: registeredInternalParticipantCount,
+    externalCount: participants.externalAttendees.length,
+  };
   const agendaMinutesByItemId = new Map(
     minutes.agendaItemMinutes.map((agendaMinutes) => [
       agendaMinutes.agenda_item_id,
@@ -423,10 +448,25 @@ export default async function MeetingPage({
           </>
         }
         agendaItemCount={meeting.agenda_item_occurrences.length}
-        attendeeCount={attendeeCount}
         committeeName={context.committee.name}
         meeting={meeting}
         minutesStatus={minutes.meetingMinutes?.status ?? null}
+        participantSummary={{
+          action: (
+            <MeetingParticipantsPanel
+              canEdit={canEditMeeting}
+              committeeId={committeeId}
+              externalAttendees={participants.externalAttendees}
+              internalParticipants={participants.internalParticipants}
+              meetingId={meetingId}
+              members={memberDirectory}
+              organizationId={organizationId}
+            />
+          ),
+          externalCount: participants.externalAttendees.length,
+          presentInternalCount: presentInternalParticipantCount,
+          registeredCount: registeredParticipantCount,
+        }}
         transferredItemCount={activeTransfers}
       />
 
@@ -584,6 +624,7 @@ export default async function MeetingPage({
         <MeetingMinutesSection
           agendaItemAttachments={minutes.agendaItemAttachments}
           approvals={minutes.approvals}
+          approvalRecipientInfo={approvalRecipientInfo}
           canApprove={minutes.canApprove}
           canEdit={canEditMeeting}
           canEditDecisions={decisionContext.canEdit}

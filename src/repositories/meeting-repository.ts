@@ -123,6 +123,56 @@ export class MeetingRepository {
     return data;
   }
 
+  async listExternalAttendees(meetingId: string) {
+    const { data, error } = await this.db
+      .from("meeting_external_attendees")
+      .select("*")
+      .eq("meeting_id", meetingId)
+      .order("name");
+    if (error) throw error;
+    return data;
+  }
+
+  async replaceAttendees(
+    meetingId: string,
+    attendees: Array<TableInsert<"meeting_attendees">>,
+  ) {
+    const deleteResult = await this.db
+      .from("meeting_attendees")
+      .delete()
+      .eq("meeting_id", meetingId);
+    if (deleteResult.error) throw deleteResult.error;
+
+    if (attendees.length === 0) return [];
+
+    const { data, error } = await this.db
+      .from("meeting_attendees")
+      .insert(attendees)
+      .select();
+    if (error) throw error;
+    return data;
+  }
+
+  async replaceExternalAttendees(
+    meetingId: string,
+    attendees: Array<TableInsert<"meeting_external_attendees">>,
+  ) {
+    const deleteResult = await this.db
+      .from("meeting_external_attendees")
+      .delete()
+      .eq("meeting_id", meetingId);
+    if (deleteResult.error) throw deleteResult.error;
+
+    if (attendees.length === 0) return [];
+
+    const { data, error } = await this.db
+      .from("meeting_external_attendees")
+      .insert(attendees)
+      .select();
+    if (error) throw error;
+    return data;
+  }
+
   async create(input: TableInsert<"meetings">) {
     const { data, error } = await this.db
       .from("meetings")

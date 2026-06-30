@@ -439,6 +439,53 @@ export const markNoResponseSchema = z.object({
   meetingId: uuidSchema,
 });
 
+export const meetingParticipantsInputSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  internalParticipants: z
+    .array(
+      z.object({
+        userId: uuidSchema,
+        status: z.enum(["attended", "absent", "excused"], {
+          required_error: "Deltagerstatus skal vælges",
+          invalid_type_error: "Deltagerstatus er ugyldig",
+        }),
+      }),
+    )
+    .default([]),
+  externalAttendees: z
+    .array(
+      z.object({
+        id: uuidSchema.optional(),
+        name: requiredName("Navn", 160),
+        email: z
+          .string()
+          .trim()
+          .email("E-mail er ugyldig")
+          .max(320, "E-mail må højst være 320 tegn")
+          .or(z.literal(""))
+          .nullable()
+          .optional(),
+        mobile: z
+          .string()
+          .trim()
+          .max(50, "Mobil må højst være 50 tegn")
+          .or(z.literal(""))
+          .nullable()
+          .optional(),
+        roleNote: z
+          .string()
+          .trim()
+          .max(240, "Funktion/notat må højst være 240 tegn")
+          .or(z.literal(""))
+          .nullable()
+          .optional(),
+      }),
+    )
+    .default([]),
+});
+
 const optionalDecisionText = (label: string, max: number) =>
   z
     .string()

@@ -5,7 +5,7 @@ import { getAgendaItemTransferRule } from "@/lib/agenda-item-minutes";
 import { formatDanishDateKey, formatDanishDateTime } from "@/lib/date-format";
 import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import type { PdfReportAttachment } from "@/lib/pdf-report";
-import { sanitizeRichText } from "@/lib/rich-text";
+import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import {
   agendaItemPrivateNoteInputSchema,
   agendaItemMinutesInputSchema,
@@ -142,6 +142,84 @@ export class MeetingMinutesService {
       throw new NotFoundError("Dagsordenspunktet på mødet");
     }
     return occurrence;
+  }
+
+  private hasMeetingMinutesContent(
+    meetingMinutes: Awaited<
+      ReturnType<MeetingMinutesRepository["findMeetingMinutes"]>
+    >,
+    agendaItemMinutes: Awaited<
+      ReturnType<MeetingMinutesRepository["listAgendaItemMinutes"]>
+    >,
+  ) {
+    if (
+      richTextToPlainText(meetingMinutes?.minutes_text).trim() ||
+      richTextToPlainText(meetingMinutes?.decisions).trim()
+    ) {
+      return true;
+    }
+
+    return agendaItemMinutes.some(
+      (minutes) =>
+        richTextToPlainText(minutes.notes).trim() ||
+        richTextToPlainText(minutes.decision).trim() ||
+        richTextToPlainText(minutes.follow_up).trim(),
+    );
+  }
+
+  private async ensureMeetingMinutesForApproval(input: {
+    organizationId: string;
+    committeeId: string;
+    meetingId: string;
+    userId: string;
+  }) {
+    const [existingMinutes, agendaItemMinutes] = await Promise.all([
+      this.minutes.findMeetingMinutes(input.meetingId),
+      this.minutes.listAgendaItemMinutes(input.meetingId),
+    ]);
+
+    if (!this.hasMeetingMinutesContent(existingMinutes, agendaItemMinutes)) {
+      throw new AppError(
+        "Referatet er tomt og kan ikke sendes til godkendelse.",
+        422,
+        "EMPTY_MEETING_MINUTES",
+      );
+    }
+
+    if (existingMinutes) return existingMinutes;
+
+    console.info("[meeting-minutes] Opretter draft-referat før godkendelse.", {
+      operation: "ensure_meeting_minutes_for_approval",
+      organizationId: input.organizationId,
+      committeeId: input.committeeId,
+      meetingId: input.meetingId,
+      agendaItemMinutesCount: agendaItemMinutes.length,
+    });
+
+    try {
+      return await this.minutes.createMeetingMinutes({
+        organization_id: input.organizationId,
+        committee_id: input.committeeId,
+        meeting_id: input.meetingId,
+        minutes_text: "",
+        decisions: "",
+        internal_note: null,
+        status: "draft",
+        created_by: input.userId,
+        updated_by: input.userId,
+      });
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "23505"
+      ) {
+        const minutes = await this.minutes.findMeetingMinutes(input.meetingId);
+        if (minutes) return minutes;
+      }
+      throw error;
+    }
   }
 
   private toReferentLockView(
@@ -628,8 +706,50 @@ export class MeetingMinutesService {
       parsed.committeeId,
       parsed.meetingId,
     );
-    const minutes = await this.minutes.findMeetingMinutes(parsed.meetingId);
-    if (!minutes) throw new NotFoundError("Referatet");
+    const [registeredAttendees, approvalMembers] = await Promise.all([
+      this.meetings.listAttendees(parsed.meetingId),
+      this.members.listMembers(parsed.organizationId),
+    ]);
+    const registeredParticipantsCount = registeredAttendees.filter((attendee) =>
+      ["accepted", "attended", "absent", "excused"].includes(
+        attendee.attendance_status,
+      ),
+    ).length;
+    const presentInternalParticipantsCount = registeredAttendees.filter(
+      (attendee) =>
+        attendee.attendance_status === "accepted" ||
+        attendee.attendance_status === "attended",
+    ).length;
+    const fallbackMemberCount = approvalMembers.filter(
+      (member) =>
+        member.status === "active" &&
+        member.committees.some(
+          (committee) =>
+            committee.id === parsed.committeeId &&
+            ["chair", "secretary", "member"].includes(committee.role),
+        ),
+    ).length;
+    console.info("[meeting-minutes] Approval recipient selection before RPC", {
+      operation: "send_minutes_for_approval",
+      organizationId: parsed.organizationId,
+      committeeId: parsed.committeeId,
+      meetingId: parsed.meetingId,
+      registeredParticipantsCount,
+      presentInternalParticipantsCount,
+      fallbackMemberCount,
+      expectedRecipientMode:
+        registeredParticipantsCount > 0 ? "participants" : "fallback",
+      expectedRecipientCount:
+        registeredParticipantsCount > 0
+          ? presentInternalParticipantsCount
+          : fallbackMemberCount,
+    });
+    const minutes = await this.ensureMeetingMinutesForApproval({
+      organizationId: parsed.organizationId,
+      committeeId: parsed.committeeId,
+      meetingId: parsed.meetingId,
+      userId: user.id,
+    });
     if (parsed.deadline < new Date().toISOString().slice(0, 10)) {
       throw new AppError(
         "Godkendelsesfristen kan ikke ligge i fortiden.",
@@ -641,6 +761,15 @@ export class MeetingMinutesService {
       minutes.id,
       parsed.deadline,
     );
+    const approvalRows = await this.governance.listApprovals(minutes.id);
+    console.info("[meeting-minutes] Approval recipient selection after RPC", {
+      operation: "send_minutes_for_approval",
+      organizationId: parsed.organizationId,
+      committeeId: parsed.committeeId,
+      meetingId: parsed.meetingId,
+      meetingMinutesId: minutes.id,
+      finalRecipientCount: approvalRows.length,
+    });
 
     const emailResult = await this.sendApprovalEmails({
       organizationId: parsed.organizationId,
@@ -1090,6 +1219,7 @@ export class MeetingMinutesService {
           ["accepted", "attended"].includes(attendee.attendance_status),
         )
         .map((attendee) => attendee.user_id),
+      externalAttendees: data.externalAttendees,
       branding: pdfBranding,
       attachmentsForPdf,
     });
@@ -1259,8 +1389,9 @@ export class MeetingMinutesService {
           : "MINUTES_NOT_APPROVED",
       );
     }
-    const [attendees, decisions, tasks] = await Promise.all([
+    const [attendees, externalAttendees, decisions, tasks] = await Promise.all([
       this.meetings.listAttendees(meetingId),
+      this.meetings.listExternalAttendees(meetingId),
       this.decisions.listByMeeting(meetingId),
       this.tasks.listByMeeting(meetingId),
     ]);
@@ -1269,6 +1400,7 @@ export class MeetingMinutesService {
       committee: context.committee,
       meeting,
       attendees,
+      externalAttendees,
       decisions,
       tasks,
       ...bundle,

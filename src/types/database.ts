@@ -393,6 +393,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      meeting_external_attendees: {
+        Row: {
+          id: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          name: string;
+          email: string | null;
+          mobile: string | null;
+          role_note: string | null;
+          created_by: string;
+          updated_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          name: string;
+          email?: string | null;
+          mobile?: string | null;
+          role_note?: string | null;
+          created_by: string;
+          updated_by: string;
+        };
+        Update: {
+          name?: string;
+          email?: string | null;
+          mobile?: string | null;
+          role_note?: string | null;
+          updated_by?: string;
+        };
+        Relationships: [];
+      };
       agenda_items: {
         Row: {
           id: string;
@@ -1605,7 +1641,8 @@ export type Database = {
         | "accepted"
         | "declined"
         | "attended"
-        | "absent";
+        | "absent"
+        | "excused";
       meeting_role: "chair" | "secretary" | "member" | "guest";
       agenda_item_type: "information" | "discussion" | "decision" | "follow_up";
       agenda_item_status:
