@@ -19,12 +19,25 @@ const uxReviewEnvSchema = z.object({
   UX_REVIEW_USER_EMAIL: z.string().email(),
 });
 
-export function getUxReviewEnv() {
-  if (
-    process.env.VERCEL_ENV !== "preview" ||
-    process.env.UX_REVIEW_ENABLED !== "true"
-  ) {
-    return null;
+export type UxReviewEnvironmentResult =
+  | {
+      ok: true;
+      value: z.infer<typeof uxReviewEnvSchema>;
+    }
+  | {
+      ok: false;
+      reason:
+        | "environment-not-preview"
+        | "review-disabled"
+        | "invalid-server-environment";
+    };
+
+export function getUxReviewEnv(): UxReviewEnvironmentResult {
+  if (process.env.VERCEL_ENV !== "preview") {
+    return { ok: false, reason: "environment-not-preview" };
+  }
+  if (process.env.UX_REVIEW_ENABLED !== "true") {
+    return { ok: false, reason: "review-disabled" };
   }
 
   const parsed = uxReviewEnvSchema.safeParse({
@@ -32,5 +45,7 @@ export function getUxReviewEnv() {
     UX_REVIEW_USER_EMAIL: process.env.UX_REVIEW_USER_EMAIL,
   });
 
-  return parsed.success ? parsed.data : null;
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : { ok: false, reason: "invalid-server-environment" };
 }

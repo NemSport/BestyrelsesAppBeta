@@ -7,6 +7,15 @@ import type { Database } from "@/types/database";
 const USERS_PER_PAGE = 1_000;
 const MAX_USER_PAGES = 100;
 
+type RestrictedAccessResult =
+  | { ok: true; organizationId: string }
+  | {
+      ok: false;
+      reason:
+        | "invalid-organization-membership"
+        | "invalid-committee-membership";
+    };
+
 export class UxReviewRepository {
   constructor(private readonly admin: SupabaseClient<Database>) {}
 
@@ -44,7 +53,7 @@ export class UxReviewRepository {
     return null;
   }
 
-  async findRestrictedOrganizationId(userId: string) {
+  async findRestrictedAccess(userId: string): Promise<RestrictedAccessResult> {
     const { data: organizationMemberships, error: organizationError } =
       await this.admin
         .from("organization_members")
@@ -55,14 +64,19 @@ export class UxReviewRepository {
     const activeOrganizationMemberships = organizationMemberships.filter(
       (membership) => membership.status === "active",
     );
+    const activeOrganizationMembership = activeOrganizationMemberships[0];
     if (
       activeOrganizationMemberships.length !== 1 ||
-      activeOrganizationMemberships[0].role !== "viewer"
+      !activeOrganizationMembership ||
+      activeOrganizationMembership.role !== "viewer"
     ) {
-      return null;
+      return {
+        ok: false,
+        reason: "invalid-organization-membership",
+      };
     }
 
-    const organizationId = activeOrganizationMemberships[0].organization_id;
+    const organizationId = activeOrganizationMembership.organization_id;
     const { data: committeeMemberships, error: committeeError } = await this.admin
       .from("committee_members")
       .select("organization_id, role, status, voting_rights")
@@ -77,7 +91,9 @@ export class UxReviewRepository {
         membership.voting_rights,
     );
 
-    return hasUnsafeCommitteeMembership ? null : organizationId;
+    return hasUnsafeCommitteeMembership
+      ? { ok: false, reason: "invalid-committee-membership" }
+      : { ok: true, organizationId };
   }
 
   async generateMagicLinkToken(email: string, expectedUserId: string) {
