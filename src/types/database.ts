@@ -175,6 +175,26 @@ export type Database = {
         };
         Relationships: [];
       };
+      ux_review_rate_limits: {
+        Row: {
+          attempt_key: string;
+          window_started_at: string;
+          attempt_count: number;
+          updated_at: string;
+        };
+        Insert: {
+          attempt_key: string;
+          window_started_at?: string;
+          attempt_count?: number;
+          updated_at?: string;
+        };
+        Update: {
+          window_started_at?: string;
+          attempt_count?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ai_activity_log: {
         Row: {
           id: string;
@@ -1455,6 +1475,14 @@ export type Database = {
       };
       is_organization_member: {
         Args: { target_organization_id: string };
+        Returns: boolean;
+      };
+      consume_ux_review_attempt: {
+        Args: {
+          attempt_key: string;
+          max_attempts: number;
+          window_seconds: number;
+        };
         Returns: boolean;
       };
       is_organization_admin: {

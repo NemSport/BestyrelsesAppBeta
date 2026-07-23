@@ -214,6 +214,40 @@ function formatDate(value: string) {
   );
 }
 
+function formatCompactDate(value: string) {
+  return new Intl.DateTimeFormat("da-DK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function annualWheelTaskDeadlineLabel(
+  template: Pick<TaskTemplateDraft, "deadlineAnchor" | "deadlineOffsetDays">,
+  event: Pick<EventDraft, "startsOn" | "endsOn">,
+) {
+  if (template.deadlineOffsetDays === null) return "Ingen relativ deadline";
+  const anchorLabel = template.deadlineAnchor === "start" ? "start" : "slut";
+  const anchorDate =
+    template.deadlineAnchor === "start" ? event.startsOn : event.endsOn;
+  const calculatedDate = addDays(anchorDate, template.deadlineOffsetDays);
+  if (template.deadlineOffsetDays === 0) {
+    return `På ${anchorLabel} · ${formatCompactDate(calculatedDate)}`;
+  }
+  const direction = template.deadlineOffsetDays < 0 ? "før" : "efter";
+  return `${Math.abs(template.deadlineOffsetDays)} dage ${direction} ${anchorLabel} · ${formatCompactDate(calculatedDate)}`;
+}
+
 function eventIsOverdue(event: AnnualWheelEventView) {
   return (
     annualWheelDeadlineState(event.ends_on, event.priority) === "overdue" &&
@@ -1588,11 +1622,17 @@ function AnnualWheelEventReadView({
                           ? `Foreslået ansvarlig: ${suggestedResponsible.full_name}`
                           : "Ingen foreslået ansvarlig"}
                         {template.deadline_offset_days !== null
-                          ? ` · Deadline ${Math.abs(template.deadline_offset_days)} dage ${
-                              template.deadline_offset_days < 0
-                                ? "før"
-                                : "efter"
-                            } aktivitetens ${template.deadline_anchor === "start" ? "start" : "slutning"}`
+                          ? ` · Deadline ${annualWheelTaskDeadlineLabel(
+                              {
+                                deadlineAnchor: template.deadline_anchor,
+                                deadlineOffsetDays:
+                                  template.deadline_offset_days,
+                              },
+                              {
+                                startsOn: currentEvent.starts_on,
+                                endsOn: currentEvent.ends_on,
+                              },
+                            )}`
                           : ""}
                       </p>
                     </div>
@@ -1823,12 +1863,45 @@ function AnnualWheelTaskTemplateEditor({
   onDraft: (draft: EventDraft) => void;
   responsibleOptions: AnnualWheelOverview["members"];
 }) {
+  const [newTemplateFocusId, setNewTemplateFocusId] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!newTemplateFocusId) return;
+    const element = document.getElementById(
+      `annual-wheel-task-template-title-${newTemplateFocusId}`,
+    );
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    element?.focus();
+    setNewTemplateFocusId(null);
+  }, [draft.taskTemplates, newTemplateFocusId]);
+
   function updateTemplate(index: number, patch: Partial<TaskTemplateDraft>) {
     onDraft({
       ...draft,
       taskTemplates: draft.taskTemplates.map((template, currentIndex) =>
         currentIndex === index ? { ...template, ...patch } : template,
       ),
+    });
+  }
+
+  function addTemplate() {
+    const id = crypto.randomUUID();
+    setNewTemplateFocusId(id);
+    onDraft({
+      ...draft,
+      taskTemplates: [
+        {
+          id,
+          title: "",
+          description: "",
+          suggestedResponsibleUserId: draft.responsibleUserId,
+          deadlineAnchor: "start",
+          deadlineOffsetDays: null,
+        },
+        ...draft.taskTemplates,
+      ],
     });
   }
 
@@ -1843,21 +1916,7 @@ function AnnualWheelTaskTemplateEditor({
           </p>
         </div>
         <Button
-          onClick={() =>
-            onDraft({
-              ...draft,
-              taskTemplates: [
-                ...draft.taskTemplates,
-                {
-                  title: "",
-                  description: "",
-                  suggestedResponsibleUserId: draft.responsibleUserId,
-                  deadlineAnchor: "start",
-                  deadlineOffsetDays: null,
-                },
-              ],
-            })
-          }
+          onClick={addTemplate}
           size="sm"
           type="button"
           variant="secondary"
@@ -1867,14 +1926,26 @@ function AnnualWheelTaskTemplateEditor({
       </div>
       {draft.taskTemplates.length ? (
         <div className="mt-3 space-y-3">
-          {draft.taskTemplates.map((template, index) => (
-            <div
-              className="border border-line bg-subtle/30 p-3"
-              key={template.id ?? index}
-            >
+          {draft.taskTemplates.map((template, index) => {
+            const deadlineAbsDays =
+              template.deadlineOffsetDays === null
+                ? ""
+                : String(Math.abs(template.deadlineOffsetDays));
+            const deadlineDirection =
+              template.deadlineOffsetDays === null
+                ? "before"
+                : template.deadlineOffsetDays < 0
+                  ? "before"
+                  : "after";
+            return (
+              <div
+                className="border border-line bg-subtle/30 p-3"
+                key={template.id ?? index}
+              >
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Titel">
                   <Input
+                    id={`annual-wheel-task-template-title-${template.id ?? index}`}
                     onChange={(event) =>
                       updateTemplate(index, { title: event.target.value })
                     }
@@ -1907,7 +1978,7 @@ function AnnualWheelTaskTemplateEditor({
                   value={template.description}
                 />
               </Field>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <div className="mt-3 grid gap-3 sm:grid-cols-[0.75fr_0.9fr_1fr_auto]">
                 <Field label="Deadline fra">
                   <Select
                     onChange={(event) =>
@@ -1921,19 +1992,43 @@ function AnnualWheelTaskTemplateEditor({
                     <option value="end">Aktivitetens slutning</option>
                   </Select>
                 </Field>
-                <Field label="Dage før/efter">
+                <Field label="Retning">
+                  <Select
+                    onChange={(event) => {
+                      const currentDays = Math.abs(
+                        template.deadlineOffsetDays ?? 0,
+                      );
+                      updateTemplate(index, {
+                        deadlineOffsetDays:
+                          event.target.value === "before"
+                            ? -currentDays
+                            : currentDays,
+                      });
+                    }}
+                    value={deadlineDirection}
+                  >
+                    <option value="before">Før</option>
+                    <option value="after">Efter</option>
+                  </Select>
+                </Field>
+                <Field label="Antal dage">
                   <Input
                     onChange={(event) =>
                       updateTemplate(index, {
                         deadlineOffsetDays: event.target.value
-                          ? Number(event.target.value)
+                          ? (deadlineDirection === "before" ? -1 : 1) *
+                            Math.abs(Number(event.target.value))
                           : null,
                       })
                     }
-                    placeholder="fx -7 eller 14"
+                    min={0}
+                    placeholder="fx 14"
                     type="number"
-                    value={template.deadlineOffsetDays ?? ""}
+                    value={deadlineAbsDays}
                   />
+                  <p className="mt-1 text-xs text-muted">
+                    {annualWheelTaskDeadlineLabel(template, draft)}
+                  </p>
                 </Field>
                 <div className="flex items-end">
                   <Button
@@ -1953,7 +2048,8 @@ function AnnualWheelTaskTemplateEditor({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted">

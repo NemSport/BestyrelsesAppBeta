@@ -486,6 +486,11 @@ into the existing edit flow; new activities still open directly in edit mode.
 The read view can export one authorized Annual Wheel activity as a branded PDF.
 The export uses the shared report foundation and includes public activity
 metadata, description, key people, fixed task templates, and activated tasks.
+Fixed task templates are edited newest-first in the modal, and their relative
+deadlines are shown with both the rule and calculated date, for example `14
+dage før start · 21.06.2027`. The activity PDF renders fixed task descriptions
+as full prose instead of truncating them in table cells and shows the same
+relative deadline plus calculated date.
 The Annual Wheel page also exports the selected year in two landscape PDF
 formats. The matrix export maps activities to Jan-Dec columns for operational
 planning, while the visual export groups the year into four quarters with
@@ -812,6 +817,14 @@ Managers can remove meeting and agenda-item attachments from the same
 attachment surface after confirmation. Removal deletes the attachment metadata
 and best-effort removes the unique Storage object, so removed attachments no
 longer appear in agenda or minutes PDFs.
+
+Update 12 adds a meeting tasklist PDF for live review. The meeting page links
+to a server-side export that reuses the shared PDF report and organization
+branding foundation. The read model is scoped to the selected meeting and
+committee: active non-archived committee tasks are included, as are tasks
+linked directly to the meeting, its agenda items, or its decisions. Completed
+tasks are only included when they are directly linked to the meeting context
+and were completed recently, while archived tasks remain excluded.
 
 Update 13.1 hardens live minutes autosave. General meeting minutes and
 agenda-item minutes continue to keep user-scoped browser drafts, but autosave
@@ -1143,6 +1156,20 @@ delivery must not depend on a logo being reachable.
   decision or task.
 - Prefer simple PostgreSQL-backed asynchronous jobs before introducing a
   separate queue platform.
+
+## Temporary UX Review Access
+
+Vercel Preview deployments may expose `/ux-review?token=...` only when
+`UX_REVIEW_ENABLED=true` and the server-only review token and user e-mail are
+configured. Production and non-Preview environments always return 404.
+
+The route creates a normal Supabase session for an existing, confirmed test
+user after constant-time token validation and PostgreSQL-backed rate limiting.
+The user must have exactly one active Organization membership as `viewer`;
+active Committee memberships must also be `viewer` without voting rights.
+Normal Row Level Security remains the data-isolation boundary. The route,
+environment variables, and temporary rate-limit database objects must be
+removed after the external UX review.
 
 ## Trash And Retention Foundation
 

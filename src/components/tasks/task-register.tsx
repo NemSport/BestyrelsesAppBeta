@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { TaskComments } from "@/components/tasks/task-comments";
+import { ActionMenu } from "@/components/ui";
 import {
   Button,
   EmptyState,
@@ -24,6 +25,7 @@ import {
   filterTasks,
   getTaskDeadlineState,
   normalizeTaskCategory,
+  sortTasksByDeadline,
   taskBoardStatuses,
   taskStatusLabels,
   taskStatusOptions,
@@ -53,7 +55,7 @@ type TaskDraft = {
   internalNote: string;
 };
 
-type TaskViewMode = "board" | "list";
+type TaskViewMode = "list" | "board";
 
 const emptyDraft = (): TaskDraft => ({
   committeeId: "",
@@ -76,6 +78,8 @@ const emptyFilters = (): TaskFilters => ({
   committeeId: "",
   responsibleUserId: "",
   category: "",
+  deadline: "",
+  mineOnly: false,
   showArchived: false,
 });
 
@@ -88,6 +92,22 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(
     new Date(`${value}T00:00:00`),
   );
+}
+
+function isOpenTask(task: TaskView) {
+  return (
+    !task.archived_at &&
+    task.status !== "completed" &&
+    task.status !== "cancelled"
+  );
+}
+
+function deadlineLabel(task: TaskView) {
+  const state = getTaskDeadlineState(task);
+  if (state === "overdue") return "Overskredet";
+  if (state === "today") return "I dag";
+  if (state === "soon") return "Snart";
+  return null;
 }
 
 function toDateTimeLocal(value: string | null) {
@@ -127,7 +147,7 @@ export function TaskRegister({
   const openedTaskParam = useRef<string | null>(null);
   const [tasks, setTasks] = useState(data.tasks);
   const [filters, setFilters] = useState<TaskFilters>(emptyFilters);
-  const [viewMode, setViewMode] = useState<TaskViewMode>("board");
+  const [viewMode, setViewMode] = useState<TaskViewMode>("list");
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -154,8 +174,8 @@ export function TaskRegister({
   }, [data.editableCommitteeIds, data.tasks, searchParams]);
 
   const filteredTasks = useMemo(
-    () => filterTasks(tasks, filters),
-    [filters, tasks],
+    () => sortTasksByDeadline(filterTasks(tasks, filters, data.userId)),
+    [data.userId, filters, tasks],
   );
 
   const categoryOptions = useMemo(() => {
@@ -197,6 +217,8 @@ export function TaskRegister({
     filters.committeeId !== "" ||
     filters.responsibleUserId !== "" ||
     filters.category !== "" ||
+    filters.deadline !== "" ||
+    filters.mineOnly ||
     filters.showArchived;
 
   function updateFilter<K extends keyof TaskFilters>(
@@ -221,6 +243,82 @@ export function TaskRegister({
     (decision) => decision.committee_id === (draft?.committeeId ?? ""),
   );
   const canCreate = data.editableCommitteeIds.length > 0;
+  const activeTasks = useMemo(
+    () => tasks.filter((task) => !task.archived_at),
+    [tasks],
+  );
+  const openTasks = useMemo(
+    () => activeTasks.filter(isOpenTask),
+    [activeTasks],
+  );
+  const summaryCards = useMemo(
+    () => [
+      {
+        label: "Alle åbne",
+        value: openTasks.length,
+        active: !filters.status && !filters.mineOnly && !filters.deadline,
+        onClick: () =>
+          setFilters((current) => ({
+            ...current,
+            status: "",
+            deadline: "",
+            mineOnly: false,
+            showArchived: false,
+          })),
+      },
+      {
+        label: "Mine",
+        value: openTasks.filter(
+          (task) => task.responsible_user_id === data.userId,
+        ).length,
+        active: filters.mineOnly,
+        onClick: () =>
+          setFilters((current) => ({
+            ...current,
+            mineOnly: !current.mineOnly,
+            showArchived: false,
+          })),
+      },
+      {
+        label: "Overdue",
+        value: openTasks.filter(
+          (task) => getTaskDeadlineState(task) === "overdue",
+        ).length,
+        active: filters.deadline === "overdue",
+        onClick: () =>
+          setFilters((current) => ({
+            ...current,
+            deadline: current.deadline === "overdue" ? "" : "overdue",
+            showArchived: false,
+          })),
+      },
+      {
+        label: "Due soon",
+        value: openTasks.filter((task) =>
+          ["today", "soon"].includes(getTaskDeadlineState(task)),
+        ).length,
+        active: filters.deadline === "soon",
+        onClick: () =>
+          setFilters((current) => ({
+            ...current,
+            deadline: current.deadline === "soon" ? "" : "soon",
+            showArchived: false,
+          })),
+      },
+      {
+        label: "Waiting",
+        value: openTasks.filter((task) => task.status === "waiting").length,
+        active: filters.status === "waiting",
+        onClick: () =>
+          setFilters((current) => ({
+            ...current,
+            status: current.status === "waiting" ? "" : "waiting",
+            showArchived: false,
+          })),
+      },
+    ],
+    [data.userId, filters.deadline, filters.mineOnly, filters.status, openTasks],
+  );
 
   function openCreate() {
     const next = emptyDraft();
@@ -393,8 +491,57 @@ export function TaskRegister({
     }
   }
 
-  function taskCard(task: TaskView, compact: boolean) {
+  function openEdit(task: TaskView) {
+    setError(null);
+    setFieldErrors({});
+    setDraft(draftFromTask(task));
+  }
+
+  function taskActions(task: TaskView) {
     const canEdit = data.editableCommitteeIds.includes(task.committee_id);
+    if (!canEdit) return null;
+    return (
+      <ActionMenu label="Handlinger">
+        <div className="space-y-1">
+          <button
+            className="block w-full rounded px-3 py-2 text-left text-sm font-medium text-ink hover:bg-subtle"
+            onClick={() => openEdit(task)}
+            type="button"
+          >
+            Rediger
+          </button>
+          <div className="border-t border-line pt-1">
+            <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
+              Skift status
+            </p>
+            {taskStatusOptions.map((option) => (
+              <button
+                className="block w-full rounded px-3 py-2 text-left text-sm text-ink hover:bg-subtle disabled:opacity-60"
+                disabled={actionId === task.id || task.status === option.value}
+                key={option.value}
+                onClick={() => void changeStatus(task, option.value)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {!task.archived_at ? (
+            <button
+              className="block w-full rounded border-t border-line px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-60"
+              disabled={actionId === task.id}
+              onClick={() => void performAction(task, "archive")}
+              type="button"
+            >
+              Arkiver
+            </button>
+          ) : null}
+        </div>
+      </ActionMenu>
+    );
+  }
+
+  function taskCard(task: TaskView, compact: boolean) {
     const deadlineState = getTaskDeadlineState(task);
     return (
       <article
@@ -522,54 +669,8 @@ export function TaskRegister({
               </div>
             ) : null}
           </div>
+          {compact ? taskActions(task) : null}
         </div>
-        {canEdit ? (
-          <div className="mt-2.5 flex flex-wrap items-end gap-2 border-t border-line pt-2.5">
-            <div className="min-w-40 flex-1">
-              <label
-                className="mb-1 block text-xs font-semibold text-muted"
-                htmlFor={`task-status-quick-${task.id}`}
-              >
-                Flyt til status
-              </label>
-              <Select
-                disabled={actionId === task.id}
-                id={`task-status-quick-${task.id}`}
-                onChange={(event) =>
-                  void changeStatus(task, event.target.value as TaskStatus)
-                }
-                value={task.status}
-              >
-                {taskStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <Button
-              onClick={() => {
-                setError(null);
-                setFieldErrors({});
-                setDraft(draftFromTask(task));
-              }}
-              size="sm"
-              variant="secondary"
-            >
-              Rediger
-            </Button>
-            {!task.archived_at ? (
-              <Button
-                disabled={actionId === task.id}
-                onClick={() => performAction(task, "archive")}
-                size="sm"
-                variant="ghost"
-              >
-                Arkiver
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
         {statusErrorId === task.id && error ? (
           <p className="mt-2 text-xs font-medium text-danger">{error}</p>
         ) : null}
@@ -577,15 +678,92 @@ export function TaskRegister({
     );
   }
 
+  function taskRow(task: TaskView) {
+    const deadlineState = getTaskDeadlineState(task);
+    const label = deadlineLabel(task);
+    return (
+      <article
+        className="grid scroll-mt-24 gap-2 border-b border-line bg-surface px-3 py-2.5 last:border-b-0 md:grid-cols-[minmax(220px,1.6fr)_minmax(120px,0.8fr)_minmax(110px,0.7fr)_minmax(120px,0.7fr)_120px_auto] md:items-center"
+        id={`task-${task.id}`}
+        key={task.id}
+      >
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold">{task.title}</h2>
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted md:hidden">
+            <span>{task.responsible?.full_name || "Ingen ansvarlig"}</span>
+            <span>{task.committee?.name ?? "Slettet udvalg"}</span>
+            <span>{formatDate(task.deadline)}</span>
+          </div>
+          {task.description ? (
+            <p className="mt-1 line-clamp-1 text-xs text-muted">
+              {task.description}
+            </p>
+          ) : null}
+        </div>
+        <div className="hidden truncate text-sm md:block">
+          {task.responsible?.full_name || "Ikke angivet"}
+        </div>
+        <div className="hidden truncate text-sm md:block">
+          {task.committee?.name ?? "Slettet udvalg"}
+        </div>
+        <div className="hidden text-sm md:block">
+          <span>{formatDate(task.deadline)}</span>
+          {label ? (
+            <span
+              className={`ml-2 text-xs font-semibold ${
+                deadlineState === "overdue" ? "text-danger" : "text-warning"
+              }`}
+            >
+              {label}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge tone={taskStatusTones[task.status]}>
+            {taskStatusLabels[task.status]}
+          </StatusBadge>
+          {task.archived_at ? <StatusBadge>Arkiveret</StatusBadge> : null}
+        </div>
+        <div className="flex justify-start md:justify-end">{taskActions(task)}</div>
+        {statusErrorId === task.id && error ? (
+          <p className="text-xs font-medium text-danger md:col-span-6">
+            {error}
+          </p>
+        ) : null}
+      </article>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {summaryCards.map((card) => (
+          <button
+            className={`rounded-[var(--radius-panel)] border px-3 py-2 text-left transition ${
+              card.active
+                ? "border-brand bg-mist text-brand"
+                : "border-line bg-surface hover:border-brand/40"
+            }`}
+            key={card.label}
+            onClick={card.onClick}
+            type="button"
+          >
+            <span className="block text-xs font-semibold uppercase tracking-wide text-muted">
+              {card.label}
+            </span>
+            <span className="mt-1 block text-2xl font-semibold leading-none">
+              {card.value}
+            </span>
+          </button>
+        ))}
+      </div>
       <div className="module-filter-surface space-y-3">
         <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto]">
-          <details className="group md:col-span-2">
+          <details className="group md:col-span-2" open>
             <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted transition hover:border-brand/40 hover:text-brand">
               Vis filtre
             </summary>
-            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-6">
           <div>
             <label className="label" htmlFor="task-search">
               Søg
@@ -671,12 +849,43 @@ export function TaskRegister({
               ))}
             </Select>
           </div>
+          <div>
+            <label className="label" htmlFor="task-deadline-filter">
+              Deadline
+            </label>
+            <Select
+              id="task-deadline-filter"
+              onChange={(event) =>
+                updateFilter(
+                  "deadline",
+                  event.target.value as TaskFilters["deadline"],
+                )
+              }
+              value={filters.deadline}
+            >
+              <option value="">Alle deadlines</option>
+              <option value="overdue">Overskredet</option>
+              <option value="soon">Forfalder snart</option>
+              <option value="today">I dag</option>
+              <option value="none">Ingen deadline</option>
+            </Select>
+          </div>
             </div>
           </details>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
           <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <input
+                checked={filters.mineOnly}
+                onChange={(event) =>
+                  updateFilter("mineOnly", event.target.checked)
+                }
+                type="checkbox"
+              />
+              Kun mine
+            </label>
             <label className="flex items-center gap-2 text-sm text-muted">
               <input
                 checked={filters.showArchived}
@@ -710,20 +919,20 @@ export function TaskRegister({
               role="group"
             >
               <Button
-                aria-pressed={viewMode === "board"}
-                onClick={() => setViewMode("board")}
-                size="sm"
-                variant={viewMode === "board" ? "primary" : "ghost"}
-              >
-                Task View
-              </Button>
-              <Button
                 aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
                 size="sm"
                 variant={viewMode === "list" ? "primary" : "ghost"}
               >
                 Liste
+              </Button>
+              <Button
+                aria-pressed={viewMode === "board"}
+                onClick={() => setViewMode("board")}
+                size="sm"
+                variant={viewMode === "board" ? "primary" : "ghost"}
+              >
+                Kanban
               </Button>
             </div>
           </div>
@@ -772,8 +981,16 @@ export function TaskRegister({
             })}
           </div>
         ) : (
-          <div className="grid gap-2.5">
-            {filteredTasks.map((task) => taskCard(task, false))}
+          <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm">
+            <div className="hidden border-b border-line bg-subtle/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(220px,1.6fr)_minmax(120px,0.8fr)_minmax(110px,0.7fr)_minmax(120px,0.7fr)_120px_auto]">
+              <span>Titel</span>
+              <span>Ansvarlig</span>
+              <span>Udvalg</span>
+              <span>Deadline</span>
+              <span>Status</span>
+              <span className="text-right">Handlinger</span>
+            </div>
+            {filteredTasks.map((task) => taskRow(task))}
           </div>
         )
       ) : (

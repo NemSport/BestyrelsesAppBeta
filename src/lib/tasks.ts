@@ -38,6 +38,8 @@ export type TaskFilters = {
   committeeId: string;
   responsibleUserId: string;
   category: string;
+  deadline: "" | "overdue" | "today" | "soon" | "none";
+  mineOnly: boolean;
   showArchived: boolean;
 };
 
@@ -70,13 +72,20 @@ export function getTaskCategorySuggestions(
     .slice(0, 8);
 }
 
-export function filterTasks(tasks: TaskView[], filters: TaskFilters) {
+export function filterTasks(
+  tasks: TaskView[],
+  filters: TaskFilters,
+  currentUserId?: string,
+) {
   const needle = filters.search.trim().toLocaleLowerCase("da-DK");
   const category = normalizeTaskCategory(filters.category);
 
   return tasks.filter((task) => {
     if (!filters.showArchived && task.archived_at) return false;
     if (filters.status && task.status !== filters.status) return false;
+    if (filters.mineOnly && task.responsible_user_id !== currentUserId) {
+      return false;
+    }
     if (filters.committeeId && task.committee_id !== filters.committeeId) {
       return false;
     }
@@ -89,6 +98,16 @@ export function filterTasks(tasks: TaskView[], filters: TaskFilters) {
     if (category && normalizeTaskCategory(task.category) !== category) {
       return false;
     }
+    if (filters.deadline) {
+      const deadlineState = getTaskDeadlineState(task);
+      if (filters.deadline === "soon") {
+        if (!["today", "soon"].includes(deadlineState)) return false;
+      } else if (filters.deadline === "none") {
+        if (task.deadline) return false;
+      } else if (deadlineState !== filters.deadline) {
+        return false;
+      }
+    }
     return (
       !needle ||
       `${task.title} ${task.description}`
@@ -100,16 +119,16 @@ export function filterTasks(tasks: TaskView[], filters: TaskFilters) {
 
 export function sortTasksByDeadline(tasks: TaskView[]) {
   return [...tasks].sort((left, right) => {
-      if (left.deadline && right.deadline) {
-        const deadlineOrder = left.deadline.localeCompare(right.deadline);
-        if (deadlineOrder !== 0) return deadlineOrder;
-      } else if (left.deadline) {
-        return -1;
-      } else if (right.deadline) {
-        return 1;
-      }
-      return right.created_at.localeCompare(left.created_at);
-    });
+    if (left.deadline && right.deadline) {
+      const deadlineOrder = left.deadline.localeCompare(right.deadline);
+      if (deadlineOrder !== 0) return deadlineOrder;
+    } else if (left.deadline) {
+      return -1;
+    } else if (right.deadline) {
+      return 1;
+    }
+    return right.created_at.localeCompare(left.created_at);
+  });
 }
 
 export function getMyOpenTasks(tasks: TaskView[], userId: string) {

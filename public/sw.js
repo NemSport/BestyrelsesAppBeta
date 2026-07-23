@@ -1,7 +1,19 @@
-const CACHE_NAME = "committee-minutes-offline-v1";
+const CACHE_NAME = "bestyrelsesapp-v2";
+const APP_ASSETS = [
+  "/manifest.webmanifest",
+  "/icons/app-icon-192.png",
+  "/icons/app-icon-512.png",
+  "/icons/maskable-icon-512.png",
+  "/icons/apple-touch-icon.png",
+];
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_ASSETS))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -50,7 +62,8 @@ self.addEventListener("fetch", (event) => {
     request.method !== "GET" ||
     url.origin !== self.location.origin ||
     url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/auth/")
+    url.pathname.startsWith("/auth/") ||
+    url.pathname === "/ux-review"
   ) {
     return;
   }

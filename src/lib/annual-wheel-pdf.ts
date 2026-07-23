@@ -66,6 +66,28 @@ function deadlineLabel(template: AnnualWheelEventView["taskTemplates"][number]) 
   return `${Math.abs(template.deadline_offset_days)} dage ${direction} ${anchor}`;
 }
 
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function calculatedDeadlineLabel(
+  event: AnnualWheelEventView,
+  template: AnnualWheelEventView["taskTemplates"][number],
+) {
+  if (template.deadline_offset_days === null) return "Ikke angivet";
+  const anchor =
+    template.deadline_anchor === "end" ? event.ends_on : event.starts_on;
+  return `${deadlineLabel(template)} · ${formatPdfDate(
+    addDays(anchor, template.deadline_offset_days),
+  )}`;
+}
+
 export async function generateAnnualWheelEventPdf(
   input: AnnualWheelPdfInput,
 ) {
@@ -157,46 +179,25 @@ export async function generateAnnualWheelEventPdf(
 
   if (input.event.taskTemplates.length) {
     report.addSection("Faste opgaver");
-    report.addTable(
-      [
-        {
-          label: "Titel",
-          width: 145,
-          getValue: (
-            template: AnnualWheelEventView["taskTemplates"][number],
-          ) => template.title,
-        },
-        {
-          label: "Beskrivelse",
-          width: 165,
-          getValue: (
-            template: AnnualWheelEventView["taskTemplates"][number],
-          ) => richTextToPlainText(template.description),
-        },
+    for (const [index, template] of input.event.taskTemplates.entries()) {
+      report.addSubsection(`${index + 1}. ${template.title}`);
+      report.addMetaGrid([
         {
           label: "Foreslået ansvarlig",
-          width: 105,
-          getValue: (
-            template: AnnualWheelEventView["taskTemplates"][number],
-          ) =>
-            memberName(
-              input.members,
-              template.suggested_responsible_user_id,
-            ),
+          value: memberName(input.members, template.suggested_responsible_user_id),
         },
         {
-          label: "Relativ deadline",
-          width: 85,
-          getValue: (
-            template: AnnualWheelEventView["taskTemplates"][number],
-          ) => deadlineLabel(template),
+          label: "Deadline",
+          value: calculatedDeadlineLabel(input.event, template),
         },
-      ],
-      input.event.taskTemplates,
-      "Ingen faste opgaver.",
-    );
+      ]);
+      if (richTextToPlainText(template.description).trim()) {
+        report.addProse(richTextToPdfBlocks(template.description));
+      } else {
+        report.addParagraph("Ingen beskrivelse.");
+      }
+    }
   }
-
   if (input.event.activatedTasks.length) {
     report.addSection("Aktiverede tasks");
     report.addTable(

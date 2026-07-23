@@ -518,7 +518,7 @@ a {
   }
 
   .minutes-document {
-    @apply mx-auto max-w-4xl;
+    @apply w-full max-w-none;
   }
 
   .minutes-document-section {
@@ -560,12 +560,12 @@ a {
   }
 
   .minutes-document .rich-text-content {
-    @apply max-w-[68ch];
+    @apply max-w-none;
   }
 
   .minutes-decision .rich-text-content,
   .minutes-follow-up .rich-text-content {
-    @apply max-w-[64ch];
+    @apply max-w-none;
   }
 
   .rich-text-editor p {

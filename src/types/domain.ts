@@ -372,6 +372,7 @@ export type TaskCommentView = TaskComment & {
 };
 
 export type TaskRegisterData = {
+  userId: string;
   tasks: TaskView[];
   committees: Committee[];
   meetings: Meeting[];

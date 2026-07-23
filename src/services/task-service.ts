@@ -12,10 +12,17 @@ import { AnnualWheelRepository } from "@/repositories/annual-wheel-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
+import { TaskCommentRepository } from "@/repositories/task-comment-repository";
 import { TaskRepository } from "@/repositories/task-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
+import type { TaskCommentView, TaskView } from "@/types/domain";
+
+export type MeetingReviewTask = TaskView & {
+  reviewSource: string;
+  latestComment: TaskCommentView | null;
+};
 
 export class TaskService {
   private readonly tasks: TaskRepository;
@@ -25,6 +32,7 @@ export class TaskService {
   private readonly annualWheel: AnnualWheelRepository;
   private readonly decisions: DecisionRepository;
   private readonly members: OrganizationMemberRepository;
+  private readonly comments: TaskCommentRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
@@ -36,6 +44,7 @@ export class TaskService {
     this.annualWheel = new AnnualWheelRepository(db);
     this.decisions = new DecisionRepository(db);
     this.members = new OrganizationMemberRepository(db);
+    this.comments = new TaskCommentRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
   }
@@ -71,6 +80,7 @@ export class TaskService {
     const editableCommitteeIdSet = new Set(editableCommitteeIds);
 
     return {
+      userId: user.id,
       tasks: tasks.map((task) =>
         editableCommitteeIdSet.has(task.committee_id)
           ? task
@@ -152,6 +162,90 @@ export class TaskService {
       categorySource,
       members,
     );
+  }
+
+  async getMeetingReviewTasks(
+    organizationId: string,
+    committeeId: string,
+    meetingId: string,
+  ) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
+    const meeting = await this.meetings.findWithAgenda(meetingId);
+    if (
+      !meeting ||
+      meeting.organization_id !== organizationId ||
+      meeting.committee_id !== committeeId
+    ) {
+      throw new NotFoundError("MÃ¸det");
+    }
+
+    const [committeeTasks, meetingDecisions] = await Promise.all([
+      this.tasks.listByCommittee(committeeId),
+      this.decisions.listByMeeting(meetingId),
+    ]);
+    const agendaItemIds = new Set(
+      meeting.agenda_item_occurrences.map(
+        (occurrence) => occurrence.agenda_item_id,
+      ),
+    );
+    const decisionIds = new Set(meetingDecisions.map((decision) => decision.id));
+    const agendaItemTitles = new Map(
+      meeting.agenda_item_occurrences.flatMap((occurrence) =>
+        occurrence.agenda_items
+          ? [[occurrence.agenda_items.id, occurrence.agenda_items.title] as const]
+          : [],
+      ),
+    );
+    const decisionTitles = new Map(
+      meetingDecisions.map((decision) => [decision.id, decision.title] as const),
+    );
+
+    const recentlyCompletedAfter = new Date();
+    recentlyCompletedAfter.setDate(recentlyCompletedAfter.getDate() - 14);
+
+    const relevantTasks = committeeTasks.filter((task) => {
+      if (task.organization_id !== organizationId || task.committee_id !== committeeId) {
+        return false;
+      }
+      if (task.archived_at) return false;
+
+      const directlyLinked =
+        task.meeting_id === meetingId ||
+        (task.agenda_item_id ? agendaItemIds.has(task.agenda_item_id) : false) ||
+        (task.decision_id ? decisionIds.has(task.decision_id) : false);
+      const isClosed =
+        task.status === "completed" || task.status === "cancelled";
+      if (!isClosed) return true;
+      if (!directlyLinked || task.status !== "completed" || !task.completed_at) {
+        return false;
+      }
+      return new Date(task.completed_at) >= recentlyCompletedAfter;
+    });
+
+    const latestComments = await this.comments.listLatestByTasks(
+      relevantTasks.map((task) => task.id),
+    );
+
+    return {
+      meeting,
+      tasks: this.sortForMeetingReview(
+        relevantTasks.map((task) => ({
+          ...task,
+          reviewSource: this.reviewSource(
+            task,
+            meetingId,
+            agendaItemTitles,
+            decisionTitles,
+          ),
+          latestComment: latestComments.get(task.id) ?? null,
+        })),
+      ),
+    };
   }
 
   async getAgendaItemContext(
@@ -347,6 +441,57 @@ export class TaskService {
       String(value.getMonth() + 1).padStart(2, "0"),
       String(value.getDate()).padStart(2, "0"),
     ].join("-");
+  }
+
+  private reviewSource(
+    task: TaskView,
+    meetingId: string,
+    agendaItemTitles: Map<string, string>,
+    decisionTitles: Map<string, string>,
+  ) {
+    const sources = [];
+    if (task.meeting_id === meetingId) sources.push("MÃ¸de");
+    if (task.agenda_item_id) {
+      sources.push(
+        `Punkt: ${agendaItemTitles.get(task.agenda_item_id) ?? task.agendaItem?.title ?? "Ukendt punkt"}`,
+      );
+    }
+    if (task.decision_id) {
+      sources.push(
+        `Beslutning: ${decisionTitles.get(task.decision_id) ?? task.decision?.title ?? "Ukendt beslutning"}`,
+      );
+    }
+    if (!sources.length) {
+      sources.push(`Udvalg: ${task.committee?.name ?? "Udvalg"}`);
+    }
+    return sources.join(" | ");
+  }
+
+  private sortForMeetingReview(tasks: MeetingReviewTask[]) {
+    const rank = (task: MeetingReviewTask) => {
+      if (!task.deadline) return 4;
+      if (task.status === "completed" || task.status === "cancelled") return 5;
+      const today = this.localDate(new Date());
+      if (task.deadline < today) return 0;
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 7);
+      if (task.deadline <= this.localDate(soon)) return 1;
+      return 2;
+    };
+
+    return [...tasks].sort((left, right) => {
+      const rankOrder = rank(left) - rank(right);
+      if (rankOrder !== 0) return rankOrder;
+      if (left.deadline && right.deadline) {
+        const deadlineOrder = left.deadline.localeCompare(right.deadline);
+        if (deadlineOrder !== 0) return deadlineOrder;
+      } else if (left.deadline) {
+        return -1;
+      } else if (right.deadline) {
+        return 1;
+      }
+      return left.title.localeCompare(right.title, "da-DK");
+    });
   }
 
   private async requireResponsibleMember(

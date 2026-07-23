@@ -19,6 +19,25 @@ export class TaskCommentRepository {
     return data as unknown as TaskCommentView[];
   }
 
+  async listLatestByTasks(taskIds: string[]) {
+    if (!taskIds.length) return new Map<string, TaskCommentView>();
+
+    const { data, error } = await this.db
+      .from("task_comments")
+      .select(this.viewSelect)
+      .in("task_id", taskIds)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const latestByTask = new Map<string, TaskCommentView>();
+    for (const comment of (data ?? []) as unknown as TaskCommentView[]) {
+      if (!latestByTask.has(comment.task_id)) {
+        latestByTask.set(comment.task_id, comment);
+      }
+    }
+    return latestByTask;
+  }
+
   async create(input: TableInsert<"task_comments">) {
     const { data, error } = await this.db
       .from("task_comments")

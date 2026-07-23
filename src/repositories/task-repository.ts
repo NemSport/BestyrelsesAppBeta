@@ -32,6 +32,17 @@ export class TaskRepository {
     return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
+  async listByCommittee(committeeId: string) {
+    const { data, error } = await this.db
+      .from("tasks")
+      .select(this.viewSelect)
+      .eq("committee_id", committeeId)
+      .order("deadline", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
   async listByMeeting(meetingId: string) {
     const { data, error } = await this.db
       .from("tasks")

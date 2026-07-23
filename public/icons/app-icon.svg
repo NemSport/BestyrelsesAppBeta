@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">BestyrelsesApp</title>
+  <rect width="512" height="512" rx="112" fill="#18313e"/>
+  <path
+    fill="#fffefd"
+    d="M150 120h126c70 0 112 30 112 82 0 31-16 55-45 68 38 12 59 39 59 76 0 61-48 92-129 92H150V120Zm116 123c31 0 47-11 47-32 0-20-16-30-47-30h-39v62h39Zm8 133c35 0 52-12 52-36 0-23-17-35-52-35h-47v71h47Z"
+  />
+  <path
+    fill="none"
+    stroke="#477065"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="28"
+    d="m106 304 34 34 63-69"
+  />
+</svg>

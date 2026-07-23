@@ -320,6 +320,15 @@ in their scope, after which the unique Storage object is removed best-effort.
 Since PDF exports read current attachment metadata, deleted attachments are not
 included in later agenda or minutes PDFs.
 
+The meeting tasklist PDF is available from the meeting page through a
+server-side route under the meeting API namespace. It reuses the authenticated
+meeting and committee context, resolves organization branding through the same
+PDF branding service, and builds a print-oriented review list from active
+non-archived tasks in the meeting's committee plus tasks linked to the meeting,
+its agenda items, or its decisions. The export excludes archived work and only
+shows recently completed work when it is directly connected to the meeting
+context.
+
 Meeting and agenda-item minutes autosave uses a user-scoped browser draft plus
 optimistic version checks. Client saves include the latest known `updated_at`
 for the target minutes row. Repository updates add that timestamp to the update
@@ -1188,6 +1197,10 @@ and the shared `pdf-report` foundation. The route validates organization
 membership through `AnnualWheelService`, relies on RLS for event visibility,
 loads branding server-side, and exports only public activity fields, key
 people, fixed task templates, and activated tasks.
+Fixed task template deadlines remain stored as `deadline_anchor` plus
+`deadline_offset_days`, but UI and PDF display both the relative rule and the
+calculated date. The event PDF renders each fixed task as its own prose block
+so long descriptions are not truncated by table-cell line limits.
 Organization-level Annual Wheel exports use the same RLS-scoped overview read
 model through
 `/api/organizations/[organizationId]/annual-wheel/pdf/overview` and
@@ -1267,6 +1280,19 @@ committee-owned tables also include `committee_id`. Application tables include
 timestamps and use PostgreSQL constraints and Supabase Row Level Security.
 
 ### Identity and Tenancy
+
+#### Temporary UX review access
+
+The server-only `/ux-review` route is available exclusively on Vercel Preview
+when explicitly enabled. It rate-limits attempts atomically in PostgreSQL,
+compares the supplied secret in constant time, verifies that the configured
+Auth user is an existing restricted viewer in exactly one Organization, and
+uses a server-generated Supabase magic-link token to establish the ordinary
+cookie session. No password, review token, or service-role credential enters
+the client bundle. The redirect strips the review token from the destination
+URL, and the normal middleware plus Row Level Security handle all subsequent
+requests. This temporary route and its database objects must be removed after
+the UX review.
 
 #### `profiles`
 

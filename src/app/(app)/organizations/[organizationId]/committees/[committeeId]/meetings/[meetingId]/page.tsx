@@ -418,6 +418,12 @@ export default async function MeetingPage({
             >
               Download dagsorden
             </a>
+            <a
+              className={buttonClassName({ variant: "secondary" })}
+              href={`/api/meetings/${meetingId}/tasks/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
+            >
+              Download opgaveliste PDF
+            </a>
             {canEditMeeting ? (
               <>
                 <EditMeetingModal
