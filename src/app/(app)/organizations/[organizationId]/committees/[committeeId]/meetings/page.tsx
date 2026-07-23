@@ -9,7 +9,7 @@ import {
 } from "@/components/ui";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { formatDateTime, meetingStatusLabels } from "@/lib/localization";
-import { canManageCommittee } from "@/lib/permissions";
+import { getMeetingCapabilities } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -94,8 +94,13 @@ function MeetingRows({
   );
 }
 
-function findNearbyMeetings(meetings: CommitteeMeeting[], selectedDate: string) {
-  const sameDay = meetings.filter((meeting) => dateKey(meeting.starts_at) === selectedDate);
+function findNearbyMeetings(
+  meetings: CommitteeMeeting[],
+  selectedDate: string,
+) {
+  const sameDay = meetings.filter(
+    (meeting) => dateKey(meeting.starts_at) === selectedDate,
+  );
   const before = meetings
     .filter((meeting) => dateKey(meeting.starts_at) < selectedDate)
     .slice(0, 2);
@@ -136,10 +141,9 @@ export default async function MeetingsPage({
     committeeId,
     user.id,
   );
-  const meetings = [...await new MeetingService(db).list(
-    organizationId,
-    committeeId,
-  )].sort(
+  const meetings = [
+    ...(await new MeetingService(db).list(organizationId, committeeId)),
+  ].sort(
     (left, right) =>
       new Date(right.starts_at).getTime() -
         new Date(left.starts_at).getTime() ||
@@ -147,10 +151,11 @@ export default async function MeetingsPage({
         new Date(left.created_at).getTime(),
   );
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
-  const canEdit = canManageCommittee(
+  const meetingCapabilities = getMeetingCapabilities(
     context.organizationMembership.role,
     context.membership?.role ?? null,
   );
+  const canEdit = meetingCapabilities.createMeeting;
   const now = Date.now();
   const upcomingMeetings = meetings.filter(
     (meeting) => new Date(meeting.starts_at).getTime() >= now,
@@ -245,7 +250,9 @@ export default async function MeetingsPage({
           <section>
             <div className="mb-2 flex items-end justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-ink">Kommende møder</h2>
+                <h2 className="text-sm font-semibold text-ink">
+                  Kommende møder
+                </h2>
                 <p className="text-xs text-muted">
                   De næste møder i udvalget med status og hurtig adgang.
                 </p>
@@ -289,7 +296,11 @@ export default async function MeetingsPage({
         </div>
       ) : (
         <EmptyState
-          description="Opret et møde for at samle dagsorden, referat og opfølgning."
+          description={
+            meetingCapabilities.createMeeting
+              ? "Opret et møde for at samle dagsorden, referat og opfølgning."
+              : "Når en ansvarlig opretter et møde, vises dagsorden, referat og opfølgning her."
+          }
           title="Der er endnu ikke oprettet nogen møder."
         />
       )}

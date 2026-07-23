@@ -14,6 +14,7 @@ import { OrganizationRepository } from "@/repositories/organization-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { TaskRepository } from "@/repositories/task-repository";
 import { sortTasksByDeadline } from "@/lib/tasks";
+import { getMeetingCapabilities } from "@/lib/permissions";
 import type { Database } from "@/types/database";
 import type { OrganizationOverview } from "@/types/domain";
 import { AuthService } from "@/services/auth-service";
@@ -86,6 +87,24 @@ export class OrganizationService {
     ]);
 
     const now = Date.now();
+    const committeeCapabilities = new Map(
+      await Promise.all(
+        committees.map(async (committee) => {
+          const context = await this.authorization.requireCommitteeMember(
+            organizationId,
+            committee.id,
+            user.id,
+          );
+          return [
+            committee.id,
+            getMeetingCapabilities(
+              context.organizationMembership.role,
+              context.membership?.role ?? null,
+            ),
+          ] as const;
+        }),
+      ),
+    );
     const committeesById = new Map(
       committees.map((committee) => [committee.id, committee]),
     );
@@ -217,6 +236,7 @@ export class OrganizationService {
         );
         return {
           committee,
+          capabilities: committeeCapabilities.get(committee.id)!,
           nextMeeting: committeeMeetings[0] ?? null,
           upcomingMeetingCount: committeeMeetings.length,
           openFollowUpCount: openFollowUpMinutes.filter(

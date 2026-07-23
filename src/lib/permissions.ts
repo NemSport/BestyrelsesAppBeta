@@ -1,7 +1,25 @@
-import type { Database } from "@/types/database";
+import { AuthorizationError } from "@/lib/errors";
+import {
+  getMeetingCapabilities,
+  hasMeetingCapability,
+  meetingCapabilityDeniedMessage,
+  type CommitteeRole,
+  type MeetingCapabilities,
+  type MeetingCapability,
+  type OrganizationRole,
+} from "@/lib/meeting-capabilities";
 
-type OrganizationRole = Database["public"]["Enums"]["organization_role"];
-type CommitteeRole = Database["public"]["Enums"]["committee_role"];
+export {
+  getMeetingCapabilities,
+  hasMeetingCapability,
+  meetingCapabilityDeniedMessage,
+};
+export type {
+  CommitteeRole,
+  MeetingCapabilities,
+  MeetingCapability,
+  OrganizationRole,
+};
 
 export function isOrganizationAdmin(role: OrganizationRole) {
   return role === "owner" || role === "admin";
@@ -11,21 +29,22 @@ export function canManageCommittee(
   organizationRole: OrganizationRole,
   committeeRole: CommitteeRole | null,
 ) {
-  return (
-    isOrganizationAdmin(organizationRole) ||
-    committeeRole === "chair" ||
-    committeeRole === "secretary"
-  );
+  return getMeetingCapabilities(organizationRole, committeeRole).editMeeting;
 }
 
 export function canEditAgendaItems(
   organizationRole: OrganizationRole,
   committeeRole: CommitteeRole | null,
 ) {
-  return (
-    isOrganizationAdmin(organizationRole) ||
-    committeeRole === "chair" ||
-    committeeRole === "secretary" ||
-    committeeRole === "member"
-  );
+  return getMeetingCapabilities(organizationRole, committeeRole)
+    .editAgendaItems;
+}
+
+export function assertMeetingCapability(
+  capabilities: MeetingCapabilities,
+  capability: MeetingCapability,
+) {
+  if (!hasMeetingCapability(capabilities, capability)) {
+    throw new AuthorizationError(meetingCapabilityDeniedMessage);
+  }
 }

@@ -164,6 +164,18 @@ export const mockOverview: OrganizationOverview = {
   committees: [
     {
       committee: boardCommittee,
+      capabilities: {
+        viewMeeting: true,
+        createMeeting: true,
+        editMeeting: true,
+        manageParticipants: true,
+        manageAgenda: true,
+        editOfficialMinutes: true,
+        manageMinutesApproval: true,
+        editAgendaItems: true,
+        editTasks: true,
+        editDecisions: true,
+      },
       nextMeeting: mockDefaultMeeting,
       upcomingMeetingCount: 1,
       openTaskCount: 1,
@@ -171,6 +183,18 @@ export const mockOverview: OrganizationOverview = {
     },
     {
       committee: sponsorCommittee,
+      capabilities: {
+        viewMeeting: true,
+        createMeeting: false,
+        editMeeting: false,
+        manageParticipants: false,
+        manageAgenda: false,
+        editOfficialMinutes: false,
+        manageMinutesApproval: false,
+        editAgendaItems: true,
+        editTasks: true,
+        editDecisions: true,
+      },
       nextMeeting: mockSponsorMeeting,
       upcomingMeetingCount: 1,
       openTaskCount: 1,

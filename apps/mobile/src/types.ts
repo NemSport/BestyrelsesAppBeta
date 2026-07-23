@@ -17,6 +17,20 @@ export type Committee = {
   id: string;
   name: string;
   description?: string | null;
+  capabilities?: MeetingCapabilities;
+};
+
+export type MeetingCapabilities = {
+  viewMeeting: boolean;
+  createMeeting: boolean;
+  editMeeting: boolean;
+  manageParticipants: boolean;
+  manageAgenda: boolean;
+  editOfficialMinutes: boolean;
+  manageMinutesApproval: boolean;
+  editAgendaItems: boolean;
+  editTasks: boolean;
+  editDecisions: boolean;
 };
 
 export type Meeting = {
@@ -75,6 +89,7 @@ export type Decision = {
 export type OrganizationOverview = {
   committees: Array<{
     committee: Committee;
+    capabilities: MeetingCapabilities;
     nextMeeting: Meeting | null;
     upcomingMeetingCount: number;
     openTaskCount: number;
@@ -98,6 +113,7 @@ export type OrganizationOverview = {
 
 export type MeetingDetail = {
   meeting: Meeting;
+  capabilities: MeetingCapabilities;
   minutes: {
     meetingMinutes: {
       minutes_text: string;

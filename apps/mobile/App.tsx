@@ -220,9 +220,15 @@ function MobileShell({ session }: { session: Session }) {
     safeOrganizations.find((item) => item.id === organizationId) ??
     safeOrganizations[0];
   const committees =
-    overview?.committees.map((entry) => entry.committee) ??
+    overview?.committees.map((entry) => ({
+      ...entry.committee,
+      capabilities: entry.capabilities,
+    })) ??
     organization?.committees ??
     [];
+  const meetingCommittees = committees.filter(
+    (committee) => committee.capabilities?.createMeeting,
+  );
 
   const allMeetings = useMemo(() => {
     const recentAsMeetings = organizationId
@@ -462,13 +468,15 @@ function MobileShell({ session }: { session: Session }) {
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            disabled={!organizationId}
-            onPress={() => setQuickActionOpen(true)}
-            style={styles.quickButton}
-          >
-            <Text style={styles.quickButtonText}>+ Opret</Text>
-          </Pressable>
+          {meetingCommittees.length > 0 ? (
+            <Pressable
+              disabled={!organizationId}
+              onPress={() => setQuickActionOpen(true)}
+              style={styles.quickButton}
+            >
+              <Text style={styles.quickButtonText}>+ Opret</Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.profileText}>{session.user.email ?? "Profil"}</Text>
         </View>
       </View>
@@ -571,7 +579,7 @@ function MobileShell({ session }: { session: Session }) {
       ) : null}
 
       <QuickActionModal
-        committees={committees}
+        committees={meetingCommittees}
         contextMeeting={meetingDetail?.meeting ?? null}
         onClose={() => setQuickActionOpen(false)}
         onCreated={(meeting) => {
@@ -1034,19 +1042,21 @@ function MeetingDetailReadScreen({
           <View style={styles.readingItem}>
             <View style={styles.readingHeader}>
               <Text style={styles.rowTitle}>Generelt referat</Text>
-              <Pressable
-                onPress={() =>
-                  openMinutesAssist({
-                    field: "minutes_text",
-                    label: "Generelt referat",
-                    source: "meeting_minutes",
-                    text: minutesText,
-                  })
-                }
-                style={styles.aiButton}
-              >
-                <Text style={styles.aiButtonText}>AI-hjælp</Text>
-              </Pressable>
+              {detail.capabilities.editOfficialMinutes ? (
+                <Pressable
+                  onPress={() =>
+                    openMinutesAssist({
+                      field: "minutes_text",
+                      label: "Generelt referat",
+                      source: "meeting_minutes",
+                      text: minutesText,
+                    })
+                  }
+                  style={styles.aiButton}
+                >
+                  <Text style={styles.aiButtonText}>AI-hjælp</Text>
+                </Pressable>
+              ) : null}
             </View>
             <Text style={styles.body}>{minutesText}</Text>
           </View>
@@ -1057,20 +1067,22 @@ function MeetingDetailReadScreen({
               <View key={minutes.id} style={styles.readingItem}>
                 <View style={styles.readingHeader}>
                   <Text style={styles.rowTitle}>{minutes.label}</Text>
-                  <Pressable
-                    onPress={() =>
-                      openMinutesAssist({
-                        agendaItemId: minutes.id,
-                        field: "notes",
-                        label: minutes.label,
-                        source: "agenda_item_minutes",
-                        text: minutes.notes,
-                      })
-                    }
-                    style={styles.aiButton}
-                  >
-                    <Text style={styles.aiButtonText}>AI-hjælp</Text>
-                  </Pressable>
+                  {detail.capabilities.editOfficialMinutes ? (
+                    <Pressable
+                      onPress={() =>
+                        openMinutesAssist({
+                          agendaItemId: minutes.id,
+                          field: "notes",
+                          label: minutes.label,
+                          source: "agenda_item_minutes",
+                          text: minutes.notes,
+                        })
+                      }
+                      style={styles.aiButton}
+                    >
+                      <Text style={styles.aiButtonText}>AI-hjælp</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 <Text style={styles.body}>{minutes.notes}</Text>
               </View>
@@ -1079,7 +1091,9 @@ function MeetingDetailReadScreen({
         ) : null}
         {!minutesText && pointMinutes.length === 0 ? (
           <Text style={styles.muted}>
-            Referat er ikke skrevet endnu. Åbn webappen for fuld redigering.
+            {detail.capabilities.editOfficialMinutes
+              ? "Referat er ikke skrevet endnu. Åbn webappen for at redigere."
+              : "Referat er ikke skrevet endnu. Du har skrivebeskyttet adgang til referatet."}
           </Text>
         ) : null}
       </SectionCard>

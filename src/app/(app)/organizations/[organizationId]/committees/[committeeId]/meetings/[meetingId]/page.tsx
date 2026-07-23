@@ -27,7 +27,7 @@ import {
   formatDateTime,
 } from "@/lib/localization";
 import { agendaItemMinutesNeedsAction } from "@/lib/agenda-item-minutes";
-import { canManageCommittee } from "@/lib/permissions";
+import { getMeetingCapabilities } from "@/lib/permissions";
 import { firstRichTextToPlainText } from "@/lib/rich-text";
 import { createClient } from "@/lib/supabase/server";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
@@ -312,7 +312,11 @@ export default async function MeetingPage({
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const organizationRole = context.organizationMembership.role;
   const committeeRole = context.membership?.role ?? null;
-  const canEditMeeting = canManageCommittee(organizationRole, committeeRole);
+  const meetingCapabilities = getMeetingCapabilities(
+    organizationRole,
+    committeeRole,
+  );
+  const canEditMeeting = meetingCapabilities.editMeeting;
   const registeredInternalParticipantCount =
     participants.internalParticipants.filter((attendee) =>
       ["accepted", "attended", "absent", "excused"].includes(
@@ -460,7 +464,7 @@ export default async function MeetingPage({
         participantSummary={{
           action: (
             <MeetingParticipantsPanel
-              canEdit={canEditMeeting}
+              canEdit={meetingCapabilities.manageParticipants}
               committeeId={committeeId}
               externalAttendees={participants.externalAttendees}
               internalParticipants={participants.internalParticipants}

@@ -175,6 +175,16 @@ may edit minutes. Committee members may read relevant minutes. Committee
 viewers may only read minutes after the general meeting minutes are approved.
 These rules must be enforced in services and PostgreSQL Row Level Security.
 
+Issue 16 centralizes meeting-action capabilities in
+`src/lib/meeting-capabilities.ts`. Presentation and server authorization derive
+meeting creation, quick meeting, participant administration, agenda
+management, official minutes, approval, task, and decision actions from the
+same organization/committee role pair. Committee members retain agenda-item,
+task, and decision editing, but meeting creation, participant administration,
+agenda scheduling, and official minutes remain committee-manager actions.
+Unavailable actions are hidden or presented as explicitly read-only, and
+denied meeting actions use a generic, actionable authorization message.
+
 Editable minutes use debounced autosave through the existing authenticated API.
 Every change is first stored as a user-scoped browser draft. Failed or offline
 writes retain that draft, reconnecting retries synchronization, and differing
