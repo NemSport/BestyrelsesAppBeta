@@ -6,7 +6,7 @@ import {
   UxReviewService,
   type UxReviewFailureReason,
 } from "@/services/ux-review-service";
-import type { UxReviewRateLimitDiagnostic } from "@/repositories/ux-review-repository";
+import type { UxReviewDiagnostic } from "@/repositories/ux-review-repository";
 import type { Database } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +117,7 @@ function logUxReviewDiagnostic(
   stage: string,
   reason: UxReviewFailureReason | "session-cookie-failed",
   requestToken: string | null,
-  diagnostic?: UxReviewRateLimitDiagnostic,
+  diagnostic?: UxReviewDiagnostic,
 ) {
   console.error("[ux-review]", {
     stage,

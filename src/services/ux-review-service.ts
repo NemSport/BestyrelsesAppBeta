@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getUxReviewEnv } from "@/lib/server-env";
 import {
   UxReviewRepository,
-  type UxReviewRateLimitDiagnostic,
+  type UxReviewDiagnostic,
 } from "@/repositories/ux-review-repository";
 
 const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
@@ -42,7 +42,7 @@ export type UxReviewAuthorizationResult =
   | { ok: true; grant: ReviewSessionGrant }
   | {
       ok: false;
-      diagnostic?: UxReviewRateLimitDiagnostic;
+      diagnostic?: UxReviewDiagnostic;
       reason: UxReviewFailureReason;
       stage: string;
     };
@@ -176,6 +176,7 @@ export class UxReviewService {
     if (!restrictedAccess.ok) {
       return {
         ok: false,
+        diagnostic: restrictedAccess.diagnostic,
         stage: "membership-validation",
         reason: restrictedAccess.reason,
       };
