@@ -1168,11 +1168,15 @@ confirmed test user after constant-time token validation and PostgreSQL-backed
 rate limiting. The server-only `/auth/ux-review-callback` route verifies the
 one-time Supabase magic-link token and writes the normal server auth cookies
 before redirecting to the test Organization.
-The user must have exactly one active Organization membership as `viewer`;
-active Committee memberships must also be `viewer` without voting rights.
-Normal Row Level Security remains the data-isolation boundary. The route,
-environment variables, and temporary rate-limit database objects must be
-removed after the external UX review.
+The user must have exactly one active Organization membership, and that
+Organization must be named `UX Testorganisation`. The temporary review profile
+may be either read-only (`viewer` Organization plus `viewer` Committee
+memberships without effective voting rights) or editing (`member` Organization
+plus `member` Committee memberships). Every active Committee membership must
+resolve to the active `Test udvalg`; mixed role profiles and memberships outside
+that test scope are rejected. Normal Row Level Security remains the
+data-isolation boundary. The route, environment variables, and temporary
+rate-limit database objects must be removed after the external UX review.
 
 ## Trash And Retention Foundation
 

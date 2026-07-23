@@ -10,8 +10,12 @@ type OrganizationRole = Database["public"]["Enums"]["organization_role"];
 type CommitteeRole = Database["public"]["Enums"]["committee_role"];
 type MembershipStatus = Database["public"]["Enums"]["membership_status"];
 
+const UX_REVIEW_ORGANIZATION_NAME = "UX Testorganisation";
+const UX_REVIEW_COMMITTEE_NAME = "Test udvalg";
 const OBSERVER_ORGANIZATION_ROLE = "viewer" satisfies OrganizationRole;
 const OBSERVER_COMMITTEE_ROLE = "viewer" satisfies CommitteeRole;
+const EDITOR_ORGANIZATION_ROLE = "member" satisfies OrganizationRole;
+const EDITOR_COMMITTEE_ROLE = "member" satisfies CommitteeRole;
 const VOTING_COMMITTEE_ROLES = [
   "chair",
   "secretary",
@@ -122,7 +126,7 @@ export class UxReviewRepository {
     if (
       activeOrganizationMemberships.length !== 1 ||
       !activeOrganizationMembership ||
-      activeOrganizationMembership.role !== OBSERVER_ORGANIZATION_ROLE
+      !isAllowedOrganizationRole(activeOrganizationMembership.role)
     ) {
       return {
         ok: false,
@@ -139,26 +143,66 @@ export class UxReviewRepository {
     }
 
     const organizationId = activeOrganizationMembership.organization_id;
+    const { data: reviewOrganization, error: organizationLookupError } =
+      await this.admin
+        .from("organizations")
+        .select("id")
+        .eq("id", organizationId)
+        .eq("name", UX_REVIEW_ORGANIZATION_NAME)
+        .is("deleted_at", null)
+        .maybeSingle();
+    if (organizationLookupError) throw organizationLookupError;
+    if (!reviewOrganization) {
+      return {
+        ok: false,
+        diagnostic: {
+          organizationRoles: organizationMemberships.map(
+            (membership) => membership.role,
+          ),
+          organizationStatuses: organizationMemberships.map(
+            (membership) => membership.status,
+          ),
+        },
+        reason: "invalid-organization-membership",
+      };
+    }
+
     const { data: committeeMemberships, error: committeeError } = await this.admin
       .from("committee_members")
-      .select("organization_id, role, status, voting_rights")
+      .select("committee_id, organization_id, role, status, voting_rights")
       .eq("user_id", userId);
     if (committeeError) throw committeeError;
 
-    // In the authoritative voting/approval functions, voting_rights only grants
-    // voting access together with chair, secretary, or member. The viewer enum
-    // is always read-only, including legacy rows carrying the table's true
-    // default in voting_rights.
+    const committeeIds = committeeMemberships.map(
+      (membership) => membership.committee_id,
+    );
+    const { data: reviewCommittees, error: committeeLookupError } =
+      committeeIds.length === 0
+        ? { data: [], error: null }
+        : await this.admin
+            .from("committees")
+            .select("id")
+            .in("id", committeeIds)
+            .eq("organization_id", organizationId)
+            .eq("name", UX_REVIEW_COMMITTEE_NAME)
+            .is("archived_at", null)
+            .is("deleted_at", null);
+    if (committeeLookupError) throw committeeLookupError;
+
     const hasUnsafeCommitteeMembership = committeeMemberships.some(
       (membership) =>
         membership.organization_id !== organizationId ||
         membership.status !== "active" ||
-        membership.role !== OBSERVER_COMMITTEE_ROLE ||
-        hasEffectiveVotingRights(membership.role, membership.voting_rights),
+        !isAllowedCommitteeMembership(
+          activeOrganizationMembership.role,
+          membership.role,
+          membership.voting_rights,
+        ),
     );
 
     if (
       committeeMemberships.length === 0 ||
+      reviewCommittees.length !== committeeMemberships.length ||
       hasUnsafeCommitteeMembership
     ) {
       return {
@@ -190,6 +234,32 @@ export class UxReviewRepository {
     if (data.user.id !== expectedUserId) return null;
     return data.properties.hashed_token;
   }
+}
+
+function isAllowedOrganizationRole(role: OrganizationRole) {
+  return (
+    role === OBSERVER_ORGANIZATION_ROLE ||
+    role === EDITOR_ORGANIZATION_ROLE
+  );
+}
+
+function isAllowedCommitteeMembership(
+  organizationRole: OrganizationRole,
+  committeeRole: CommitteeRole,
+  votingRights: boolean,
+) {
+  if (organizationRole === EDITOR_ORGANIZATION_ROLE) {
+    return committeeRole === EDITOR_COMMITTEE_ROLE;
+  }
+
+  // In the authoritative voting/approval functions, voting_rights only grants
+  // voting access together with chair, secretary, or member. The viewer enum
+  // remains read-only, including legacy rows carrying the table's true default.
+  return (
+    organizationRole === OBSERVER_ORGANIZATION_ROLE &&
+    committeeRole === OBSERVER_COMMITTEE_ROLE &&
+    !hasEffectiveVotingRights(committeeRole, votingRights)
+  );
 }
 
 function hasEffectiveVotingRights(

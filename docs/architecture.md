@@ -1286,9 +1286,13 @@ timestamps and use PostgreSQL constraints and Supabase Row Level Security.
 The server-only `/ux-review` route is available exclusively on Vercel Preview
 when explicitly enabled. It rate-limits attempts atomically in PostgreSQL,
 compares the supplied secret in constant time, verifies that the configured
-Auth user is an existing restricted viewer in exactly one Organization, and
-uses a server-generated Supabase magic-link token plus a two-minute signed
-callback grant. `/ux-review` redirects to the server-only
+Auth user has exactly one active membership in the specifically named
+`UX Testorganisation`, and accepts only a coherent test profile: either
+`viewer`/`viewer` without effective voting rights or `member`/`member`.
+Every Committee membership must resolve to the active `Test udvalg`; mixed
+roles or memberships outside the named test scope are rejected. The route uses
+a server-generated Supabase magic-link token plus a two-minute signed callback
+grant. `/ux-review` redirects to the server-only
 `/auth/ux-review-callback`, which verifies the one-time token through
 `verifyOtp`, writes cookies through the ordinary Supabase SSR server adapter,
 and redirects to the validated test Organization. No password, review token,
