@@ -1,13 +1,10 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { env } from "@/lib/env";
 import {
   UxReviewService,
   type UxReviewFailureReason,
 } from "@/services/ux-review-service";
 import type { UxReviewDiagnostic } from "@/repositories/ux-review-repository";
-import type { Database } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,58 +39,19 @@ export async function GET(request: NextRequest) {
     }
     const { grant } = authorization;
 
-    const destination = new URL(
+    const callback = new URL("/auth/ux-review-callback", request.url);
+    callback.searchParams.set("token_hash", grant.tokenHash);
+    callback.searchParams.set("type", "magiclink");
+    callback.searchParams.set(
+      "next",
       `/organizations/${grant.organizationId}`,
-      request.url,
     );
-    const response = NextResponse.redirect(destination, 303);
+    callback.searchParams.set("expires", String(grant.callbackExpiresAt));
+    callback.searchParams.set("signature", grant.callbackSignature);
+
+    const response = NextResponse.redirect(callback, 303);
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("Referrer-Policy", "no-referrer");
-
-    try {
-      const supabase = createServerClient<Database>(
-        env.NEXT_PUBLIC_SUPABASE_URL,
-        env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        {
-          cookies: {
-            getAll: () => request.cookies.getAll(),
-            setAll: (cookiesToSet) => {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                response.cookies.set(name, value, options),
-              );
-            },
-          },
-        },
-      );
-      const { data, error } = await supabase.auth.verifyOtp({
-        type: "magiclink",
-        token_hash: grant.tokenHash,
-      });
-      const hasSessionCookie = response.cookies
-        .getAll()
-        .some((cookie) => cookie.name.includes("-auth-token"));
-      if (
-        error ||
-        !data.session ||
-        data.user?.id !== grant.userId ||
-        !hasSessionCookie
-      ) {
-        logUxReviewDiagnostic(
-          "session-creation",
-          "session-cookie-failed",
-          requestToken,
-        );
-        return denied();
-      }
-    } catch {
-      logUxReviewDiagnostic(
-        "session-creation",
-        "session-cookie-failed",
-        requestToken,
-      );
-      return denied();
-    }
-
     return response;
   } catch {
     logUxReviewDiagnostic(

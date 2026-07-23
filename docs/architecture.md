@@ -1287,12 +1287,15 @@ The server-only `/ux-review` route is available exclusively on Vercel Preview
 when explicitly enabled. It rate-limits attempts atomically in PostgreSQL,
 compares the supplied secret in constant time, verifies that the configured
 Auth user is an existing restricted viewer in exactly one Organization, and
-uses a server-generated Supabase magic-link token to establish the ordinary
-cookie session. No password, review token, or service-role credential enters
-the client bundle. The redirect strips the review token from the destination
-URL, and the normal middleware plus Row Level Security handle all subsequent
-requests. This temporary route and its database objects must be removed after
-the UX review.
+uses a server-generated Supabase magic-link token plus a two-minute signed
+callback grant. `/ux-review` redirects to the server-only
+`/auth/ux-review-callback`, which verifies the one-time token through
+`verifyOtp`, writes cookies through the ordinary Supabase SSR server adapter,
+and redirects to the validated test Organization. No password, review token,
+or service-role credential enters the client bundle. The final redirect strips
+all review credentials from the destination URL, and the normal middleware
+plus Row Level Security handle all subsequent requests. These temporary routes
+and their database objects must be removed after the UX review.
 
 #### `profiles`
 

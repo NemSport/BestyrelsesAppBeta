@@ -16,11 +16,13 @@ import {
 const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const MAX_ATTEMPTS_PER_CLIENT = 8;
 const MAX_ATTEMPTS_GLOBALLY = 80;
+const CALLBACK_LIFETIME_SECONDS = 2 * 60;
 
 type ReviewSessionGrant = {
+  callbackExpiresAt: number;
+  callbackSignature: string;
   organizationId: string;
   tokenHash: string;
-  userId: string;
 };
 
 export type UxReviewFailureReason =
@@ -200,15 +202,48 @@ export class UxReviewService {
       };
     }
 
+    const callbackExpiresAt =
+      Math.floor(Date.now() / 1_000) + CALLBACK_LIFETIME_SECONDS;
+
     return {
       ok: true,
       grant: {
+        callbackExpiresAt,
+        callbackSignature: signCallbackGrant(
+          tokenHash,
+          restrictedAccess.organizationId,
+          callbackExpiresAt,
+          reviewEnv.UX_REVIEW_TOKEN,
+        ),
         organizationId: restrictedAccess.organizationId,
         tokenHash,
-        userId: user.id,
       },
     };
   }
+}
+
+export function isValidUxReviewCallbackGrant(input: {
+  expiresAt: number;
+  organizationId: string;
+  signature: string;
+  tokenHash: string;
+}, secret: string) {
+  const currentTime = Math.floor(Date.now() / 1_000);
+  if (
+    !Number.isSafeInteger(input.expiresAt) ||
+    input.expiresAt < currentTime ||
+    input.expiresAt > currentTime + CALLBACK_LIFETIME_SECONDS
+  ) {
+    return false;
+  }
+
+  const expectedSignature = signCallbackGrant(
+    input.tokenHash,
+    input.organizationId,
+    input.expiresAt,
+    secret,
+  );
+  return tokensMatch(input.signature, expectedSignature);
 }
 
 function tokensMatch(suppliedToken: string | null, expectedToken: string) {
@@ -217,6 +252,17 @@ function tokensMatch(suppliedToken: string | null, expectedToken: string) {
     .digest();
   const expectedDigest = createHash("sha256").update(expectedToken).digest();
   return timingSafeEqual(suppliedDigest, expectedDigest);
+}
+
+function signCallbackGrant(
+  tokenHash: string,
+  organizationId: string,
+  expiresAt: number,
+  secret: string,
+) {
+  return createHmac("sha256", secret)
+    .update(`v1\n${tokenHash}\n${organizationId}\n${expiresAt}`)
+    .digest("hex");
 }
 
 function isCurrentlyBanned(user: { banned_until?: string }) {

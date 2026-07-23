@@ -29,6 +29,9 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup") ||
     request.nextUrl.pathname.startsWith("/auth");
+  const isAuthCallback =
+    request.nextUrl.pathname.startsWith("/auth/callback") ||
+    request.nextUrl.pathname.startsWith("/auth/ux-review-callback");
   const isProtected = request.nextUrl.pathname.startsWith("/organizations") ||
     request.nextUrl.pathname.startsWith("/onboarding");
 
@@ -39,7 +42,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute && !request.nextUrl.pathname.startsWith("/auth/callback")) {
+  if (user && isAuthRoute && !isAuthCallback) {
     const url = request.nextUrl.clone();
     url.pathname = "/organizations";
     url.search = "";

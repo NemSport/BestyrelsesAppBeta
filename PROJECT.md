@@ -1163,8 +1163,11 @@ Vercel Preview deployments may expose `/ux-review?token=...` only when
 `UX_REVIEW_ENABLED=true` and the server-only review token and user e-mail are
 configured. Production and non-Preview environments always return 404.
 
-The route creates a normal Supabase session for an existing, confirmed test
-user after constant-time token validation and PostgreSQL-backed rate limiting.
+The route creates a short-lived, signed callback grant for an existing,
+confirmed test user after constant-time token validation and PostgreSQL-backed
+rate limiting. The server-only `/auth/ux-review-callback` route verifies the
+one-time Supabase magic-link token and writes the normal server auth cookies
+before redirecting to the test Organization.
 The user must have exactly one active Organization membership as `viewer`;
 active Committee memberships must also be `viewer` without voting rights.
 Normal Row Level Security remains the data-isolation boundary. The route,
