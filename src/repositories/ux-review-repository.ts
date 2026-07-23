@@ -6,6 +6,21 @@ import type { Database } from "@/types/database";
 
 const USERS_PER_PAGE = 1_000;
 const MAX_USER_PAGES = 100;
+export const UX_REVIEW_RATE_LIMIT_RPC = "consume_ux_review_attempt";
+export const UX_REVIEW_RATE_LIMIT_SCHEMA = "public";
+
+export type UxReviewRateLimitDiagnostic = {
+  code: string | null;
+  message: string | null;
+  details: string | null;
+  hint: string | null;
+  rpc: typeof UX_REVIEW_RATE_LIMIT_RPC;
+  schema: typeof UX_REVIEW_RATE_LIMIT_SCHEMA;
+};
+
+type RateLimitResult =
+  | { ok: true; allowed: boolean }
+  | { ok: false; diagnostic: UxReviewRateLimitDiagnostic };
 
 type RestrictedAccessResult =
   | { ok: true; organizationId: string }
@@ -23,14 +38,28 @@ export class UxReviewRepository {
     attemptKey: string,
     maxAttempts: number,
     windowSeconds: number,
-  ) {
-    const { data, error } = await this.admin.rpc("consume_ux_review_attempt", {
-      attempt_key: attemptKey,
-      max_attempts: maxAttempts,
-      window_seconds: windowSeconds,
-    });
-    if (error) throw error;
-    return data;
+  ): Promise<RateLimitResult> {
+    try {
+      const { data, error } = await this.admin
+        .schema(UX_REVIEW_RATE_LIMIT_SCHEMA)
+        .rpc(UX_REVIEW_RATE_LIMIT_RPC, {
+          attempt_key: attemptKey,
+          max_attempts: maxAttempts,
+          window_seconds: windowSeconds,
+        });
+      if (error) {
+        return {
+          ok: false,
+          diagnostic: toRateLimitDiagnostic(error),
+        };
+      }
+      return { ok: true, allowed: data };
+    } catch (error) {
+      return {
+        ok: false,
+        diagnostic: toRateLimitDiagnostic(error),
+      };
+    }
   }
 
   async findExistingUserByEmail(email: string): Promise<User | null> {
@@ -105,4 +134,38 @@ export class UxReviewRepository {
     if (data.user.id !== expectedUserId) return null;
     return data.properties.hashed_token;
   }
+}
+
+function toRateLimitDiagnostic(error: unknown): UxReviewRateLimitDiagnostic {
+  const candidate =
+    typeof error === "object" && error !== null
+      ? (error as Record<string, unknown>)
+      : {};
+
+  return {
+    code: sanitizeDiagnosticField(candidate.code),
+    message: sanitizeDiagnosticField(candidate.message),
+    details: sanitizeDiagnosticField(candidate.details),
+    hint: sanitizeDiagnosticField(candidate.hint),
+    rpc: UX_REVIEW_RATE_LIMIT_RPC,
+    schema: UX_REVIEW_RATE_LIMIT_SCHEMA,
+  };
+}
+
+function sanitizeDiagnosticField(value: unknown) {
+  if (typeof value !== "string") return null;
+
+  let sanitized = value.slice(0, 1_000);
+  const secrets = [
+    process.env.UX_REVIEW_TOKEN,
+    process.env.UX_REVIEW_USER_EMAIL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  ].filter((secret): secret is string => Boolean(secret));
+
+  for (const secret of secrets) {
+    sanitized = sanitized.split(secret).join("[redacted]");
+  }
+
+  return sanitized;
 }

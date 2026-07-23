@@ -6,6 +6,7 @@ import {
   UxReviewService,
   type UxReviewFailureReason,
 } from "@/services/ux-review-service";
+import type { UxReviewRateLimitDiagnostic } from "@/repositories/ux-review-repository";
 import type { Database } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
         authorization.stage,
         authorization.reason,
         requestToken,
+        authorization.diagnostic,
       );
       return denied();
     }
@@ -115,6 +117,7 @@ function logUxReviewDiagnostic(
   stage: string,
   reason: UxReviewFailureReason | "session-cookie-failed",
   requestToken: string | null,
+  diagnostic?: UxReviewRateLimitDiagnostic,
 ) {
   console.error("[ux-review]", {
     stage,
@@ -128,5 +131,6 @@ function logUxReviewDiagnostic(
     hasSupabaseAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     requestTokenLength: requestToken?.length ?? 0,
     configuredTokenLength: process.env.UX_REVIEW_TOKEN?.length ?? 0,
+    ...(diagnostic ?? {}),
   });
 }

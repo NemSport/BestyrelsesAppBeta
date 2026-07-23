@@ -8,7 +8,10 @@ import {
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUxReviewEnv } from "@/lib/server-env";
-import { UxReviewRepository } from "@/repositories/ux-review-repository";
+import {
+  UxReviewRepository,
+  type UxReviewRateLimitDiagnostic,
+} from "@/repositories/ux-review-repository";
 
 const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const MAX_ATTEMPTS_PER_CLIENT = 8;
@@ -39,6 +42,7 @@ export type UxReviewAuthorizationResult =
   | { ok: true; grant: ReviewSessionGrant }
   | {
       ok: false;
+      diagnostic?: UxReviewRateLimitDiagnostic;
       reason: UxReviewFailureReason;
       stage: string;
     };
@@ -86,31 +90,35 @@ export class UxReviewService {
       .update("global")
       .digest("hex");
 
-    try {
-      const [clientAllowed, globallyAllowed] = await Promise.all([
-        repository.consumeAttempt(
-          clientAttemptKey,
-          MAX_ATTEMPTS_PER_CLIENT,
-          RATE_LIMIT_WINDOW_SECONDS,
-        ),
-        repository.consumeAttempt(
-          globalAttemptKey,
-          MAX_ATTEMPTS_GLOBALLY,
-          RATE_LIMIT_WINDOW_SECONDS,
-        ),
-      ]);
-      if (!clientAllowed || !globallyAllowed) {
-        return {
-          ok: false,
-          stage: "rate-limit",
-          reason: "rate-limit-rejected",
-        };
-      }
-    } catch {
+    const rateLimitResults = await Promise.all([
+      repository.consumeAttempt(
+        clientAttemptKey,
+        MAX_ATTEMPTS_PER_CLIENT,
+        RATE_LIMIT_WINDOW_SECONDS,
+      ),
+      repository.consumeAttempt(
+        globalAttemptKey,
+        MAX_ATTEMPTS_GLOBALLY,
+        RATE_LIMIT_WINDOW_SECONDS,
+      ),
+    ]);
+    const failedRateLimit = rateLimitResults.find((result) => !result.ok);
+    if (failedRateLimit && !failedRateLimit.ok) {
+      return {
+        ok: false,
+        diagnostic: failedRateLimit.diagnostic,
+        stage: "rate-limit",
+        reason: "supabase-operation-failed",
+      };
+    }
+    const rateLimitRejected = rateLimitResults.some(
+      (result) => result.ok && !result.allowed,
+    );
+    if (rateLimitRejected) {
       return {
         ok: false,
         stage: "rate-limit",
-        reason: "supabase-operation-failed",
+        reason: "rate-limit-rejected",
       };
     }
     if (!tokensMatch(suppliedToken, reviewEnv.UX_REVIEW_TOKEN)) {
