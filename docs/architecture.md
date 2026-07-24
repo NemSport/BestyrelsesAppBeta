@@ -177,6 +177,11 @@ exposing raw server details. The hook provides an immediate in-memory submit
 lock in addition to disabled button state, so two events before the next React
 render cannot create duplicate mutations. Dirty-state handling is independent
 of authorization and is used only to prevent accidental loss of local edits.
+The navigation guard leaves Next.js links as normal anchors and registers its
+document click listener only while a form is dirty. It ignores modified,
+external, download, new-tab, and hash-only navigation; only a rejected
+same-origin page change receives `preventDefault`. Both click and
+`beforeunload` listeners are removed by the effect cleanup.
 The existing meeting capability model, service authorization, repositories,
 RLS, and role hierarchy remain unchanged.
 

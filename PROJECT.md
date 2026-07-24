@@ -206,6 +206,9 @@ attendee rows can identify the exact invalid field. Minutes autosave continues
 to keep local drafts and now also warns before leaving while synchronization is
 pending, offline, conflicted, or failed. Authorization failures use neutral,
 actionable copy and remain enforced by the existing capability and RLS layers.
+Internal navigation guards are installed only while a concrete form is dirty:
+clean links are untouched, rejected navigation alone is cancelled, and all
+listeners are removed when the form becomes clean or unmounts.
 
 Editable minutes use debounced autosave through the existing authenticated API.
 Every change is first stored as a user-scoped browser draft. Failed or offline

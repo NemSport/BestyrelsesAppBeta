@@ -15,6 +15,7 @@ const [
   members,
   autosave,
   quickActions,
+  mutationHook,
 ] = await Promise.all([
   source("../../src/lib/api.ts"),
   source("../../src/components/forms/resource-form.tsx"),
@@ -24,6 +25,7 @@ const [
   source("../../src/components/members/member-access-editor.tsx"),
   source("../../src/hooks/use-offline-autosave.ts"),
   source("../../src/components/layout/quick-action-menu.tsx"),
+  source("../../src/hooks/use-mutation-feedback.ts"),
 ]);
 
 test("API validation retains nested field paths", () => {
@@ -71,4 +73,33 @@ test("participant validation keeps partially completed external rows", () => {
     participants,
     /\.filter\(\(attendee\) => attendee\.name\.trim\(\)\)/,
   );
+});
+
+test("dirty navigation listeners are scoped and cleaned up", () => {
+  assert.match(
+    mutationHook,
+    /if \(!dirty\) return;[\s\S]*document\.addEventListener\("click"/,
+  );
+  assert.match(
+    mutationHook,
+    /document\.removeEventListener\("click", guardInternalNavigation, true\)/,
+  );
+  assert.match(
+    mutationHook,
+    /window\.removeEventListener\("beforeunload", warnBeforeUnload\)/,
+  );
+  assert.match(
+    mutationHook,
+    /decision === "cancel"[\s\S]*event\.preventDefault\(\)/,
+  );
+  assert.match(
+    mutationHook,
+    /if \(!shouldGuardNavigation\(intent\)\) return;[\s\S]*window\.confirm/,
+  );
+  assert.doesNotMatch(mutationHook, /stopPropagation|stopImmediatePropagation/);
+});
+
+test("submit locks remain local to mutation handlers", () => {
+  assert.doesNotMatch(mutationHook, /submissionLockRef/);
+  assert.match(quickActions, /submissionLockRef\.current/);
 });
