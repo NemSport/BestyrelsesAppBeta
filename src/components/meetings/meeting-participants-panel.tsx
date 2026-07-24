@@ -420,6 +420,9 @@ export function MeetingParticipantsPanel({
                   >
                     {canEdit ? (
                       <div className="grid gap-2">
+                        <label className="label" htmlFor={fieldId("name")}>
+                          Navn
+                        </label>
                         <Input
                           aria-describedby={
                             fieldErrors[fieldKey("name")]
@@ -440,6 +443,9 @@ export function MeetingParticipantsPanel({
                         />
                         <div className="grid gap-2 sm:grid-cols-2">
                           <div>
+                            <label className="label" htmlFor={fieldId("email")}>
+                              E-mail
+                            </label>
                             <Input
                               aria-describedby={
                                 fieldErrors[fieldKey("email")]
@@ -465,6 +471,12 @@ export function MeetingParticipantsPanel({
                             />
                           </div>
                           <div>
+                            <label
+                              className="label"
+                              htmlFor={fieldId("mobile")}
+                            >
+                              Mobil
+                            </label>
                             <Input
                               aria-describedby={
                                 fieldErrors[fieldKey("mobile")]
@@ -489,6 +501,9 @@ export function MeetingParticipantsPanel({
                             />
                           </div>
                         </div>
+                        <label className="label" htmlFor={fieldId("roleNote")}>
+                          Funktion eller notat
+                        </label>
                         <Input
                           aria-describedby={
                             fieldErrors[fieldKey("roleNote")]

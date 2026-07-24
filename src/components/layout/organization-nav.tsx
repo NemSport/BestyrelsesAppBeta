@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { useDialogFocus } from "@/hooks/use-dialog-focus";
 import {
   getActiveCommitteeId,
   isOrganizationNavItemActive,
@@ -43,6 +44,12 @@ export function OrganizationNav({
   const activeCommittee = committees.find(
     (committee) => committee.id === activeCommitteeId,
   );
+  useDialogFocus({
+    active: mobileOpen,
+    containerRef: drawerRef,
+    onEscape: () => setMobileOpen(false),
+    returnFocusRef: triggerRef,
+  });
 
   useEffect(() => {
     setMobileOpen(false);
@@ -56,51 +63,6 @@ export function OrganizationNav({
     desktopMedia.addEventListener("change", closeOnDesktop);
     return () => desktopMedia.removeEventListener("change", closeOnDesktop);
   }, []);
-
-  useEffect(() => {
-    if (!mobileOpen) return;
-
-    const drawer = drawerRef.current;
-    const trigger = triggerRef.current;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const focusableSelector =
-      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const focusables = () =>
-      Array.from(
-        drawer?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
-      );
-    focusables()[0]?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMobileOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      const elements = focusables();
-      if (elements.length === 0) return;
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-      trigger?.focus();
-    };
-  }, [mobileOpen]);
 
   const navLinks = (onNavigate?: () => void) => (
     <div className="org-nav-list">

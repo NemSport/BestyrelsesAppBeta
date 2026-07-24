@@ -734,6 +734,18 @@ sidebar or in a modal mobile drawer. Opening and closing the drawer does not
 change the URL; link navigation continues through Next.js routing, so deep
 links and browser history retain their existing behavior.
 
+Issue 15 adds shared presentation-layer accessibility primitives without a new
+domain or authorization boundary. `useDialogFocus` is consumed by both the
+portal-based modal and the mobile organization drawer, so participant, task,
+decision, membership, confirmation, and navigation overlays share focus
+containment, topmost-dialog Escape handling, scroll locking, and focus return.
+Native `details` disclosures retain their browser semantics and add only
+outside/Escape dismissal. Quick Action remains capability-filtered and uses
+ordinary buttons with Tab navigation instead of an incomplete ARIA menu
+pattern. Form labels, described-by relations, live feedback, table header
+scope, and focus-visible styles remain presentation concerns; services,
+repositories, server checks, and PostgreSQL RLS are unchanged.
+
 ## Domain Hierarchy
 
 ```text

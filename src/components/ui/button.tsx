@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 import clsx from "clsx";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
@@ -36,7 +36,7 @@ export function Button({
   variant,
   type = "button",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ComponentPropsWithRef<"button"> & {
   size?: ButtonSize;
   variant?: ButtonVariant;
 }) {

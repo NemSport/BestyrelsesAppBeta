@@ -71,8 +71,9 @@ test("viewer, member, chair, and admin retain existing action visibility", () =>
 });
 
 test("mobile drawer implements dialog semantics and interaction lifecycle", async () => {
-  const [navigation, styles] = await Promise.all([
+  const [navigation, dialogFocus, styles] = await Promise.all([
     source("../../src/components/layout/organization-nav.tsx"),
+    source("../../src/hooks/use-dialog-focus.ts"),
     source("../../src/app/globals.css"),
   ]);
 
@@ -80,10 +81,11 @@ test("mobile drawer implements dialog semantics and interaction lifecycle", asyn
   assert.match(navigation, /aria-haspopup="dialog"/);
   assert.match(navigation, /aria-modal="true"/);
   assert.match(navigation, /role="dialog"/);
-  assert.match(navigation, /event\.key === "Escape"/);
-  assert.match(navigation, /event\.key !== "Tab"/);
-  assert.match(navigation, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(navigation, /trigger\?\.focus\(\)/);
+  assert.match(navigation, /useDialogFocus/);
+  assert.match(dialogFocus, /event\.key === "Escape"/);
+  assert.match(dialogFocus, /event\.key !== "Tab"/);
+  assert.match(dialogFocus, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(dialogFocus, /returnTarget\?\.isConnected/);
   assert.match(navigation, /window\.matchMedia\("\(min-width: 1024px\)"\)/);
   assert.match(navigation, /aria-current=\{active \? "page" : undefined\}/);
   assert.match(styles, /\.org-mobile-drawer[\s\S]*overflow-y: auto/);

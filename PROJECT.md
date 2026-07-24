@@ -367,6 +367,17 @@ It reuses the existing route matching and capability-filtered destinations;
 desktop navigation, URLs, browser history, authorization, and RLS are
 unchanged.
 
+Issue 15 strengthens keyboard and assistive-technology behavior across the
+shared application shell and core editing flows. Modal dialogs and the mobile
+navigation drawer use one focus-management pattern for initial focus, Tab and
+Shift+Tab containment, topmost-overlay Escape handling, background scroll
+locking, and focus return. Global disclosure menus support Escape and outside
+dismissal without claiming an unsupported ARIA menu pattern. Shared fields,
+participant editing, tables, feedback, and focus-visible styling expose
+persistent labels, descriptions, column scope, live status, and a distinct
+keyboard focus indicator. Capability filtering, mutation authorization, and
+RLS remain unchanged.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.

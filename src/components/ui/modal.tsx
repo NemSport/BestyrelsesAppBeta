@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -11,6 +12,7 @@ import { createPortal } from "react-dom";
 import clsx from "clsx";
 
 import { Button } from "@/components/ui/button";
+import { useDialogFocus } from "@/hooks/use-dialog-focus";
 
 export function Modal({
   open,
@@ -34,32 +36,25 @@ export function Modal({
   style?: CSSProperties;
 }) {
   const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setPortalTarget(document.body);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose, open]);
+  useDialogFocus({
+    active: open && Boolean(portalTarget),
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
 
   if (!open || !portalTarget) return null;
 
   return createPortal(
     <div
+      aria-describedby={description ? descriptionId : undefined}
       aria-labelledby={titleId}
       aria-modal="true"
       className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto overscroll-contain bg-ink/45 px-0 py-4 backdrop-blur-sm sm:px-6 sm:py-8"
@@ -67,6 +62,8 @@ export function Modal({
         if (event.currentTarget === event.target) onClose();
       }}
       role="dialog"
+      ref={dialogRef}
+      tabIndex={-1}
       style={{ ...style, fontFamily: "var(--font-sans)" }}
     >
       <div
@@ -84,7 +81,11 @@ export function Modal({
             <h2 className="section-title mt-1" id={titleId}>
               {title}
             </h2>
-            {description ? <p className="metadata mt-1">{description}</p> : null}
+            {description ? (
+              <p className="metadata mt-1" id={descriptionId}>
+                {description}
+              </p>
+            ) : null}
           </div>
           <Button
             aria-label="Luk modal"
