@@ -46,6 +46,15 @@ change their own access or any owner's access, and only an owner may grant or
 remove the owner role. Committee chairs and secretaries retain their ordinary
 committee-manager capabilities but do not administer committee memberships.
 
+Issue 9 keeps that access model intact while making the member directory
+responsive. Active members and pending invitations use one native table DOM:
+below the desktop breakpoint each row is presented as a labelled vertical card,
+while desktop retains column headers and compact table scanning. Names,
+e-mails, organization roles, statuses, and committee assignments wrap without
+requiring horizontal scrolling. Access editing and destructive removal remain
+separate, capability-filtered controls, and mutation feedback continues through
+the Issue 17 pattern.
+
 ## Central Entity
 
 The **Agenda Item** is the central product entity.

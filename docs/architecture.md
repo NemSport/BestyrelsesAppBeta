@@ -1413,6 +1413,14 @@ Membership administration follows these invariants:
 - Committee membership writes are restricted to organization owners and
   administrators. Committee chairs and secretaries do not gain membership
   administration rights from their committee-manager role.
+- Issue 9 changes only the responsive member-directory presentation. The
+  members and invitations tables retain one semantic table tree and switch
+  their rows to labelled, non-scrolling card layouts below `md`. The desktop
+  table, per-member capability calculation, owner protections, access editor,
+  destructive action menu, server service, PostgreSQL function, and RLS
+  boundary are unchanged. No search, sorting, or pagination state existed in
+  this directory before the responsive change, so no such state is replaced or
+  discarded.
 - Owners may manually create an authenticated user with a temporary password,
   a non-owner organization role, and zero, one, or multiple committee
   assignments. Each selected committee stores its own committee role.
