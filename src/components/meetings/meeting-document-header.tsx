@@ -109,7 +109,13 @@ export function MeetingDocumentHeader({
           <dd>{transferredItemCount}</dd>
         </div>
         <div>
-          <dt>Deltagere</dt>
+          <dt
+            className="scroll-mt-24"
+            id="meeting-participants-heading"
+            tabIndex={-1}
+          >
+            Deltagere
+          </dt>
           <dd className="space-y-1">
             <span className="block">{participantCountLabel}</span>
             {participantSummary ? (

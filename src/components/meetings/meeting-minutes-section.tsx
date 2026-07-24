@@ -739,7 +739,12 @@ function AgendaMinutesCard({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [isOpen, setIsOpen] = useState(false);
+  const agendaPointHash = `#agenda-point-${occurrence.id}`;
+  const [isOpen, setIsOpen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.location.hash === agendaPointHash,
+  );
   const [activeActionPanel, setActiveActionPanel] =
     useState<AgendaActionPanel>(null);
   const [deleting, setDeleting] = useState(false);
@@ -864,6 +869,16 @@ function AgendaMinutesCard({
   }, [itemType]);
 
   useEffect(() => {
+    function openDeepLinkedPoint() {
+      if (window.location.hash === agendaPointHash) setIsOpen(true);
+    }
+
+    openDeepLinkedPoint();
+    window.addEventListener("hashchange", openDeepLinkedPoint);
+    return () => window.removeEventListener("hashchange", openDeepLinkedPoint);
+  }, [agendaPointHash]);
+
+  useEffect(() => {
     if (
       !initialMinutes ||
       !isNewerServerVersion(initialMinutes.updated_at, minutes?.updated_at)
@@ -950,7 +965,7 @@ function AgendaMinutesCard({
   return (
     <details
       className={clsx(
-        "group overflow-hidden rounded-[var(--radius-panel)] border bg-subtle/60 shadow-sm",
+        "group scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border bg-subtle/60 shadow-sm",
         isStandardItem ? "border-line bg-subtle/70" : "border-line-strong",
         isTransferredItem && "border-l-4 border-l-progress/40",
         isAnyOtherBusiness && "border-dashed",
@@ -1897,7 +1912,9 @@ export function MeetingMinutesSection({
   const [isGeneralMinutesOpen, setIsGeneralMinutesOpen] = useState(
     () =>
       typeof window !== "undefined" &&
-      window.location.hash === "#general-minutes-content",
+      ["#general-minutes-content", "#general-minutes-heading"].includes(
+        window.location.hash,
+      ),
   );
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const [referentLock, setReferentLock] = useState(initialReferentLock);
@@ -1981,6 +1998,23 @@ export function MeetingMinutesSection({
   }, [error, meetingAutosave.conflict]);
 
   useEffect(() => {
+    function openDeepLinkedGeneralMinutes() {
+      if (
+        ["#general-minutes-content", "#general-minutes-heading"].includes(
+          window.location.hash,
+        )
+      ) {
+        setIsGeneralMinutesOpen(true);
+      }
+    }
+
+    openDeepLinkedGeneralMinutes();
+    window.addEventListener("hashchange", openDeepLinkedGeneralMinutes);
+    return () =>
+      window.removeEventListener("hashchange", openDeepLinkedGeneralMinutes);
+  }, []);
+
+  useEffect(() => {
     if (
       initialMeetingMinutes &&
       isNewerServerVersion(
@@ -2037,7 +2071,7 @@ export function MeetingMinutesSection({
         referentLock={referentLock}
       />
       <section
-        className="order-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
+        className="order-2 scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
         aria-labelledby="general-minutes-heading"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
@@ -2058,8 +2092,9 @@ export function MeetingMinutesSection({
             </span>
             <span>
               <span
-                className="block font-semibold text-ink"
+                className="block scroll-mt-24 font-semibold text-ink"
                 id="general-minutes-heading"
+                tabIndex={-1}
               >
                 Generelt mødereferat
               </span>
@@ -2335,7 +2370,11 @@ export function MeetingMinutesSection({
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-2.5">
           <div>
             <p className="page-eyebrow">Dagsorden</p>
-            <h3 className="section-title mt-1" id="agenda-minutes-heading">
+            <h3
+              className="section-title mt-1 scroll-mt-24"
+              id="agenda-minutes-heading"
+              tabIndex={-1}
+            >
               Referat pr. dagsordenspunkt
             </h3>
             <p className="metadata mt-1">

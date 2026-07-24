@@ -9,6 +9,7 @@ import { MeetingAiOverview } from "@/components/meetings/meeting-ai-overview";
 import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-header";
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
+import { MeetingSectionNavigation } from "@/components/meetings/meeting-section-navigation";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
@@ -499,6 +500,40 @@ export default async function MeetingPage({
         openTaskCount={openTaskCount}
       />
 
+      <MeetingSectionNavigation
+        sections={[
+          {
+            id: "meeting-participants-heading",
+            label: "Deltagere",
+            count: registeredParticipantCount,
+          },
+          {
+            id: "agenda-minutes-heading",
+            label: "Dagsorden",
+            count: meeting.agenda_item_occurrences.length,
+          },
+          { id: "general-minutes-heading", label: "Referat" },
+          ...(decisionContext.decisions.length > 0
+            ? [
+                {
+                  id: "meeting-decisions-heading",
+                  label: "Beslutninger",
+                  count: decisionContext.decisions.length,
+                },
+              ]
+            : []),
+          ...(taskContext.tasks.length > 0
+            ? [
+                {
+                  id: "meeting-tasks-heading",
+                  label: "Opgaver",
+                  count: taskContext.tasks.length,
+                },
+              ]
+            : []),
+        ]}
+      />
+
       <PageSection
         actions={
           <div className="flex flex-wrap gap-2">
@@ -591,7 +626,10 @@ export default async function MeetingPage({
         />
         {decisionContext.decisions.length > 0 ||
         taskContext.tasks.length > 0 ? (
-          <details className="group mb-4 rounded-[var(--radius-panel)] border border-line bg-subtle/20">
+          <details
+            className="group mb-4 scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-subtle/20"
+            id="meeting-related-work"
+          >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-4">
               <span>
                 Relateret arbejde
@@ -606,9 +644,15 @@ export default async function MeetingPage({
               </span>
             </summary>
             <div className="grid gap-4 border-t border-line p-3 sm:p-4 lg:grid-cols-2">
-              <section>
+              <section aria-labelledby="meeting-decisions-heading">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Beslutninger</h3>
+                  <h3
+                    className="scroll-mt-24 text-sm font-semibold"
+                    id="meeting-decisions-heading"
+                    tabIndex={-1}
+                  >
+                    Beslutninger
+                  </h3>
                   <a
                     className="text-xs font-semibold text-brand hover:underline"
                     href={`/organizations/${organizationId}/decisions`}
@@ -622,9 +666,15 @@ export default async function MeetingPage({
                   organizationId={organizationId}
                 />
               </section>
-              <section>
+              <section aria-labelledby="meeting-tasks-heading">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Opgaver</h3>
+                  <h3
+                    className="scroll-mt-24 text-sm font-semibold"
+                    id="meeting-tasks-heading"
+                    tabIndex={-1}
+                  >
+                    Opgaver
+                  </h3>
                   <a
                     className="text-xs font-semibold text-brand hover:underline"
                     href={`/organizations/${organizationId}/tasks`}

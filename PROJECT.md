@@ -396,6 +396,16 @@ and buttons are interactive. Read-only task and decision cards are labelled as
 such, and compact actions use a 44-pixel minimum target. Capability filtering,
 routes, mutation authorization, services, repositories, and RLS are unchanged.
 
+Issue 6 adds compact in-page navigation to long meeting documents. Native hash
+links target the participant summary, agenda minutes, general minutes, and
+relevant task or decision sections already returned by the authorized meeting
+read model. Deep links open ancestor disclosures and React-controlled agenda or
+general-minutes panels before moving visible focus to the target. Hash changes
+use browser history and do not remount editors, discard local drafts, trigger
+autosave writes, or pass through the dirty-form leave guard. The navigation is
+non-sticky and horizontally contained on mobile so it cannot cover form fields
+or the software keyboard.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.

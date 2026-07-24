@@ -756,6 +756,18 @@ buttons and action menus cannot trigger parent navigation. The patterns consume
 the existing capability-filtered render tree and do not introduce client-side
 authorization, new routes, service logic, persistence, or RLS changes.
 
+Issue 6 adds a presentation-only meeting section navigator. The server page
+constructs its link list from the same RLS-scoped meeting, participant, task,
+decision, and Issue 16 capability context it already loaded; empty related-work
+sections are omitted. `MeetingSectionNavigation` uses native fragment URLs,
+opens enclosing `details` elements, and focuses stable headings without route
+replacement. The client minutes component synchronizes its controlled general
+minutes and agenda-point disclosures on initial hash and `hashchange`. Because
+the components remain mounted and Issue 17 excludes same-page hash changes from
+the leave guard, local editor and autosave state survives section navigation.
+No repository, service, mutation, database, authorization, or RLS behavior
+changes.
+
 ## Domain Hierarchy
 
 ```text
