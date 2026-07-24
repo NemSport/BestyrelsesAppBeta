@@ -6,78 +6,81 @@ async function source(path) {
   return readFile(new URL(path, import.meta.url), "utf8");
 }
 
-const [navigation, meetingPage, minutes, header, dirtyGuard] =
-  await Promise.all([
-    source(
-      "../../src/components/meetings/meeting-section-navigation.tsx",
-    ),
-    source(
-      "../../src/app/(app)/organizations/[organizationId]/committees/[committeeId]/meetings/[meetingId]/page.tsx",
-    ),
-    source("../../src/components/meetings/meeting-minutes-section.tsx"),
-    source("../../src/components/meetings/meeting-document-header.tsx"),
-    source("../../src/lib/navigation-guard.ts"),
-  ]);
+const [meetingPage, minutes, header, dirtyGuard, pdf] = await Promise.all([
+  source(
+    "../../src/app/(app)/organizations/[organizationId]/committees/[committeeId]/meetings/[meetingId]/page.tsx",
+  ),
+  source("../../src/components/meetings/meeting-minutes-section.tsx"),
+  source("../../src/components/meetings/meeting-document-header.tsx"),
+  source("../../src/lib/navigation-guard.ts"),
+  source("../../src/lib/minutes-pdf.ts"),
+]);
 
-test("meeting navigation is compact, native, and focus-aware", () => {
-  assert.match(navigation, /aria-label="Gå til sektion i mødet"/);
-  assert.match(navigation, /href=\{`#\$\{section\.id\}`\}/);
-  assert.match(navigation, /min-h-11/);
-  assert.match(navigation, /overflow-x-auto/);
-  assert.doesNotMatch(navigation, /\bsticky\b|\bfixed\b/);
-  assert.match(navigation, /aria-current=/);
-  assert.match(navigation, /focus\(\{ preventScroll: true \}\)/);
-  assert.match(navigation, /scrollIntoView\(\{ block: "start" \}\)/);
+test("meeting workspace renders one active agenda item beside a compact desktop master list", () => {
+  assert.match(minutes, /lg:grid-cols-\[minmax\(15rem,20rem\)_minmax\(0,1fr\)\]/);
+  assert.match(minutes, /aria-label="Dagsordenspunkter"/);
+  assert.match(minutes, /max-h-\[calc\(100vh-7rem\)\]/);
+  assert.match(minutes, /overflow-y-auto/);
+  assert.match(minutes, /aria-current=\{isActive \? "location" : undefined\}/);
+  assert.match(minutes, /border-2 border-brand bg-brand-soft/);
+  assert.match(minutes, /hidden=\{occurrence\.id !== activeOccurrence\.id\}/);
+  assert.match(minutes, /aria-hidden=\{occurrence\.id !== activeOccurrence\.id\}/);
+  assert.doesNotMatch(minutes, /agendaPointHash =/);
 });
 
-test("deep links open disclosures and follow browser history", () => {
-  assert.match(
-    navigation,
-    /target\.closest<HTMLDetailsElement>\("details"\)/,
+test("the active item is addressable and follows native hash history", () => {
+  assert.match(minutes, /#agenda-point-\(\.\+\)\$/);
+  assert.match(minutes, /window\.addEventListener\("hashchange"/);
+  assert.match(minutes, /href=\{`#agenda-point-\$\{occurrence\.id\}`\}/);
+  assert.match(minutes, /focus\(\{ preventScroll: true \}\)/);
+  assert.doesNotMatch(minutes, /history\.(pushState|replaceState)/);
+  assert.doesNotMatch(minutes, /router\.(push|replace)/);
+});
+
+test("mobile exposes current context, a modal selector, and previous/next links", () => {
+  assert.match(minutes, /Punkt \{activeIndex \+ 1\} af \{occurrences\.length\}/);
+  assert.match(minutes, /Vælg et andet punkt/);
+  assert.match(minutes, /open=\{selectorOpen\}/);
+  assert.match(minutes, /setSelectorOpen\(false\)/);
+  assert.match(minutes, /← Forrige/);
+  assert.match(minutes, /Næste →/);
+  assert.match(minutes, /lg:hidden/);
+});
+
+test("point editing is opt-in and cards stay mounted to preserve local drafts", () => {
+  assert.match(minutes, /const \[isEditingMinutes, setIsEditingMinutes\]/);
+  assert.match(minutes, /canEdit && !isEditingMinutes/);
+  assert.match(minutes, /Rediger referat/);
+  assert.match(minutes, /canEdit && isEditingMinutes/);
+  assert.match(minutes, /Tilføj beslutning/);
+  assert.match(minutes, /Opret opgave/);
+  assert.match(minutes, /Flere handlinger/);
+  assert.match(minutes, /useDismissibleDetails\(moreActionsRef\)/);
+  assert.match(minutes, /occurrences\.map\(\(occurrence, index\) => \(/);
+  assert.match(minutes, /hidden=\{occurrence\.id !== activeOccurrence\.id\}/);
+});
+
+test("general minutes editor is absent while historical data contracts remain", () => {
+  const currentComponent = minutes.slice(
+    minutes.indexOf("export function MeetingMinutesSection"),
   );
-  assert.match(navigation, /disclosure\.open = true/);
-  assert.match(navigation, /target\.tagName === "DETAILS"/);
-  assert.match(navigation, /window\.addEventListener\("hashchange"/);
-  assert.doesNotMatch(navigation, /preventDefault/);
-  assert.doesNotMatch(navigation, /router\.(push|replace)/);
+  assert.doesNotMatch(currentComponent, /meeting-minutes-text/);
+  assert.doesNotMatch(currentComponent, /Generelt mødereferat/);
+  assert.match(currentComponent, /initialMeetingMinutes/);
+  assert.match(currentComponent, /MinutesApprovalPanel/);
+  assert.match(currentComponent, /general-minutes-heading/);
+  assert.match(pdf, /agendaItemMinutes/);
+  assert.match(pdf, /minutes_text/);
 });
 
-test("agenda point and general minutes state synchronize with hashes", () => {
-  assert.match(minutes, /agendaPointHash = `#agenda-point-\$\{occurrence\.id\}`/);
-  assert.match(minutes, /window\.location\.hash === agendaPointHash/);
-  assert.match(minutes, /openDeepLinkedPoint/);
-  assert.match(minutes, /"#general-minutes-heading"/);
-  assert.match(minutes, /openDeepLinkedGeneralMinutes/);
-  assert.match(minutes, /window\.addEventListener\("hashchange"/g);
-  assert.match(minutes, /id="agenda-minutes-heading"[\s\S]*tabIndex=\{-1\}/);
-  assert.match(minutes, /id="general-minutes-heading"[\s\S]*tabIndex=\{-1\}/);
-});
-
-test("server-rendered section links reflect relevant authorized data", () => {
+test("page keeps participants and capabilities but removes duplicate section navigation", () => {
+  assert.match(header, /id="meeting-participants-heading"/);
   assert.match(meetingPage, /getMeetingCapabilities/);
-  assert.match(meetingPage, /id: "meeting-participants-heading"/);
-  assert.match(meetingPage, /id: "agenda-minutes-heading"/);
-  assert.match(meetingPage, /id: "general-minutes-heading"/);
-  assert.match(
-    meetingPage,
-    /decisionContext\.decisions\.length > 0[\s\S]*meeting-decisions-heading/,
-  );
-  assert.match(
-    meetingPage,
-    /taskContext\.tasks\.length > 0[\s\S]*meeting-tasks-heading/,
-  );
+  assert.match(meetingPage, /meetingCapabilities\.editOfficialMinutes/);
   assert.match(meetingPage, /meetingCapabilities\.editDecisions/);
   assert.match(meetingPage, /meetingCapabilities\.editTasks/);
-});
-
-test("participants and related work expose stable semantic targets", () => {
-  assert.match(header, /id="meeting-participants-heading"/);
-  assert.match(header, /tabIndex=\{-1\}/);
-  assert.match(meetingPage, /id="meeting-related-work"/);
-  assert.match(meetingPage, /aria-labelledby="meeting-decisions-heading"/);
-  assert.match(meetingPage, /aria-labelledby="meeting-tasks-heading"/);
-  assert.match(meetingPage, /id="meeting-decisions-heading"/);
-  assert.match(meetingPage, /id="meeting-tasks-heading"/);
+  assert.doesNotMatch(meetingPage, /MeetingSectionNavigation/);
+  assert.doesNotMatch(meetingPage, /meeting-related-work/);
 });
 
 test("hash-only navigation does not trigger the dirty-form leave guard", () => {
