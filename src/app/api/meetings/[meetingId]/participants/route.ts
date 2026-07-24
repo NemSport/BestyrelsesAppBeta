@@ -11,7 +11,9 @@ export async function PUT(
   try {
     const meetingId = (await params).meetingId;
     const body = await request.json();
-    const result = await new MeetingService(await createClient()).saveParticipants({
+    const result = await new MeetingService(
+      await createClient(),
+    ).saveParticipants({
       ...body,
       meetingId,
     });
@@ -20,6 +22,9 @@ export async function PUT(
       message: "Deltagere er gemt.",
     });
   } catch (error) {
-    return apiError(error);
+    return apiError(error, {
+      fallbackMessage:
+        "Deltagerne kunne ikke gemmes. Genindlæs siden, og prøv igen.",
+    });
   }
 }

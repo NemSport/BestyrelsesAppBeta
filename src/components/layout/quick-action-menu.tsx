@@ -1,10 +1,21 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { AgendaItemCreateForm } from "@/components/agenda-items/agenda-item-create-form";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
+import {
+  focusInvalidField,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
+import { firstFieldError } from "@/lib/mutation-feedback";
 import type { MeetingCapabilities } from "@/lib/permissions";
 
 type CommitteeOption = {
@@ -89,6 +100,32 @@ export function QuickActionMenu({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const submissionLockRef = useRef(false);
+  const meetingDirty =
+    meetingOpen &&
+    (committeeId !== defaultMeetingCommitteeId ||
+      title !== "" ||
+      startsAt !== "");
+  const quickMeetingDirty =
+    quickMeetingOpen &&
+    (committeeId !== defaultQuickMeetingCommitteeId ||
+      title !== "Hurtigt møde" ||
+      startsAt !== "" ||
+      quickNotes !== "");
+  const confirmMeetingDiscard = useUnsavedChanges(meetingDirty && !saving);
+  const confirmQuickMeetingDiscard = useUnsavedChanges(
+    quickMeetingDirty && !saving,
+  );
+
+  function closeMeetingModal() {
+    if (saving || !confirmMeetingDiscard()) return;
+    setMeetingOpen(false);
+  }
+
+  function closeQuickMeetingModal() {
+    if (saving || !confirmQuickMeetingDiscard()) return;
+    setQuickMeetingOpen(false);
+  }
 
   function openMeetingModal() {
     setCommitteeId(defaultMeetingCommitteeId);
@@ -113,6 +150,8 @@ export function QuickActionMenu({
 
   async function submitMeeting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionLockRef.current) return;
+    submissionLockRef.current = true;
     setSaving(true);
     setError(null);
     setFieldErrors({});
@@ -136,6 +175,17 @@ export function QuickActionMenu({
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setError("Mødet kunne ikke oprettes.");
+      focusInvalidField(
+        {
+          committeeId: "quick-action-committee",
+          title: "quick-action-meeting-title",
+          startsAt: "quick-action-meeting-starts-at",
+        }[
+          firstFieldError(clientErrors, ["committeeId", "title", "startsAt"]) ??
+            ""
+        ],
+      );
+      submissionLockRef.current = false;
       setSaving(false);
       return;
     }
@@ -165,12 +215,24 @@ export function QuickActionMenu({
 
       if (!response.ok || !result.id) {
         setError(result.error || "Mødet kunne ikke oprettes.");
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(
-              ([key, messages]) => (messages[0] ? [[key, messages[0]]] : []),
-            ),
+        const nextFieldErrors = Object.fromEntries(
+          Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
+            messages[0] ? [[key, messages[0]]] : [],
           ),
+        );
+        setFieldErrors(nextFieldErrors);
+        focusInvalidField(
+          {
+            committeeId: "quick-action-committee",
+            title: "quick-action-meeting-title",
+            startsAt: "quick-action-meeting-starts-at",
+          }[
+            firstFieldError(nextFieldErrors, [
+              "committeeId",
+              "title",
+              "startsAt",
+            ]) ?? ""
+          ],
         );
         return;
       }
@@ -185,12 +247,15 @@ export function QuickActionMenu({
         "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
     } finally {
+      submissionLockRef.current = false;
       setSaving(false);
     }
   }
 
   async function submitQuickMeeting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionLockRef.current) return;
+    submissionLockRef.current = true;
     setSaving(true);
     setError(null);
     setFieldErrors({});
@@ -214,6 +279,17 @@ export function QuickActionMenu({
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setError("Det hurtige møde kunne ikke oprettes.");
+      focusInvalidField(
+        {
+          committeeId: "quick-meeting-committee",
+          title: "quick-meeting-title",
+          startsAt: "quick-meeting-starts-at",
+        }[
+          firstFieldError(clientErrors, ["committeeId", "title", "startsAt"]) ??
+            ""
+        ],
+      );
+      submissionLockRef.current = false;
       setSaving(false);
       return;
     }
@@ -245,12 +321,24 @@ export function QuickActionMenu({
 
       if (!response.ok || !result.id) {
         setError(result.error || "Det hurtige møde kunne ikke oprettes.");
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(
-              ([key, messages]) => (messages[0] ? [[key, messages[0]]] : []),
-            ),
+        const nextFieldErrors = Object.fromEntries(
+          Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
+            messages[0] ? [[key, messages[0]]] : [],
           ),
+        );
+        setFieldErrors(nextFieldErrors);
+        focusInvalidField(
+          {
+            committeeId: "quick-meeting-committee",
+            title: "quick-meeting-title",
+            startsAt: "quick-meeting-starts-at",
+          }[
+            firstFieldError(nextFieldErrors, [
+              "committeeId",
+              "title",
+              "startsAt",
+            ]) ?? ""
+          ],
         );
         return;
       }
@@ -265,6 +353,7 @@ export function QuickActionMenu({
         "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
     } finally {
+      submissionLockRef.current = false;
       setSaving(false);
     }
   }
@@ -380,7 +469,7 @@ export function QuickActionMenu({
       <Modal
         description="Mødet oprettes med faste standardpunkter og åbnes efter gem."
         maxWidth="lg"
-        onClose={() => setMeetingOpen(false)}
+        onClose={closeMeetingModal}
         open={meetingOpen}
         style={style}
         title="Opret nyt møde"
@@ -420,6 +509,11 @@ export function QuickActionMenu({
                 Udvalg
               </label>
               <Select
+                aria-describedby={
+                  fieldErrors.committeeId
+                    ? "quick-action-committee-error"
+                    : undefined
+                }
                 aria-invalid={Boolean(fieldErrors.committeeId)}
                 id="quick-action-committee"
                 onChange={(event) => setCommitteeId(event.target.value)}
@@ -432,6 +526,14 @@ export function QuickActionMenu({
                   </option>
                 ))}
               </Select>
+              {fieldErrors.committeeId ? (
+                <p
+                  className="mt-1 text-sm text-danger"
+                  id="quick-action-committee-error"
+                >
+                  {fieldErrors.committeeId}
+                </p>
+              ) : null}
               {meetingCommittees.length > 1 ? (
                 <p className="mt-1 text-xs text-muted">
                   Organisationen har flere udvalg, så du skal vælge udvalg
@@ -446,30 +548,52 @@ export function QuickActionMenu({
               Titel
             </label>
             <Input
+              aria-describedby={
+                fieldErrors.title
+                  ? "quick-action-meeting-title-error"
+                  : undefined
+              }
               aria-invalid={Boolean(fieldErrors.title)}
               id="quick-action-meeting-title"
               onChange={(event) => setTitle(event.target.value)}
               value={title}
             />
+            {fieldErrors.title ? (
+              <p
+                className="mt-1 text-sm text-danger"
+                id="quick-action-meeting-title-error"
+              >
+                {fieldErrors.title}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label" htmlFor="quick-action-meeting-starts-at">
               Dato og tid
             </label>
             <Input
+              aria-describedby={
+                fieldErrors.startsAt
+                  ? "quick-action-meeting-starts-at-error"
+                  : undefined
+              }
               aria-invalid={Boolean(fieldErrors.startsAt)}
               id="quick-action-meeting-starts-at"
               onChange={(event) => setStartsAt(event.target.value)}
               type="datetime-local"
               value={startsAt}
             />
+            {fieldErrors.startsAt ? (
+              <p
+                className="mt-1 text-sm text-danger"
+                id="quick-action-meeting-starts-at-error"
+              >
+                {fieldErrors.startsAt}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <Button
-              onClick={() => setMeetingOpen(false)}
-              size="sm"
-              variant="secondary"
-            >
+            <Button onClick={closeMeetingModal} size="sm" variant="secondary">
               Annuller
             </Button>
             <Button
@@ -486,7 +610,7 @@ export function QuickActionMenu({
       <Modal
         description="Opret et ad hoc-møde uden dagsorden og start direkte med frie noter."
         maxWidth="lg"
-        onClose={() => setQuickMeetingOpen(false)}
+        onClose={closeQuickMeetingModal}
         open={quickMeetingOpen}
         style={style}
         title="Hurtigt møde"
@@ -526,6 +650,11 @@ export function QuickActionMenu({
                 Udvalg
               </label>
               <Select
+                aria-describedby={
+                  fieldErrors.committeeId
+                    ? "quick-meeting-committee-error"
+                    : undefined
+                }
                 aria-invalid={Boolean(fieldErrors.committeeId)}
                 id="quick-meeting-committee"
                 onChange={(event) => setCommitteeId(event.target.value)}
@@ -538,6 +667,14 @@ export function QuickActionMenu({
                   </option>
                 ))}
               </Select>
+              {fieldErrors.committeeId ? (
+                <p
+                  className="mt-1 text-sm text-danger"
+                  id="quick-meeting-committee-error"
+                >
+                  {fieldErrors.committeeId}
+                </p>
+              ) : null}
               {quickMeetingCommittees.length > 1 ? (
                 <p className="mt-1 text-xs text-muted">
                   Organisationen har flere udvalg, så du skal vælge udvalg
@@ -552,23 +689,47 @@ export function QuickActionMenu({
               Titel
             </label>
             <Input
+              aria-describedby={
+                fieldErrors.title ? "quick-meeting-title-error" : undefined
+              }
               aria-invalid={Boolean(fieldErrors.title)}
               id="quick-meeting-title"
               onChange={(event) => setTitle(event.target.value)}
               value={title}
             />
+            {fieldErrors.title ? (
+              <p
+                className="mt-1 text-sm text-danger"
+                id="quick-meeting-title-error"
+              >
+                {fieldErrors.title}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label" htmlFor="quick-meeting-starts-at">
               Dato og tid
             </label>
             <Input
+              aria-describedby={
+                fieldErrors.startsAt
+                  ? "quick-meeting-starts-at-error"
+                  : undefined
+              }
               aria-invalid={Boolean(fieldErrors.startsAt)}
               id="quick-meeting-starts-at"
               onChange={(event) => setStartsAt(event.target.value)}
               type="datetime-local"
               value={startsAt}
             />
+            {fieldErrors.startsAt ? (
+              <p
+                className="mt-1 text-sm text-danger"
+                id="quick-meeting-starts-at-error"
+              >
+                {fieldErrors.startsAt}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label" htmlFor="quick-meeting-notes">
@@ -597,7 +758,7 @@ export function QuickActionMenu({
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
-              onClick={() => setQuickMeetingOpen(false)}
+              onClick={closeQuickMeetingModal}
               size="sm"
               variant="secondary"
             >

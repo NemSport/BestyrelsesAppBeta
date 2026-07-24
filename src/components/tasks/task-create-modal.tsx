@@ -3,7 +3,25 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  FieldError,
+  Input,
+  Modal,
+  MutationFeedback,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 import {
   getTaskCategorySuggestions,
   taskStatusOptions,
@@ -74,9 +92,21 @@ export function TaskCreateModal({
   const [meetingId, setMeetingId] = useState(initialMeetingId);
   const [agendaItemId, setAgendaItemId] = useState(initialAgendaItemId);
   const [decisionId, setDecisionId] = useState(initialDecisionId);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const mutation = useMutationFeedback();
+  const dirty =
+    title !== initialTitle ||
+    description !== initialDescription ||
+    status !== "not_started" ||
+    responsibleUserId !== initialResponsibleUserId ||
+    deadline !== initialDeadline ||
+    reminderAt !== "" ||
+    category !== initialCategory ||
+    internalNote !== "" ||
+    meetingId !== initialMeetingId ||
+    agendaItemId !== initialAgendaItemId ||
+    decisionId !== initialDecisionId;
+  const confirmDiscard = useUnsavedChanges(open && dirty && !mutation.pending);
 
   const categorySuggestions = useMemo(
     () => getTaskCategorySuggestions(categorySource, committeeId, category),
@@ -95,20 +125,23 @@ export function TaskCreateModal({
     setMeetingId(initialMeetingId);
     setAgendaItemId(initialAgendaItemId);
     setDecisionId(initialDecisionId);
-    setError(null);
     setFieldErrors({});
+    mutation.reset();
     setOpen(true);
+  }
+
+  function closeModal() {
+    if (mutation.pending || !confirmDiscard()) return;
+    setOpen(false);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setError(null);
+    if (!mutation.begin("Opgaven gemmes...")) return;
     setFieldErrors({});
     try {
-      const response = await fetch(
-        `/api/organizations/${organizationId}/tasks`,
-        {
+      const result = await readMutationResponse<{ message?: string }>(
+        await fetch(`/api/organizations/${organizationId}/tasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -122,37 +155,34 @@ export function TaskCreateModal({
             status,
             responsibleUserId: responsibleUserId || null,
             deadline: deadline || null,
-            reminderAt: reminderAt
-              ? new Date(reminderAt).toISOString()
-              : null,
+            reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
             category: category || null,
             internalNote: internalNote || null,
           }),
-        },
+        }),
+        "Opgaven kunne ikke gemmes. Kontrollér felterne, og prøv igen.",
       );
-      const result = (await response.json()) as {
-        error?: string;
-        fieldErrors?: Record<string, string[]>;
-      };
-      if (!response.ok) {
-        setError(result.error || "Opgaven kunne ikke gemmes.");
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
-              messages[0] ? [[key, messages[0]]] : [],
-            ),
-          ),
-        );
-        return;
-      }
+      mutation.succeed(result.message || "Opgaven er gemt.");
       setOpen(false);
       router.refresh();
-    } catch {
-      setError(
-        "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
+    } catch (caught) {
+      const nextFieldErrors =
+        caught instanceof MutationRequestError ? caught.fieldErrors : {};
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(
+        caught instanceof Error
+          ? caught.message
+          : "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
-    } finally {
-      setSaving(false);
+      const field = firstFieldError(nextFieldErrors, [
+        "title",
+        "description",
+        "deadline",
+        "reminderAt",
+        "category",
+        "internalNote",
+      ]);
+      focusInvalidField(field ? `task-${field}-${formId}` : null);
     }
   }
 
@@ -165,6 +195,7 @@ export function TaskCreateModal({
           {triggerLabel}
         </Button>
       )}
+      {!open ? <MutationFeedback feedback={mutation.feedback} /> : null}
       <Modal
         description={
           sourceLabel
@@ -172,32 +203,29 @@ export function TaskCreateModal({
             : "Opgaven knyttes til den aktuelle kontekst og kan tilrettes før gem."
         }
         maxWidth="3xl"
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         open={open}
         title={triggerLabel}
       >
         <form className="space-y-5" noValidate onSubmit={submit}>
-          {error ? (
-            <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
-              <p className="font-semibold">{error}</p>
-              {Object.values(fieldErrors).length ? (
-                <ul className="mt-2 list-disc pl-5">
-                  {[...new Set(Object.values(fieldErrors))].map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
+          <MutationFeedback feedback={mutation.feedback} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="label" htmlFor={`task-title-${formId}`}>
                 Titel
               </label>
               <Input
+                aria-describedby={
+                  fieldErrors.title ? `task-title-${formId}-error` : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.title)}
                 id={`task-title-${formId}`}
                 onChange={(event) => setTitle(event.target.value)}
                 value={title}
+              />
+              <FieldError
+                id={`task-title-${formId}-error`}
+                message={fieldErrors.title}
               />
             </div>
             <div className="sm:col-span-2">
@@ -205,9 +233,19 @@ export function TaskCreateModal({
                 Beskrivelse
               </label>
               <Textarea
+                aria-describedby={
+                  fieldErrors.description
+                    ? `task-description-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.description)}
                 id={`task-description-${formId}`}
                 onChange={(event) => setDescription(event.target.value)}
                 value={description}
+              />
+              <FieldError
+                id={`task-description-${formId}-error`}
+                message={fieldErrors.description}
               />
             </div>
             <div>
@@ -216,7 +254,9 @@ export function TaskCreateModal({
               </label>
               <Select
                 id={`task-status-${formId}`}
-                onChange={(event) => setStatus(event.target.value as TaskStatus)}
+                onChange={(event) =>
+                  setStatus(event.target.value as TaskStatus)
+                }
                 value={status}
               >
                 {taskStatusOptions.map((option) => (
@@ -248,10 +288,20 @@ export function TaskCreateModal({
                 Deadline
               </label>
               <Input
+                aria-describedby={
+                  fieldErrors.deadline
+                    ? `task-deadline-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.deadline)}
                 id={`task-deadline-${formId}`}
                 onChange={(event) => setDeadline(event.target.value)}
                 type="date"
                 value={deadline}
+              />
+              <FieldError
+                id={`task-deadline-${formId}-error`}
+                message={fieldErrors.deadline}
               />
             </div>
             <div>
@@ -261,10 +311,20 @@ export function TaskCreateModal({
               <Input
                 autoComplete="off"
                 id={`task-category-${formId}`}
+                aria-describedby={
+                  fieldErrors.category
+                    ? `task-category-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.category)}
                 list={`task-categories-${formId}`}
                 onChange={(event) => setCategory(event.target.value)}
                 placeholder="Skriv eller vælg en tidligere kategori"
                 value={category}
+              />
+              <FieldError
+                id={`task-category-${formId}-error`}
+                message={fieldErrors.category}
               />
               <datalist id={`task-categories-${formId}`}>
                 {categorySuggestions.map((suggestion) => (
@@ -276,18 +336,28 @@ export function TaskCreateModal({
               </datalist>
             </div>
             <div>
-              <label className="label" htmlFor={`task-reminder-${formId}`}>
+              <label className="label" htmlFor={`task-reminderAt-${formId}`}>
                 Påmindelse
               </label>
               <Input
-                id={`task-reminder-${formId}`}
+                aria-describedby={
+                  fieldErrors.reminderAt
+                    ? `task-reminderAt-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.reminderAt)}
+                id={`task-reminderAt-${formId}`}
                 onChange={(event) => setReminderAt(event.target.value)}
                 type="datetime-local"
                 value={reminderAt}
               />
+              <FieldError
+                id={`task-reminderAt-${formId}-error`}
+                message={fieldErrors.reminderAt}
+              />
               <p className="mt-1 text-xs text-muted">
-                Gemmes til senere email/notifikation. Der sendes ikke
-                automatisk noget endnu.
+                Gemmes til senere email/notifikation. Der sendes ikke automatisk
+                noget endnu.
               </p>
             </div>
             {meetings.length ? (
@@ -348,27 +418,37 @@ export function TaskCreateModal({
               </div>
             ) : null}
             <div className="sm:col-span-2">
-              <label className="label" htmlFor={`task-note-${formId}`}>
+              <label className="label" htmlFor={`task-internalNote-${formId}`}>
                 Intern note
               </label>
               <Textarea
-                id={`task-note-${formId}`}
+                aria-describedby={
+                  fieldErrors.internalNote
+                    ? `task-internalNote-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.internalNote)}
+                id={`task-internalNote-${formId}`}
                 onChange={(event) => setInternalNote(event.target.value)}
                 value={internalNote}
+              />
+              <FieldError
+                id={`task-internalNote-${formId}-error`}
+                message={fieldErrors.internalNote}
               />
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             <Button
-              disabled={saving}
-              onClick={() => setOpen(false)}
+              disabled={mutation.pending}
+              onClick={closeModal}
               type="button"
               variant="secondary"
             >
               Annuller
             </Button>
-            <Button disabled={saving} type="submit">
-              {saving ? "Gemmer..." : "Gem opgave"}
+            <Button disabled={mutation.pending} type="submit">
+              {mutation.pending ? "Gemmer..." : "Gem opgave"}
             </Button>
           </div>
         </form>

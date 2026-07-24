@@ -167,7 +167,7 @@ export class MeetingRepository {
 
     const { data, error } = await this.db
       .from("meeting_external_attendees")
-      .insert(attendees)
+      .insert(attendees, { defaultToNull: false })
       .select();
     if (error) throw error;
     return data;

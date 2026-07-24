@@ -1,20 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { ActionBar, Button, Input, Select, Textarea } from "@/components/ui";
+import {
+  ActionBar,
+  Button,
+  Input,
+  MutationFeedback,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 
 export type ResourceFormField = {
   name: string;
   label: string;
-  type?:
-    | "text"
-    | "textarea"
-    | "datetime-local"
-    | "date"
-    | "select"
-    | "radio";
+  type?: "text" | "textarea" | "datetime-local" | "date" | "select" | "radio";
   required?: boolean;
   requiredMessage?: string;
   defaultValue?: string | null;
@@ -46,19 +57,30 @@ export function ResourceForm({
   method?: "POST" | "PATCH";
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(
+  const initialValuesRef = useRef(
     Object.fromEntries(
       fields.map((field) => [field.name, field.defaultValue ?? ""]),
-    ),
+    ) as Record<string, string>,
   );
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(
+    initialValuesRef.current,
+  );
+  const mutation = useMutationFeedback();
+  const dirty =
+    JSON.stringify(fieldValues) !== JSON.stringify(initialValuesRef.current);
+  const confirmDiscard = useUnsavedChanges(dirty && !mutation.pending);
+  const fieldOrder = fields.map((field) => field.name);
+
+  function showFieldErrors(errors: Record<string, string>) {
+    setFieldErrors(errors);
+    focusInvalidField(firstFieldError(errors, fieldOrder));
+  }
 
   async function submit(formData: FormData) {
-    setLoading(true);
-    setError(null);
+    if (!mutation.begin("Ændringerne gemmes...")) return;
     setFieldErrors({});
+
     const body = Object.fromEntries(formData.entries()) as Record<
       string,
       unknown
@@ -95,34 +117,22 @@ export function ResourceForm({
     }
 
     if (Object.keys(clientErrors).length > 0) {
-      setFieldErrors(clientErrors);
-      setError("Formularen kunne ikke gemmes.");
-      setLoading(false);
+      showFieldErrors(clientErrors);
+      mutation.fail("Ret de markerede felter, og prøv igen.");
       return;
     }
 
     try {
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = (await response.json()) as Record<string, unknown>;
-      if (!response.ok) {
-        const responseFieldErrors = (result.fieldErrors || {}) as Record<
-          string,
-          string[]
-        >;
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(responseFieldErrors)
-              .filter(([, messages]) => messages.length > 0)
-              .map(([name, messages]) => [name, messages[0]]),
-          ),
-        );
-        setError(String(result.error || "Formularen kunne ikke gemmes."));
-        return;
-      }
+      const result = await readMutationResponse<Record<string, unknown>>(
+        await fetch(endpoint, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        "Formularen kunne ikke gemmes. Prøv igen.",
+      );
+      initialValuesRef.current = { ...fieldValues };
+      mutation.succeed("Ændringerne er gemt.");
 
       if (onSuccess) {
         onSuccess(result);
@@ -132,37 +142,36 @@ export function ResourceForm({
         router.push(successPath.replace(":id", String(result.id)));
         router.refresh();
       }
-    } catch {
-      setError(
-        "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
-      );
-    } finally {
-      setLoading(false);
+    } catch (caught) {
+      if (caught instanceof MutationRequestError) {
+        showFieldErrors(caught.fieldErrors);
+        mutation.fail(caught.message);
+      } else {
+        mutation.fail(
+          "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
+        );
+      }
     }
   }
 
   return (
     <form action={submit} className="space-y-4" noValidate>
-      {error ? (
-        <div
-          className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
-          role="alert"
-        >
-          <p className="font-semibold">{error}</p>
-          {Object.values(fieldErrors).length > 0 ? (
-            <ul className="mt-2 list-disc pl-5">
-              {[...new Set(Object.values(fieldErrors))].map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+      <MutationFeedback feedback={mutation.feedback} />
       {fields.map((field) => {
         const visible =
           !field.visibleWhen ||
           fieldValues[field.visibleWhen.field] === field.visibleWhen.equals;
         if (!visible) return null;
+
+        const describedBy = fieldErrors[field.name]
+          ? `${field.name}-error`
+          : undefined;
+        const sharedProps = {
+          "aria-describedby": describedBy,
+          "aria-invalid": Boolean(fieldErrors[field.name]),
+          id: field.name,
+          name: field.name,
+        };
 
         return (
           <div key={field.name}>
@@ -173,13 +182,21 @@ export function ResourceForm({
               <p className="mb-2 text-xs text-muted">{field.helpText}</p>
             ) : null}
             {field.type === "radio" ? (
-              <div className="flex flex-wrap gap-3">
+              <div
+                aria-describedby={describedBy}
+                aria-invalid={Boolean(fieldErrors[field.name])}
+                className="flex flex-wrap gap-3"
+                id={field.name}
+                role="radiogroup"
+                tabIndex={-1}
+              >
                 {field.options?.map((option) => (
                   <label
                     className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-medium"
                     key={option.value}
                   >
                     <input
+                      aria-describedby={describedBy}
                       checked={fieldValues[field.name] === option.value}
                       name={field.name}
                       onChange={(event) =>
@@ -197,35 +214,25 @@ export function ResourceForm({
               </div>
             ) : field.type === "textarea" ? (
               <Textarea
-                aria-describedby={
-                  fieldErrors[field.name] ? `${field.name}-error` : undefined
-                }
-                aria-invalid={Boolean(fieldErrors[field.name])}
-                defaultValue={field.defaultValue ?? ""}
-                id={field.name}
-                name={field.name}
+                {...sharedProps}
                 onChange={(event) =>
                   setFieldValues((current) => ({
                     ...current,
                     [field.name]: event.target.value,
                   }))
                 }
+                value={fieldValues[field.name]}
               />
             ) : field.type === "select" ? (
               <Select
-                aria-describedby={
-                  fieldErrors[field.name] ? `${field.name}-error` : undefined
-                }
-                aria-invalid={Boolean(fieldErrors[field.name])}
-                defaultValue={field.defaultValue ?? undefined}
-                id={field.name}
-                name={field.name}
+                {...sharedProps}
                 onChange={(event) =>
                   setFieldValues((current) => ({
                     ...current,
                     [field.name]: event.target.value,
                   }))
                 }
+                value={fieldValues[field.name]}
               >
                 {field.options?.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -235,13 +242,7 @@ export function ResourceForm({
               </Select>
             ) : (
               <Input
-                aria-describedby={
-                  fieldErrors[field.name] ? `${field.name}-error` : undefined
-                }
-                aria-invalid={Boolean(fieldErrors[field.name])}
-                defaultValue={field.defaultValue ?? ""}
-                id={field.name}
-                name={field.name}
+                {...sharedProps}
                 onChange={(event) =>
                   setFieldValues((current) => ({
                     ...current,
@@ -250,6 +251,7 @@ export function ResourceForm({
                 }
                 required={field.required}
                 type={field.type || "text"}
+                value={fieldValues[field.name]}
               />
             )}
             {fieldErrors[field.name] ? (
@@ -265,13 +267,15 @@ export function ResourceForm({
       })}
       <ActionBar>
         <div className="flex flex-wrap gap-2">
-          <Button disabled={loading} type="submit">
-            {loading ? "Gemmer..." : submitLabel}
+          <Button disabled={mutation.pending} type="submit">
+            {mutation.pending ? "Gemmer..." : submitLabel}
           </Button>
           {secondaryAction ? (
             <Button
-              disabled={loading}
-              onClick={secondaryAction.onClick}
+              disabled={mutation.pending}
+              onClick={() => {
+                if (confirmDiscard()) secondaryAction.onClick();
+              }}
               type="button"
               variant="secondary"
             >

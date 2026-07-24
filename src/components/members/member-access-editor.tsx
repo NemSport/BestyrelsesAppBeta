@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 
-import { Button, Modal, Select } from "@/components/ui";
+import { Button, Modal, MutationFeedback, Select } from "@/components/ui";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
 import {
   isCommitteeRoleReduction,
   isOrganizationRoleReduction,
@@ -12,6 +17,11 @@ import {
   committeeRoleLabels,
   organizationRoleLabels,
 } from "@/lib/localization";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 import type { Database } from "@/types/database";
 import type {
   Committee,
@@ -55,8 +65,8 @@ export function MemberAccessEditor({
   const [assignments, setAssignments] = useState<CommitteeAssignment[]>([]);
   const [committeeToAdd, setCommitteeToAdd] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const mutation = useMutationFeedback();
+  const loading = mutation.pending;
 
   const initialAssignments = useMemo(
     () =>
@@ -73,6 +83,7 @@ export function MemberAccessEditor({
     role !== member.role ||
     JSON.stringify(normalizedAssignments) !==
       JSON.stringify(initialAssignments);
+  const confirmDiscard = useUnsavedChanges(open && dirty && !loading);
   const selectedCommitteeIds = new Set(
     assignments.map((assignment) => assignment.committeeId),
   );
@@ -85,20 +96,13 @@ export function MemberAccessEditor({
     setAssignments(initialAssignments);
     setCommitteeToAdd("");
     setFieldErrors({});
-    setError(null);
+    mutation.reset();
     setOpen(true);
   }
 
   function closeEditor() {
     if (loading) return;
-    if (
-      dirty &&
-      !window.confirm(
-        "Du har ændringer, som ikke er gemt. Vil du lukke uden at gemme?",
-      )
-    ) {
-      return;
-    }
+    if (!confirmDiscard()) return;
     setOpen(false);
     window.setTimeout(
       () =>
@@ -174,38 +178,25 @@ export function MemberAccessEditor({
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    if (!mutation.begin("Medlemsadgangen gemmes...")) return;
     setFieldErrors({});
     try {
-      const response = await fetch(
-        `/api/organizations/${organizationId}/members/${member.user_id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            role,
-            committeeAssignments: normalizedAssignments,
-          }),
-        },
+      const result = await readMutationResponse<{ message?: string }>(
+        await fetch(
+          `/api/organizations/${organizationId}/members/${member.user_id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              role,
+              committeeAssignments: normalizedAssignments,
+            }),
+          },
+        ),
+        "Adgangen kunne ikke opdateres. Kontrollér felterne, og prøv igen.",
       );
-      const result = (await response.json()) as {
-        error?: string;
-        message?: string;
-        fieldErrors?: Record<string, string[]>;
-      };
-      if (!response.ok) {
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors || {}).map(([key, messages]) => [
-              key,
-              messages[0] || "",
-            ]),
-          ),
-        );
-        throw new Error(result.error || "Adgangen kunne ikke opdateres.");
-      }
 
+      mutation.succeed(result.message || "Medlemmets adgang er opdateret.");
       setOpen(false);
       onUpdated(result.message || "Medlemmets adgang er opdateret.");
       window.setTimeout(
@@ -216,13 +207,27 @@ export function MemberAccessEditor({
         0,
       );
     } catch (caughtError) {
-      setError(
+      const nextFieldErrors =
+        caughtError instanceof MutationRequestError
+          ? caughtError.fieldErrors
+          : {};
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(
         caughtError instanceof Error
           ? caughtError.message
           : "Adgangen kunne ikke opdateres. Prøv igen.",
       );
-    } finally {
-      setLoading(false);
+      const field = firstFieldError(nextFieldErrors, [
+        "role",
+        "committeeAssignments",
+      ]);
+      focusInvalidField(
+        field === "role"
+          ? `organization-role-${member.user_id}`
+          : field
+            ? `committee-add-${member.user_id}`
+            : null,
+      );
     }
   }
 
@@ -267,14 +272,7 @@ export function MemberAccessEditor({
           id={`member-access-${member.user_id}`}
           onSubmit={save}
         >
-          {error ? (
-            <div
-              className="alert-danger rounded-xl px-4 py-3 text-sm"
-              role="alert"
-            >
-              {error}
-            </div>
-          ) : null}
+          <MutationFeedback feedback={mutation.feedback} />
 
           <div>
             <label

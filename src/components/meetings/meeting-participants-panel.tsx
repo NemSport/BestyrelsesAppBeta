@@ -3,8 +3,30 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, EmptyState, Input, Select, StatusBadge } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  FieldError,
+  Input,
+  MutationFeedback,
+  Select,
+  StatusBadge,
+} from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
+import {
+  hasExternalAttendeeInput,
+  remapExternalAttendeeFieldErrors,
+} from "@/lib/meeting-participants";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 import type { Database } from "@/types/database";
 import type {
   MeetingAttendee,
@@ -32,26 +54,18 @@ type ExternalAttendeeState = {
 
 const statusLabels: Record<ParticipantStatus, string> = {
   attended: "Til stede",
-  absent: "FravÃ¦rende",
+  absent: "Fraværende",
   excused: "Afbud",
 };
 
-const statusTones: Record<ParticipantStatus, "success" | "neutral" | "warning"> =
-  {
-    attended: "success",
-    absent: "neutral",
-    excused: "warning",
-  };
-
-async function readResponse<T>(response: Response) {
-  const result = (await response.json().catch(() => null)) as
-    | (T & { error?: string })
-    | null;
-  if (!response.ok) {
-    throw new Error(result?.error || "Deltagerne kunne ikke gemmes.");
-  }
-  return result as T;
-}
+const statusTones: Record<
+  ParticipantStatus,
+  "success" | "neutral" | "warning"
+> = {
+  attended: "success",
+  absent: "neutral",
+  excused: "warning",
+};
 
 function toExternalState(
   attendee: MeetingExternalAttendee,
@@ -109,10 +123,13 @@ export function MeetingParticipantsPanel({
   );
   const [internal, setInternal] = useState<InternalParticipantState[]>([]);
   const [external, setExternal] = useState<ExternalAttendeeState[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [savedSignature, setSavedSignature] = useState("");
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const mutation = useMutationFeedback();
+  const currentSignature = JSON.stringify({ internal, external });
+  const dirty = Boolean(savedSignature) && currentSignature !== savedSignature;
+  const confirmDiscard = useUnsavedChanges(open && dirty && !mutation.pending);
 
   useEffect(() => {
     const participantsByUser = new Map(
@@ -121,22 +138,27 @@ export function MeetingParticipantsPanel({
         participant.attendance_status,
       ]),
     );
-    setInternal(
-      committeeMembers.map((member) => {
-        const status = participantsByUser.get(member.user_id);
-        return {
-          userId: member.user_id,
-          status: toParticipantStatus(status),
-        };
-      }),
+    const nextInternal = committeeMembers.map((member) => {
+      const status = participantsByUser.get(member.user_id);
+      return {
+        userId: member.user_id,
+        status: toParticipantStatus(status),
+      };
+    });
+    const nextExternal = externalAttendees.map(toExternalState);
+    setInternal(nextInternal);
+    setExternal(nextExternal);
+    setSavedSignature(
+      JSON.stringify({ internal: nextInternal, external: nextExternal }),
     );
-    setExternal(externalAttendees.map(toExternalState));
   }, [committeeMembers, externalAttendees, internalParticipants]);
 
   function updateInternal(userId: string, status: ParticipantStatus | "") {
     setInternal((current) =>
       current.map((participant) =>
-        participant.userId === userId ? { ...participant, status } : participant,
+        participant.userId === userId
+          ? { ...participant, status }
+          : participant,
       ),
     );
   }
@@ -153,11 +175,26 @@ export function MeetingParticipantsPanel({
   }
 
   async function save() {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
+    if (!mutation.begin("Deltagerne gemmes...")) return;
+    setFieldErrors({});
+    const externalPayload = external.flatMap((attendee, originalIndex) =>
+      hasExternalAttendeeInput(attendee)
+        ? [
+            {
+              originalIndex,
+              value: {
+                id: attendee.id,
+                name: attendee.name,
+                email: attendee.email,
+                mobile: attendee.mobile,
+                roleNote: attendee.roleNote,
+              },
+            },
+          ]
+        : [],
+    );
     try {
-      const result = await readResponse<{ message: string }>(
+      const result = await readMutationResponse<{ message: string }>(
         await fetch(`/api/meetings/${meetingId}/participants`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -174,35 +211,60 @@ export function MeetingParticipantsPanel({
                   ]
                 : [],
             ),
-            externalAttendees: external
-              .map((attendee) => ({
-                id: attendee.id,
-                name: attendee.name,
-                email: attendee.email,
-                mobile: attendee.mobile,
-                roleNote: attendee.roleNote,
-              }))
-              .filter((attendee) => attendee.name.trim()),
+            externalAttendees: externalPayload.map((item) => item.value),
           }),
         }),
+        "Deltagerne kunne ikke gemmes. Kontrollér felterne, og prøv igen.",
       );
-      setMessage(result.message);
+      setSavedSignature(currentSignature);
+      mutation.succeed(result.message || "Deltagerne er gemt.");
       router.refresh();
-      setOpen(false);
     } catch (caught) {
-      setError(
+      const nextFieldErrors =
+        caught instanceof MutationRequestError
+          ? remapExternalAttendeeFieldErrors(
+              caught.fieldErrors,
+              externalPayload.map((item) => item.originalIndex),
+            )
+          : {};
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(
         caught instanceof Error
           ? caught.message
-          : "Deltagerne kunne ikke gemmes.",
+          : "Deltagerne kunne ikke gemmes. Prøv igen.",
       );
-    } finally {
-      setSaving(false);
+      const firstError = firstFieldError(nextFieldErrors, [
+        ...external.flatMap((_, index) => [
+          `externalAttendees.${index}.name`,
+          `externalAttendees.${index}.email`,
+          `externalAttendees.${index}.mobile`,
+          `externalAttendees.${index}.roleNote`,
+        ]),
+      ]);
+      focusInvalidField(
+        firstError
+          ? `external-attendee-${firstError.replaceAll(".", "-")}`
+          : null,
+      );
     }
+  }
+
+  function closeModal() {
+    if (mutation.pending || !confirmDiscard()) return;
+    setOpen(false);
+    setFieldErrors({});
+    mutation.reset();
+  }
+
+  function openModal() {
+    setFieldErrors({});
+    mutation.reset();
+    setOpen(true);
   }
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} size="sm" type="button" variant="ghost">
+      <Button onClick={openModal} size="sm" type="button" variant="ghost">
         {"\u00c5bn"}
       </Button>
       <Modal
@@ -214,25 +276,32 @@ export function MeetingParticipantsPanel({
         footer={
           <div className="flex flex-wrap items-center gap-3">
             {canEdit ? (
-              <Button disabled={saving} onClick={save} type="button">
-                {saving ? "Gemmer..." : "Gem deltagere"}
+              <Button
+                disabled={mutation.pending || !dirty}
+                onClick={save}
+                type="button"
+              >
+                {mutation.pending ? "Gemmer..." : "Gem deltagere"}
               </Button>
             ) : null}
-            <Button onClick={() => setOpen(false)} type="button" variant="secondary">
+            <Button
+              disabled={mutation.pending}
+              onClick={closeModal}
+              type="button"
+              variant="secondary"
+            >
               Luk
             </Button>
-            {message ? (
-              <p className="text-sm font-medium text-emerald-700">{message}</p>
-            ) : null}
-            {error ? (
-              <p className="text-sm font-medium text-red-700" role="alert">
-                {error}
+            <MutationFeedback feedback={mutation.feedback} />
+            {canEdit && dirty && mutation.feedback.status === "idle" ? (
+              <p className="text-sm text-warning" role="status">
+                Du har ændringer, som ikke er gemt.
               </p>
             ) : null}
           </div>
         }
         maxWidth="6xl"
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         open={open}
         title="Deltagere"
       >
@@ -291,7 +360,7 @@ export function MeetingParticipantsPanel({
                       >
                         <option value="">Ikke registreret</option>
                         <option value="attended">Til stede</option>
-                        <option value="absent">FravÃ¦rende</option>
+                        <option value="absent">Fraværende</option>
                         <option value="excused">Afbud</option>
                       </Select>
                     ) : status ? (
@@ -299,7 +368,9 @@ export function MeetingParticipantsPanel({
                         {statusLabels[status]}
                       </StatusBadge>
                     ) : (
-                      <span className="text-xs text-muted">Ikke registreret</span>
+                      <span className="text-xs text-muted">
+                        Ikke registreret
+                      </span>
                     )}
                   </div>
                 );
@@ -332,80 +403,147 @@ export function MeetingParticipantsPanel({
                   type="button"
                   variant="secondary"
                 >
-                  TilfÃ¸j ekstern
+                  Tilføj ekstern
                 </Button>
               ) : null}
             </div>
             <div className="space-y-3">
-              {external.map((attendee, index) => (
-                <div
-                  className="rounded-[var(--radius-control)] border border-line bg-subtle/25 p-3"
-                  key={attendee.id ?? `new-${index}`}
-                >
-                  {canEdit ? (
-                    <div className="grid gap-2">
-                      <Input
-                        onChange={(event) =>
-                          updateExternal(index, { name: event.target.value })
-                        }
-                        placeholder="Navn"
-                        value={attendee.name}
-                      />
-                      <div className="grid gap-2 sm:grid-cols-2">
+              {external.map((attendee, index) => {
+                const fieldKey = (field: keyof ExternalAttendeeState) =>
+                  `externalAttendees.${index}.${field}`;
+                const fieldId = (field: keyof ExternalAttendeeState) =>
+                  `external-attendee-${fieldKey(field).replaceAll(".", "-")}`;
+                return (
+                  <div
+                    className="rounded-[var(--radius-control)] border border-line bg-subtle/25 p-3"
+                    key={attendee.id ?? `new-${index}`}
+                  >
+                    {canEdit ? (
+                      <div className="grid gap-2">
                         <Input
-                          onChange={(event) =>
-                            updateExternal(index, { email: event.target.value })
+                          aria-describedby={
+                            fieldErrors[fieldKey("name")]
+                              ? `${fieldId("name")}-error`
+                              : undefined
                           }
-                          placeholder="E-mail"
-                          type="email"
-                          value={attendee.email}
+                          aria-invalid={Boolean(fieldErrors[fieldKey("name")])}
+                          id={fieldId("name")}
+                          onChange={(event) =>
+                            updateExternal(index, { name: event.target.value })
+                          }
+                          placeholder="Navn"
+                          value={attendee.name}
                         />
+                        <FieldError
+                          id={`${fieldId("name")}-error`}
+                          message={fieldErrors[fieldKey("name")]}
+                        />
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div>
+                            <Input
+                              aria-describedby={
+                                fieldErrors[fieldKey("email")]
+                                  ? `${fieldId("email")}-error`
+                                  : undefined
+                              }
+                              aria-invalid={Boolean(
+                                fieldErrors[fieldKey("email")],
+                              )}
+                              id={fieldId("email")}
+                              onChange={(event) =>
+                                updateExternal(index, {
+                                  email: event.target.value,
+                                })
+                              }
+                              placeholder="E-mail"
+                              type="email"
+                              value={attendee.email}
+                            />
+                            <FieldError
+                              id={`${fieldId("email")}-error`}
+                              message={fieldErrors[fieldKey("email")]}
+                            />
+                          </div>
+                          <div>
+                            <Input
+                              aria-describedby={
+                                fieldErrors[fieldKey("mobile")]
+                                  ? `${fieldId("mobile")}-error`
+                                  : undefined
+                              }
+                              aria-invalid={Boolean(
+                                fieldErrors[fieldKey("mobile")],
+                              )}
+                              id={fieldId("mobile")}
+                              onChange={(event) =>
+                                updateExternal(index, {
+                                  mobile: event.target.value,
+                                })
+                              }
+                              placeholder="Mobil"
+                              value={attendee.mobile}
+                            />
+                            <FieldError
+                              id={`${fieldId("mobile")}-error`}
+                              message={fieldErrors[fieldKey("mobile")]}
+                            />
+                          </div>
+                        </div>
                         <Input
-                          onChange={(event) =>
-                            updateExternal(index, { mobile: event.target.value })
+                          aria-describedby={
+                            fieldErrors[fieldKey("roleNote")]
+                              ? `${fieldId("roleNote")}-error`
+                              : undefined
                           }
-                          placeholder="Mobil"
-                          value={attendee.mobile}
+                          aria-invalid={Boolean(
+                            fieldErrors[fieldKey("roleNote")],
+                          )}
+                          id={fieldId("roleNote")}
+                          onChange={(event) =>
+                            updateExternal(index, {
+                              roleNote: event.target.value,
+                            })
+                          }
+                          placeholder="Funktion/notat"
+                          value={attendee.roleNote}
                         />
+                        <FieldError
+                          id={`${fieldId("roleNote")}-error`}
+                          message={fieldErrors[fieldKey("roleNote")]}
+                        />
+                        <Button
+                          onClick={() =>
+                            setExternal((current) =>
+                              current.filter(
+                                (_, itemIndex) => itemIndex !== index,
+                              ),
+                            )
+                          }
+                          size="sm"
+                          type="button"
+                          variant="danger"
+                        >
+                          Fjern
+                        </Button>
                       </div>
-                      <Input
-                        onChange={(event) =>
-                          updateExternal(index, { roleNote: event.target.value })
-                        }
-                        placeholder="Funktion/notat"
-                        value={attendee.roleNote}
-                      />
-                      <Button
-                        onClick={() =>
-                          setExternal((current) =>
-                            current.filter((_, itemIndex) => itemIndex !== index),
-                          )
-                        }
-                        size="sm"
-                        type="button"
-                        variant="danger"
-                      >
-                        Fjern
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-sm font-semibold">{attendee.name}</p>
-                      <p className="text-xs text-muted">
-                        {[attendee.roleNote, attendee.email, attendee.mobile]
-                          .filter(Boolean)
-                          .join(" Â· ") || "Ingen kontaktoplysninger"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <div>
+                        <p className="text-sm font-semibold">{attendee.name}</p>
+                        <p className="text-xs text-muted">
+                          {[attendee.roleNote, attendee.email, attendee.mobile]
+                            .filter(Boolean)
+                            .join(" Â· ") || "Ingen kontaktoplysninger"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {external.length === 0 ? (
                 <EmptyState compact title="Ingen eksterne deltagere." />
               ) : null}
             </div>
           </section>
-
         </div>
       </Modal>
     </>

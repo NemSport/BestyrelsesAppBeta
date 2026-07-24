@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type AutosaveStatus =
-  | "idle"
-  | "saving"
-  | "saved"
-  | "error"
-  | "offline"
-  | "pending"
-  | "conflict";
+import { useUnsavedChanges } from "@/hooks/use-mutation-feedback";
+import {
+  hasUnsynchronizedAutosaveChanges,
+  type AutosaveStatus,
+} from "@/lib/autosave-state";
+
+export type { AutosaveStatus } from "@/lib/autosave-state";
 
 export type StoredLocalDraft<T> = {
   version: 1;
@@ -76,6 +75,14 @@ export function useOfflineAutosave<T, TResult>({
   onErrorRef.current = onError;
   getSavedServerUpdatedAtRef.current = getSavedServerUpdatedAt;
   conflictRef.current = conflict;
+  const hasUnsavedChanges = hasUnsynchronizedAutosaveChanges({
+    enabled,
+    currentSerialized: observedSerialized,
+    lastSavedSerialized: lastSavedSerializedRef.current,
+    status,
+    hasConflict: Boolean(conflict),
+  });
+  useUnsavedChanges(hasUnsavedChanges);
 
   useEffect(() => {
     serverUpdatedAtRef.current = serverUpdatedAt;
@@ -125,7 +132,10 @@ export function useOfflineAutosave<T, TResult>({
       setStatus("saving");
       setErrorMessage(null);
       try {
-        const result = await saveRef.current(payload, serverUpdatedAtRef.current);
+        const result = await saveRef.current(
+          payload,
+          serverUpdatedAtRef.current,
+        );
         lastSavedSerializedRef.current = serializedPayload;
         const savedServerUpdatedAt =
           getSavedServerUpdatedAtRef.current?.(result) ?? null;
@@ -286,5 +296,6 @@ export function useOfflineAutosave<T, TResult>({
     retry: saveNow,
     restoreLocalDraft,
     keepServerVersion,
+    hasUnsavedChanges,
   };
 }
