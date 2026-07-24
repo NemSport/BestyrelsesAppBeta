@@ -17,7 +17,8 @@
     "test:issue-15": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-15/*.test.mjs",
     "test:issue-14": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-14/*.test.mjs",
     "test:issue-9": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-9/*.test.mjs",
-    "test:issue-6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-6/*.test.mjs"
+    "test:issue-6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-6/*.test.mjs",
+    "test:issue-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-5/*.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",

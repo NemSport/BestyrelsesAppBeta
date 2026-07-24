@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { MeetingList } from "@/components/meetings/meeting-list";
+import { MeetingListFilters } from "@/components/meetings/meeting-list-filters";
 import {
   EmptyState,
   PageHeader,
@@ -11,11 +13,14 @@ import {
   staticSurfaceClassName,
   type StatusTone,
 } from "@/components/ui";
-import { formatDanishDate, formatDanishDateKey } from "@/lib/date-format";
+import {
+  filterMeetingList,
+  groupMeetingList,
+  parseMeetingListFilters,
+} from "@/lib/meeting-list";
 import {
   formatDateTime,
   meetingMinutesStatusLabels,
-  meetingStatusLabels,
 } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
@@ -25,9 +30,6 @@ import { OrganizationService } from "@/services/organization-service";
 type OrganizationOverview = Awaited<
   ReturnType<OrganizationService["getOverview"]>
 >;
-type OrganizationMeeting = Awaited<
-  ReturnType<OrganizationService["listMeetings"]>
->[number];
 type RecentMinutes = OrganizationOverview["recentMinutes"][number];
 
 const minutesStatusTones = {
@@ -36,114 +38,6 @@ const minutesStatusTones = {
   approved: "success",
 } as const satisfies Record<string, StatusTone>;
 
-const meetingStatusTones = {
-  draft: "neutral",
-  scheduled: "info",
-  in_progress: "progress",
-  completed: "success",
-  cancelled: "danger",
-} as const satisfies Record<string, StatusTone>;
-
-function OrganizationMeetingRow({
-  meeting,
-  organizationRoot,
-}: {
-  meeting: OrganizationMeeting;
-  organizationRoot: string;
-}) {
-  const meetingHref = `${organizationRoot}/committees/${meeting.committee_id}/meetings/${meeting.id}`;
-  const agendaCount = meeting.agenda_item_occurrences.length;
-
-  return (
-    <article
-      className={staticSurfaceClassName(
-        "border-l-4 border-l-brand/55 px-3 py-3 sm:px-4",
-      )}
-    >
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="min-w-0">
-          <Link
-            className={primarySurfaceLinkClassName("text-base")}
-            href={meetingHref}
-          >
-            {meeting.title}
-          </Link>
-          <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-            <div className="inline-flex gap-1">
-              <dt className="font-semibold text-ink/70">Dato:</dt>
-              <dd>{formatDateTime(meeting.starts_at)}</dd>
-            </div>
-            <div className="inline-flex gap-1">
-              <dt className="font-semibold text-ink/70">Udvalg:</dt>
-              <dd>{meeting.committeeName}</dd>
-            </div>
-            <div className="inline-flex gap-1">
-              <dt className="font-semibold text-ink/70">Dagsorden:</dt>
-              <dd>
-                {agendaCount}{" "}
-                {agendaCount === 1 ? "dagsordenspunkt" : "dagsordenspunkter"}
-              </dd>
-            </div>
-          </dl>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
-          <StatusBadge tone={meetingStatusTones[meeting.status]}>
-            {meetingStatusLabels[meeting.status]}
-          </StatusBadge>
-          <Link
-            className={buttonClassName({ size: "sm", variant: "secondary" })}
-            href={meetingHref}
-          >
-            Åbn møde
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function isValidDateKey(value: string | undefined) {
-  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
-}
-
-function sortMeetingsNewestFirst<
-  T extends { created_at: string; starts_at: string },
->(meetings: T[]) {
-  return [...meetings].sort((left, right) => {
-    const byDate =
-      new Date(right.starts_at).getTime() - new Date(left.starts_at).getTime();
-    if (byDate !== 0) return byDate;
-    return (
-      new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-    );
-  });
-}
-
-function findNearbyMeetings(
-  meetings: OrganizationMeeting[],
-  selectedDate: string,
-) {
-  const sameDay = meetings.filter(
-    (meeting) => formatDanishDateKey(meeting.starts_at) === selectedDate,
-  );
-  const before = meetings
-    .filter((meeting) => formatDanishDateKey(meeting.starts_at) < selectedDate)
-    .slice(0, 2);
-  const after = [...meetings]
-    .filter((meeting) => formatDanishDateKey(meeting.starts_at) > selectedDate)
-    .reverse()
-    .slice(0, 2);
-  const seen = new Set<string>();
-
-  return sortMeetingsNewestFirst([...sameDay, ...before, ...after]).filter(
-    (meeting) => {
-      if (seen.has(meeting.id)) return false;
-      seen.add(meeting.id);
-      return true;
-    },
-  );
-}
-
 function RecentMinutesRow({
   minutes,
   organizationRoot,
@@ -151,7 +45,7 @@ function RecentMinutesRow({
   minutes: RecentMinutes;
   organizationRoot: string;
 }) {
-  const meetingHref = `${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`;
+  const meetingHref = `${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}#general-minutes-heading`;
 
   return (
     <article
@@ -161,32 +55,42 @@ function RecentMinutesRow({
     >
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
         <div className="min-w-0">
-          <Link
-            className={primarySurfaceLinkClassName("text-base")}
-            href={meetingHref}
-          >
-            {minutes.meetingTitle}
-          </Link>
-          <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-            <div className="inline-flex gap-1">
-              <dt className="font-semibold text-ink/70">Dato:</dt>
-              <dd>{formatDateTime(minutes.meetingStartsAt)}</dd>
-            </div>
-            <div className="inline-flex gap-1">
-              <dt className="font-semibold text-ink/70">Udvalg:</dt>
-              <dd>{minutes.committeeName}</dd>
-            </div>
-          </dl>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
           <StatusBadge tone={minutesStatusTones[minutes.status]}>
             {meetingMinutesStatusLabels[minutes.status]}
           </StatusBadge>
+          <h3 className="mt-2">
+            <Link
+              className={primarySurfaceLinkClassName(
+                "break-words text-base leading-snug",
+              )}
+              href={meetingHref}
+            >
+              {minutes.meetingTitle}
+            </Link>
+          </h3>
+          <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2">
+            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-1">
+              <dt className="font-semibold text-ink/70">Dato og tid</dt>
+              <dd>
+                <time dateTime={minutes.meetingStartsAt}>
+                  {formatDateTime(minutes.meetingStartsAt)}
+                </time>
+              </dd>
+            </div>
+            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-1">
+              <dt className="font-semibold text-ink/70">Udvalg</dt>
+              <dd className="break-words">{minutes.committeeName}</dd>
+            </div>
+          </dl>
+        </div>
+        <div className="flex min-w-36 flex-col items-start gap-1 md:items-end">
+          <span className="text-xs font-semibold text-muted">Næste trin</span>
           <Link
+            aria-label={`Se referat: ${minutes.meetingTitle}`}
             className={buttonClassName({ size: "sm", variant: "secondary" })}
             href={meetingHref}
           >
-            Åbn møde
+            Se referat
           </Link>
         </div>
       </div>
@@ -199,11 +103,17 @@ export default async function OrganizationMeetingsPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams?: Promise<{ date?: string }>;
+  searchParams?: Promise<{
+    date?: string;
+    period?: string;
+    status?: string;
+  }>;
 }) {
   const { organizationId } = await params;
-  const { date } = (await searchParams) ?? {};
-  const selectedDate = isValidDateKey(date) ? date : "";
+  const filters = parseMeetingListFilters((await searchParams) ?? {});
+  const filtersActive = Boolean(
+    filters.date || filters.period || filters.status,
+  );
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
   const context = await new AuthorizationService(db)
@@ -217,33 +127,39 @@ export default async function OrganizationMeetingsPage({
     organizationService.getOverview(organizationId),
     organizationService.listMeetings(organizationId),
   ]);
-  const organizationRoot = `/organizations/${organizationId}`;
-  const sortedMeetings = sortMeetingsNewestFirst(meetings);
+  const capabilitiesByCommittee = new Map(
+    overview.committees.map(({ committee, capabilities }) => [
+      committee.id,
+      capabilities,
+    ]),
+  );
+  const meetingEntries = meetings.flatMap((meeting) => {
+    const capabilities = capabilitiesByCommittee.get(meeting.committee_id);
+    return capabilities ? [{ ...meeting, capabilities }] : [];
+  });
   const now = Date.now();
-  const upcomingMeetings = sortedMeetings.filter(
-    (meeting) => new Date(meeting.starts_at).getTime() >= now,
+  const grouped = groupMeetingList(meetingEntries, now);
+  const filteredGrouped = groupMeetingList(
+    filterMeetingList(meetingEntries, filters, now),
+    now,
   );
-  const previousMeetings = sortedMeetings.filter(
-    (meeting) => new Date(meeting.starts_at).getTime() < now,
-  );
-  const nearbyMeetings = selectedDate
-    ? findNearbyMeetings(sortedMeetings, selectedDate)
-    : [];
-  const selectedDateMatches = selectedDate
-    ? sortedMeetings.filter(
-        (meeting) => formatDanishDateKey(meeting.starts_at) === selectedDate,
-      ).length
-    : 0;
+  const filteredMeetings = [
+    ...filteredGrouped.upcoming,
+    ...filteredGrouped.previous,
+    ...filteredGrouped.cancelled,
+  ];
   const recentMinutes = [...overview.recentMinutes].sort(
     (left, right) =>
       new Date(right.meetingStartsAt).getTime() -
       new Date(left.meetingStartsAt).getTime(),
   );
+  const organizationRoot = `/organizations/${organizationId}`;
+  const meetingsRoot = `${organizationRoot}/meetings`;
 
   return (
     <div className="space-y-8">
       <PageHeader
-        description="Et samlet, roligt overblik over kommende møder og de seneste referater på tværs af organisationens udvalg."
+        description="Et samlet overblik over møder og referater på tværs af de udvalg, du har adgang til."
         eyebrow={
           <Link
             className="text-muted transition hover:text-brand"
@@ -255,121 +171,87 @@ export default async function OrganizationMeetingsPage({
         title={`Møder i ${context.organization.name}`}
       />
 
-      <section className="border-y border-line bg-subtle/20 px-3 py-3 sm:px-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <h2 className="text-sm font-semibold text-ink">
-              Find møder omkring en dato
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              Vælg en dato for at se møder på dagen og de nærmeste møder før og
-              efter.
-            </p>
-          </div>
-          <form className="flex flex-wrap items-end gap-2" method="get">
-            <label className="grid gap-1 text-xs font-semibold text-muted">
-              Dato
-              <input
-                className="field min-h-9 w-44 px-3 py-2 text-sm"
-                defaultValue={selectedDate}
-                name="date"
-                type="date"
-              />
-            </label>
-            <button
-              className={buttonClassName({ size: "sm", variant: "secondary" })}
-              type="submit"
-            >
-              Find møder
-            </button>
-            {selectedDate ? (
-              <Link
-                className={buttonClassName({ size: "sm", variant: "ghost" })}
-                href={`${organizationRoot}/meetings`}
-              >
-                Ryd dato
-              </Link>
-            ) : null}
-          </form>
-        </div>
+      <MeetingListFilters filters={filters} resetHref={meetingsRoot} />
 
-        {selectedDate ? (
-          <div className="mt-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-ink">
-                Møder omkring {formatDanishDate(`${selectedDate}T12:00:00Z`)}
-              </h3>
-              <p className="text-xs text-muted">
-                {selectedDateMatches > 0
-                  ? `${selectedDateMatches} møde(r) på valgt dato`
-                  : "Ingen møder præcis på valgt dato"}
+      {filtersActive ? (
+        <PageSection
+          description="Kommende resultater vises først, derefter de nyeste afholdte og aflyste."
+          title="Filtrerede møder"
+        >
+          {filteredMeetings.length > 0 ? (
+            <>
+              <p className="mb-2 text-xs font-semibold text-muted">
+                {filteredMeetings.length}{" "}
+                {filteredMeetings.length === 1 ? "møde" : "møder"}
               </p>
-            </div>
-            {nearbyMeetings.length > 0 ? (
-              <div className="divide-y divide-line overflow-hidden border border-line bg-surface/60">
-                {nearbyMeetings.map((meeting) => (
-                  <OrganizationMeetingRow
-                    key={meeting.id}
-                    meeting={meeting}
-                    organizationRoot={organizationRoot}
-                  />
-                ))}
-              </div>
+              <MeetingList
+                meetings={filteredMeetings}
+                now={now}
+                organizationId={organizationId}
+              />
+            </>
+          ) : (
+            <EmptyState
+              description="Prøv at rydde et filter eller vælge en anden periode, status eller dato."
+              title="Ingen møder matcher filtrene."
+            />
+          )}
+        </PageSection>
+      ) : (
+        <>
+          <PageSection
+            description="Næste møde først; igangværende møder placeres her."
+            title="Kommende og igangværende"
+          >
+            {grouped.upcoming.length > 0 ? (
+              <MeetingList
+                meetings={grouped.upcoming}
+                now={now}
+                organizationId={organizationId}
+              />
             ) : (
-              <p className="border border-line bg-surface px-3 py-3 text-sm text-muted">
-                Der findes ingen møder omkring den valgte dato.
-              </p>
+              <EmptyState
+                description="Når der planlægges møder i dine udvalg, vises de her."
+                title="Der er ingen kommende eller igangværende møder."
+              />
             )}
-          </div>
-        ) : null}
-      </section>
+          </PageSection>
 
-      <PageSection
-        description="Planlagte møder i de udvalg, du har adgang til."
-        title="Kommende møder"
-      >
-        {upcomingMeetings.length > 0 ? (
-          <div className="divide-y divide-line overflow-hidden border border-line bg-surface/60">
-            {upcomingMeetings.map((meeting) => (
-              <OrganizationMeetingRow
-                key={meeting.id}
-                meeting={meeting}
-                organizationRoot={organizationRoot}
+          <PageSection
+            description="Afholdte møder sorteret med nyeste mødedato først."
+            title="Afholdte møder"
+          >
+            {grouped.previous.length > 0 ? (
+              <MeetingList
+                meetings={grouped.previous}
+                now={now}
+                organizationId={organizationId}
               />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            description="Når der oprettes møder i organisationens udvalg, vises de her."
-            title="Der er ingen kommende møder."
-          />
-        )}
-      </PageSection>
-
-      <PageSection
-        description="Afholdte møder sorteret med det nyeste møde først."
-        title="Tidligere møder"
-      >
-        {previousMeetings.length > 0 ? (
-          <div className="divide-y divide-line overflow-hidden border border-line bg-surface/60">
-            {previousMeetings.map((meeting) => (
-              <OrganizationMeetingRow
-                key={meeting.id}
-                meeting={meeting}
-                organizationRoot={organizationRoot}
+            ) : (
+              <EmptyState
+                description="Afholdte møder vises her, når mødedatoen er passeret."
+                title="Der er ingen afholdte møder."
               />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            description="Afholdte møder vises her, når mødedatoen er passeret."
-            title="Der er ingen tidligere møder."
-          />
-        )}
-      </PageSection>
+            )}
+          </PageSection>
+
+          {grouped.cancelled.length > 0 ? (
+            <PageSection
+              description="Aflyste møder sorteret med nyeste mødedato først."
+              title="Aflyste møder"
+            >
+              <MeetingList
+                meetings={grouped.cancelled}
+                now={now}
+                organizationId={organizationId}
+              />
+            </PageSection>
+          ) : null}
+        </>
+      )}
 
       <PageSection
-        description="Seneste møder med referatstatus. Selve referatet åbnes på mødesiden."
+        description="Seneste referater med status; linket åbner referatafsnittet direkte."
         title="Seneste referater"
       >
         {recentMinutes.length > 0 ? (

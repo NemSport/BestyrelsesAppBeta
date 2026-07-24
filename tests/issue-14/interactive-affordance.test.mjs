@@ -11,6 +11,7 @@ const [
   agendaItems,
   organizationMeetings,
   committeeMeetings,
+  meetingList,
   committees,
   dashboard,
   tasks,
@@ -29,6 +30,7 @@ const [
   source(
     "../../src/app/(app)/organizations/[organizationId]/committees/[committeeId]/meetings/page.tsx",
   ),
+  source("../../src/components/meetings/meeting-list.tsx"),
   source(
     "../../src/app/(app)/organizations/[organizationId]/committees/page.tsx",
   ),
@@ -60,17 +62,13 @@ test("true full-card destinations use the interactive surface and a persistent c
 });
 
 test("rows with separate actions stay static and expose explicit primary links", () => {
-  for (const module of [
-    organizationMeetings,
-    committeeMeetings,
-    committees,
-    dashboard,
-  ]) {
+  for (const module of [meetingList, committees, dashboard]) {
     assert.match(module, /staticSurfaceClassName/);
     assert.match(module, /primarySurfaceLinkClassName/);
   }
-  assert.doesNotMatch(organizationMeetings, /<article[^>]+onClick=/);
-  assert.doesNotMatch(committeeMeetings, /<article[^>]+onClick=/);
+  assert.match(organizationMeetings, /<MeetingList/);
+  assert.match(committeeMeetings, /<MeetingList/);
+  assert.doesNotMatch(meetingList, /<article[^>]+onClick=/);
   assert.doesNotMatch(committees, /<article[^>]+onClick=/);
   assert.doesNotMatch(table, /hover:bg-subtle/);
 });

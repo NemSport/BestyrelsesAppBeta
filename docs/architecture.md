@@ -768,6 +768,19 @@ the leave guard, local editor and autosave state survives section navigation.
 No repository, service, mutation, database, authorization, or RLS behavior
 changes.
 
+Issue 5 centralizes meeting-list presentation and deterministic list state.
+`meeting-list.ts` validates URL filters, groups cancelled meetings separately,
+sorts upcoming meetings ascending and historical meetings descending, and maps
+meeting status plus Issue 16 capabilities to the next permitted link.
+Organization lists join each already RLS-visible meeting to the per-committee
+capability context produced by `OrganizationService.getOverview`; committee
+lists use `requireCommitteeMember` and the same capability model. The shared
+row renders native title/action links and semantic date/status metadata without
+making its static surface interactive. Filtering is server-rendered from GET
+query parameters and never expands the meetings returned by the existing
+organization- or committee-scoped repository reads. No mutation, persistence,
+authorization, database, or RLS behavior changes.
+
 ## Domain Hierarchy
 
 ```text

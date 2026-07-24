@@ -406,6 +406,18 @@ autosave writes, or pass through the dirty-form leave guard. The navigation is
 non-sticky and horizontally contained on mobile so it cannot cover form fields
 or the software keyboard.
 
+Issue 5 gives organization and committee meeting lists one responsive row
+pattern with explicit title, date/time, committee, agenda count, textual status,
+time grouping, and a capability-derived next step. The documented default order
+is nearest upcoming meeting first, then newest held meeting first; cancelled
+meetings are separated. URL query parameters filter by period, status, and exact
+date, so reload, deep links, and browser history preserve the result. Filtered
+empty results remain distinct from an organization or committee with no
+meetings. Organization rows reuse the per-committee Issue 16 capabilities
+already assembled by the authorized overview, while committee rows use the
+authorized committee context. Existing repository organization/committee
+filters, server checks, and RLS remain unchanged.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.
