@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createClient } from "@supabase/supabase-js";
 
 async function source(path) {
   return readFile(new URL(path, import.meta.url), "utf8");
@@ -102,12 +103,51 @@ test("valid participant persistence remains connected through service and read-b
   assert.match(meetingService, /replaceExternalAttendees/);
   assert.match(
     meetingRepository,
-    /\.from\("meeting_external_attendees"\)[\s\S]*\.insert\(attendees\)[\s\S]*\.select\(\)/,
+    /\.from\("meeting_external_attendees"\)[\s\S]*\.insert\(attendees, \{ defaultToNull: false \}\)[\s\S]*\.select\(\)/,
   );
   assert.match(
     meetingRepository,
     /listExternalAttendees[\s\S]*\.from\("meeting_external_attendees"\)[\s\S]*\.select\("\*"\)/,
   );
+});
+
+test("valid new external attendee uses the database-generated id", async () => {
+  let request;
+  const db = createClient("https://example.supabase.co", "test-anon-key", {
+    auth: { persistSession: false },
+    global: {
+      fetch: async (url, init) => {
+        request = { url: String(url), init };
+        return new Response("[]", {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    },
+  });
+
+  const result = await db
+    .from("meeting_external_attendees")
+    .insert(
+      [
+        {
+          id: undefined,
+          name: "UX Feedback Test",
+          email: "ux-feedback@example.test",
+        },
+      ],
+      { defaultToNull: false },
+    )
+    .select();
+
+  assert.equal(result.error, null);
+  assert.match(request.init.headers.get("prefer"), /missing=default/);
+  assert.deepEqual(JSON.parse(request.init.body), [
+    {
+      name: "UX Feedback Test",
+      email: "ux-feedback@example.test",
+    },
+  ]);
 });
 
 test("participant manager RLS permits the authorized write response and reload", () => {
