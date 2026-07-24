@@ -1880,6 +1880,17 @@ committee, meeting, and agenda-item restore services and PostgreSQL RPCs.
 Complex permanent deletion remains deferred; expired records are only marked
 as ready for permanent deletion.
 
+Issue 1 makes the organization trash route an explicit owner/admin capability.
+The organization layout passes that capability to navigation, so viewers,
+members, and committee chairs do not receive a Papirkurv link. Direct route
+access for an ordinary organization member renders a controlled Danish
+access-denied state before trash data is queried. Restore dispatch repeats the
+organization-admin check before invoking resource services, and a database
+trigger rejects any direct `deleted_at` transition from trashed to active for
+non-admin actors. Committee managers may still move resources to trash through
+their existing resource workflows; this change does not expand or redesign
+those permissions.
+
 P4 adds authorized UI entry points for moving committees, meetings, and durable
 agenda items to trash. Meeting agenda rows distinguish occurrence cleanup from
 durable item trash: “Fjern punkt fra dette møde” soft-deletes only the
