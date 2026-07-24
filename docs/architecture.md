@@ -183,6 +183,13 @@ status. It delegates navigation protection to the same scoped dirty-state
 guard, including after save failures. Repeated-field validation canonicalizes
 both `externalAttendees[0].email` and `externalAttendees.0.email`, then remaps
 filtered request indices back to the original UI rows.
+The participant repository uses insert-with-returning and subsequent reads.
+Accordingly, participant SELECT policies cover committee members plus actors
+already accepted by `can_manage_committee`; write policies remain unchanged.
+External attendee normalization preserves valid name and email values while
+converting empty optional fields to `null`. Unexpected API failures are logged
+as redacted name/code/message metadata in development and translated to
+flow-specific recovery copy for the client.
 The navigation guard leaves Next.js links as normal anchors and registers its
 document click listener only while a form is dirty. It ignores modified,
 external, download, new-tab, and hash-only navigation; only a rejected

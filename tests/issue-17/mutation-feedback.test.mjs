@@ -10,6 +10,7 @@ import {
 } from "../../src/lib/mutation-feedback.ts";
 import {
   hasExternalAttendeeInput,
+  normalizeExternalAttendeeForPersistence,
   remapExternalAttendeeFieldErrors,
 } from "../../src/lib/meeting-participants.ts";
 import { hasUnsynchronizedAutosaveChanges } from "../../src/lib/autosave-state.ts";
@@ -156,6 +157,42 @@ test("attendee validation mapping preserves entered values", () => {
   );
 
   assert.deepEqual(attendees, snapshot);
+});
+
+test("valid external attendee values are preserved for persistence", () => {
+  assert.deepEqual(
+    normalizeExternalAttendeeForPersistence({
+      name: "  UX Feedback Test  ",
+      email: "  ux-feedback@example.test  ",
+      mobile: "  12345678  ",
+      roleNote: "  Rådgiver  ",
+    }),
+    {
+      id: undefined,
+      name: "UX Feedback Test",
+      email: "ux-feedback@example.test",
+      mobile: "12345678",
+      role_note: "Rådgiver",
+    },
+  );
+});
+
+test("empty optional attendee fields normalize to null", () => {
+  assert.deepEqual(
+    normalizeExternalAttendeeForPersistence({
+      name: "UX Feedback Test",
+      email: "",
+      mobile: " ",
+      roleNote: null,
+    }),
+    {
+      id: undefined,
+      name: "UX Feedback Test",
+      email: null,
+      mobile: null,
+      role_note: null,
+    },
+  );
 });
 
 test("local minutes changes and failed autosaves remain dirty", () => {

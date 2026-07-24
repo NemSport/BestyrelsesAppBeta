@@ -17,6 +17,10 @@ const [
   quickActions,
   mutationHook,
   autosaveState,
+  meetingService,
+  meetingRepository,
+  participantRoute,
+  participantRls,
 ] = await Promise.all([
   source("../../src/lib/api.ts"),
   source("../../src/components/forms/resource-form.tsx"),
@@ -28,6 +32,12 @@ const [
   source("../../src/components/layout/quick-action-menu.tsx"),
   source("../../src/hooks/use-mutation-feedback.ts"),
   source("../../src/lib/autosave-state.ts"),
+  source("../../src/services/meeting-service.ts"),
+  source("../../src/repositories/meeting-repository.ts"),
+  source("../../src/app/api/meetings/[meetingId]/participants/route.ts"),
+  source(
+    "../../supabase/migrations/202607240003_fix_meeting_participant_manager_select.sql",
+  ),
 ]);
 
 test("API validation retains nested field paths", () => {
@@ -81,6 +91,46 @@ test("participant validation keeps partially completed external rows", () => {
   assert.doesNotMatch(
     participants,
     /\.filter\(\(attendee\) => attendee\.name\.trim\(\)\)/,
+  );
+});
+
+test("valid participant persistence remains connected through service and read-back", () => {
+  assert.match(
+    meetingService,
+    /parsed\.externalAttendees\.map\([\s\S]*normalizeExternalAttendeeForPersistence/,
+  );
+  assert.match(meetingService, /replaceExternalAttendees/);
+  assert.match(
+    meetingRepository,
+    /\.from\("meeting_external_attendees"\)[\s\S]*\.insert\(attendees\)[\s\S]*\.select\(\)/,
+  );
+  assert.match(
+    meetingRepository,
+    /listExternalAttendees[\s\S]*\.from\("meeting_external_attendees"\)[\s\S]*\.select\("\*"\)/,
+  );
+});
+
+test("participant manager RLS permits the authorized write response and reload", () => {
+  assert.match(
+    participantRls,
+    /meeting_external_attendees_select_member[\s\S]*is_committee_member\(committee_id\)[\s\S]*can_manage_committee\(committee_id\)/,
+  );
+  assert.match(
+    participantRls,
+    /meeting_attendees_select_member[\s\S]*is_committee_member\(committee_id\)[\s\S]*can_manage_committee\(committee_id\)/,
+  );
+});
+
+test("participant flow uses correct Danish UTF-8 copy", () => {
+  assert.match(participants, /Tilføj ekstern/);
+  assert.match(participants, /Fraværende/);
+  assert.doesNotMatch(participants, /Ã|â€“|â€™|�/);
+});
+
+test("participant API returns actionable fallback without leaking raw failures", () => {
+  assert.match(
+    participantRoute,
+    /Deltagerne kunne ikke gemmes\. Genindlæs siden, og prøv igen\./,
   );
 });
 

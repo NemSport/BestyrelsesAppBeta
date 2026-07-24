@@ -54,7 +54,7 @@ type ExternalAttendeeState = {
 
 const statusLabels: Record<ParticipantStatus, string> = {
   attended: "Til stede",
-  absent: "FravÃ¦rende",
+  absent: "Fraværende",
   excused: "Afbud",
 };
 
@@ -360,7 +360,7 @@ export function MeetingParticipantsPanel({
                       >
                         <option value="">Ikke registreret</option>
                         <option value="attended">Til stede</option>
-                        <option value="absent">FravÃ¦rende</option>
+                        <option value="absent">Fraværende</option>
                         <option value="excused">Afbud</option>
                       </Select>
                     ) : status ? (
@@ -403,7 +403,7 @@ export function MeetingParticipantsPanel({
                   type="button"
                   variant="secondary"
                 >
-                  TilfÃ¸j ekstern
+                  Tilføj ekstern
                 </Button>
               ) : null}
             </div>

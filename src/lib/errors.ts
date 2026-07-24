@@ -28,6 +28,6 @@ export class NotFoundError extends AppError {
 }
 
 export function toErrorMessage(error: unknown) {
-  console.error(error);
+  void error;
   return "Der opstod en uventet fejl. Prøv igen.";
 }

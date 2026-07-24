@@ -211,6 +211,13 @@ draft with the last server-confirmed payload, so a newly typed or failed draft
 cannot be mistaken for saved content before the autosave status effect runs.
 Exact Zod issue paths are included in validation responses and normalized from
 bracket or dot notation before repeated participant fields consume them.
+Participant reads now use the same committee-manager boundary as participant
+writes. This lets organization administrators and committee managers receive
+the rows returned by an authorized insert and read them again after reload,
+without widening mutation capabilities. Optional external-attendee fields are
+trimmed and persisted as `null` when empty. Unknown participant failures use
+actionable client copy and development logs redact identifiers and contact
+values.
 Internal navigation guards are installed only while a concrete form is dirty:
 clean links are untouched, rejected navigation alone is cancelled, and all
 listeners are removed when the form becomes clean or unmounts.

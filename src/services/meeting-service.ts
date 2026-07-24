@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { NotFoundError } from "@/lib/errors";
+import { normalizeExternalAttendeeForPersistence } from "@/lib/meeting-participants";
 import { sanitizeRichText } from "@/lib/rich-text";
 import {
   meetingParticipantsInputSchema,
@@ -116,15 +117,9 @@ export class MeetingService {
       dedupedInternal.set(participant.userId, participant);
     }
 
-    const normalizedExternal = parsed.externalAttendees
-      .map((attendee) => ({
-        id: attendee.id,
-        name: attendee.name.trim(),
-        email: attendee.email?.trim() || null,
-        mobile: attendee.mobile?.trim() || null,
-        role_note: attendee.roleNote?.trim() || null,
-      }))
-      .filter((attendee) => attendee.name);
+    const normalizedExternal = parsed.externalAttendees.map(
+      normalizeExternalAttendeeForPersistence,
+    );
 
     const [internalParticipants, externalAttendees] = await Promise.all([
       this.meetings.replaceAttendees(

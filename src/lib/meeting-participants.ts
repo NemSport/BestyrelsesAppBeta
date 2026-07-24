@@ -5,6 +5,14 @@ export type ExternalAttendeeInput = {
   roleNote: string;
 };
 
+export type ExternalAttendeePayload = {
+  id?: string;
+  name: string;
+  email?: string | null;
+  mobile?: string | null;
+  roleNote?: string | null;
+};
+
 export function hasExternalAttendeeInput(attendee: ExternalAttendeeInput) {
   return Boolean(
     attendee.name.trim() ||
@@ -33,4 +41,16 @@ export function remapExternalAttendeeFieldErrors(
       ];
     }),
   );
+}
+
+export function normalizeExternalAttendeeForPersistence(
+  attendee: ExternalAttendeePayload,
+) {
+  return {
+    id: attendee.id,
+    name: attendee.name.trim(),
+    email: attendee.email?.trim() || null,
+    mobile: attendee.mobile?.trim() || null,
+    role_note: attendee.roleNote?.trim() || null,
+  };
 }
