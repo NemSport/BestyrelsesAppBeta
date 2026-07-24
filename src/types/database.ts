@@ -1536,6 +1536,15 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["organization_members"]["Row"];
       };
+      update_organization_member_access: {
+        Args: {
+          target_organization_id: string;
+          target_user_id: string;
+          new_role: Database["public"]["Enums"]["organization_role"];
+          committee_assignments: Json;
+        };
+        Returns: Database["public"]["Tables"]["organization_members"]["Row"];
+      };
       remove_organization_member: {
         Args: {
           target_organization_id: string;

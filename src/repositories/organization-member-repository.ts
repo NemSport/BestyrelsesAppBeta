@@ -48,16 +48,27 @@ export class OrganizationMemberRepository {
     return data;
   }
 
-  async updateRole(
+  async updateAccess(
     organizationId: string,
     userId: string,
     role: Database["public"]["Enums"]["organization_role"],
+    committeeAssignments: Array<{
+      committeeId: string;
+      role: Database["public"]["Enums"]["committee_role"];
+    }>,
   ) {
-    const { data, error } = await this.db.rpc("update_organization_member_role", {
-      target_organization_id: organizationId,
-      target_user_id: userId,
-      new_role: role,
-    });
+    const { data, error } = await this.db.rpc(
+      "update_organization_member_access",
+      {
+        target_organization_id: organizationId,
+        target_user_id: userId,
+        new_role: role,
+        committee_assignments: committeeAssignments.map((assignment) => ({
+          committee_id: assignment.committeeId,
+          role: assignment.role,
+        })),
+      },
+    );
     if (error) throw error;
     return data;
   }

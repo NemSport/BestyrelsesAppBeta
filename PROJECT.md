@@ -39,6 +39,13 @@ one, or multiple committee assignments. Each selected committee has its own
 committee role. This workflow uses the Supabase Admin API exclusively on the
 server and may only assign non-owner organization roles.
 
+Existing member access is maintained by organization owners and administrators
+through one atomic organization-scoped operation that updates the organization
+role and the complete set of committee assignments. Administrators cannot
+change their own access or any owner's access, and only an owner may grant or
+remove the owner role. Committee chairs and secretaries retain their ordinary
+committee-manager capabilities but do not administer committee memberships.
+
 ## Central Entity
 
 The **Agenda Item** is the central product entity.

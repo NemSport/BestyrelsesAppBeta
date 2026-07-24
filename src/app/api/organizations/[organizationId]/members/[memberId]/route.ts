@@ -16,14 +16,14 @@ export async function PATCH(
     const { organizationId, memberId } = await params;
     const member = await new OrganizationMemberService(
       await createClient(),
-    ).updateRole({
+    ).updateAccess({
       ...(await request.json()),
       organizationId,
       userId: memberId,
     });
     return NextResponse.json({
       ...member,
-      message: "Medlemmets rolle er opdateret.",
+      message: "Medlemmets adgang er opdateret.",
     });
   } catch (error) {
     return apiError(error);

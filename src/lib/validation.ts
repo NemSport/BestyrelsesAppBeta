@@ -187,14 +187,47 @@ export const organizationInvitationInputSchema = z.object({
   }),
 });
 
-export const organizationMemberRoleUpdateSchema = z.object({
-  organizationId: uuidSchema,
-  userId: uuidSchema,
-  role: z.enum(["owner", "admin", "member", "viewer"], {
-    required_error: "Rolle skal vælges",
-    invalid_type_error: "Rolle skal vælges",
+const committeeAssignmentSchema = z.object({
+  committeeId: uuidSchema,
+  role: z.enum(["chair", "secretary", "member", "viewer"], {
+    required_error: "Udvalgsrolle skal vælges",
+    invalid_type_error: "Udvalgsrolle er ugyldig",
   }),
 });
+
+function rejectDuplicateCommitteeAssignments(
+  committeeAssignments: Array<{ committeeId: string }>,
+  context: z.RefinementCtx,
+) {
+  const committeeIds = committeeAssignments.map(
+    (assignment) => assignment.committeeId,
+  );
+  if (new Set(committeeIds).size !== committeeIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Det samme udvalg kan kun vælges én gang",
+      path: ["committeeAssignments"],
+    });
+  }
+}
+
+export const organizationMemberAccessUpdateSchema = z
+  .object({
+    organizationId: uuidSchema,
+    userId: uuidSchema,
+    role: z.enum(["owner", "admin", "member", "viewer"], {
+      required_error: "Organisationsrolle skal vælges",
+      invalid_type_error: "Organisationsrolle skal vælges",
+    }),
+    committeeAssignments: z
+      .array(committeeAssignmentSchema, {
+        invalid_type_error: "Udvalgstilknytninger er ugyldige",
+      })
+      .default([]),
+  })
+  .superRefine(({ committeeAssignments }, context) => {
+    rejectDuplicateCommitteeAssignments(committeeAssignments, context);
+  });
 
 export const organizationMemberRemoveSchema = z.object({
   organizationId: uuidSchema,
@@ -234,29 +267,13 @@ export const manualOrganizationMemberInputSchema = z
       invalid_type_error: "Organisationsrolle skal vælges",
     }),
     committeeAssignments: z
-      .array(
-        z.object({
-          committeeId: uuidSchema,
-          role: z.enum(["chair", "secretary", "member", "viewer"], {
-            required_error: "Udvalgsrolle skal vælges",
-            invalid_type_error: "Udvalgsrolle er ugyldig",
-          }),
-        }),
-        { invalid_type_error: "Udvalgstilknytninger er ugyldige" },
-      )
+      .array(committeeAssignmentSchema, {
+        invalid_type_error: "Udvalgstilknytninger er ugyldige",
+      })
       .default([]),
   })
   .superRefine(({ committeeAssignments }, context) => {
-    const committeeIds = committeeAssignments.map(
-      (assignment) => assignment.committeeId,
-    );
-    if (new Set(committeeIds).size !== committeeIds.length) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Det samme udvalg kan kun vælges én gang",
-        path: ["committeeAssignments"],
-      });
-    }
+    rejectDuplicateCommitteeAssignments(committeeAssignments, context);
   });
 
 export const committeeUpdateSchema = committeeInputSchema.extend({
