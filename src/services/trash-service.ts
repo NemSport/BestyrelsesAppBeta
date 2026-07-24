@@ -10,7 +10,10 @@ import { MeetingService } from "@/services/meeting-service";
 import { OrganizationService } from "@/services/organization-service";
 import { TrashRepository } from "@/repositories/trash-repository";
 import type { Database } from "@/types/database";
-import type { OrganizationTrashData, OrganizationTrashItem } from "@/types/domain";
+import type {
+  OrganizationTrashData,
+  OrganizationTrashItem,
+} from "@/types/domain";
 
 export class TrashService {
   private readonly trash: TrashRepository;
@@ -23,24 +26,30 @@ export class TrashService {
     this.authorization = new AuthorizationService(db);
   }
 
-  async getOrganizationTrash(organizationId: string): Promise<OrganizationTrashData> {
+  async getOrganizationTrash(
+    organizationId: string,
+  ): Promise<OrganizationTrashData> {
     const user = await this.auth.requireUser();
     await this.authorization.requireOrganizationAdmin(organizationId, user.id, {
       includeDeleted: true,
     });
 
-    const [organization, committees, meetings, agendaItems] = await Promise.all([
-      this.trash.findDeletedOrganization(organizationId),
-      this.trash.listDeletedCommittees(organizationId),
-      this.trash.listDeletedMeetings(organizationId),
-      this.trash.listDeletedAgendaItems(organizationId),
-    ]);
-    const profiles = await this.trash.listDeletedByProfiles([
-      organization?.deleted_by,
-      ...committees.map((item) => item.deleted_by),
-      ...meetings.map((item) => item.deleted_by),
-      ...agendaItems.map((item) => item.deleted_by),
-    ].filter((id): id is string => Boolean(id)));
+    const [organization, committees, meetings, agendaItems] = await Promise.all(
+      [
+        this.trash.findDeletedOrganization(organizationId),
+        this.trash.listDeletedCommittees(organizationId),
+        this.trash.listDeletedMeetings(organizationId),
+        this.trash.listDeletedAgendaItems(organizationId),
+      ],
+    );
+    const profiles = await this.trash.listDeletedByProfiles(
+      [
+        organization?.deleted_by,
+        ...committees.map((item) => item.deleted_by),
+        ...meetings.map((item) => item.deleted_by),
+        ...agendaItems.map((item) => item.deleted_by),
+      ].filter((id): id is string => Boolean(id)),
+    );
 
     const now = new Date();
     const items: OrganizationTrashItem[] = [
@@ -57,7 +66,10 @@ export class TrashService {
               meetingTitle: null,
               deletedAt: organization.deleted_at!,
               deletedBy: organization.deleted_by,
-              deletedByName: this.profileName(profiles, organization.deleted_by),
+              deletedByName: this.profileName(
+                profiles,
+                organization.deleted_by,
+              ),
               deleteExpiresAt: organization.delete_expires_at!,
               parentDeleted: false,
               now,
@@ -131,7 +143,14 @@ export class TrashService {
   }
 
   async restore(input: unknown) {
+    const user = await this.auth.requireUser();
     const parsed = organizationTrashRestoreSchema.parse(input);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+      { includeDeleted: parsed.type === "organization" },
+    );
+
     if (parsed.type === "organization") {
       return new OrganizationService(this.db).restore({
         organizationId: parsed.organizationId,
@@ -144,7 +163,11 @@ export class TrashService {
       });
     }
     if (!parsed.committeeId) {
-      throw new AppError("Udvalg mangler for gendannelse.", 422, "COMMITTEE_REQUIRED");
+      throw new AppError(
+        "Udvalg mangler for gendannelse.",
+        422,
+        "COMMITTEE_REQUIRED",
+      );
     }
     if (parsed.type === "meeting") {
       return new MeetingService(this.db).restore({

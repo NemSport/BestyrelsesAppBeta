@@ -18,10 +18,12 @@ const items = [
 ] as const;
 
 export function OrganizationNav({
+  canManageTrash = false,
   organizationId,
   organizationName,
 }: {
   logoUrl?: string | null;
+  canManageTrash?: boolean;
   organizationId: string;
   organizationName?: string;
 }) {
@@ -36,8 +38,7 @@ export function OrganizationNav({
       if (pathname === href || pathname === `${href}/new`) return true;
       if (!pathname.startsWith(`${href}/`)) return false;
       return (
-        !pathname.includes("/meetings") &&
-        !pathname.includes("/annual-wheel")
+        !pathname.includes("/meetings") && !pathname.includes("/annual-wheel")
       );
     }
     if (item.label === "Møder") {
@@ -77,21 +78,26 @@ export function OrganizationNav({
           </p>
         </div>
         <div className="org-nav-list">
-          {items.map((item) => {
-            const href = `${root}${item.suffix}`;
-            const active = isActive(item);
+          {items
+            .filter((item) => item.suffix !== "/trash" || canManageTrash)
+            .map((item) => {
+              const href = `${root}${item.suffix}`;
+              const active = isActive(item);
 
-            return (
-              <Link
-                aria-current={active ? "page" : undefined}
-                className={clsx("org-nav-link", active && "org-nav-link-active")}
-                href={href}
-                key={item.label}
-              >
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={clsx(
+                    "org-nav-link",
+                    active && "org-nav-link-active",
+                  )}
+                  href={href}
+                  key={item.label}
+                >
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
         </div>
       </nav>
     </aside>

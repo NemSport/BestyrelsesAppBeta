@@ -8,12 +8,14 @@ export function OrganizationWorkspace({
   organizationName,
   branding,
   committees = [],
+  canManageTrash = false,
 }: {
   children: React.ReactNode;
   organizationId: string;
   organizationName?: string;
   branding?: SafeOrganizationBranding;
   committees?: Array<{ id: string; name: string }>;
+  canManageTrash?: boolean;
 }) {
   return (
     <div className="org-layout" style={branding?.cssVariables}>
@@ -23,13 +25,12 @@ export function OrganizationWorkspace({
         style={branding?.cssVariables}
       />
       <OrganizationNav
+        canManageTrash={canManageTrash}
         logoUrl={branding?.logoUrl ?? null}
         organizationId={organizationId}
         organizationName={organizationName}
       />
-      <div className="org-layout-content">
-        {children}
-      </div>
+      <div className="org-layout-content">{children}</div>
     </div>
   );
 }

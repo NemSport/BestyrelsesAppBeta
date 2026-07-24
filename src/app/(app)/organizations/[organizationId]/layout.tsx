@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { OrganizationWorkspace } from "@/components/layout/organization-workspace";
 import { createClient } from "@/lib/supabase/server";
+import { canManageOrganizationTrash } from "@/lib/trash-capabilities";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
@@ -30,6 +31,7 @@ export default async function OrganizationLayout({
   return (
     <OrganizationWorkspace
       branding={branding}
+      canManageTrash={canManageOrganizationTrash(context.membership.role)}
       committees={committees.map((committee) => ({
         id: committee.id,
         name: committee.name,

@@ -1185,6 +1185,12 @@ hides it from normal organization lists and blocks ordinary organization
 flows, but it does not hard-delete or cascade-delete committees, meetings,
 decisions, tasks, minutes, Annual Wheel records, Job Cards, or history.
 Owners and administrators can restore the organization through the trash flow.
+The organization trash destination and restore actions are available only to
+organization owners and administrators. Other organization members do not see
+the navigation destination, and direct route access returns a controlled
+Danish access explanation. Committee managers retain their existing ability to
+move committee-owned resources to trash, but restoring a trashed record
+requires organization-admin access in both the service and database.
 
 Trashing a committee also trashes its active meetings and agenda-item
 occurrences. Trashing a meeting also trashes its active occurrences. Durable
