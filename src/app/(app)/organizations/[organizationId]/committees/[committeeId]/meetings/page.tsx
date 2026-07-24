@@ -155,7 +155,7 @@ export default async function MeetingsPage({
     context.organizationMembership.role,
     context.membership?.role ?? null,
   );
-  const canEdit = meetingCapabilities.createMeeting;
+  const canCreateMeeting = meetingCapabilities.createMeeting;
   const now = Date.now();
   const upcomingMeetings = meetings.filter(
     (meeting) => new Date(meeting.starts_at).getTime() >= now,
@@ -174,7 +174,7 @@ export default async function MeetingsPage({
   return (
     <PageSection
       actions={
-        canEdit ? (
+        canCreateMeeting ? (
           <Link className={buttonClassName()} href={`${root}/meetings/new`}>
             Nyt møde
           </Link>
@@ -297,7 +297,7 @@ export default async function MeetingsPage({
       ) : (
         <EmptyState
           description={
-            meetingCapabilities.createMeeting
+            canCreateMeeting
               ? "Opret et møde for at samle dagsorden, referat og opfølgning."
               : "Når en ansvarlig opretter et møde, vises dagsorden, referat og opfølgning her."
           }

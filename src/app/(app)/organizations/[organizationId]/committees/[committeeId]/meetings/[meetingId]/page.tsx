@@ -316,7 +316,9 @@ export default async function MeetingPage({
     organizationRole,
     committeeRole,
   );
-  const canEditMeeting = meetingCapabilities.editMeeting;
+  const canEditDecisions =
+    meetingCapabilities.editDecisions && decisionContext.canEdit;
+  const canEditTasks = meetingCapabilities.editTasks && taskContext.canEdit;
   const registeredInternalParticipantCount =
     participants.internalParticipants.filter((attendee) =>
       ["accepted", "attended", "absent", "excused"].includes(
@@ -428,31 +430,39 @@ export default async function MeetingPage({
             >
               Download opgaveliste PDF
             </a>
-            {canEditMeeting ? (
+            {meetingCapabilities.updateMeeting ||
+            meetingCapabilities.sendAgendaEmail ||
+            meetingCapabilities.deleteMeeting ? (
               <>
-                <EditMeetingModal
-                  committeeId={committeeId}
-                  meeting={meeting}
-                  organizationId={organizationId}
-                />
-                <SendMeetingAgendaEmailModal
-                  agendaItemCount={meeting.agenda_item_occurrences.length}
-                  committeeId={committeeId}
-                  meetingDateLabel={formatDateTime(meeting.starts_at, "full")}
-                  meetingId={meetingId}
-                  meetingTitle={meeting.title}
-                  organizationId={organizationId}
-                  recipients={emailRecipients}
-                  triggerStyle="button"
-                />
-                <TrashActionButton
-                  confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
-                  endpoint={`/api/meetings/${meetingId}?organizationId=${organizationId}&committeeId=${committeeId}`}
-                  label="Flyt møde til papirkurv"
-                  pendingLabel="Flytter..."
-                  redirectTo={root}
-                  variant="secondary"
-                />
+                {meetingCapabilities.updateMeeting ? (
+                  <EditMeetingModal
+                    committeeId={committeeId}
+                    meeting={meeting}
+                    organizationId={organizationId}
+                  />
+                ) : null}
+                {meetingCapabilities.sendAgendaEmail ? (
+                  <SendMeetingAgendaEmailModal
+                    agendaItemCount={meeting.agenda_item_occurrences.length}
+                    committeeId={committeeId}
+                    meetingDateLabel={formatDateTime(meeting.starts_at, "full")}
+                    meetingId={meetingId}
+                    meetingTitle={meeting.title}
+                    organizationId={organizationId}
+                    recipients={emailRecipients}
+                    triggerStyle="button"
+                  />
+                ) : null}
+                {meetingCapabilities.deleteMeeting ? (
+                  <TrashActionButton
+                    confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                    endpoint={`/api/meetings/${meetingId}?organizationId=${organizationId}&committeeId=${committeeId}`}
+                    label="Flyt møde til papirkurv"
+                    pendingLabel="Flytter..."
+                    redirectTo={root}
+                    variant="secondary"
+                  />
+                ) : null}
               </>
             ) : null}
           </>
@@ -492,9 +502,9 @@ export default async function MeetingPage({
       <PageSection
         actions={
           <div className="flex flex-wrap gap-2">
-            {decisionContext.canEdit || taskContext.canEdit ? (
+            {canEditDecisions || canEditTasks ? (
               <ActionMenu className="order-2">
-                {decisionContext.canEdit ? (
+                {canEditDecisions ? (
                   <DecisionCreateModal
                     agendaItems={meeting.agenda_item_occurrences.flatMap(
                       (occurrence) =>
@@ -515,7 +525,7 @@ export default async function MeetingPage({
                     responsiblePeople={decisionContext.responsiblePeople}
                   />
                 ) : null}
-                {taskContext.canEdit ? (
+                {canEditTasks ? (
                   <TaskCreateModal
                     agendaItems={meeting.agenda_item_occurrences.flatMap(
                       (occurrence) =>
@@ -546,7 +556,7 @@ export default async function MeetingPage({
                 ) : null}
               </ActionMenu>
             ) : null}
-            {canEditMeeting ? (
+            {meetingCapabilities.scheduleAgendaItem ? (
               <AddAgendaItemModal
                 committeeId={committeeId}
                 meetingId={meeting.id}
@@ -636,9 +646,9 @@ export default async function MeetingPage({
           approvals={minutes.approvals}
           approvalRecipientInfo={approvalRecipientInfo}
           canApprove={minutes.canApprove}
-          canEdit={canEditMeeting}
-          canEditDecisions={decisionContext.canEdit}
-          canEditTasks={taskContext.canEdit}
+          canEdit={meetingCapabilities.editOfficialMinutes}
+          canEditDecisions={canEditDecisions}
+          canEditTasks={canEditTasks}
           committeeId={committeeId}
           decisionCategorySource={decisionContext.categorySource}
           decisionHistoryByAgendaItem={decisionContext.historyByAgendaItem}
@@ -660,7 +670,7 @@ export default async function MeetingPage({
           userId={user.id}
         />
         <TransferredAgendaItemsSection
-          canEdit={canEditMeeting}
+          canEdit={meetingCapabilities.manageTransferredAgendaItems}
           futureMeetings={transferredAgendaItems.futureMeetings}
           items={transferredAgendaItems.items}
           root={root}

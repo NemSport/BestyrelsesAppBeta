@@ -106,7 +106,7 @@ export class TransferredAgendaItemService {
               item_type: sourceAgendaItem.item_type,
             },
             targetMeeting: transfer.target_meeting_id
-              ? futureMeetingsById.get(transfer.target_meeting_id) ?? null
+              ? (futureMeetingsById.get(transfer.target_meeting_id) ?? null)
               : null,
           },
         ];
@@ -114,7 +114,9 @@ export class TransferredAgendaItemService {
       .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
     const [sourceMeetings, sourceAgendaItems] = await Promise.all([
       this.transfers.listSourceMeetings([
-        ...new Set(incomingTransfers.map((transfer) => transfer.source_meeting_id)),
+        ...new Set(
+          incomingTransfers.map((transfer) => transfer.source_meeting_id),
+        ),
       ]),
       this.transfers.listSourceAgendaItems([
         ...new Set(
@@ -161,25 +163,24 @@ export class TransferredAgendaItemService {
     const parsed = scheduleTransferredAgendaItemSchema.parse(input);
     const transfer = await this.transfers.findById(parsed.transferId);
     if (!transfer) throw new NotFoundError("Det overførte punkt");
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       transfer.organization_id,
       transfer.committee_id,
       user.id,
+      "manageTransferredAgendaItems",
     );
-    return this.transfers.schedule(
-      transfer.id,
-      parsed.meetingId ?? null,
-    );
+    return this.transfers.schedule(transfer.id, parsed.meetingId ?? null);
   }
 
   async dismiss(transferId: string) {
     const user = await this.auth.requireUser();
     const transfer = await this.transfers.findById(transferId);
     if (!transfer) throw new NotFoundError("Det overførte punkt");
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       transfer.organization_id,
       transfer.committee_id,
       user.id,
+      "manageTransferredAgendaItems",
     );
 
     if (transfer.status === "scheduled") {

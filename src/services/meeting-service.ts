@@ -185,7 +185,7 @@ export class MeetingService {
       parsed.organizationId,
       parsed.committeeId,
       user.id,
-      "createMeeting",
+      "createQuickMeeting",
     );
 
     const meeting = await this.meetings.create({
@@ -224,7 +224,7 @@ export class MeetingService {
       parsed.organizationId,
       parsed.committeeId,
       user.id,
-      "editMeeting",
+      "updateMeeting",
     );
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
     if (
@@ -246,10 +246,11 @@ export class MeetingService {
   async moveToTrash(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "deleteMeeting",
     );
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
     if (
@@ -265,10 +266,11 @@ export class MeetingService {
   async restore(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "restoreMeeting",
     );
     const meeting = await this.meetings.findIncludingDeleted(parsed.meetingId);
     if (

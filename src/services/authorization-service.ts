@@ -122,7 +122,7 @@ export class AuthorizationService {
       organizationId,
       committeeId,
       userId,
-      "editMeeting",
+      "updateMeeting",
     );
   }
 
@@ -135,7 +135,7 @@ export class AuthorizationService {
       organizationId,
       committeeId,
       userId,
-      "editAgendaItems",
+      "updateAgendaItem",
     );
   }
 }

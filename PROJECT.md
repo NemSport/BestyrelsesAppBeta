@@ -177,11 +177,13 @@ These rules must be enforced in services and PostgreSQL Row Level Security.
 
 Issue 16 centralizes meeting-action capabilities in
 `src/lib/meeting-capabilities.ts`. Presentation and server authorization derive
-meeting creation, quick meeting, participant administration, agenda
-management, official minutes, approval, task, and decision actions from the
-same organization/committee role pair. Committee members retain agenda-item,
-task, and decision editing, but meeting creation, participant administration,
-agenda scheduling, and official minutes remain committee-manager actions.
+meeting viewing, ordinary and quick creation, update, trash/restore,
+participant administration, durable agenda-item editing, meeting scheduling
+and ordering, official minutes, approval, attachments, transfers, email,
+tasks, and decisions from the same organization/committee role pair.
+Committee members retain backlog agenda-item, note, task, and decision
+editing, but meeting creation, participant administration, meeting agenda
+scheduling/ordering, and official minutes remain committee-manager actions.
 Unavailable actions are hidden or presented as explicitly read-only, and
 denied meeting actions use a generic, actionable authorization message.
 

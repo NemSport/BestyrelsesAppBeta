@@ -23,12 +23,23 @@ export type Committee = {
 export type MeetingCapabilities = {
   viewMeeting: boolean;
   createMeeting: boolean;
-  editMeeting: boolean;
+  createQuickMeeting: boolean;
+  updateMeeting: boolean;
+  deleteMeeting: boolean;
+  restoreMeeting: boolean;
   manageParticipants: boolean;
-  manageAgenda: boolean;
+  createAgendaItem: boolean;
+  updateAgendaItem: boolean;
+  scheduleAgendaItem: boolean;
+  reorderAgendaItems: boolean;
+  deleteAgendaItem: boolean;
+  restoreAgendaItem: boolean;
+  editNotes: boolean;
   editOfficialMinutes: boolean;
   manageMinutesApproval: boolean;
-  editAgendaItems: boolean;
+  manageMinutesAttachments: boolean;
+  manageTransferredAgendaItems: boolean;
+  sendAgendaEmail: boolean;
   editTasks: boolean;
   editDecisions: boolean;
 };

@@ -29,7 +29,7 @@ export function canManageCommittee(
   organizationRole: OrganizationRole,
   committeeRole: CommitteeRole | null,
 ) {
-  return getMeetingCapabilities(organizationRole, committeeRole).editMeeting;
+  return getMeetingCapabilities(organizationRole, committeeRole).updateMeeting;
 }
 
 export function canEditAgendaItems(
@@ -37,7 +37,7 @@ export function canEditAgendaItems(
   committeeRole: CommitteeRole | null,
 ) {
   return getMeetingCapabilities(organizationRole, committeeRole)
-    .editAgendaItems;
+    .updateAgendaItem;
 }
 
 export function assertMeetingCapability(

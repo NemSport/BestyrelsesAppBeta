@@ -51,7 +51,10 @@ import {
 type TabKey = "home" | "meetings" | "tasks" | "more";
 type MoreView = "menu" | "decisions";
 type FormFieldErrors = Partial<
-  Record<"organizationId" | "committeeId" | "title" | "startsAt" | "minutesText", string>
+  Record<
+    "organizationId" | "committeeId" | "title" | "startsAt" | "minutesText",
+    string
+  >
 >;
 
 const selectedOrganizationStorageKey = "mobile:selected-organization-id";
@@ -204,9 +207,15 @@ function MobileShell({ session }: { session: Session }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-  const [meetingDetail, setMeetingDetail] = useState<MeetingDetail | null>(null);
-  const [meetingDetailError, setMeetingDetailError] = useState<string | null>(null);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
+    null,
+  );
+  const [meetingDetail, setMeetingDetail] = useState<MeetingDetail | null>(
+    null,
+  );
+  const [meetingDetailError, setMeetingDetailError] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
@@ -227,7 +236,7 @@ function MobileShell({ session }: { session: Session }) {
     organization?.committees ??
     [];
   const meetingCommittees = committees.filter(
-    (committee) => committee.capabilities?.createMeeting,
+    (committee) => committee.capabilities?.createQuickMeeting,
   );
 
   const allMeetings = useMemo(() => {
@@ -282,12 +291,14 @@ function MobileShell({ session }: { session: Session }) {
       }
       const selectedId =
         (organizationId &&
-        availableOrganizations.some((candidate) => candidate.id === organizationId)
+        availableOrganizations.some(
+          (candidate) => candidate.id === organizationId,
+        )
           ? organizationId
           : null) ??
         storedOrganization?.id ??
         (availableOrganizations.length === 1
-          ? availableOrganizations[0]?.id ?? null
+          ? (availableOrganizations[0]?.id ?? null)
           : null);
 
       setOrganizations(availableOrganizations);
@@ -405,7 +416,9 @@ function MobileShell({ session }: { session: Session }) {
   async function selectOrganization(nextOrganizationId: string) {
     if (
       safeOrganizations.length > 0 &&
-      !safeOrganizations.some((candidate) => candidate.id === nextOrganizationId)
+      !safeOrganizations.some(
+        (candidate) => candidate.id === nextOrganizationId,
+      )
     ) {
       await AsyncStorage.removeItem(selectedOrganizationStorageKey);
       setOrganizationId(null);
@@ -455,7 +468,10 @@ function MobileShell({ session }: { session: Session }) {
   }
 
   function showPlaceholder(label: string) {
-    Alert.alert(label, "Denne navigation er en del af layout-spiken og kobles til rigtig skærm senere.");
+    Alert.alert(
+      label,
+      "Denne navigation er en del af layout-spiken og kobles til rigtig skærm senere.",
+    );
   }
 
   return (
@@ -477,7 +493,9 @@ function MobileShell({ session }: { session: Session }) {
               <Text style={styles.quickButtonText}>+ Opret</Text>
             </Pressable>
           ) : null}
-          <Text style={styles.profileText}>{session.user.email ?? "Profil"}</Text>
+          <Text style={styles.profileText}>
+            {session.user.email ?? "Profil"}
+          </Text>
         </View>
       </View>
 
@@ -500,9 +518,7 @@ function MobileShell({ session }: { session: Session }) {
         />
       ) : null}
 
-      {!organizationsLoaded && loading ? (
-        <OrganizationLoadingScreen />
-      ) : null}
+      {!organizationsLoaded && loading ? <OrganizationLoadingScreen /> : null}
 
       {organizationId && activeTab === "home" ? (
         <HomeScreen
@@ -523,7 +539,9 @@ function MobileShell({ session }: { session: Session }) {
               setMeetingDetail(null);
               setMeetingDetailError(null);
             }}
-            tasks={tasks.filter((task) => task.meeting_id === meetingDetail.meeting.id)}
+            tasks={tasks.filter(
+              (task) => task.meeting_id === meetingDetail.meeting.id,
+            )}
           />
         ) : selectedMeetingId && meetingDetailError ? (
           <MeetingDetailErrorScreen
@@ -623,7 +641,9 @@ function OrganizationPickerScreen({
                   {organization.name || "Organisation uden navn"}
                 </Text>
                 <Text style={styles.muted}>
-                  {organization.committeeCount ?? (organization.committees ?? []).length} udvalg
+                  {organization.committeeCount ??
+                    (organization.committees ?? []).length}{" "}
+                  udvalg
                   {organization.role ? ` · ${organization.role}` : ""}
                 </Text>
               </View>
@@ -703,13 +723,17 @@ function HomeScreen({
             onPress={() => onOpenMeeting(nextMeeting.id)}
           />
         ) : (
-          <Text style={styles.muted}>Der er ingen kommende mÃ¸der i denne organisation.</Text>
+          <Text style={styles.muted}>
+            Der er ingen kommende mÃ¸der i denne organisation.
+          </Text>
         )}
       </SectionCard>
 
       <SectionCard title="Mine vigtigste opgaver">
         {priorityTasks.length > 0 ? (
-          priorityTasks.map((task) => <TaskCard key={task.id} task={task} compact />)
+          priorityTasks.map((task) => (
+            <TaskCard key={task.id} task={task} compact />
+          ))
         ) : (
           <Text style={styles.muted}>Du har ingen åbne opgaver lige nu.</Text>
         )}
@@ -721,7 +745,8 @@ function HomeScreen({
             <View key={entry.committee.id} style={styles.listRow}>
               <Text style={styles.rowTitle}>{entry.committee.name}</Text>
               <Text style={styles.muted}>
-                {entry.openTaskCount} opgaver · {entry.activeDecisionCount} beslutninger
+                {entry.openTaskCount} opgaver · {entry.activeDecisionCount}{" "}
+                beslutninger
               </Text>
             </View>
           ))
@@ -737,7 +762,9 @@ function HomeScreen({
             {formatDateTime(overview.recentMinutes[0].updatedAt)}
           </Text>
         ) : (
-          <Text style={styles.muted}>Ingen nyere referater i dette overblik.</Text>
+          <Text style={styles.muted}>
+            Ingen nyere referater i dette overblik.
+          </Text>
         )}
       </SectionCard>
     </AppScreen>
@@ -754,7 +781,10 @@ function MeetingsScreen({
   upcomingMeetings: Meeting[];
 }) {
   return (
-    <AppScreen title="Møder" subtitle="Kommende og seneste møder med agenda-preview.">
+    <AppScreen
+      title="Møder"
+      subtitle="Kommende og seneste møder med agenda-preview."
+    >
       {upcomingMeetings.length === 0 && recentMeetings.length === 0 ? (
         <SectionCard title="Ingen møder">
           <Text style={styles.muted}>Der er ingen møder at vise endnu.</Text>
@@ -764,13 +794,13 @@ function MeetingsScreen({
       <SectionCard title="Kommende møder">
         {upcomingMeetings.length > 0 ? (
           upcomingMeetings.map((meeting) => (
-          <MeetingCard
-            key={meeting.id}
-            meeting={meeting}
-            onPress={() => onOpenMeeting(meeting.id)}
-          />
-        ))
-      ) : (
+            <MeetingCard
+              key={meeting.id}
+              meeting={meeting}
+              onPress={() => onOpenMeeting(meeting.id)}
+            />
+          ))
+        ) : (
           <Text style={styles.muted}>Der er ingen kommende møder.</Text>
         )}
       </SectionCard>
@@ -785,7 +815,9 @@ function MeetingsScreen({
             />
           ))
         ) : (
-          <Text style={styles.muted}>Der er ingen tidligere møder i overblikket.</Text>
+          <Text style={styles.muted}>
+            Der er ingen tidligere møder i overblikket.
+          </Text>
         )}
       </SectionCard>
     </AppScreen>
@@ -829,7 +861,8 @@ function MeetingDetailScreen({
 
       <SectionCard title="Referat">
         <Text style={styles.body}>
-          {minutesText || "Referat er ikke skrevet endnu. Åbn webappen for fuld redigering."}
+          {minutesText ||
+            "Referat er ikke skrevet endnu. Åbn webappen for fuld redigering."}
         </Text>
       </SectionCard>
 
@@ -914,11 +947,14 @@ function MeetingDetailReadScreen({
         ]
       : [];
   });
-  const meetingStatus = detail.minutes.meetingMinutes?.status ?? detail.meeting.status;
+  const meetingStatus =
+    detail.minutes.meetingMinutes?.status ?? detail.meeting.status;
   const [aiOverview, setAiOverview] = useState<AiMeetingOverview | null>(null);
   const [aiOverviewLoading, setAiOverviewLoading] = useState(false);
   const [aiOverviewError, setAiOverviewError] = useState<string | null>(null);
-  const [assistTarget, setAssistTarget] = useState<MinutesAssistTarget | null>(null);
+  const [assistTarget, setAssistTarget] = useState<MinutesAssistTarget | null>(
+    null,
+  );
 
   async function generateAiOverview() {
     setAiOverviewLoading(true);
@@ -972,8 +1008,12 @@ function MeetingDetailReadScreen({
       <View style={styles.detailHeader}>
         <View style={styles.detailHeaderText}>
           <Text style={styles.eyebrow}>Mødedetalje</Text>
-          <Text style={styles.rowTitle}>{detail.meeting.committeeName ?? "Udvalg"}</Text>
-          <Text style={styles.muted}>{formatDateTime(detail.meeting.starts_at)}</Text>
+          <Text style={styles.rowTitle}>
+            {detail.meeting.committeeName ?? "Udvalg"}
+          </Text>
+          <Text style={styles.muted}>
+            {formatDateTime(detail.meeting.starts_at)}
+          </Text>
         </View>
         <View style={styles.statusPill}>
           <Text style={styles.statusPillText}>{meetingStatus}</Text>
@@ -993,7 +1033,9 @@ function MeetingDetailReadScreen({
             beslutningspunkter og opfølgning.
           </Text>
         )}
-        {aiOverviewError ? <Text style={styles.errorText}>{aiOverviewError}</Text> : null}
+        {aiOverviewError ? (
+          <Text style={styles.errorText}>{aiOverviewError}</Text>
+        ) : null}
         <Pressable
           disabled={aiOverviewLoading}
           onPress={generateAiOverview}
@@ -1017,7 +1059,10 @@ function MeetingDetailReadScreen({
             const itemMinutes = minutesByAgendaItemId.get(item.id);
             const notePreview = plainTextFromRichText(itemMinutes?.notes);
             return (
-              <View key={`${occurrence.position}-${item.id}`} style={styles.agendaDetailRow}>
+              <View
+                key={`${occurrence.position}-${item.id}`}
+                style={styles.agendaDetailRow}
+              >
                 <Text style={styles.agendaPosition}>{index + 1}</Text>
                 <View style={styles.agendaDetailText}>
                   <Text style={styles.agendaDetailTitle}>
@@ -1033,7 +1078,9 @@ function MeetingDetailReadScreen({
             );
           })
         ) : (
-          <Text style={styles.muted}>Der er ingen dagsordenspunkter på mødet endnu.</Text>
+          <Text style={styles.muted}>
+            Der er ingen dagsordenspunkter på mødet endnu.
+          </Text>
         )}
       </SectionCard>
 
@@ -1107,7 +1154,9 @@ function MeetingDetailReadScreen({
             </View>
           ))
         ) : (
-          <Text style={styles.muted}>Ingen beslutninger er registreret på mødet endnu.</Text>
+          <Text style={styles.muted}>
+            Ingen beslutninger er registreret på mødet endnu.
+          </Text>
         )}
       </SectionCard>
 
@@ -1139,9 +1188,15 @@ function AiOverviewContent({
   return (
     <View style={styles.aiOverview}>
       <Text style={styles.body}>{overview.summary}</Text>
-      <AiOverviewList title="Beslutninger" items={overview.key_decision_points} />
+      <AiOverviewList
+        title="Beslutninger"
+        items={overview.key_decision_points}
+      />
       <AiOverviewList title="Opfølgning" items={overview.follow_up_points} />
-      <AiOverviewList title="Forberedelse" items={overview.preparation_points} />
+      <AiOverviewList
+        title="Forberedelse"
+        items={overview.preparation_points}
+      />
       <AiOverviewList
         title="Opmærksomhed"
         items={overview.risks_or_attention_points}
@@ -1352,7 +1407,9 @@ function TasksScreen({
         {soon.length > 0 ? (
           soon.map((task) => <TaskCard key={task.id} task={task} compact />)
         ) : (
-          <Text style={styles.muted}>Ingen opgaver forfalder de næste 14 dage.</Text>
+          <Text style={styles.muted}>
+            Ingen opgaver forfalder de næste 14 dage.
+          </Text>
         )}
       </SectionCard>
 
@@ -1369,12 +1426,18 @@ function TasksScreen({
 
       <SectionCard title="Afsluttede">
         {completed.length > 0 ? (
-          completed.slice(0, 4).map((task) => <TaskCard key={task.id} task={task} compact />)
+          completed
+            .slice(0, 4)
+            .map((task) => <TaskCard key={task.id} task={task} compact />)
         ) : (
-          <Text style={styles.muted}>Ingen afsluttede opgaver i dette overblik.</Text>
+          <Text style={styles.muted}>
+            Ingen afsluttede opgaver i dette overblik.
+          </Text>
         )}
         {completed.length > 4 ? (
-          <Text style={styles.muted}>+ {completed.length - 4} flere afsluttede opgaver.</Text>
+          <Text style={styles.muted}>
+            + {completed.length - 4} flere afsluttede opgaver.
+          </Text>
         ) : null}
       </SectionCard>
     </AppScreen>
@@ -1393,7 +1456,9 @@ function DecisionsScreen({
   const sortedDecisions = [...decisions].sort((left, right) => {
     const leftDate = left.decision_date ?? left.deadline ?? "";
     const rightDate = right.decision_date ?? right.deadline ?? "";
-    return rightDate.localeCompare(leftDate) || left.title.localeCompare(right.title);
+    return (
+      rightDate.localeCompare(leftDate) || left.title.localeCompare(right.title)
+    );
   });
   const activeDecisions = sortedDecisions.filter(
     (decision) =>
@@ -1452,9 +1517,7 @@ function DecisionsScreen({
             Der er ikke registreret beslutninger i den valgte organisation.
           </Text>
         </SectionCard>
-      ) : (
-        null
-      )}
+      ) : null}
     </AppScreen>
   );
 }
@@ -1471,22 +1534,30 @@ function DecisionCard({ decision }: { decision: Decision }) {
             taskStatusLabels[decision.status] ??
             decision.status}
         </Text>
-        {decision.category ? <Text style={styles.metaPill}>{decision.category}</Text> : null}
-        {date ? <Text style={styles.metaPill}>{formatDateTime(date)}</Text> : null}
+        {decision.category ? (
+          <Text style={styles.metaPill}>{decision.category}</Text>
+        ) : null}
+        {date ? (
+          <Text style={styles.metaPill}>{formatDateTime(date)}</Text>
+        ) : null}
       </View>
       {text ? <Text style={styles.body}>{text}</Text> : null}
       {decision.meeting ? (
         <Text style={styles.muted}>
-          Møde: {decision.meeting.title} · {formatDateTime(decision.meeting.starts_at)}
+          Møde: {decision.meeting.title} ·{" "}
+          {formatDateTime(decision.meeting.starts_at)}
         </Text>
       ) : null}
       {decision.agendaItem ? (
         <Text style={styles.muted}>
-          Punkt: ({agendaLabel(decision.agendaItem.item_type)}) {decision.agendaItem.title}
+          Punkt: ({agendaLabel(decision.agendaItem.item_type)}){" "}
+          {decision.agendaItem.title}
         </Text>
       ) : null}
       {decision.responsible?.full_name ? (
-        <Text style={styles.muted}>Ansvarlig: {decision.responsible.full_name}</Text>
+        <Text style={styles.muted}>
+          Ansvarlig: {decision.responsible.full_name}
+        </Text>
       ) : null}
     </SectionCard>
   );
@@ -1517,7 +1588,10 @@ function MoreScreen({
   ];
 
   return (
-    <AppScreen title="Mere" subtitle="Sekundær navigation uden desktop-sidebar.">
+    <AppScreen
+      title="Mere"
+      subtitle="Sekundær navigation uden desktop-sidebar."
+    >
       <SectionCard title="Aktiv organisation">
         <Text style={styles.muted}>{organizationName}</Text>
         {canSwitchOrganization ? (
@@ -1531,7 +1605,11 @@ function MoreScreen({
 
       <SectionCard title="Genveje">
         {items.map((item) => (
-          <Pressable key={item} onPress={() => onOpen(item)} style={styles.moreRow}>
+          <Pressable
+            key={item}
+            onPress={() => onOpen(item)}
+            style={styles.moreRow}
+          >
             <Text style={styles.rowTitle}>{item}</Text>
             <Text style={styles.moreArrow}>›</Text>
           </Pressable>
@@ -1579,9 +1657,11 @@ function QuickActionModal({
     if (!open) return;
     setCommitteeId(
       contextMeeting?.committee_id ??
-        (committees.length === 1 ? committees[0]?.id ?? "" : ""),
+        (committees.length === 1 ? (committees[0]?.id ?? "") : ""),
     );
-    setTitle(contextMeeting ? `${contextMeeting.title} - opfølgning` : "Mobilt møde");
+    setTitle(
+      contextMeeting ? `${contextMeeting.title} - opfølgning` : "Mobilt møde",
+    );
     setStartsAt(formatMobileDateTimeInput());
     setMinutesText("");
     setError(null);
@@ -1656,7 +1736,9 @@ function QuickActionModal({
     }
   }
 
-  const selectedCommittee = committees.find((committee) => committee.id === committeeId);
+  const selectedCommittee = committees.find(
+    (committee) => committee.id === committeeId,
+  );
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} visible={open}>
@@ -1787,13 +1869,7 @@ function QuickActionModal({
   );
 }
 
-function DisabledQuickAction({
-  label,
-  text,
-}: {
-  label: string;
-  text: string;
-}) {
+function DisabledQuickAction({ label, text }: { label: string; text: string }) {
   return (
     <View style={styles.disabledAction}>
       <Text style={styles.rowTitle}>{label}</Text>
@@ -1818,7 +1894,12 @@ function BottomNavigation({
           onPress={() => onChange(tab.key)}
           style={[styles.tab, activeTab === tab.key && styles.tabActive]}
         >
-          <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === tab.key && styles.tabTextActive,
+            ]}
+          >
             {tab.label}
           </Text>
         </Pressable>
@@ -1893,7 +1974,12 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   headerActions: { alignItems: "flex-end", gap: 4 },
   headerTitle: { color: "#fff", fontSize: 19, fontWeight: "800" },
-  profileText: { color: "#d8e0ea", flexShrink: 1, fontSize: 11, textAlign: "right" },
+  profileText: {
+    color: "#d8e0ea",
+    flexShrink: 1,
+    fontSize: 11,
+    textAlign: "right",
+  },
   quickButton: {
     backgroundColor: "#f0c66a",
     borderRadius: 999,
@@ -1902,8 +1988,19 @@ const styles = StyleSheet.create({
   },
   quickButtonText: { color: "#172033", fontSize: 13, fontWeight: "900" },
   loginCard: { gap: 14, margin: 18, paddingTop: 80 },
-  centered: { alignItems: "center", flex: 1, gap: 12, justifyContent: "center", padding: 24 },
-  eyebrow: { color: "#8ea0b3", fontSize: 12, fontWeight: "800", textTransform: "uppercase" },
+  centered: {
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+    justifyContent: "center",
+    padding: 24,
+  },
+  eyebrow: {
+    color: "#8ea0b3",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
   title: { color: "#172033", fontSize: 24, fontWeight: "800" },
   rowTitle: { color: "#172033", fontSize: 15, fontWeight: "800" },
   body: { color: "#283347", fontSize: 15, lineHeight: 22 },
@@ -1976,7 +2073,12 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: "#10243f" },
   tabText: { color: "#657282", fontSize: 12, fontWeight: "800" },
   tabTextActive: { color: "#fff" },
-  listRow: { borderTopColor: "#eee5da", borderTopWidth: 1, gap: 3, paddingVertical: 10 },
+  listRow: {
+    borderTopColor: "#eee5da",
+    borderTopWidth: 1,
+    gap: 3,
+    paddingVertical: 10,
+  },
   backButton: { alignSelf: "flex-start", paddingVertical: 4 },
   backText: { color: "#0f4f8f", fontSize: 14, fontWeight: "800" },
   detailHeader: {
@@ -2019,9 +2121,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   agendaDetailText: { flex: 1, gap: 4 },
-  agendaDetailTitle: { color: "#172033", fontSize: 14, fontWeight: "900", lineHeight: 20 },
+  agendaDetailTitle: {
+    color: "#172033",
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 20,
+  },
   readingList: { gap: 10 },
-  readingItem: { borderTopColor: "#eee5da", borderTopWidth: 1, gap: 5, paddingTop: 10 },
+  readingItem: {
+    borderTopColor: "#eee5da",
+    borderTopWidth: 1,
+    gap: 5,
+    paddingTop: 10,
+  },
   readingHeader: {
     alignItems: "center",
     flexDirection: "row",

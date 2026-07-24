@@ -58,16 +58,31 @@ export function QuickActionMenu({
   const meetingCommittees = committees.filter(
     (committee) => committee.capabilities.createMeeting,
   );
-  const defaultCommitteeId =
-    (contextCommittee?.capabilities.createMeeting ? contextCommittee.id : null) ??
+  const quickMeetingCommittees = committees.filter(
+    (committee) => committee.capabilities.createQuickMeeting,
+  );
+  const defaultMeetingCommitteeId =
+    (contextCommittee?.capabilities.createMeeting
+      ? contextCommittee.id
+      : null) ??
     (meetingCommittees.length === 1 ? meetingCommittees[0].id : "");
-  const committeeLocked = Boolean(contextCommittee?.capabilities.createMeeting);
+  const defaultQuickMeetingCommitteeId =
+    (contextCommittee?.capabilities.createQuickMeeting
+      ? contextCommittee.id
+      : null) ??
+    (quickMeetingCommittees.length === 1 ? quickMeetingCommittees[0].id : "");
+  const meetingCommitteeLocked = Boolean(
+    contextCommittee?.capabilities.createMeeting,
+  );
+  const quickMeetingCommitteeLocked = Boolean(
+    contextCommittee?.capabilities.createQuickMeeting,
+  );
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [quickMeetingOpen, setQuickMeetingOpen] = useState(false);
   const [agendaItemOpen, setAgendaItemOpen] = useState(false);
-  const [committeeId, setCommitteeId] = useState(defaultCommitteeId);
+  const [committeeId, setCommitteeId] = useState(defaultMeetingCommitteeId);
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [quickNotes, setQuickNotes] = useState("");
@@ -76,7 +91,7 @@ export function QuickActionMenu({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function openMeetingModal() {
-    setCommitteeId(defaultCommitteeId);
+    setCommitteeId(defaultMeetingCommitteeId);
     setTitle("");
     setStartsAt("");
     setError(null);
@@ -86,7 +101,7 @@ export function QuickActionMenu({
   }
 
   function openQuickMeetingModal() {
-    setCommitteeId(defaultCommitteeId);
+    setCommitteeId(defaultQuickMeetingCommitteeId);
     setTitle("Hurtigt møde");
     setStartsAt("");
     setQuickNotes("");
@@ -102,8 +117,8 @@ export function QuickActionMenu({
     setError(null);
     setFieldErrors({});
 
-    const selectedCommitteeId = committeeLocked
-      ? contextCommittee?.id ?? ""
+    const selectedCommitteeId = meetingCommitteeLocked
+      ? (contextCommittee?.id ?? "")
       : committeeId;
     const startsAtIso = datetimeLocalToIso(startsAt);
     const clientErrors: Record<string, string> = {};
@@ -152,8 +167,8 @@ export function QuickActionMenu({
         setError(result.error || "Mødet kunne ikke oprettes.");
         setFieldErrors(
           Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
-              messages[0] ? [[key, messages[0]]] : [],
+            Object.entries(result.fieldErrors ?? {}).flatMap(
+              ([key, messages]) => (messages[0] ? [[key, messages[0]]] : []),
             ),
           ),
         );
@@ -180,8 +195,8 @@ export function QuickActionMenu({
     setError(null);
     setFieldErrors({});
 
-    const selectedCommitteeId = committeeLocked
-      ? contextCommittee?.id ?? ""
+    const selectedCommitteeId = quickMeetingCommitteeLocked
+      ? (contextCommittee?.id ?? "")
       : committeeId;
     const startsAtIso = datetimeLocalToIso(startsAt);
     const clientErrors: Record<string, string> = {};
@@ -232,8 +247,8 @@ export function QuickActionMenu({
         setError(result.error || "Det hurtige møde kunne ikke oprettes.");
         setFieldErrors(
           Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
-              messages[0] ? [[key, messages[0]]] : [],
+            Object.entries(result.fieldErrors ?? {}).flatMap(
+              ([key, messages]) => (messages[0] ? [[key, messages[0]]] : []),
             ),
           ),
         );
@@ -256,12 +271,13 @@ export function QuickActionMenu({
 
   const canCreateAgendaItem = Boolean(
     context.committeeId &&
-      context.meetingId &&
-      contextCommittee?.capabilities.manageAgenda,
+    context.meetingId &&
+    contextCommittee?.capabilities.scheduleAgendaItem,
   );
   const canCreateMeeting = meetingCommittees.length > 0;
-  const canManageAgenda = committees.some(
-    (committee) => committee.capabilities.manageAgenda,
+  const canCreateQuickMeeting = quickMeetingCommittees.length > 0;
+  const canScheduleAgendaItem = committees.some(
+    (committee) => committee.capabilities.scheduleAgendaItem,
   );
 
   return (
@@ -281,30 +297,30 @@ export function QuickActionMenu({
             role="menu"
           >
             {canCreateMeeting ? (
-              <>
-                <button
-                  className="quick-action-item"
-                  onClick={openMeetingModal}
-                  role="menuitem"
-                  type="button"
-                >
-                  <span className="font-semibold text-ink">Nyt møde</span>
-                  <span className="text-xs text-muted">
-                    Vælg udvalg, titel og dato.
-                  </span>
-                </button>
-                <button
-                  className="quick-action-item"
-                  onClick={openQuickMeetingModal}
-                  role="menuitem"
-                  type="button"
-                >
-                  <span className="font-semibold text-ink">Hurtigt møde</span>
-                  <span className="text-xs text-muted">
-                    Ad hoc-møde uden dagsorden.
-                  </span>
-                </button>
-              </>
+              <button
+                className="quick-action-item"
+                onClick={openMeetingModal}
+                role="menuitem"
+                type="button"
+              >
+                <span className="font-semibold text-ink">Nyt møde</span>
+                <span className="text-xs text-muted">
+                  Vælg udvalg, titel og dato.
+                </span>
+              </button>
+            ) : null}
+            {canCreateQuickMeeting ? (
+              <button
+                className="quick-action-item"
+                onClick={openQuickMeetingModal}
+                role="menuitem"
+                type="button"
+              >
+                <span className="font-semibold text-ink">Hurtigt møde</span>
+                <span className="text-xs text-muted">
+                  Ad hoc-møde uden dagsorden.
+                </span>
+              </button>
             ) : null}
             <button
               className="quick-action-item disabled"
@@ -330,7 +346,7 @@ export function QuickActionMenu({
                 Åbn beslutninger eller et møde først.
               </span>
             </button>
-            {canManageAgenda ? (
+            {canScheduleAgendaItem ? (
               <button
                 className="quick-action-item"
                 disabled={!canCreateAgendaItem}
@@ -391,7 +407,7 @@ export function QuickActionMenu({
               Der findes endnu ikke et udvalg i organisationen. Opret et udvalg,
               før du opretter møder.
             </p>
-          ) : committeeLocked && contextCommittee ? (
+          ) : meetingCommitteeLocked && contextCommittee ? (
             <div>
               <p className="label">Udvalg</p>
               <p className="rounded-[var(--radius-control)] border border-line bg-subtle px-3 py-2 text-sm text-ink">
@@ -456,7 +472,11 @@ export function QuickActionMenu({
             >
               Annuller
             </Button>
-            <Button disabled={saving || meetingCommittees.length === 0} size="sm" type="submit">
+            <Button
+              disabled={saving || meetingCommittees.length === 0}
+              size="sm"
+              type="submit"
+            >
               {saving ? "Opretter..." : "Opret møde"}
             </Button>
           </div>
@@ -488,12 +508,12 @@ export function QuickActionMenu({
             </div>
           ) : null}
 
-          {meetingCommittees.length === 0 ? (
+          {quickMeetingCommittees.length === 0 ? (
             <p className="metadata">
               Der findes endnu ikke et udvalg i organisationen. Opret et udvalg,
               før du opretter møder.
             </p>
-          ) : committeeLocked && contextCommittee ? (
+          ) : quickMeetingCommitteeLocked && contextCommittee ? (
             <div>
               <p className="label">Udvalg</p>
               <p className="rounded-[var(--radius-control)] border border-line bg-subtle px-3 py-2 text-sm text-ink">
@@ -512,13 +532,13 @@ export function QuickActionMenu({
                 value={committeeId}
               >
                 <option value="">Vælg udvalg</option>
-                {meetingCommittees.map((committee) => (
+                {quickMeetingCommittees.map((committee) => (
                   <option key={committee.id} value={committee.id}>
                     {committee.name}
                   </option>
                 ))}
               </Select>
-              {meetingCommittees.length > 1 ? (
+              {quickMeetingCommittees.length > 1 ? (
                 <p className="mt-1 text-xs text-muted">
                   Organisationen har flere udvalg, så du skal vælge udvalg
                   aktivt.
@@ -583,7 +603,11 @@ export function QuickActionMenu({
             >
               Annuller
             </Button>
-            <Button disabled={saving || meetingCommittees.length === 0} size="sm" type="submit">
+            <Button
+              disabled={saving || quickMeetingCommittees.length === 0}
+              size="sm"
+              type="submit"
+            >
               {saving ? "Opretter..." : "Opret hurtigt møde"}
             </Button>
           </div>

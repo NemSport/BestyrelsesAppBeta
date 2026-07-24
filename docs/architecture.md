@@ -155,9 +155,12 @@ large logo block in the navigation.
 Issue 16 introduces a shared, pure meeting capability model in
 `src/lib/meeting-capabilities.ts`. Server-rendered web UI, mobile responses,
 and `AuthorizationService.requireMeetingCapability` consume the same
-capability result. The model does not alter roles or RLS: organization
-owner/admin and committee chair/secretary retain manager capabilities;
-committee member retains agenda-item, task, and decision editing; committee
+action-specific capability result for meeting create/quick-create/update/
+trash/restore, participants, agenda-item create/update/schedule/reorder/delete,
+official minutes, approval, attachments, transfers, agenda email, tasks, and
+decisions. The model does not alter roles or RLS: organization owner/admin and
+committee chair/secretary retain manager capabilities; committee member
+retains backlog agenda-item, note, task, and decision editing; committee
 viewer remains read-only. Services still authorize every mutation and
 PostgreSQL RLS remains the independent data boundary.
 

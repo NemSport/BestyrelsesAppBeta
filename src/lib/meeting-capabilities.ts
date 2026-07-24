@@ -4,12 +4,23 @@ export type CommitteeRole = "chair" | "secretary" | "member" | "viewer";
 export type MeetingCapabilities = {
   viewMeeting: boolean;
   createMeeting: boolean;
-  editMeeting: boolean;
+  createQuickMeeting: boolean;
+  updateMeeting: boolean;
+  deleteMeeting: boolean;
+  restoreMeeting: boolean;
   manageParticipants: boolean;
-  manageAgenda: boolean;
+  createAgendaItem: boolean;
+  updateAgendaItem: boolean;
+  scheduleAgendaItem: boolean;
+  reorderAgendaItems: boolean;
+  deleteAgendaItem: boolean;
+  restoreAgendaItem: boolean;
+  editNotes: boolean;
   editOfficialMinutes: boolean;
   manageMinutesApproval: boolean;
-  editAgendaItems: boolean;
+  manageMinutesAttachments: boolean;
+  manageTransferredAgendaItems: boolean;
+  sendAgendaEmail: boolean;
   editTasks: boolean;
   editDecisions: boolean;
 };
@@ -34,12 +45,23 @@ export function getMeetingCapabilities(
     viewMeeting:
       manager || committeeRole === "member" || committeeRole === "viewer",
     createMeeting: manager,
-    editMeeting: manager,
+    createQuickMeeting: manager,
+    updateMeeting: manager,
+    deleteMeeting: manager,
+    restoreMeeting: manager,
     manageParticipants: manager,
-    manageAgenda: manager,
+    createAgendaItem: editor,
+    updateAgendaItem: editor,
+    scheduleAgendaItem: manager,
+    reorderAgendaItems: manager,
+    deleteAgendaItem: manager,
+    restoreAgendaItem: manager,
+    editNotes: editor,
     editOfficialMinutes: manager,
     manageMinutesApproval: manager,
-    editAgendaItems: editor,
+    manageMinutesAttachments: manager,
+    manageTransferredAgendaItems: manager,
+    sendAgendaEmail: manager,
     editTasks: editor,
     editDecisions: editor,
   };
