@@ -358,6 +358,15 @@ pages, related work is progressively disclosed, the whole-minutes AI action is
 the primary extraction entry, and point-specific AI analysis moves under
 secondary actions. No domain state, route, or permission model changes.
 
+Issue 2 keeps the Phase 3 organization navigation compact on mobile. Below the
+desktop breakpoint, the full sidebar is replaced by a short context bar that
+keeps the active organization, optional committee, and active destination
+visible. The menu opens as a scrollable modal drawer with focus containment,
+Escape and backdrop dismissal, focus return, and background scroll locking.
+It reuses the existing route matching and capability-filtered destinations;
+desktop navigation, URLs, browser history, authorization, and RLS are
+unchanged.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.

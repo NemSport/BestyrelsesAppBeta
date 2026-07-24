@@ -31,6 +31,7 @@ export function OrganizationWorkspace({
       />
       <OrganizationNav
         canManageTrash={canManageTrash}
+        committees={committees}
         logoUrl={branding?.logoUrl ?? null}
         organizationId={organizationId}
         organizationName={organizationName}

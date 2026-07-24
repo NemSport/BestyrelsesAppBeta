@@ -725,6 +725,15 @@ the prominent AI action; point-specific analysis remains available under
 secondary actions. These are composition changes only and do not alter
 repositories, mutation routes, task confirmation, or RLS.
 
+Issue 2 changes only the responsive presentation of organization navigation.
+The server layout still supplies the same RLS-visible committee list,
+per-committee capability model, organization identity, and trash-management
+capability. The client derives the optional active committee from the current
+route and presents the same filtered destinations either in the sticky desktop
+sidebar or in a modal mobile drawer. Opening and closing the drawer does not
+change the URL; link navigation continues through Next.js routing, so deep
+links and browser history retain their existing behavior.
+
 ## Domain Hierarchy
 
 ```text
