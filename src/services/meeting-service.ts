@@ -33,13 +33,21 @@ export class MeetingService {
 
   async list(organizationId: string, committeeId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(organizationId, committeeId, user.id);
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
     return this.meetings.listByCommittee(committeeId);
   }
 
   async get(organizationId: string, committeeId: string, meetingId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(organizationId, committeeId, user.id);
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
     const meeting = await this.meetings.findWithAgenda(meetingId);
     if (
       !meeting ||
@@ -76,10 +84,11 @@ export class MeetingService {
   async saveParticipants(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingParticipantsInputSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "manageParticipants",
     );
     await this.get(parsed.organizationId, parsed.committeeId, parsed.meetingId);
 
@@ -152,10 +161,11 @@ export class MeetingService {
   async create(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingInputSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "createMeeting",
     );
     return this.meetings.createWithStandardItems({
       organizationId: parsed.organizationId,
@@ -171,10 +181,11 @@ export class MeetingService {
   async createQuick(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = quickMeetingInputSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "createQuickMeeting",
     );
 
     const meeting = await this.meetings.create({
@@ -209,10 +220,11 @@ export class MeetingService {
   async update(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingUpdateSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "updateMeeting",
     );
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
     if (
@@ -234,10 +246,11 @@ export class MeetingService {
   async moveToTrash(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "deleteMeeting",
     );
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
     if (
@@ -253,10 +266,11 @@ export class MeetingService {
   async restore(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "restoreMeeting",
     );
     const meeting = await this.meetings.findIncludingDeleted(parsed.meetingId);
     if (

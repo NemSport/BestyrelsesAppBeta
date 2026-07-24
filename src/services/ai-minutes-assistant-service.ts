@@ -12,10 +12,7 @@ import {
 } from "@/lib/ai-minutes-assistant";
 import { formatDanishDate } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
-import {
-  richTextToPlainText,
-  sanitizeRichText,
-} from "@/lib/rich-text";
+import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { AiActivityLogService } from "@/services/ai-activity-log-service";
 import { AuthService } from "@/services/auth-service";
@@ -73,8 +70,7 @@ function logAiMinutesAssistantError({
         ? error.name
         : readString(record, "name") || "UnknownError",
     errorMessage: safeErrorMessage(error, apiKey),
-    status:
-      readNumber(record, "status") || readNumber(record, "statusCode"),
+    status: readNumber(record, "status") || readNumber(record, "statusCode"),
     code: readString(record, "code") || readString(nested, "code"),
     type: readString(record, "type") || readString(nested, "type"),
     requestId:
@@ -113,10 +109,11 @@ export class AiMinutesAssistantService {
   async rewrite(input: unknown) {
     const parsed = aiMinutesAssistantRequestSchema.parse(input);
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "editOfficialMinutes",
     );
 
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
@@ -146,7 +143,8 @@ export class AiMinutesAssistantService {
       );
     }
 
-    let model = process.env.OPENAI_MINUTES_ASSISTANT_MODEL?.trim() || "gpt-4.1-mini";
+    let model =
+      process.env.OPENAI_MINUTES_ASSISTANT_MODEL?.trim() || "gpt-4.1-mini";
     let apiKey: string | undefined;
 
     try {

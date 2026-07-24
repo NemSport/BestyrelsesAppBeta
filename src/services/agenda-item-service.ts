@@ -62,10 +62,11 @@ export class AgendaItemService {
     const user = await this.auth.requireUser();
     const parsed = agendaItemInputSchema.parse(input);
     if (parsed.meetingId) {
-      await this.authorization.requireCommitteeManager(
+      await this.authorization.requireMeetingCapability(
         parsed.organizationId,
         parsed.committeeId,
         user.id,
+        "scheduleAgendaItem",
       );
       const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
       if (
@@ -76,10 +77,11 @@ export class AgendaItemService {
         throw new NotFoundError("Mødet");
       }
     } else {
-      await this.authorization.requireAgendaItemEditor(
+      await this.authorization.requireMeetingCapability(
         parsed.organizationId,
         parsed.committeeId,
         user.id,
+        "createAgendaItem",
       );
     }
 
@@ -98,10 +100,11 @@ export class AgendaItemService {
   async update(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemUpdateSchema.parse(input);
-    await this.authorization.requireAgendaItemEditor(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "updateAgendaItem",
     );
     const agendaItem = await this.agendaItems.findWithHistory(
       parsed.agendaItemId,
@@ -125,10 +128,11 @@ export class AgendaItemService {
   async schedule(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = scheduleAgendaItemSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "scheduleAgendaItem",
     );
     const [agendaItem, meeting] = await Promise.all([
       this.agendaItems.findWithHistory(parsed.agendaItemId),
@@ -161,10 +165,11 @@ export class AgendaItemService {
   async remove(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemRemoveSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "deleteAgendaItem",
     );
     const agendaItem = await this.agendaItems.findWithHistory(
       parsed.agendaItemId,
@@ -183,10 +188,11 @@ export class AgendaItemService {
   async restore(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "restoreAgendaItem",
     );
     const agendaItem = await this.agendaItems.findIncludingDeleted(
       parsed.agendaItemId,
@@ -205,10 +211,11 @@ export class AgendaItemService {
   async moveOccurrenceToTrash(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemOccurrenceTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "deleteAgendaItem",
     );
     const occurrence = await this.agendaItems.findOccurrenceIncludingDeleted(
       parsed.occurrenceId,
@@ -227,10 +234,11 @@ export class AgendaItemService {
   async reorderOccurrence(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemOccurrenceReorderSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "reorderAgendaItems",
     );
     const occurrence = await this.agendaItems.findOccurrenceIncludingDeleted(
       parsed.occurrenceId,
@@ -252,10 +260,11 @@ export class AgendaItemService {
   async reorderMeetingOccurrences(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemOccurrenceBatchReorderSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "reorderAgendaItems",
     );
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
     if (
@@ -295,10 +304,11 @@ export class AgendaItemService {
   async restoreOccurrence(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemOccurrenceTrashActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "restoreAgendaItem",
     );
     const occurrence = await this.agendaItems.findOccurrenceIncludingDeleted(
       parsed.occurrenceId,

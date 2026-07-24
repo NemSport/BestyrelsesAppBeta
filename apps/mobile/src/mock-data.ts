@@ -1,11 +1,19 @@
-import type { Meeting, Organization, OrganizationOverview, Task } from "./types";
+import type {
+  Meeting,
+  Organization,
+  OrganizationOverview,
+  Task,
+} from "./types";
 
 const now = new Date();
 const tomorrow = new Date(now.getTime() + 1000 * 60 * 60 * 24);
 const nextWeek = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
 
 const boardCommittee = { id: "mock-committee-board", name: "Bestyrelsen" };
-const sponsorCommittee = { id: "mock-committee-sponsor", name: "Sponsorudvalg" };
+const sponsorCommittee = {
+  id: "mock-committee-sponsor",
+  name: "Sponsorudvalg",
+};
 
 export const mockOrganization: Organization = {
   id: "mock-organization",
@@ -22,83 +30,83 @@ export const mockDefaultMeeting: Meeting = {
   status: "scheduled",
   committeeName: boardCommittee.name,
   agenda_item_occurrences: [
-      {
-        position: 1,
-        agenda_items: {
-          id: "mock-agenda-1",
-          title: "Godkendelse af dagsorden",
-          item_type: "decision",
-        },
+    {
+      position: 1,
+      agenda_items: {
+        id: "mock-agenda-1",
+        title: "Godkendelse af dagsorden",
+        item_type: "decision",
       },
-      {
-        position: 2,
-        agenda_items: {
-          id: "mock-agenda-2",
-          title: "Økonomi og budgetopfølgning",
-          item_type: "discussion",
-        },
+    },
+    {
+      position: 2,
+      agenda_items: {
+        id: "mock-agenda-2",
+        title: "Økonomi og budgetopfølgning",
+        item_type: "discussion",
       },
-      {
-        position: 3,
-        agenda_items: {
-          id: "mock-agenda-3",
-          title: "Sponsorarbejde frem mod sæsonstart",
-          item_type: "follow_up",
-        },
+    },
+    {
+      position: 3,
+      agenda_items: {
+        id: "mock-agenda-3",
+        title: "Sponsorarbejde frem mod sæsonstart",
+        item_type: "follow_up",
       },
-      {
-        position: 4,
-        agenda_items: {
-          id: "mock-agenda-4",
-          title: "Orientering fra udvalg",
-          item_type: "information",
-        },
+    },
+    {
+      position: 4,
+      agenda_items: {
+        id: "mock-agenda-4",
+        title: "Orientering fra udvalg",
+        item_type: "information",
       },
-      {
-        position: 5,
-        agenda_items: {
-          id: "mock-agenda-5",
-          title: "Eventuelt",
-          item_type: "discussion",
-        },
+    },
+    {
+      position: 5,
+      agenda_items: {
+        id: "mock-agenda-5",
+        title: "Eventuelt",
+        item_type: "discussion",
       },
+    },
   ],
 };
 
 export const mockSponsorMeeting: Meeting = {
-    id: "mock-meeting-sponsor",
-    organization_id: mockOrganization.id,
-    committee_id: sponsorCommittee.id,
-    title: "Sponsorudvalg: opfølgning",
-    starts_at: nextWeek.toISOString(),
-    status: "scheduled",
-    committeeName: sponsorCommittee.name,
-    agenda_item_occurrences: [
-      {
-        position: 1,
-        agenda_items: {
-          id: "mock-sponsor-1",
-          title: "Status på nuværende sponsorer",
-          item_type: "information",
-        },
+  id: "mock-meeting-sponsor",
+  organization_id: mockOrganization.id,
+  committee_id: sponsorCommittee.id,
+  title: "Sponsorudvalg: opfølgning",
+  starts_at: nextWeek.toISOString(),
+  status: "scheduled",
+  committeeName: sponsorCommittee.name,
+  agenda_item_occurrences: [
+    {
+      position: 1,
+      agenda_items: {
+        id: "mock-sponsor-1",
+        title: "Status på nuværende sponsorer",
+        item_type: "information",
       },
-      {
-        position: 2,
-        agenda_items: {
-          id: "mock-sponsor-2",
-          title: "Nye sponsorprospekter",
-          item_type: "discussion",
-        },
+    },
+    {
+      position: 2,
+      agenda_items: {
+        id: "mock-sponsor-2",
+        title: "Nye sponsorprospekter",
+        item_type: "discussion",
       },
-      {
-        position: 3,
-        agenda_items: {
-          id: "mock-sponsor-3",
-          title: "Opfølgning på materialer",
-          item_type: "follow_up",
-        },
+    },
+    {
+      position: 3,
+      agenda_items: {
+        id: "mock-sponsor-3",
+        title: "Opfølgning på materialer",
+        item_type: "follow_up",
       },
-    ],
+    },
+  ],
 };
 
 export const mockMeetings: Meeting[] = [mockDefaultMeeting, mockSponsorMeeting];
@@ -164,6 +172,29 @@ export const mockOverview: OrganizationOverview = {
   committees: [
     {
       committee: boardCommittee,
+      capabilities: {
+        viewMeeting: true,
+        createMeeting: true,
+        createQuickMeeting: true,
+        updateMeeting: true,
+        deleteMeeting: true,
+        restoreMeeting: true,
+        manageParticipants: true,
+        createAgendaItem: true,
+        updateAgendaItem: true,
+        scheduleAgendaItem: true,
+        reorderAgendaItems: true,
+        deleteAgendaItem: true,
+        restoreAgendaItem: true,
+        editNotes: true,
+        editOfficialMinutes: true,
+        manageMinutesApproval: true,
+        manageMinutesAttachments: true,
+        manageTransferredAgendaItems: true,
+        sendAgendaEmail: true,
+        editTasks: true,
+        editDecisions: true,
+      },
       nextMeeting: mockDefaultMeeting,
       upcomingMeetingCount: 1,
       openTaskCount: 1,
@@ -171,6 +202,29 @@ export const mockOverview: OrganizationOverview = {
     },
     {
       committee: sponsorCommittee,
+      capabilities: {
+        viewMeeting: true,
+        createMeeting: false,
+        createQuickMeeting: false,
+        updateMeeting: false,
+        deleteMeeting: false,
+        restoreMeeting: false,
+        manageParticipants: false,
+        createAgendaItem: true,
+        updateAgendaItem: true,
+        scheduleAgendaItem: false,
+        reorderAgendaItems: false,
+        deleteAgendaItem: false,
+        restoreAgendaItem: false,
+        editNotes: true,
+        editOfficialMinutes: false,
+        manageMinutesApproval: false,
+        manageMinutesAttachments: false,
+        manageTransferredAgendaItems: false,
+        sendAgendaEmail: false,
+        editTasks: true,
+        editDecisions: true,
+      },
       nextMeeting: mockSponsorMeeting,
       upcomingMeetingCount: 1,
       openTaskCount: 1,

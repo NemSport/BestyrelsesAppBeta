@@ -6,6 +6,7 @@ import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import { CommitteeService } from "@/services/committee-service";
+import { getMeetingCapabilities } from "@/lib/permissions";
 
 export default async function OrganizationLayout({
   children,
@@ -26,14 +27,26 @@ export default async function OrganizationLayout({
     new CommitteeService(db).list(organizationId),
     new OrganizationBrandingService(db).getSafeBranding(organizationId),
   ]);
+  const committeeOptions = await Promise.all(
+    committees.map(async (committee) => {
+      const committeeContext = await new AuthorizationService(
+        db,
+      ).requireCommitteeMember(organizationId, committee.id, user.id);
+      return {
+        id: committee.id,
+        name: committee.name,
+        capabilities: getMeetingCapabilities(
+          committeeContext.organizationMembership.role,
+          committeeContext.membership?.role ?? null,
+        ),
+      };
+    }),
+  );
 
   return (
     <OrganizationWorkspace
       branding={branding}
-      committees={committees.map((committee) => ({
-        id: committee.id,
-        name: committee.name,
-      }))}
+      committees={committeeOptions}
       organizationId={organizationId}
       organizationName={context.organization.name}
     >

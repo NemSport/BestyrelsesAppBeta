@@ -5,10 +5,12 @@ import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 
 import { QuickActionMenu } from "@/components/layout/quick-action-menu";
+import type { MeetingCapabilities } from "@/lib/permissions";
 
 type CommitteeOption = {
   id: string;
   name: string;
+  capabilities: MeetingCapabilities;
 };
 
 export function QuickActionHeaderSlot({

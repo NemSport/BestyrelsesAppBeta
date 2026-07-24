@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 
+import type { MeetingCapabilities } from "@/lib/permissions";
 import type { TableRow } from "@/types/database";
 
 export type Profile = TableRow<"profiles">;
@@ -230,6 +231,7 @@ export type PendingMinutesApprovalReminder = {
 export type OrganizationOverview = {
   committees: Array<{
     committee: Committee;
+    capabilities: MeetingCapabilities;
     nextMeeting: MeetingWithAgendaPreview | null;
     upcomingMeetingCount: number;
     openFollowUpCount: number;

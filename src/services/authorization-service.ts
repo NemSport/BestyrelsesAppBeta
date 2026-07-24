@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AuthorizationError, NotFoundError } from "@/lib/errors";
+import {
+  assertMeetingCapability,
+  getMeetingCapabilities,
+  type MeetingCapability,
+} from "@/lib/permissions";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { OrganizationRepository } from "@/repositories/organization-repository";
 import type { Database } from "@/types/database";
@@ -23,7 +28,10 @@ export class AuthorizationService {
       includeDeleted,
     });
     if (!organization) throw new NotFoundError("Organisationen");
-    const membership = await this.organizations.getMembership(organizationId, userId);
+    const membership = await this.organizations.getMembership(
+      organizationId,
+      userId,
+    );
     if (!membership) throw new AuthorizationError();
     return { organization, membership };
   }
@@ -33,17 +41,26 @@ export class AuthorizationService {
     userId: string,
     { includeDeleted = false }: { includeDeleted?: boolean } = {},
   ) {
-    const context = await this.requireOrganizationMember(organizationId, userId, {
-      includeDeleted,
-    });
+    const context = await this.requireOrganizationMember(
+      organizationId,
+      userId,
+      {
+        includeDeleted,
+      },
+    );
     if (!["owner", "admin"].includes(context.membership.role)) {
-      throw new AuthorizationError("Kun ejere og administratorer kan gøre dette.");
+      throw new AuthorizationError(
+        "Kun ejere og administratorer kan gøre dette.",
+      );
     }
     return context;
   }
 
   async requireOrganizationOwner(organizationId: string, userId: string) {
-    const context = await this.requireOrganizationMember(organizationId, userId);
+    const context = await this.requireOrganizationMember(
+      organizationId,
+      userId,
+    );
     if (context.membership.role !== "owner") {
       throw new AuthorizationError("Kun organisationens ejer kan gøre dette.");
     }
@@ -55,7 +72,10 @@ export class AuthorizationService {
     committeeId: string,
     userId: string,
   ) {
-    const organizationContext = await this.requireOrganizationMember(organizationId, userId);
+    const organizationContext = await this.requireOrganizationMember(
+      organizationId,
+      userId,
+    );
     const committee = await this.committees.findById(committeeId);
     if (!committee || committee.organization_id !== organizationId) {
       throw new NotFoundError("Udvalget");
@@ -72,25 +92,38 @@ export class AuthorizationService {
     };
   }
 
+  async requireMeetingCapability(
+    organizationId: string,
+    committeeId: string,
+    userId: string,
+    capability: MeetingCapability,
+  ) {
+    const context = await this.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      userId,
+    );
+    assertMeetingCapability(
+      getMeetingCapabilities(
+        context.organizationMembership.role,
+        context.membership?.role ?? null,
+      ),
+      capability,
+    );
+    return context;
+  }
+
   async requireCommitteeManager(
     organizationId: string,
     committeeId: string,
     userId: string,
   ) {
-    const organizationContext = await this.requireOrganizationMember(organizationId, userId);
-    const committee = await this.committees.findById(committeeId);
-    if (!committee || committee.organization_id !== organizationId) {
-      throw new NotFoundError("Udvalget");
-    }
-    const membership = await this.committees.getMembership(committeeId, userId);
-    const organizationAdmin = ["owner", "admin"].includes(
-      organizationContext.membership.role,
+    return this.requireMeetingCapability(
+      organizationId,
+      committeeId,
+      userId,
+      "updateMeeting",
     );
-    if (!organizationAdmin && !membership) throw new AuthorizationError();
-    if (!organizationAdmin && !["chair", "secretary"].includes(membership!.role)) {
-      throw new AuthorizationError("Kun formanden eller sekretæren kan gøre dette.");
-    }
-    return { committee, membership, organizationMembership: organizationContext.membership };
   }
 
   async requireAgendaItemEditor(
@@ -98,23 +131,11 @@ export class AuthorizationService {
     committeeId: string,
     userId: string,
   ) {
-    const organizationContext = await this.requireOrganizationMember(organizationId, userId);
-    const committee = await this.committees.findById(committeeId);
-    if (!committee || committee.organization_id !== organizationId) {
-      throw new NotFoundError("Udvalget");
-    }
-    const membership = await this.committees.getMembership(committeeId, userId);
-    const organizationAdmin = ["owner", "admin"].includes(
-      organizationContext.membership.role,
+    return this.requireMeetingCapability(
+      organizationId,
+      committeeId,
+      userId,
+      "updateAgendaItem",
     );
-    if (
-      !organizationAdmin &&
-      (!membership || !["chair", "secretary", "member"].includes(membership.role))
-    ) {
-      throw new AuthorizationError(
-        "Du har kun læseadgang til dagsordenspunkter i dette udvalg.",
-      );
-    }
-    return { committee, membership, organizationMembership: organizationContext.membership };
   }
 }

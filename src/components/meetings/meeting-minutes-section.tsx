@@ -2339,7 +2339,9 @@ export function MeetingMinutesSection({
               Referat pr. dagsordenspunkt
             </h3>
             <p className="metadata mt-1">
-              Åbn et punkt for at læse eller redigere dets referat.
+              {canEdit
+                ? "Åbn et punkt for at læse og, når du er referent, redigere dets referat."
+                : "Åbn et punkt for at læse dets referat."}
             </p>
           </div>
           <div className="flex flex-wrap items-end justify-end gap-3">
