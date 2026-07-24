@@ -26,16 +26,26 @@ export class MutationRequestError extends Error {
   }
 }
 
+export function normalizeMutationFieldPath(path: string) {
+  return path
+    .replace(/\[(\d+)\]/g, ".$1")
+    .replace(/\[['"]([^'"]+)['"]\]/g, ".$1")
+    .replace(/^\./, "");
+}
+
 export function mutationFieldErrors(payload: MutationErrorPayload | null) {
   const errors: Record<string, string> = {};
 
   for (const issue of payload?.validationErrors ?? []) {
-    const key = issue.path.join(".");
+    const key = normalizeMutationFieldPath(issue.path.join("."));
     if (key && !errors[key]) errors[key] = issue.message;
   }
 
   for (const [key, messages] of Object.entries(payload?.fieldErrors ?? {})) {
-    if (!errors[key] && messages[0]) errors[key] = messages[0];
+    const normalizedKey = normalizeMutationFieldPath(key);
+    if (!errors[normalizedKey] && messages[0]) {
+      errors[normalizedKey] = messages[0];
+    }
   }
 
   return errors;

@@ -13,3 +13,24 @@ export function hasExternalAttendeeInput(attendee: ExternalAttendeeInput) {
     attendee.roleNote.trim(),
   );
 }
+
+export function remapExternalAttendeeFieldErrors(
+  fieldErrors: Record<string, string>,
+  originalIndices: number[],
+) {
+  return Object.fromEntries(
+    Object.entries(fieldErrors).map(([key, message]) => {
+      const match = key.match(
+        /^externalAttendees\.(\d+)\.(name|email|mobile|roleNote)$/,
+      );
+      if (!match) return [key, message];
+      const originalIndex = originalIndices[Number(match[1])];
+      return [
+        originalIndex === undefined
+          ? key
+          : `externalAttendees.${originalIndex}.${match[2]}`,
+        message,
+      ];
+    }),
+  );
+}

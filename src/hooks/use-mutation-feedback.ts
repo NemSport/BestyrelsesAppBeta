@@ -65,6 +65,7 @@ export function useUnsavedChanges(
     if (!dirty) return;
 
     let resetTimer: number | null = null;
+    let focusBeforeNavigation: HTMLElement | null = null;
 
     function warnBeforeUnload(event: BeforeUnloadEvent) {
       if (allowNextUnloadRef.current) return;
@@ -100,6 +101,7 @@ export function useUnsavedChanges(
 
       if (decision === "cancel") {
         event.preventDefault();
+        window.requestAnimationFrame(() => focusBeforeNavigation?.focus());
         return;
       }
       if (decision === "allow") {
@@ -110,10 +112,36 @@ export function useUnsavedChanges(
       }
     }
 
+    function rememberFocusBeforeNavigation(event: PointerEvent) {
+      const element =
+        event.target instanceof Element
+          ? event.target
+          : event.target instanceof Node
+            ? event.target.parentElement
+            : null;
+      const anchor = element?.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor) return;
+
+      focusBeforeNavigation =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    }
+
     window.addEventListener("beforeunload", warnBeforeUnload);
+    document.addEventListener(
+      "pointerdown",
+      rememberFocusBeforeNavigation,
+      true,
+    );
     document.addEventListener("click", guardInternalNavigation, true);
     return () => {
       window.removeEventListener("beforeunload", warnBeforeUnload);
+      document.removeEventListener(
+        "pointerdown",
+        rememberFocusBeforeNavigation,
+        true,
+      );
       document.removeEventListener("click", guardInternalNavigation, true);
       if (resetTimer !== null) window.clearTimeout(resetTimer);
       allowNextUnloadRef.current = false;

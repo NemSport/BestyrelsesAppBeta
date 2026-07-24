@@ -21,6 +21,10 @@ export function apiError(error: unknown) {
         error: "Ret de markerede felter, og prøv igen.",
         fieldErrors: issues.fieldErrors,
         formErrors: issues.formErrors,
+        validationErrors: error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
       },
       { status: 422 },
     );

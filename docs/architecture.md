@@ -177,6 +177,12 @@ exposing raw server details. The hook provides an immediate in-memory submit
 lock in addition to disabled button state, so two events before the next React
 render cannot create duplicate mutations. Dirty-state handling is independent
 of authorization and is used only to prevent accidental loss of local edits.
+Offline autosave derives `hasUnsavedChanges` directly from the serialized local
+draft, last server-confirmed serialization, conflict state, and synchronization
+status. It delegates navigation protection to the same scoped dirty-state
+guard, including after save failures. Repeated-field validation canonicalizes
+both `externalAttendees[0].email` and `externalAttendees.0.email`, then remaps
+filtered request indices back to the original UI rows.
 The navigation guard leaves Next.js links as normal anchors and registers its
 document click listener only while a form is dirty. It ignores modified,
 external, download, new-tab, and hash-only navigation; only a rejected

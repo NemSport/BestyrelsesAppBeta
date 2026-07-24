@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type AutosaveStatus =
-  | "idle"
-  | "saving"
-  | "saved"
-  | "error"
-  | "offline"
-  | "pending"
-  | "conflict";
+import { useUnsavedChanges } from "@/hooks/use-mutation-feedback";
+import {
+  hasUnsynchronizedAutosaveChanges,
+  type AutosaveStatus,
+} from "@/lib/autosave-state";
+
+export type { AutosaveStatus } from "@/lib/autosave-state";
 
 export type StoredLocalDraft<T> = {
   version: 1;
@@ -76,6 +75,14 @@ export function useOfflineAutosave<T, TResult>({
   onErrorRef.current = onError;
   getSavedServerUpdatedAtRef.current = getSavedServerUpdatedAt;
   conflictRef.current = conflict;
+  const hasUnsavedChanges = hasUnsynchronizedAutosaveChanges({
+    enabled,
+    currentSerialized: observedSerialized,
+    lastSavedSerialized: lastSavedSerializedRef.current,
+    status,
+    hasConflict: Boolean(conflict),
+  });
+  useUnsavedChanges(hasUnsavedChanges);
 
   useEffect(() => {
     serverUpdatedAtRef.current = serverUpdatedAt;
@@ -264,23 +271,6 @@ export function useOfflineAutosave<T, TResult>({
     };
   }, [enabled, saveNow, storageKey]);
 
-  useEffect(() => {
-    if (
-      !enabled ||
-      !["saving", "error", "offline", "pending", "conflict"].includes(status)
-    ) {
-      return;
-    }
-
-    function warnBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-
-    window.addEventListener("beforeunload", warnBeforeUnload);
-    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [enabled, status]);
-
   function restoreLocalDraft() {
     if (!conflict) return;
     restoreRef.current(conflict.data);
@@ -306,5 +296,6 @@ export function useOfflineAutosave<T, TResult>({
     retry: saveNow,
     restoreLocalDraft,
     keepServerVersion,
+    hasUnsavedChanges,
   };
 }

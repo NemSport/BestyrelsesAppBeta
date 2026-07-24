@@ -5,9 +5,14 @@ import {
   firstFieldError,
   MutationRequestError,
   mutationFieldErrors,
+  normalizeMutationFieldPath,
   readMutationResponse,
 } from "../../src/lib/mutation-feedback.ts";
-import { hasExternalAttendeeInput } from "../../src/lib/meeting-participants.ts";
+import {
+  hasExternalAttendeeInput,
+  remapExternalAttendeeFieldErrors,
+} from "../../src/lib/meeting-participants.ts";
+import { hasUnsynchronizedAutosaveChanges } from "../../src/lib/autosave-state.ts";
 import {
   navigationDecision,
   shouldGuardNavigation,
@@ -51,6 +56,17 @@ test("nested validation errors remain attached to the exact field", () => {
       "externalAttendees.0.email",
     ]),
     "externalAttendees.0.email",
+  );
+});
+
+test("bracket and dot paths normalize to the same attendee fields", () => {
+  assert.equal(
+    normalizeMutationFieldPath("externalAttendees[2].email"),
+    "externalAttendees.2.email",
+  );
+  assert.equal(
+    normalizeMutationFieldPath("externalAttendees[1]['name']"),
+    "externalAttendees.1.name",
   );
 });
 
@@ -106,6 +122,83 @@ test("external attendee input is not silently discarded when name is missing", (
   );
 });
 
+test("nested attendee email and name errors map to their original rows", () => {
+  assert.deepEqual(
+    remapExternalAttendeeFieldErrors(
+      {
+        "externalAttendees.0.email": "E-mail er ugyldig",
+        "externalAttendees.1.name": "Navn skal udfyldes",
+      },
+      [1, 3],
+    ),
+    {
+      "externalAttendees.1.email": "E-mail er ugyldig",
+      "externalAttendees.3.name": "Navn skal udfyldes",
+    },
+  );
+});
+
+test("attendee validation mapping preserves entered values", () => {
+  const attendees = [
+    { name: "", email: "", mobile: "", roleNote: "" },
+    {
+      name: "Ekstern person",
+      email: "ugyldig",
+      mobile: "12345678",
+      roleNote: "Rådgiver",
+    },
+  ];
+  const snapshot = structuredClone(attendees);
+
+  remapExternalAttendeeFieldErrors(
+    { "externalAttendees.0.email": "E-mail er ugyldig" },
+    [1],
+  );
+
+  assert.deepEqual(attendees, snapshot);
+});
+
+test("local minutes changes and failed autosaves remain dirty", () => {
+  const draft = { notes: "<p>Ny tekst</p>" };
+  const saved = { notes: "<p>Gammel tekst</p>" };
+
+  assert.equal(
+    hasUnsynchronizedAutosaveChanges({
+      enabled: true,
+      currentSerialized: JSON.stringify(draft),
+      lastSavedSerialized: JSON.stringify(saved),
+      status: "idle",
+      hasConflict: false,
+    }),
+    true,
+  );
+  assert.equal(
+    hasUnsynchronizedAutosaveChanges({
+      enabled: true,
+      currentSerialized: JSON.stringify(draft),
+      lastSavedSerialized: JSON.stringify(saved),
+      status: "error",
+      hasConflict: false,
+    }),
+    true,
+  );
+  assert.equal(draft.notes, "<p>Ny tekst</p>");
+});
+
+test("completed minutes autosave removes dirty state", () => {
+  const savedDraft = JSON.stringify({ notes: "<p>Gemt tekst</p>" });
+  assert.equal(
+    hasUnsynchronizedAutosaveChanges({
+      enabled: true,
+      currentSerialized: savedDraft,
+      lastSavedSerialized: savedDraft,
+      status: "saved",
+      hasConflict: false,
+    }),
+    false,
+  );
+});
+
 test("clean navigation is never guarded", () => {
   assert.equal(shouldGuardNavigation(cleanInternalClick), false);
   assert.equal(navigationDecision(cleanInternalClick, false), "ignore");
@@ -113,10 +206,12 @@ test("clean navigation is never guarded", () => {
 
 test("dirty internal navigation allows leave and cancels stay", () => {
   const dirtyClick = { ...cleanInternalClick, dirty: true };
+  const minutesText = "<p>Ugemt referattekst</p>";
 
   assert.equal(shouldGuardNavigation(dirtyClick), true);
   assert.equal(navigationDecision(dirtyClick, true), "allow");
   assert.equal(navigationDecision(dirtyClick, false), "cancel");
+  assert.equal(minutesText, "<p>Ugemt referattekst</p>");
 });
 
 test("modified clicks and new-tab links bypass the dirty guard", () => {

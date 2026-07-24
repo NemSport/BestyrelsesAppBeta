@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   EmptyState,
+  FieldError,
   Input,
   MutationFeedback,
   Select,
@@ -17,7 +18,10 @@ import {
   useMutationFeedback,
   useUnsavedChanges,
 } from "@/hooks/use-mutation-feedback";
-import { hasExternalAttendeeInput } from "@/lib/meeting-participants";
+import {
+  hasExternalAttendeeInput,
+  remapExternalAttendeeFieldErrors,
+} from "@/lib/meeting-participants";
 import {
   firstFieldError,
   MutationRequestError,
@@ -218,21 +222,9 @@ export function MeetingParticipantsPanel({
     } catch (caught) {
       const nextFieldErrors =
         caught instanceof MutationRequestError
-          ? Object.fromEntries(
-              Object.entries(caught.fieldErrors).map(([key, message]) => {
-                const match = key.match(
-                  /^externalAttendees\.(\d+)\.(name|email|mobile|roleNote)$/,
-                );
-                if (!match) return [key, message];
-                const originalIndex =
-                  externalPayload[Number(match[1])]?.originalIndex;
-                return [
-                  originalIndex === undefined
-                    ? key
-                    : `externalAttendees.${originalIndex}.${match[2]}`,
-                  message,
-                ];
-              }),
+          ? remapExternalAttendeeFieldErrors(
+              caught.fieldErrors,
+              externalPayload.map((item) => item.originalIndex),
             )
           : {};
       setFieldErrors(nextFieldErrors);
@@ -242,10 +234,12 @@ export function MeetingParticipantsPanel({
           : "Deltagerne kunne ikke gemmes. Prøv igen.",
       );
       const firstError = firstFieldError(nextFieldErrors, [
-        "externalAttendees.0.name",
-        "externalAttendees.0.email",
-        "externalAttendees.0.mobile",
-        "externalAttendees.0.roleNote",
+        ...external.flatMap((_, index) => [
+          `externalAttendees.${index}.name`,
+          `externalAttendees.${index}.email`,
+          `externalAttendees.${index}.mobile`,
+          `externalAttendees.${index}.roleNote`,
+        ]),
       ]);
       focusInvalidField(
         firstError
@@ -440,69 +434,61 @@ export function MeetingParticipantsPanel({
                           placeholder="Navn"
                           value={attendee.name}
                         />
-                        {fieldErrors[fieldKey("name")] ? (
-                          <p
-                            className="text-sm text-danger"
-                            id={`${fieldId("name")}-error`}
-                          >
-                            {fieldErrors[fieldKey("name")]}
-                          </p>
-                        ) : null}
+                        <FieldError
+                          id={`${fieldId("name")}-error`}
+                          message={fieldErrors[fieldKey("name")]}
+                        />
                         <div className="grid gap-2 sm:grid-cols-2">
-                          <Input
-                            aria-describedby={
-                              fieldErrors[fieldKey("email")]
-                                ? `${fieldId("email")}-error`
-                                : undefined
-                            }
-                            aria-invalid={Boolean(
-                              fieldErrors[fieldKey("email")],
-                            )}
-                            id={fieldId("email")}
-                            onChange={(event) =>
-                              updateExternal(index, {
-                                email: event.target.value,
-                              })
-                            }
-                            placeholder="E-mail"
-                            type="email"
-                            value={attendee.email}
-                          />
-                          <Input
-                            aria-describedby={
-                              fieldErrors[fieldKey("mobile")]
-                                ? `${fieldId("mobile")}-error`
-                                : undefined
-                            }
-                            aria-invalid={Boolean(
-                              fieldErrors[fieldKey("mobile")],
-                            )}
-                            id={fieldId("mobile")}
-                            onChange={(event) =>
-                              updateExternal(index, {
-                                mobile: event.target.value,
-                              })
-                            }
-                            placeholder="Mobil"
-                            value={attendee.mobile}
-                          />
+                          <div>
+                            <Input
+                              aria-describedby={
+                                fieldErrors[fieldKey("email")]
+                                  ? `${fieldId("email")}-error`
+                                  : undefined
+                              }
+                              aria-invalid={Boolean(
+                                fieldErrors[fieldKey("email")],
+                              )}
+                              id={fieldId("email")}
+                              onChange={(event) =>
+                                updateExternal(index, {
+                                  email: event.target.value,
+                                })
+                              }
+                              placeholder="E-mail"
+                              type="email"
+                              value={attendee.email}
+                            />
+                            <FieldError
+                              id={`${fieldId("email")}-error`}
+                              message={fieldErrors[fieldKey("email")]}
+                            />
+                          </div>
+                          <div>
+                            <Input
+                              aria-describedby={
+                                fieldErrors[fieldKey("mobile")]
+                                  ? `${fieldId("mobile")}-error`
+                                  : undefined
+                              }
+                              aria-invalid={Boolean(
+                                fieldErrors[fieldKey("mobile")],
+                              )}
+                              id={fieldId("mobile")}
+                              onChange={(event) =>
+                                updateExternal(index, {
+                                  mobile: event.target.value,
+                                })
+                              }
+                              placeholder="Mobil"
+                              value={attendee.mobile}
+                            />
+                            <FieldError
+                              id={`${fieldId("mobile")}-error`}
+                              message={fieldErrors[fieldKey("mobile")]}
+                            />
+                          </div>
                         </div>
-                        {fieldErrors[fieldKey("email")] ? (
-                          <p
-                            className="text-sm text-danger"
-                            id={`${fieldId("email")}-error`}
-                          >
-                            {fieldErrors[fieldKey("email")]}
-                          </p>
-                        ) : null}
-                        {fieldErrors[fieldKey("mobile")] ? (
-                          <p
-                            className="text-sm text-danger"
-                            id={`${fieldId("mobile")}-error`}
-                          >
-                            {fieldErrors[fieldKey("mobile")]}
-                          </p>
-                        ) : null}
                         <Input
                           aria-describedby={
                             fieldErrors[fieldKey("roleNote")]
@@ -521,14 +507,10 @@ export function MeetingParticipantsPanel({
                           placeholder="Funktion/notat"
                           value={attendee.roleNote}
                         />
-                        {fieldErrors[fieldKey("roleNote")] ? (
-                          <p
-                            className="text-sm text-danger"
-                            id={`${fieldId("roleNote")}-error`}
-                          >
-                            {fieldErrors[fieldKey("roleNote")]}
-                          </p>
-                        ) : null}
+                        <FieldError
+                          id={`${fieldId("roleNote")}-error`}
+                          message={fieldErrors[fieldKey("roleNote")]}
+                        />
                         <Button
                           onClick={() =>
                             setExternal((current) =>

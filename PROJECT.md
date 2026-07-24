@@ -206,6 +206,11 @@ attendee rows can identify the exact invalid field. Minutes autosave continues
 to keep local drafts and now also warns before leaving while synchronization is
 pending, offline, conflicted, or failed. Authorization failures use neutral,
 actionable copy and remain enforced by the existing capability and RLS layers.
+Minutes dirty-state is derived synchronously by comparing the current local
+draft with the last server-confirmed payload, so a newly typed or failed draft
+cannot be mistaken for saved content before the autosave status effect runs.
+Exact Zod issue paths are included in validation responses and normalized from
+bracket or dot notation before repeated participant fields consume them.
 Internal navigation guards are installed only while a concrete form is dirty:
 clean links are untouched, rejected navigation alone is cancelled, and all
 listeners are removed when the form becomes clean or unmounts.

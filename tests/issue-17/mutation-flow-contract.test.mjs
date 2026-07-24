@@ -16,6 +16,7 @@ const [
   autosave,
   quickActions,
   mutationHook,
+  autosaveState,
 ] = await Promise.all([
   source("../../src/lib/api.ts"),
   source("../../src/components/forms/resource-form.tsx"),
@@ -26,10 +27,12 @@ const [
   source("../../src/hooks/use-offline-autosave.ts"),
   source("../../src/components/layout/quick-action-menu.tsx"),
   source("../../src/hooks/use-mutation-feedback.ts"),
+  source("../../src/lib/autosave-state.ts"),
 ]);
 
 test("API validation retains nested field paths", () => {
-  assert.match(api, /validationErrors: error\.issues\.map/);
+  const responseBody = api.slice(api.indexOf("return NextResponse.json"));
+  assert.match(responseBody, /validationErrors: error\.issues\.map/);
   assert.match(api, /path: issue\.path/);
 });
 
@@ -58,17 +61,23 @@ test("acceptance-critical modal flows share pending and dirty-state patterns", (
 });
 
 test("minutes autosave warns while local changes are not synchronized", () => {
-  assert.match(autosave, /beforeunload/);
+  assert.match(autosave, /useUnsavedChanges\(hasUnsavedChanges\)/);
+  assert.match(autosave, /hasUnsynchronizedAutosaveChanges/);
+  assert.match(autosave, /hasUnsavedChanges,/);
   assert.match(
-    autosave,
-    /\["saving", "error", "offline", "pending", "conflict"\]/,
+    autosaveState,
+    /"saving",[\s\S]*"error",[\s\S]*"offline",[\s\S]*"pending",[\s\S]*"conflict"/,
   );
 });
 
 test("participant validation keeps partially completed external rows", () => {
   assert.match(participants, /hasExternalAttendeeInput\(attendee\)/);
   assert.match(participants, /originalIndex/);
+  assert.match(participants, /remapExternalAttendeeFieldErrors/);
+  assert.match(participants, /external\.flatMap\(\(_, index\)/);
   assert.match(participants, /externalAttendees\.\$\{index\}\.\$\{field\}/);
+  assert.match(participants, /<FieldError/);
+  assert.match(participants, /aria-invalid=\{Boolean/);
   assert.doesNotMatch(
     participants,
     /\.filter\(\(attendee\) => attendee\.name\.trim\(\)\)/,
@@ -86,11 +95,19 @@ test("dirty navigation listeners are scoped and cleaned up", () => {
   );
   assert.match(
     mutationHook,
+    /document\.removeEventListener\([\s\S]*"pointerdown",[\s\S]*rememberFocusBeforeNavigation/,
+  );
+  assert.match(
+    mutationHook,
     /window\.removeEventListener\("beforeunload", warnBeforeUnload\)/,
   );
   assert.match(
     mutationHook,
     /decision === "cancel"[\s\S]*event\.preventDefault\(\)/,
+  );
+  assert.match(
+    mutationHook,
+    /decision === "cancel"[\s\S]*focusBeforeNavigation\?\.focus\(\)/,
   );
   assert.match(
     mutationHook,
