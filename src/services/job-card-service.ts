@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, NotFoundError } from "@/lib/errors";
+import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
 import {
   jobCardArchiveSchema,
   jobCardInputSchema,
@@ -84,6 +85,19 @@ export class JobCardService {
     const memberMap = new Map(members.map((member) => [member.user_id, member]));
     const committeeMap = new Map(committees.map((committee) => [committee.id, committee]));
     const areaMap = new Map(areas.map((area) => [area.id, area]));
+    const currentMember = members.find((member) => member.user_id === user.id);
+    const editableCommitteeIds = committees
+      .filter((committee) => {
+        const committeeRole =
+          currentMember?.committees.find(
+            (membership) => membership.id === committee.id,
+          )?.role ?? null;
+        return getMeetingCapabilities(
+          context.membership.role,
+          committeeRole,
+        ).editTasks;
+      })
+      .map((committee) => committee.id);
 
     const roleViews: RoleProfileView[] = roles.map((role) => {
       const roleCommitteeIds = relations.committees
@@ -155,6 +169,7 @@ export class JobCardService {
       members,
       annualWheelEvents,
       decisions: decisions.filter((decision) => !decision.archived_at),
+      editableCommitteeIds,
       canManage: ["owner", "admin"].includes(context.membership.role),
     };
   }

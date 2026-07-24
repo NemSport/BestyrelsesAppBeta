@@ -21,6 +21,7 @@
     "test:issue-8": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-8/*.test.mjs",
     "test:issue-7": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-7/*.test.mjs",
     "test:issue-10": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-10/*.test.mjs",
+    "test:issue-11": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-11/*.test.mjs",
     "test:issue-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-5/*.test.mjs"
   },
   "dependencies": {

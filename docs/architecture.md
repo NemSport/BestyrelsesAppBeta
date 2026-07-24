@@ -519,7 +519,9 @@ Job Card, AI, PDF, and task-template endpoints, but renders roles as flatter
 role-profile rows instead of large nested panels. PDF export, AI update, and
 edit actions are secondary actions in `ActionMenu`; onboarding, task templates,
 documents, Annual Wheel context, and decision context are quieter read sections
-within the same authorized read model.
+within the same authorized read model. Task-template creation is presented only
+when the existing meeting capability model grants `editTasks` for the template's
+committee; the task endpoint remains the authoritative write boundary.
 
 Phase 7R.6 extends that secondary-surface rule to members, trash, and legacy
 CRUD pages. Member administration keeps the same membership APIs and protected

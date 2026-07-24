@@ -1122,7 +1122,9 @@ the primary creation action visible, moves PDF, AI update, and edit actions
 behind the shared action menu, and presents onboarding, task templates,
 documents, Annual Wheel links, and decision context as quieter role-profile
 sections. Existing Job Card CRUD, AI draft review, task-template instantiation,
-PDF export, services, permissions, and RLS behavior are unchanged.
+PDF export, services, permissions, and RLS behavior are unchanged. The register
+shows task-template creation only for committees where the current user already
+has agenda-item editor capability; read-only members get no write signal.
 
 Phase 7R.6 aligns secondary organization surfaces with the same admin layout.
 Member administration now uses flatter invitation and manual-creation sections,
