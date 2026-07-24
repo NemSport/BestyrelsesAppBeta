@@ -152,6 +152,22 @@ large logo block in the navigation.
 
 ### Meeting Document Layout
 
+Issue 16 introduces a shared, pure meeting capability model in
+`src/lib/meeting-capabilities.ts`. Server-rendered web UI, mobile responses,
+and `AuthorizationService.requireMeetingCapability` consume the same
+action-specific capability result for meeting create/quick-create/update/
+trash/restore, participants, agenda-item create/update/schedule/reorder/delete,
+official minutes, approval, attachments, transfers, agenda email, tasks, and
+decisions. The model does not alter roles or RLS: organization owner/admin and
+committee chair/secretary retain manager capabilities; committee member
+retains backlog agenda-item, note, task, and decision editing; committee
+viewer remains read-only. Services still authorize every mutation and
+PostgreSQL RLS remains the independent data boundary.
+Restore is the one deliberate exception to the committee-manager grouping:
+`restoreMeeting` and `restoreAgendaItem` require organization owner/admin so
+the shared capability result, resource services, organization trash service,
+and database restore trigger enforce the same boundary.
+
 Update 12 adds a meeting-work overview layer without changing the underlying
 meeting or minutes model. The meeting page derives counts from the existing
 meeting agenda, agenda-item minutes, decisions, tasks, and transfer read
@@ -1328,6 +1344,14 @@ Membership administration follows these invariants:
 - Removing an organization member also removes their committee memberships.
 - Direct member writes are blocked by RLS; protected PostgreSQL functions
   perform mutations atomically.
+- Existing organization roles and committee assignments are updated together
+  through `update_organization_member_access`. The function takes an
+  organization-scoped replacement set, validates every committee against that
+  organization, rejects duplicates, and preserves the owner invariants in one
+  transaction.
+- Committee membership writes are restricted to organization owners and
+  administrators. Committee chairs and secretaries do not gain membership
+  administration rights from their committee-manager role.
 - Owners may manually create an authenticated user with a temporary password,
   a non-owner organization role, and zero, one, or multiple committee
   assignments. Each selected committee stores its own committee role.
@@ -1859,6 +1883,17 @@ parent context, and restorable/expiry status. Restore calls the existing
 committee, meeting, and agenda-item restore services and PostgreSQL RPCs.
 Complex permanent deletion remains deferred; expired records are only marked
 as ready for permanent deletion.
+
+Issue 1 makes the organization trash route an explicit owner/admin capability.
+The organization layout passes that capability to navigation, so viewers,
+members, and committee chairs do not receive a Papirkurv link. Direct route
+access for an ordinary organization member renders a controlled Danish
+access-denied state before trash data is queried. Restore dispatch repeats the
+organization-admin check before invoking resource services, and a database
+trigger rejects any direct `deleted_at` transition from trashed to active for
+non-admin actors. Committee managers may still move resources to trash through
+their existing resource workflows; this change does not expand or redesign
+those permissions.
 
 P4 adds authorized UI entry points for moving committees, meetings, and durable
 agenda items to trash. Meeting agenda rows distinguish occurrence cleanup from

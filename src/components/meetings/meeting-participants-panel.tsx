@@ -206,7 +206,11 @@ export function MeetingParticipantsPanel({
         {"\u00c5bn"}
       </Button>
       <Modal
-        description="Registrer interne deltagere og eksterne nøglepersoner for mødet."
+        description={
+          canEdit
+            ? "Registrer interne deltagere og eksterne nøglepersoner for mødet."
+            : "Se de registrerede deltagere. Deltagerlisten er skrivebeskyttet for dig."
+        }
         footer={
           <div className="flex flex-wrap items-center gap-3">
             {canEdit ? (
@@ -232,14 +236,24 @@ export function MeetingParticipantsPanel({
         open={open}
         title="Deltagere"
       >
+        {!canEdit ? (
+          <div
+            className="mb-4 rounded-[var(--radius-control)] border border-line bg-subtle/45 px-3 py-2 text-sm text-muted"
+            role="status"
+          >
+            <p className="font-semibold text-ink">Skrivebeskyttet</p>
+            <p>Du kan se deltagerstatus, men ikke ændre mødedeltagere.</p>
+          </div>
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
           <section className="min-w-0">
             <div className="mb-2 flex items-end justify-between gap-2">
               <div>
                 <h3 className="text-sm font-semibold">Interne deltagere</h3>
                 <p className="mt-0.5 text-xs text-muted">
-                  Godkendelse sendes som standard til interne deltagere markeret
-                  som til stede.
+                  {canEdit
+                    ? "Godkendelse sendes som standard til interne deltagere markeret som til stede."
+                    : "Her vises den registrerede deltagelse for interne medlemmer."}
                 </p>
               </div>
             </div>
@@ -301,8 +315,9 @@ export function MeetingParticipantsPanel({
               <div>
                 <h3 className="text-sm font-semibold">Eksterne deltagere</h3>
                 <p className="mt-0.5 text-xs text-muted">
-                  Eksterne deltagere registreres pÃ¥ mÃ¸det, men modtager ikke
-                  referatgodkendelse automatisk.
+                  {canEdit
+                    ? "Eksterne deltagere registreres på mødet, men modtager ikke referatgodkendelse automatisk."
+                    : "Her vises de eksterne deltagere, der er registreret på mødet."}
                 </p>
               </div>
               {canEdit ? (

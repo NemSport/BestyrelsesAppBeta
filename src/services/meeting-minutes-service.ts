@@ -231,9 +231,8 @@ export class MeetingMinutesService {
     const { profiles: profile, ...lockFields } = lock;
     return {
       ...lockFields,
-      memberName:
-        profile?.full_name || "Ukendt referent",
-	memberEmail: "",
+      memberName: profile?.full_name || "Ukendt referent",
+      memberEmail: "",
       isCurrentUser: lock.user_id === currentUserId,
       isExpired: new Date(lock.expires_at).getTime() <= Date.now(),
       claimed,
@@ -271,12 +270,12 @@ export class MeetingMinutesService {
       members,
       referentLock,
     ] = await Promise.all([
-        this.minutes.findMeetingMinutes(meetingId),
-        this.minutes.listAgendaItemMinutes(meetingId),
-        this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
-        this.members.listMembers(organizationId),
-        this.minutes.findReferentLock(meetingId),
-      ]);
+      this.minutes.findMeetingMinutes(meetingId),
+      this.minutes.listAgendaItemMinutes(meetingId),
+      this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
+      this.members.listMembers(organizationId),
+      this.minutes.findReferentLock(meetingId),
+    ]);
 
     const [approvals, meetingAttachments, agendaItemAttachments, canApprove] =
       meetingMinutes
@@ -411,10 +410,11 @@ export class MeetingMinutesService {
   async saveMeetingMinutes(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingMinutesInputSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "editOfficialMinutes",
     );
     await this.requireMeeting(
       parsed.organizationId,
@@ -469,10 +469,11 @@ export class MeetingMinutesService {
   async saveAgendaItemMinutes(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemMinutesInputSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "editOfficialMinutes",
     );
     const meeting = await this.requireMeeting(
       parsed.organizationId,
@@ -588,10 +589,11 @@ export class MeetingMinutesService {
   async updateReferentLock(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = meetingMinutesReferentActionSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "editOfficialMinutes",
     );
     await this.requireMeeting(
       parsed.organizationId,
@@ -696,10 +698,11 @@ export class MeetingMinutesService {
   async sendForApproval(input: unknown, options: { appUrl?: string } = {}) {
     const user = await this.auth.requireUser();
     const parsed = sendMinutesForApprovalSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "manageMinutesApproval",
     );
     await this.requireMeeting(
       parsed.organizationId,
@@ -833,10 +836,11 @@ export class MeetingMinutesService {
   async markNoResponse(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = markNoResponseSchema.parse(input);
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "manageMinutesApproval",
     );
     await this.requireMeeting(
       parsed.organizationId,
@@ -866,10 +870,11 @@ export class MeetingMinutesService {
     file: File;
   }) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       input.organizationId,
       input.committeeId,
       user.id,
+      "manageMinutesAttachments",
     );
     await this.requireMeeting(
       input.organizationId,
@@ -993,10 +998,11 @@ export class MeetingMinutesService {
     const attachment = await this.governance.findAttachment(attachmentId);
     if (!attachment) throw new NotFoundError("Vedhæftningen");
 
-    await this.authorization.requireCommitteeManager(
+    await this.authorization.requireMeetingCapability(
       attachment.organization_id,
       attachment.committee_id,
       user.id,
+      "manageMinutesAttachments",
     );
     await this.requireMeeting(
       attachment.organization_id,
@@ -1189,20 +1195,19 @@ export class MeetingMinutesService {
       ? `${root}/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`
       : `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`;
     const brandingService = new OrganizationBrandingService(this.db);
-    const [pdfBranding, emailBranding, attachmentsForPdf] =
-      await Promise.all([
-        brandingService.getPdfBranding(
-          data.organization.id,
-          data.organization.name,
-        ),
-        brandingService.getEmailBranding(
-          data.organization.id,
-          data.organization.name,
-        ),
-        this.getPdfAttachments(organizationId, committeeId, meetingId, {
-          includeMeetingAttachments: true,
-        }),
-      ]);
+    const [pdfBranding, emailBranding, attachmentsForPdf] = await Promise.all([
+      brandingService.getPdfBranding(
+        data.organization.id,
+        data.organization.name,
+      ),
+      brandingService.getEmailBranding(
+        data.organization.id,
+        data.organization.name,
+      ),
+      this.getPdfAttachments(organizationId, committeeId, meetingId, {
+        includeMeetingAttachments: true,
+      }),
+    ]);
 
     const pdf = await generateMeetingMinutesPdf({
       meeting: data.meeting,

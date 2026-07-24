@@ -1,6 +1,7 @@
 import { OrganizationNav } from "@/components/layout/organization-nav";
 import { QuickActionHeaderSlot } from "@/components/layout/quick-action-header-slot";
 import type { SafeOrganizationBranding } from "@/lib/organization-branding";
+import type { MeetingCapabilities } from "@/lib/permissions";
 
 export function OrganizationWorkspace({
   children,
@@ -8,12 +9,18 @@ export function OrganizationWorkspace({
   organizationName,
   branding,
   committees = [],
+  canManageTrash = false,
 }: {
   children: React.ReactNode;
   organizationId: string;
   organizationName?: string;
   branding?: SafeOrganizationBranding;
-  committees?: Array<{ id: string; name: string }>;
+  committees?: Array<{
+    id: string;
+    name: string;
+    capabilities: MeetingCapabilities;
+  }>;
+  canManageTrash?: boolean;
 }) {
   return (
     <div className="org-layout" style={branding?.cssVariables}>
@@ -23,13 +30,12 @@ export function OrganizationWorkspace({
         style={branding?.cssVariables}
       />
       <OrganizationNav
+        canManageTrash={canManageTrash}
         logoUrl={branding?.logoUrl ?? null}
         organizationId={organizationId}
         organizationName={organizationName}
       />
-      <div className="org-layout-content">
-        {children}
-      </div>
+      <div className="org-layout-content">{children}</div>
     </div>
   );
 }

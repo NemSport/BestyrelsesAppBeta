@@ -39,6 +39,13 @@ one, or multiple committee assignments. Each selected committee has its own
 committee role. This workflow uses the Supabase Admin API exclusively on the
 server and may only assign non-owner organization roles.
 
+Existing member access is maintained by organization owners and administrators
+through one atomic organization-scoped operation that updates the organization
+role and the complete set of committee assignments. Administrators cannot
+change their own access or any owner's access, and only an owner may grant or
+remove the owner role. Committee chairs and secretaries retain their ordinary
+committee-manager capabilities but do not administer committee memberships.
+
 ## Central Entity
 
 The **Agenda Item** is the central product entity.
@@ -174,6 +181,21 @@ Organization owners and administrators plus committee chairs and secretaries
 may edit minutes. Committee members may read relevant minutes. Committee
 viewers may only read minutes after the general meeting minutes are approved.
 These rules must be enforced in services and PostgreSQL Row Level Security.
+
+Issue 16 centralizes meeting-action capabilities in
+`src/lib/meeting-capabilities.ts`. Presentation and server authorization derive
+meeting viewing, ordinary and quick creation, update, trash and restore,
+participant administration, durable agenda-item editing, meeting scheduling
+and ordering, official minutes, approval, attachments, transfers, email,
+tasks, and decisions from the same organization/committee role pair.
+Committee members retain backlog agenda-item, note, task, and decision
+editing, but meeting creation, participant administration, meeting agenda
+scheduling/ordering, and official minutes remain committee-manager actions.
+Unavailable actions are hidden or presented as explicitly read-only, and
+denied meeting actions use a generic, actionable authorization message.
+Restore capabilities are deliberately organization-admin-only, matching the
+organization Papirkurv service and its database restore guard; committee
+managers may move committee-owned resources to trash but cannot restore them.
 
 Editable minutes use debounced autosave through the existing authenticated API.
 Every change is first stored as a user-scoped browser draft. Failed or offline
@@ -1185,6 +1207,12 @@ hides it from normal organization lists and blocks ordinary organization
 flows, but it does not hard-delete or cascade-delete committees, meetings,
 decisions, tasks, minutes, Annual Wheel records, Job Cards, or history.
 Owners and administrators can restore the organization through the trash flow.
+The organization trash destination and restore actions are available only to
+organization owners and administrators. Other organization members do not see
+the navigation destination, and direct route access returns a controlled
+Danish access explanation. Committee managers retain their existing ability to
+move committee-owned resources to trash, but restoring a trashed record
+requires organization-admin access in both the service and database.
 
 Trashing a committee also trashes its active meetings and agenda-item
 occurrences. Trashing a meeting also trashes its active occurrences. Durable

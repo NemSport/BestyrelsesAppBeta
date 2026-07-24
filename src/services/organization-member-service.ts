@@ -1,12 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
+import { getMemberAccessCapabilities } from "@/lib/member-access-capabilities";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   manualOrganizationMemberInputSchema,
   organizationInvitationInputSchema,
+  organizationMemberAccessUpdateSchema,
   organizationMemberRemoveSchema,
-  organizationMemberRoleUpdateSchema,
 } from "@/lib/validation";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { ManualMemberRepository } from "@/repositories/manual-member-repository";
@@ -22,6 +23,9 @@ const controlledDatabaseMessages = [
   "Du kan ikke ændre din egen rolle",
   "Den sidste ejer",
   "Medlemmet blev ikke fundet",
+  "Et eller flere udvalg blev ikke fundet",
+  "Udvalgstilknytningerne er ugyldige",
+  "Det samme udvalg kan kun vælges én gang",
   "Brugeren er allerede medlem",
   "Der findes allerede en afventende invitation",
   "Indtast en gyldig e-mailadresse",
@@ -93,7 +97,9 @@ export class OrganizationMemberService {
       user.id,
     );
 
-    const existingMembers = await this.members.listMembers(parsed.organizationId);
+    const existingMembers = await this.members.listMembers(
+      parsed.organizationId,
+    );
     if (
       existingMembers.some(
         (member) => member.email.toLowerCase() === parsed.email,
@@ -170,7 +176,10 @@ export class OrganizationMemberService {
         try {
           await manualMembers.deleteAuthUser(createdUserId);
         } catch (cleanupError) {
-          console.error("Kunne ikke rydde Auth-bruger efter fejl.", cleanupError);
+          console.error(
+            "Kunne ikke rydde Auth-bruger efter fejl.",
+            cleanupError,
+          );
         }
       }
 
@@ -224,9 +233,9 @@ export class OrganizationMemberService {
     }
   }
 
-  async updateRole(input: unknown) {
+  async updateAccess(input: unknown) {
     const user = await this.auth.requireUser();
-    const parsed = organizationMemberRoleUpdateSchema.parse(input);
+    const parsed = organizationMemberAccessUpdateSchema.parse(input);
     const context = await this.authorization.requireOrganizationAdmin(
       parsed.organizationId,
       user.id,
@@ -234,23 +243,45 @@ export class OrganizationMemberService {
     const target = await this.organizations.getMembership(
       parsed.organizationId,
       parsed.userId,
-      false,
     );
     if (!target) throw new NotFoundError("Medlemmet");
 
-    const actorIsOwner = context.membership.role === "owner";
-    if (parsed.userId === user.id && !actorIsOwner) {
-      throw new AuthorizationError("Du kan ikke ændre din egen rolle.");
+    const capabilities = getMemberAccessCapabilities({
+      actorRole: context.membership.role,
+      actorUserId: user.id,
+      targetRole: target.role,
+      targetUserId: parsed.userId,
+    });
+    if (!capabilities.canEditAccess) {
+      if (capabilities.ownerProtectedFromAdmin) {
+        throw new AuthorizationError("Kun en ejer kan ændre en ejers adgang.");
+      }
+      throw new AuthorizationError("Du kan ikke ændre din egen adgang.");
     }
-    if ((target.role === "owner" || parsed.role === "owner") && !actorIsOwner) {
-      throw new AuthorizationError("Kun en ejer kan tildele eller fjerne ejerrollen.");
+    if (!capabilities.assignableOrganizationRoles.includes(parsed.role)) {
+      throw new AuthorizationError("Kun en ejer kan tildele ejerrollen.");
+    }
+
+    const organizationCommittees = await this.committees.listByOrganization(
+      parsed.organizationId,
+    );
+    const availableCommitteeIds = new Set(
+      organizationCommittees.map((committee) => committee.id),
+    );
+    if (
+      parsed.committeeAssignments.some(
+        (assignment) => !availableCommitteeIds.has(assignment.committeeId),
+      )
+    ) {
+      throw new NotFoundError("Et eller flere udvalg");
     }
 
     try {
-      return await this.members.updateRole(
+      return await this.members.updateAccess(
         parsed.organizationId,
         parsed.userId,
         parsed.role,
+        parsed.committeeAssignments,
       );
     } catch (error) {
       membershipError(error);

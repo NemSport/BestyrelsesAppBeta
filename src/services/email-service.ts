@@ -65,10 +65,11 @@ export class EmailService {
         parsed.organizationId,
         user.id,
       );
-    const committeeContext = await this.authorization.requireCommitteeManager(
+    const committeeContext = await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "sendAgendaEmail",
     );
 
     const meeting = await this.meetings.findWithAgenda(parsed.meetingId);
