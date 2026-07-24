@@ -1328,6 +1328,14 @@ Membership administration follows these invariants:
 - Removing an organization member also removes their committee memberships.
 - Direct member writes are blocked by RLS; protected PostgreSQL functions
   perform mutations atomically.
+- Existing organization roles and committee assignments are updated together
+  through `update_organization_member_access`. The function takes an
+  organization-scoped replacement set, validates every committee against that
+  organization, rejects duplicates, and preserves the owner invariants in one
+  transaction.
+- Committee membership writes are restricted to organization owners and
+  administrators. Committee chairs and secretaries do not gain membership
+  administration rights from their committee-manager role.
 - Owners may manually create an authenticated user with a temporary password,
   a non-owner organization role, and zero, one, or multiple committee
   assignments. Each selected committee stores its own committee role.
