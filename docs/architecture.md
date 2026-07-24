@@ -746,6 +746,16 @@ pattern. Form labels, described-by relations, live feedback, table header
 scope, and focus-visible styles remain presentation concerns; services,
 repositories, server checks, and PostgreSQL RLS are unchanged.
 
+Issue 14 adds presentation-only surface primitives. `interactiveSurfaceClassName`
+is reserved for native links that own the complete surface, while
+`staticSurfaceClassName` marks informational containers and rows with nested
+actions. `primarySurfaceLinkClassName` supplies an explicit underlined link,
+direction cue, focus behavior, and touch target where only part of a row
+navigates. Task and decision cards deliberately remain static so their nested
+buttons and action menus cannot trigger parent navigation. The patterns consume
+the existing capability-filtered render tree and do not introduce client-side
+authorization, new routes, service logic, persistence, or RLS changes.
+
 ## Domain Hierarchy
 
 ```text

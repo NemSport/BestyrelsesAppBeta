@@ -9,8 +9,10 @@ import {
   EmptyState,
   Input,
   Modal,
+  primarySurfaceLinkClassName,
   Select,
   StatusBadge,
+  staticSurfaceClassName,
   Textarea,
 } from "@/components/ui";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
@@ -597,7 +599,7 @@ export function DecisionRegister({
               }));
             return (
               <article
-                className="module-card scroll-mt-24 p-4"
+                className={staticSurfaceClassName("scroll-mt-24 p-4")}
                 id={`decision-${decision.id}`}
                 key={decision.id}
               >
@@ -612,6 +614,9 @@ export function DecisionRegister({
                       </StatusBadge>
                       {decision.archived_at ? (
                         <StatusBadge>Arkiveret</StatusBadge>
+                      ) : null}
+                      {!canEdit ? (
+                        <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge>
                       ) : null}
                       {decision.cancelled_at &&
                       decision.status !== "cancelled" ? (
@@ -668,7 +673,7 @@ export function DecisionRegister({
                     <div className="mt-3 flex flex-wrap gap-3 text-sm">
                       {decision.meeting ? (
                         <Link
-                          className="font-semibold text-brand hover:underline"
+                          className={primarySurfaceLinkClassName("text-sm")}
                           href={`${committeeRoot}/meetings/${decision.meeting.id}`}
                         >
                           Åbn møde: {decision.meeting.title}
@@ -680,7 +685,7 @@ export function DecisionRegister({
                       ) : null}
                       {decision.agendaItem ? (
                         <Link
-                          className="font-semibold text-brand hover:underline"
+                          className={primarySurfaceLinkClassName("text-sm")}
                           href={`${committeeRoot}/agenda-items/${decision.agendaItem.id}`}
                         >
                           Åbn dagsordenspunkt: {decision.agendaItem.title}

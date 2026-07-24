@@ -24,7 +24,7 @@ export function ActionMenu({
       className={clsx("group relative inline-block max-w-full", className)}
       ref={detailsRef}
     >
-      <summary className="inline-flex min-h-9 max-w-full cursor-pointer list-none items-center justify-center rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent/55 hover:bg-mist/65 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex min-h-11 max-w-full cursor-pointer list-none items-center justify-center rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent/55 hover:bg-mist/65 [&::-webkit-details-marker]:hidden">
         {label}
         <span
           className="ml-1.5 text-[0.65rem] text-muted transition group-open:rotate-180"

@@ -6,6 +6,8 @@ import {
   PageSection,
   StatusBadge,
   buttonClassName,
+  primarySurfaceLinkClassName,
+  staticSurfaceClassName,
 } from "@/components/ui";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { formatDateTime, meetingStatusLabels } from "@/lib/localization";
@@ -40,11 +42,15 @@ function MeetingRow({
   root: string;
 }) {
   return (
-    <article className="border-l-4 border-l-brand/55 border-y border-r border-line bg-surface px-3 py-3 transition hover:border-brand/35 hover:border-l-brand sm:px-4">
+    <article
+      className={staticSurfaceClassName(
+        "border-l-4 border-l-brand/55 px-3 py-3 sm:px-4",
+      )}
+    >
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
         <div className="min-w-0">
           <Link
-            className="text-base font-semibold text-ink hover:text-brand hover:underline"
+            className={primarySurfaceLinkClassName("text-base")}
             href={`${root}/meetings/${meeting.id}`}
           >
             {meeting.title}

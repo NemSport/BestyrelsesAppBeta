@@ -10,4 +10,5 @@ export * from "@/components/ui/mutation-feedback";
 export * from "@/components/ui/page-layout";
 export * from "@/components/ui/panels";
 export * from "@/components/ui/status-badge";
+export * from "@/components/ui/surface";
 export * from "@/components/ui/table";

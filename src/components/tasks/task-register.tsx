@@ -17,8 +17,10 @@ import {
   EmptyState,
   Input,
   Modal,
+  primarySurfaceLinkClassName,
   Select,
   StatusBadge,
+  staticSurfaceClassName,
   Textarea,
 } from "@/components/ui";
 import {
@@ -543,13 +545,12 @@ export function TaskRegister({
 
   function taskCard(task: TaskView, compact: boolean) {
     const deadlineState = getTaskDeadlineState(task);
+    const canEdit = data.editableCommitteeIds.includes(task.committee_id);
     return (
       <article
-        className={
-          compact
-            ? "module-card-compact p-2.5"
-            : "module-card scroll-mt-24 p-4"
-        }
+        className={staticSurfaceClassName(
+          compact ? "p-2.5" : "scroll-mt-24 p-4",
+        )}
         id={`task-${task.id}`}
         key={task.id}
       >
@@ -571,6 +572,9 @@ export function TaskRegister({
                 </StatusBadge>
               ) : null}
               {task.archived_at ? <StatusBadge>Arkiveret</StatusBadge> : null}
+              {!canEdit ? (
+                <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge>
+              ) : null}
             </div>
             {!compact && task.description ? (
               <p className="mt-2 max-w-3xl whitespace-pre-wrap text-sm text-muted">
@@ -638,7 +642,7 @@ export function TaskRegister({
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 {task.meeting ? (
                   <Link
-                    className="font-semibold text-brand hover:underline"
+                    className={primarySurfaceLinkClassName("text-sm")}
                     href={`/organizations/${organizationId}/committees/${task.committee_id}/meetings/${task.meeting.id}`}
                   >
                     Åbn møde: {task.meeting.title}
@@ -648,7 +652,7 @@ export function TaskRegister({
                 ) : null}
                 {task.agendaItem ? (
                   <Link
-                    className="font-semibold text-brand hover:underline"
+                    className={primarySurfaceLinkClassName("text-sm")}
                     href={`/organizations/${organizationId}/committees/${task.committee_id}/agenda-items/${task.agendaItem.id}`}
                   >
                     Åbn dagsordenspunkt: {task.agendaItem.title}
@@ -660,7 +664,7 @@ export function TaskRegister({
                 ) : null}
                 {task.decision ? (
                   <Link
-                    className="font-semibold text-brand hover:underline"
+                    className={primarySurfaceLinkClassName("text-sm")}
                     href={`/organizations/${organizationId}/decisions#decision-${task.decision.id}`}
                   >
                     Åbn beslutning: {task.decision.title}

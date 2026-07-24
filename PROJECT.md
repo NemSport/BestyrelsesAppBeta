@@ -378,6 +378,15 @@ persistent labels, descriptions, column scope, live status, and a distinct
 keyboard focus indicator. Capability filtering, mutation authorization, and
 RLS remain unchanged.
 
+Issue 14 establishes a shared visual and semantic distinction between
+interactive and informational surfaces. True full-card destinations use native
+links with persistent action cues, pointer/touch feedback, and the shared focus
+indicator. Rows that contain separate links, status information, or nested
+action menus remain non-focusable static articles; only their explicit links
+and buttons are interactive. Read-only task and decision cards are labelled as
+such, and compact actions use a 44-pixel minimum target. Capability filtering,
+routes, mutation authorization, services, repositories, and RLS are unchanged.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.

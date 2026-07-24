@@ -66,10 +66,7 @@ export function TableRow({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={clsx(
-        "border-b border-line transition-colors last:border-b-0 hover:bg-subtle/45",
-        className,
-      )}
+      className={clsx("border-b border-line last:border-b-0", className)}
       {...props}
     />
   );

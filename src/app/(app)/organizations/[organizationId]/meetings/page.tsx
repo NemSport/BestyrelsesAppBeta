@@ -7,12 +7,11 @@ import {
   PageSection,
   StatusBadge,
   buttonClassName,
+  primarySurfaceLinkClassName,
+  staticSurfaceClassName,
   type StatusTone,
 } from "@/components/ui";
-import {
-  formatDanishDate,
-  formatDanishDateKey,
-} from "@/lib/date-format";
+import { formatDanishDate, formatDanishDateKey } from "@/lib/date-format";
 import {
   formatDateTime,
   meetingMinutesStatusLabels,
@@ -56,11 +55,15 @@ function OrganizationMeetingRow({
   const agendaCount = meeting.agenda_item_occurrences.length;
 
   return (
-    <article className="border-l-4 border-l-brand/55 border-y border-r border-line bg-surface px-3 py-3 transition hover:border-brand/35 hover:border-l-brand sm:px-4">
+    <article
+      className={staticSurfaceClassName(
+        "border-l-4 border-l-brand/55 px-3 py-3 sm:px-4",
+      )}
+    >
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
         <div className="min-w-0">
           <Link
-            className="text-base font-semibold text-ink hover:text-brand hover:underline"
+            className={primarySurfaceLinkClassName("text-base")}
             href={meetingHref}
           >
             {meeting.title}
@@ -103,16 +106,15 @@ function isValidDateKey(value: string | undefined) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
-function sortMeetingsNewestFirst<T extends { created_at: string; starts_at: string }>(
-  meetings: T[],
-) {
+function sortMeetingsNewestFirst<
+  T extends { created_at: string; starts_at: string },
+>(meetings: T[]) {
   return [...meetings].sort((left, right) => {
     const byDate =
       new Date(right.starts_at).getTime() - new Date(left.starts_at).getTime();
     if (byDate !== 0) return byDate;
     return (
-      new Date(right.created_at).getTime() -
-      new Date(left.created_at).getTime()
+      new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
     );
   });
 }
@@ -125,14 +127,10 @@ function findNearbyMeetings(
     (meeting) => formatDanishDateKey(meeting.starts_at) === selectedDate,
   );
   const before = meetings
-    .filter(
-      (meeting) => formatDanishDateKey(meeting.starts_at) < selectedDate,
-    )
+    .filter((meeting) => formatDanishDateKey(meeting.starts_at) < selectedDate)
     .slice(0, 2);
   const after = [...meetings]
-    .filter(
-      (meeting) => formatDanishDateKey(meeting.starts_at) > selectedDate,
-    )
+    .filter((meeting) => formatDanishDateKey(meeting.starts_at) > selectedDate)
     .reverse()
     .slice(0, 2);
   const seen = new Set<string>();
@@ -156,11 +154,15 @@ function RecentMinutesRow({
   const meetingHref = `${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`;
 
   return (
-    <article className="border-l-4 border-l-accent/55 border-y border-r border-line bg-surface px-3 py-3 transition hover:border-accent/45 hover:border-l-accent sm:px-4">
+    <article
+      className={staticSurfaceClassName(
+        "border-l-4 border-l-accent/55 px-3 py-3 sm:px-4",
+      )}
+    >
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
         <div className="min-w-0">
           <Link
-            className="text-base font-semibold text-ink hover:text-brand hover:underline"
+            className={primarySurfaceLinkClassName("text-base")}
             href={meetingHref}
           >
             {minutes.meetingTitle}
@@ -260,8 +262,8 @@ export default async function OrganizationMeetingsPage({
               Find møder omkring en dato
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Vælg en dato for at se møder på dagen og de nærmeste møder før
-              og efter.
+              Vælg en dato for at se møder på dagen og de nærmeste møder før og
+              efter.
             </p>
           </div>
           <form className="flex flex-wrap items-end gap-2" method="get">
