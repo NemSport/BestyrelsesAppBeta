@@ -10,6 +10,10 @@ export function apiError(error: unknown) {
       console.error("API validation failed", {
         fieldErrors: issues.fieldErrors,
         formErrors: issues.formErrors,
+        validationErrors: error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
       });
     }
     return NextResponse.json(
@@ -23,8 +27,12 @@ export function apiError(error: unknown) {
   }
 
   if (error instanceof AppError) {
+    const message =
+      error.code === "AUTHORIZATION_FAILED"
+        ? "Handlingen kunne ikke gennemføres. Genindlæs siden, eller kontakt en ansvarlig, hvis du fortsat har brug for adgang."
+        : error.message;
     return NextResponse.json(
-      { error: error.message, code: error.code },
+      { error: message, code: error.code },
       { status: error.statusCode },
     );
   }

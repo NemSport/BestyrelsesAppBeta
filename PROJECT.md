@@ -197,6 +197,16 @@ Restore capabilities are deliberately organization-admin-only, matching the
 organization Papirkurv service and its database restore guard; committee
 managers may move committee-owned resources to trash but cannot restore them.
 
+Issue 17 standardizes mutation feedback without changing capabilities.
+Meeting and agenda resource forms, participant administration, task and
+decision creation, and member access editing share pending locks, accessible
+success/error feedback, field-level validation focus, and dirty-state
+protection. Nested server validation paths are preserved so repeated external
+attendee rows can identify the exact invalid field. Minutes autosave continues
+to keep local drafts and now also warns before leaving while synchronization is
+pending, offline, conflicted, or failed. Authorization failures use neutral,
+actionable copy and remain enforced by the existing capability and RLS layers.
+
 Editable minutes use debounced autosave through the existing authenticated API.
 Every change is first stored as a user-scoped browser draft. Failed or offline
 writes retain that draft, reconnecting retries synchronization, and differing

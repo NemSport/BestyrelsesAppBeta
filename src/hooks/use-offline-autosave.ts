@@ -125,7 +125,10 @@ export function useOfflineAutosave<T, TResult>({
       setStatus("saving");
       setErrorMessage(null);
       try {
-        const result = await saveRef.current(payload, serverUpdatedAtRef.current);
+        const result = await saveRef.current(
+          payload,
+          serverUpdatedAtRef.current,
+        );
         lastSavedSerializedRef.current = serializedPayload;
         const savedServerUpdatedAt =
           getSavedServerUpdatedAtRef.current?.(result) ?? null;
@@ -260,6 +263,23 @@ export function useOfflineAutosave<T, TResult>({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [enabled, saveNow, storageKey]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !["saving", "error", "offline", "pending", "conflict"].includes(status)
+    ) {
+      return;
+    }
+
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [enabled, status]);
 
   function restoreLocalDraft() {
     if (!conflict) return;

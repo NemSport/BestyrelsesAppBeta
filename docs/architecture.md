@@ -168,6 +168,18 @@ Restore is the one deliberate exception to the committee-manager grouping:
 the shared capability result, resource services, organization trash service,
 and database restore trigger enforce the same boundary.
 
+Issue 17 adds a presentation-layer mutation contract in
+`src/lib/mutation-feedback.ts`, `useMutationFeedback`, and
+`MutationFeedback`. API validation responses retain both the existing flat
+field map and exact Zod issue paths. Clients can therefore bind repeated-row
+errors such as `externalAttendees.0.email` to the correct control without
+exposing raw server details. The hook provides an immediate in-memory submit
+lock in addition to disabled button state, so two events before the next React
+render cannot create duplicate mutations. Dirty-state handling is independent
+of authorization and is used only to prevent accidental loss of local edits.
+The existing meeting capability model, service authorization, repositories,
+RLS, and role hierarchy remain unchanged.
+
 Update 12 adds a meeting-work overview layer without changing the underlying
 meeting or minutes model. The meeting page derives counts from the existing
 meeting agenda, agenda-item minutes, decisions, tasks, and transfer read

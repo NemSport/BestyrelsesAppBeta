@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+async function source(path) {
+  return readFile(new URL(path, import.meta.url), "utf8");
+}
+
+const [
+  api,
+  resourceForm,
+  participants,
+  tasks,
+  decisions,
+  members,
+  autosave,
+  quickActions,
+] = await Promise.all([
+  source("../../src/lib/api.ts"),
+  source("../../src/components/forms/resource-form.tsx"),
+  source("../../src/components/meetings/meeting-participants-panel.tsx"),
+  source("../../src/components/tasks/task-create-modal.tsx"),
+  source("../../src/components/decisions/decision-create-modal.tsx"),
+  source("../../src/components/members/member-access-editor.tsx"),
+  source("../../src/hooks/use-offline-autosave.ts"),
+  source("../../src/components/layout/quick-action-menu.tsx"),
+]);
+
+test("API validation retains nested field paths", () => {
+  assert.match(api, /validationErrors: error\.issues\.map/);
+  assert.match(api, /path: issue\.path/);
+});
+
+test("central meeting and agenda forms use shared mutation feedback", () => {
+  assert.match(resourceForm, /useMutationFeedback/);
+  assert.match(resourceForm, /useUnsavedChanges/);
+  assert.match(resourceForm, /focusInvalidField/);
+  assert.match(resourceForm, /readMutationResponse/);
+});
+
+test("quick meeting creation guards rapid duplicate submits and dirty close", () => {
+  assert.match(quickActions, /submissionLockRef/);
+  assert.match(quickActions, /useUnsavedChanges/);
+  assert.match(quickActions, /focusInvalidField/);
+});
+
+test("acceptance-critical modal flows share pending and dirty-state patterns", () => {
+  for (const flow of [participants, tasks, decisions, members]) {
+    assert.match(flow, /useMutationFeedback/);
+    assert.match(flow, /MutationFeedback/);
+    assert.match(flow, /readMutationResponse/);
+  }
+  for (const flow of [participants, tasks, decisions, members]) {
+    assert.match(flow, /useUnsavedChanges/);
+  }
+});
+
+test("minutes autosave warns while local changes are not synchronized", () => {
+  assert.match(autosave, /beforeunload/);
+  assert.match(
+    autosave,
+    /\["saving", "error", "offline", "pending", "conflict"\]/,
+  );
+});
+
+test("participant validation keeps partially completed external rows", () => {
+  assert.match(participants, /hasExternalAttendeeInput\(attendee\)/);
+  assert.match(participants, /originalIndex/);
+  assert.match(participants, /externalAttendees\.\$\{index\}\.\$\{field\}/);
+  assert.doesNotMatch(
+    participants,
+    /\.filter\(\(attendee\) => attendee\.name\.trim\(\)\)/,
+  );
+});

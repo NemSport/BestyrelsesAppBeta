@@ -3,7 +3,25 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  FieldError,
+  Input,
+  Modal,
+  MutationFeedback,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 import {
   decisionStatusOptions,
   getDecisionCategorySuggestions,
@@ -62,13 +80,22 @@ export function DecisionCreateModal({
   const [category, setCategory] = useState(initialCategory);
   const [internalNote, setInternalNote] = useState("");
   const [agendaItemId, setAgendaItemId] = useState(initialAgendaItemId);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const mutation = useMutationFeedback();
+  const dirty =
+    title !== initialTitle ||
+    description !== initialDescription ||
+    status !== "not_started" ||
+    responsibleUserId !== initialResponsibleUserId ||
+    decisionDate !== meetingDate.slice(0, 10) ||
+    deadline !== initialDeadline ||
+    category !== initialCategory ||
+    internalNote !== "" ||
+    agendaItemId !== initialAgendaItemId;
+  const confirmDiscard = useUnsavedChanges(open && dirty && !mutation.pending);
 
   const categorySuggestions = useMemo(
-    () =>
-      getDecisionCategorySuggestions(categorySource, committeeId, category),
+    () => getDecisionCategorySuggestions(categorySource, committeeId, category),
     [category, categorySource, committeeId],
   );
 
@@ -82,20 +109,23 @@ export function DecisionCreateModal({
     setStatus("not_started");
     setCategory(initialCategory);
     setInternalNote("");
-    setError(null);
     setFieldErrors({});
+    mutation.reset();
     setOpen(true);
+  }
+
+  function closeModal() {
+    if (mutation.pending || !confirmDiscard()) return;
+    setOpen(false);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setError(null);
+    if (!mutation.begin("Beslutningen gemmes...")) return;
     setFieldErrors({});
     try {
-      const response = await fetch(
-        `/api/organizations/${organizationId}/decisions`,
-        {
+      const result = await readMutationResponse<{ message?: string }>(
+        await fetch(`/api/organizations/${organizationId}/decisions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -112,31 +142,30 @@ export function DecisionCreateModal({
             category: category || null,
             internalNote: internalNote || null,
           }),
-        },
+        }),
+        "Beslutningen kunne ikke gemmes. Kontrollér felterne, og prøv igen.",
       );
-      const result = (await response.json()) as {
-        error?: string;
-        fieldErrors?: Record<string, string[]>;
-      };
-      if (!response.ok) {
-        setError(result.error || "Beslutningen kunne ikke gemmes.");
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
-              messages[0] ? [[key, messages[0]]] : [],
-            ),
-          ),
-        );
-        return;
-      }
+      mutation.succeed(result.message || "Beslutningen er gemt.");
       setOpen(false);
       router.refresh();
-    } catch {
-      setError(
-        "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
+    } catch (caught) {
+      const nextFieldErrors =
+        caught instanceof MutationRequestError ? caught.fieldErrors : {};
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(
+        caught instanceof Error
+          ? caught.message
+          : "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
-    } finally {
-      setSaving(false);
+      const field = firstFieldError(nextFieldErrors, [
+        "title",
+        "description",
+        "decisionDate",
+        "deadline",
+        "category",
+        "internalNote",
+      ]);
+      focusInvalidField(field ? `decision-${field}-${formId}` : null);
     }
   }
 
@@ -149,6 +178,7 @@ export function DecisionCreateModal({
           {triggerLabel}
         </Button>
       )}
+      {!open ? <MutationFeedback feedback={mutation.feedback} /> : null}
       <Modal
         description={
           sourceLabel
@@ -156,48 +186,60 @@ export function DecisionCreateModal({
             : "Relationer og mødedato er udfyldt fra den aktuelle mødekontekst og kan justeres før gem."
         }
         maxWidth="3xl"
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         open={open}
         title={
           sourceLabel
             ? "Opret beslutning fra referat"
             : initialAgendaItemId
-            ? "Opret beslutning fra dette punkt"
-            : "Opret beslutning"
+              ? "Opret beslutning fra dette punkt"
+              : "Opret beslutning"
         }
       >
         <form className="space-y-5" noValidate onSubmit={submit}>
-          {error ? (
-            <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
-              <p className="font-semibold">{error}</p>
-              {Object.values(fieldErrors).length ? (
-                <ul className="mt-2 list-disc pl-5">
-                  {[...new Set(Object.values(fieldErrors))].map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
+          <MutationFeedback feedback={mutation.feedback} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="label" htmlFor={`decision-title-${formId}`}>
                 Titel
               </label>
               <Input
+                aria-describedby={
+                  fieldErrors.title
+                    ? `decision-title-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.title)}
                 id={`decision-title-${formId}`}
                 onChange={(event) => setTitle(event.target.value)}
                 value={title}
               />
+              <FieldError
+                id={`decision-title-${formId}-error`}
+                message={fieldErrors.title}
+              />
             </div>
             <div className="sm:col-span-2">
-              <label className="label" htmlFor={`decision-description-${formId}`}>
+              <label
+                className="label"
+                htmlFor={`decision-description-${formId}`}
+              >
                 Beskrivelse
               </label>
               <Textarea
+                aria-describedby={
+                  fieldErrors.description
+                    ? `decision-description-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.description)}
                 id={`decision-description-${formId}`}
                 onChange={(event) => setDescription(event.target.value)}
                 value={description}
+              />
+              <FieldError
+                id={`decision-description-${formId}-error`}
+                message={fieldErrors.description}
               />
             </div>
             <div>
@@ -206,7 +248,9 @@ export function DecisionCreateModal({
               </label>
               <Select
                 id={`decision-status-${formId}`}
-                onChange={(event) => setStatus(event.target.value as DecisionStatus)}
+                onChange={(event) =>
+                  setStatus(event.target.value as DecisionStatus)
+                }
                 value={status}
               >
                 {decisionStatusOptions.map((option) => (
@@ -217,18 +261,34 @@ export function DecisionCreateModal({
               </Select>
             </div>
             <div>
-              <label className="label" htmlFor={`decision-date-${formId}`}>
+              <label
+                className="label"
+                htmlFor={`decision-decisionDate-${formId}`}
+              >
                 Beslutningsdato
               </label>
               <Input
-                id={`decision-date-${formId}`}
+                aria-describedby={
+                  fieldErrors.decisionDate
+                    ? `decision-decisionDate-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.decisionDate)}
+                id={`decision-decisionDate-${formId}`}
                 onChange={(event) => setDecisionDate(event.target.value)}
                 type="date"
                 value={decisionDate}
               />
+              <FieldError
+                id={`decision-decisionDate-${formId}-error`}
+                message={fieldErrors.decisionDate}
+              />
             </div>
             <div>
-              <label className="label" htmlFor={`decision-responsible-${formId}`}>
+              <label
+                className="label"
+                htmlFor={`decision-responsible-${formId}`}
+              >
                 Ansvarlig
               </label>
               <Select
@@ -249,10 +309,20 @@ export function DecisionCreateModal({
                 Deadline
               </label>
               <Input
+                aria-describedby={
+                  fieldErrors.deadline
+                    ? `decision-deadline-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.deadline)}
                 id={`decision-deadline-${formId}`}
                 onChange={(event) => setDeadline(event.target.value)}
                 type="date"
                 value={deadline}
+              />
+              <FieldError
+                id={`decision-deadline-${formId}-error`}
+                message={fieldErrors.deadline}
               />
             </div>
             <div>
@@ -260,12 +330,22 @@ export function DecisionCreateModal({
                 Kategori
               </label>
               <Input
+                aria-describedby={
+                  fieldErrors.category
+                    ? `decision-category-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.category)}
                 autoComplete="off"
                 id={`decision-category-${formId}`}
                 list={`decision-categories-${formId}`}
                 onChange={(event) => setCategory(event.target.value)}
                 placeholder="Skriv eller vælg en tidligere kategori"
                 value={category}
+              />
+              <FieldError
+                id={`decision-category-${formId}-error`}
+                message={fieldErrors.category}
               />
               <datalist id={`decision-categories-${formId}`}>
                 {categorySuggestions.map((suggestion) => (
@@ -294,27 +374,40 @@ export function DecisionCreateModal({
               </Select>
             </div>
             <div className="sm:col-span-2">
-              <label className="label" htmlFor={`decision-note-${formId}`}>
+              <label
+                className="label"
+                htmlFor={`decision-internalNote-${formId}`}
+              >
                 Intern note
               </label>
               <Textarea
-                id={`decision-note-${formId}`}
+                aria-describedby={
+                  fieldErrors.internalNote
+                    ? `decision-internalNote-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.internalNote)}
+                id={`decision-internalNote-${formId}`}
                 onChange={(event) => setInternalNote(event.target.value)}
                 value={internalNote}
+              />
+              <FieldError
+                id={`decision-internalNote-${formId}-error`}
+                message={fieldErrors.internalNote}
               />
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
             <Button
-              disabled={saving}
-              onClick={() => setOpen(false)}
+              disabled={mutation.pending}
+              onClick={closeModal}
               type="button"
               variant="secondary"
             >
               Annuller
             </Button>
-            <Button disabled={saving} type="submit">
-              {saving ? "Gemmer..." : "Gem beslutning"}
+            <Button disabled={mutation.pending} type="submit">
+              {mutation.pending ? "Gemmer..." : "Gem beslutning"}
             </Button>
           </div>
         </form>
