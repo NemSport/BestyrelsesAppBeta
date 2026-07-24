@@ -45,10 +45,12 @@ test("client model distinguishes viewer, member, and committee manager", () => {
   assert.equal(manager.createQuickMeeting, true);
   assert.equal(manager.updateMeeting, true);
   assert.equal(manager.deleteMeeting, true);
+  assert.equal(manager.restoreMeeting, false);
   assert.equal(manager.manageParticipants, true);
   assert.equal(manager.scheduleAgendaItem, true);
   assert.equal(manager.reorderAgendaItems, true);
   assert.equal(manager.deleteAgendaItem, true);
+  assert.equal(manager.restoreAgendaItem, false);
   assert.equal(manager.editOfficialMinutes, true);
   assert.equal(manager.manageMinutesApproval, true);
   assert.equal(manager.manageMinutesAttachments, true);
@@ -79,6 +81,8 @@ test("organization admins and owners retain committee-manager capabilities", () 
   assert.equal(admin.createMeeting, true);
   assert.equal(admin.createQuickMeeting, true);
   assert.equal(admin.manageParticipants, true);
+  assert.equal(admin.restoreMeeting, true);
+  assert.equal(admin.restoreAgendaItem, true);
   assert.equal(admin.scheduleAgendaItem, true);
   assert.equal(admin.editOfficialMinutes, true);
   assert.deepEqual(owner, admin);

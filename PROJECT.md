@@ -184,7 +184,7 @@ These rules must be enforced in services and PostgreSQL Row Level Security.
 
 Issue 16 centralizes meeting-action capabilities in
 `src/lib/meeting-capabilities.ts`. Presentation and server authorization derive
-meeting viewing, ordinary and quick creation, update, trash/restore,
+meeting viewing, ordinary and quick creation, update, trash and restore,
 participant administration, durable agenda-item editing, meeting scheduling
 and ordering, official minutes, approval, attachments, transfers, email,
 tasks, and decisions from the same organization/committee role pair.
@@ -193,6 +193,9 @@ editing, but meeting creation, participant administration, meeting agenda
 scheduling/ordering, and official minutes remain committee-manager actions.
 Unavailable actions are hidden or presented as explicitly read-only, and
 denied meeting actions use a generic, actionable authorization message.
+Restore capabilities are deliberately organization-admin-only, matching the
+organization Papirkurv service and its database restore guard; committee
+managers may move committee-owned resources to trash but cannot restore them.
 
 Editable minutes use debounced autosave through the existing authenticated API.
 Every change is first stored as a user-scoped browser draft. Failed or offline

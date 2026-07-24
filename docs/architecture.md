@@ -163,6 +163,10 @@ committee chair/secretary retain manager capabilities; committee member
 retains backlog agenda-item, note, task, and decision editing; committee
 viewer remains read-only. Services still authorize every mutation and
 PostgreSQL RLS remains the independent data boundary.
+Restore is the one deliberate exception to the committee-manager grouping:
+`restoreMeeting` and `restoreAgendaItem` require organization owner/admin so
+the shared capability result, resource services, organization trash service,
+and database restore trigger enforce the same boundary.
 
 Update 12 adds a meeting-work overview layer without changing the underlying
 meeting or minutes model. The meeting page derives counts from the existing

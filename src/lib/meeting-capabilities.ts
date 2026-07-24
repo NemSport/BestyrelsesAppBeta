@@ -39,6 +39,8 @@ export function getMeetingCapabilities(
     organizationRole === "admin" ||
     committeeRole === "chair" ||
     committeeRole === "secretary";
+  const organizationAdmin =
+    organizationRole === "owner" || organizationRole === "admin";
   const editor = manager || committeeRole === "member";
 
   return {
@@ -48,14 +50,14 @@ export function getMeetingCapabilities(
     createQuickMeeting: manager,
     updateMeeting: manager,
     deleteMeeting: manager,
-    restoreMeeting: manager,
+    restoreMeeting: organizationAdmin,
     manageParticipants: manager,
     createAgendaItem: editor,
     updateAgendaItem: editor,
     scheduleAgendaItem: manager,
     reorderAgendaItems: manager,
     deleteAgendaItem: manager,
-    restoreAgendaItem: manager,
+    restoreAgendaItem: organizationAdmin,
     editNotes: editor,
     editOfficialMinutes: manager,
     manageMinutesApproval: manager,
