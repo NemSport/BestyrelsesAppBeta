@@ -535,6 +535,16 @@ states distinguish an empty register from filters that return no matches.
 Filtering operates only on the RLS-scoped register read model already returned
 to the authenticated user.
 
+Issue 7 makes Agenda Item context mandatory for every newly created decision.
+The register and agenda-item workspace require an explicit authorized agenda
+item before submission, the service validates its organization and committee,
+and a PostgreSQL insert trigger independently rejects a missing relation.
+Historical decisions with a null `agenda_item_id` remain readable and editable;
+no existing row is rewritten or deleted, and an established agenda relation is
+preserved if an update omits it. Register filters are URL-backed, show active
+chips and result counts, and distinguish an empty register from a filtered
+empty result. Viewer create/edit controls remain absent.
+
 Phase 2A.5 lets authorized users turn current minutes text into an editable
 decision proposal without AI or editor coupling. From an agenda item, the
 source priority is the explicit decision text, then notes, then follow-up; the

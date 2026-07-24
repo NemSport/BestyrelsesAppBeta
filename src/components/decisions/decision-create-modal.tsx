@@ -50,8 +50,8 @@ export function DecisionCreateModal({
 }: {
   organizationId: string;
   committeeId: string;
-  meetingId: string;
-  meetingDate: string;
+  meetingId?: string;
+  meetingDate?: string;
   agendaItems: Array<Pick<AgendaItem, "id" | "title">>;
   responsiblePeople: Array<{ id: string; name: string }>;
   categorySource: DecisionView[];
@@ -67,7 +67,9 @@ export function DecisionCreateModal({
   instanceId?: string;
 }) {
   const router = useRouter();
-  const formId = instanceId || initialAgendaItemId || meetingId;
+  const initialDecisionDate =
+    meetingDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  const formId = instanceId || initialAgendaItemId || meetingId || committeeId;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
@@ -75,7 +77,7 @@ export function DecisionCreateModal({
   const [responsibleUserId, setResponsibleUserId] = useState(
     initialResponsibleUserId,
   );
-  const [decisionDate, setDecisionDate] = useState(meetingDate.slice(0, 10));
+  const [decisionDate, setDecisionDate] = useState(initialDecisionDate);
   const [deadline, setDeadline] = useState(initialDeadline);
   const [category, setCategory] = useState(initialCategory);
   const [internalNote, setInternalNote] = useState("");
@@ -87,7 +89,7 @@ export function DecisionCreateModal({
     description !== initialDescription ||
     status !== "not_started" ||
     responsibleUserId !== initialResponsibleUserId ||
-    decisionDate !== meetingDate.slice(0, 10) ||
+    decisionDate !== initialDecisionDate ||
     deadline !== initialDeadline ||
     category !== initialCategory ||
     internalNote !== "" ||
@@ -105,7 +107,7 @@ export function DecisionCreateModal({
     setResponsibleUserId(initialResponsibleUserId);
     setDeadline(initialDeadline);
     setAgendaItemId(initialAgendaItemId);
-    setDecisionDate(meetingDate.slice(0, 10));
+    setDecisionDate(initialDecisionDate);
     setStatus("not_started");
     setCategory(initialCategory);
     setInternalNote("");
@@ -121,6 +123,15 @@ export function DecisionCreateModal({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!agendaItemId) {
+      const nextFieldErrors = {
+        agendaItemId: "Vælg det dagsordenspunkt, beslutningen hører til.",
+      };
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(nextFieldErrors.agendaItemId);
+      focusInvalidField(`decision-agenda-${formId}`);
+      return;
+    }
     if (!mutation.begin("Beslutningen gemmes...")) return;
     setFieldErrors({});
     try {
@@ -131,8 +142,8 @@ export function DecisionCreateModal({
           body: JSON.stringify({
             organizationId,
             committeeId,
-            meetingId,
-            agendaItemId: agendaItemId || null,
+            meetingId: meetingId || null,
+            agendaItemId,
             title,
             description,
             status,
@@ -158,6 +169,7 @@ export function DecisionCreateModal({
           : "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
       const field = firstFieldError(nextFieldErrors, [
+        "agendaItemId",
         "title",
         "description",
         "decisionDate",
@@ -165,7 +177,13 @@ export function DecisionCreateModal({
         "category",
         "internalNote",
       ]);
-      focusInvalidField(field ? `decision-${field}-${formId}` : null);
+      focusInvalidField(
+        field
+          ? field === "agendaItemId"
+            ? `decision-agenda-${formId}`
+            : `decision-${field}-${formId}`
+          : null,
+      );
     }
   }
 
@@ -182,8 +200,8 @@ export function DecisionCreateModal({
       <Modal
         description={
           sourceLabel
-            ? `Teksten er hentet fra ${sourceLabel} og kan tilrettes før gem.`
-            : "Relationer og mødedato er udfyldt fra den aktuelle mødekontekst og kan justeres før gem."
+            ? `Teksten er hentet fra ${sourceLabel} og kan tilrettes før gem. Beslutningen gemmes i det valgte dagsordenspunkts historik.`
+            : "Vælg det dagsordenspunkt, hvor beslutningen blev truffet. Beslutningen kan ikke oprettes uden denne relation."
         }
         maxWidth="3xl"
         onClose={closeModal}
@@ -361,17 +379,27 @@ export function DecisionCreateModal({
                 Relateret dagsordenspunkt
               </label>
               <Select
+                aria-describedby={
+                  fieldErrors.agendaItemId
+                    ? `decision-agenda-${formId}-error`
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.agendaItemId)}
                 id={`decision-agenda-${formId}`}
                 onChange={(event) => setAgendaItemId(event.target.value)}
                 value={agendaItemId}
               >
-                <option value="">Intet dagsordenspunkt</option>
+                <option value="">Vælg dagsordenspunkt</option>
                 {agendaItems.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.title}
                   </option>
                 ))}
               </Select>
+              <FieldError
+                id={`decision-agenda-${formId}-error`}
+                message={fieldErrors.agendaItemId}
+              />
             </div>
             <div className="sm:col-span-2">
               <label

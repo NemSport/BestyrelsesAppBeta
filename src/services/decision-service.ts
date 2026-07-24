@@ -223,7 +223,8 @@ export class DecisionService {
       internal_note: parsed.internalNote ?? null,
       created_by: user.id,
       updated_by: user.id,
-      cancelled_at: parsed.status === "cancelled" ? new Date().toISOString() : null,
+      cancelled_at:
+        parsed.status === "cancelled" ? new Date().toISOString() : null,
     });
   }
 
@@ -246,12 +247,13 @@ export class DecisionService {
         user.id,
       );
     }
+    const agendaItemId = parsed.agendaItemId ?? decision.agenda_item_id ?? null;
     await this.requireValidReferences(parsed);
 
     return this.decisions.update(parsed.decisionId, {
       committee_id: parsed.committeeId,
       meeting_id: parsed.meetingId ?? null,
-      agenda_item_id: parsed.agendaItemId ?? null,
+      agenda_item_id: agendaItemId,
       title: parsed.title,
       description: parsed.description,
       status: parsed.status,
@@ -261,7 +263,8 @@ export class DecisionService {
       category: parsed.category ?? null,
       internal_note: parsed.internalNote ?? null,
       updated_by: user.id,
-      cancelled_at: parsed.status === "cancelled" ? new Date().toISOString() : null,
+      cancelled_at:
+        parsed.status === "cancelled" ? new Date().toISOString() : null,
     });
   }
 

@@ -1197,6 +1197,17 @@ styling applies only to decisions that are neither completed nor cancelled.
 No filter endpoint, database index, migration, or RLS exception is introduced
 at this scale.
 
+Issue 7 strengthens the existing aggregate boundary without introducing a new
+decision entity. New decision inserts require a non-null `agenda_item_id`;
+application validation, service reference checks, and a PostgreSQL `before
+insert` trigger enforce that the agenda item belongs to the same organization
+and committee. The trigger is insert-only so historical rows without an agenda
+relation are preserved. The organization register serializes its presentation
+filters into validated URL parameters and preserves unrelated deep-link state.
+Creation is exposed only to agenda-item editors and starts with an explicit
+agenda-item selection or from the agenda-item workspace itself. Updates that
+omit an already established agenda relation retain the stored relation.
+
 Phase 2A.5 reuses the existing RLS-protected decision creation route and modal
 from the minutes workflow. Current client-side minutes state is converted from
 sanitized rich text to plain text when the user opens the modal, so an
