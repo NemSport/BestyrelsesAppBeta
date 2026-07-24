@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ManualMemberForm } from "@/components/members/manual-member-form";
+import { MemberAccessEditor } from "@/components/members/member-access-editor";
 import {
   ActionMenu,
   Button,
@@ -26,6 +27,7 @@ import {
   membershipStatusLabels,
   organizationRoleLabels,
 } from "@/lib/localization";
+import { getMemberAccessCapabilities } from "@/lib/member-access-capabilities";
 import type { Database } from "@/types/database";
 import type {
   Committee,
@@ -35,7 +37,12 @@ import type {
 
 type OrganizationRole = Database["public"]["Enums"]["organization_role"];
 
-const allRoleOptions: OrganizationRole[] = ["owner", "admin", "member", "viewer"];
+const allRoleOptions: OrganizationRole[] = [
+  "owner",
+  "admin",
+  "member",
+  "viewer",
+];
 const adminRoleOptions: OrganizationRole[] = ["admin", "member", "viewer"];
 
 export function MemberAdministration({
@@ -56,14 +63,21 @@ export function MemberAdministration({
   const router = useRouter();
   const canManage = currentUserRole === "owner" || currentUserRole === "admin";
   const [email, setEmail] = useState("");
-  const [invitationRole, setInvitationRole] = useState<OrganizationRole>("member");
+  const [invitationRole, setInvitationRole] =
+    useState<OrganizationRole>("member");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const activeOwnerCount = members.filter(
+    (member) => member.role === "owner" && member.status === "active",
+  ).length;
 
   async function readResponse(response: Response) {
-    const result = (await response.json()) as { error?: string; message?: string };
+    const result = (await response.json()) as {
+      error?: string;
+      message?: string;
+    };
     if (!response.ok) {
       throw new Error(result.error || "Handlingen kunne ikke gennemføres.");
     }
@@ -91,7 +105,10 @@ export function MemberAdministration({
         await fetch(`/api/organizations/${organizationId}/invitations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: normalizedEmail, role: invitationRole }),
+          body: JSON.stringify({
+            email: normalizedEmail,
+            role: invitationRole,
+          }),
         }),
       );
       setEmail("");
@@ -104,32 +121,6 @@ export function MemberAdministration({
           ? caughtError.message
           : "Invitationen kunne ikke gemmes.",
       );
-    } finally {
-      setLoadingKey(null);
-    }
-  }
-
-  async function updateRole(memberId: string, role: OrganizationRole) {
-    setMessage(null);
-    setError(null);
-    setLoadingKey(`role-${memberId}`);
-    try {
-      const result = await readResponse(
-        await fetch(`/api/organizations/${organizationId}/members/${memberId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role }),
-        }),
-      );
-      setMessage(result.message || "Medlemmets rolle er opdateret.");
-      router.refresh();
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Rollen kunne ikke opdateres.",
-      );
-      router.refresh();
     } finally {
       setLoadingKey(null);
     }
@@ -175,7 +166,10 @@ export function MemberAdministration({
   return (
     <div className="section-stack">
       {message ? (
-        <div className="alert-success rounded-xl px-4 py-3 text-sm" role="status">
+        <div
+          className="alert-success rounded-xl px-4 py-3 text-sm"
+          role="status"
+        >
           {message}
         </div>
       ) : null}
@@ -270,15 +264,13 @@ export function MemberAdministration({
               <TableBody>
                 {members.map((member) => {
                   const isSelf = member.user_id === currentUserId;
-                  const actorIsOwner = currentUserRole === "owner";
-                  const managesOwner = member.role === "owner";
-                  const canChangeRole =
-                    canManage && (actorIsOwner || (!isSelf && !managesOwner));
-                  const canRemove =
-                    canManage && (actorIsOwner || !managesOwner);
-                  const roleOptions = actorIsOwner
-                    ? allRoleOptions
-                    : adminRoleOptions;
+                  const capabilities = getMemberAccessCapabilities({
+                    actorRole: currentUserRole,
+                    actorUserId: currentUserId,
+                    targetRole: member.role,
+                    targetUserId: member.user_id,
+                    activeOwnerCount,
+                  });
 
                   return (
                     <TableRow key={member.user_id}>
@@ -291,7 +283,9 @@ export function MemberAdministration({
                             </span>
                           ) : null}
                         </p>
-                        <p className="mt-1 text-sm text-muted">{member.email}</p>
+                        <p className="mt-1 text-sm text-muted">
+                          {member.email}
+                        </p>
                       </TableCell>
                       <TableCell className="min-w-64">
                         <div className="flex flex-wrap gap-1.5">
@@ -312,29 +306,7 @@ export function MemberAdministration({
                         </div>
                       </TableCell>
                       <TableCell className="min-w-44">
-                        {canChangeRole ? (
-                          <Select
-                            aria-label={`Rolle for ${
-                              member.full_name || member.email
-                            }`}
-                            defaultValue={member.role}
-                            disabled={loadingKey === `role-${member.user_id}`}
-                            onChange={(event) =>
-                              updateRole(
-                                member.user_id,
-                                event.target.value as OrganizationRole,
-                              )
-                            }
-                          >
-                            {roleOptions.map((role) => (
-                              <option key={role} value={role}>
-                                {organizationRoleLabels[role]}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : (
-                          organizationRoleLabels[member.role]
-                        )}
+                        {organizationRoleLabels[member.role]}
                       </TableCell>
                       <TableCell>
                         <StatusBadge tone="success">
@@ -342,19 +314,41 @@ export function MemberAdministration({
                         </StatusBadge>
                       </TableCell>
                       <TableCell>
-                        {canRemove ? (
-                          <ActionMenu align="right">
-                            <button
-                              className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
-                              disabled={loadingKey === `remove-${member.user_id}`}
-                              onClick={() => removeMember(member)}
-                              type="button"
-                            >
-                              {loadingKey === `remove-${member.user_id}`
-                                ? "Fjerner..."
-                                : "Fjern medlem"}
-                            </button>
-                          </ActionMenu>
+                        {capabilities.canEditAccess ||
+                        capabilities.canRemove ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {capabilities.canEditAccess ? (
+                              <MemberAccessEditor
+                                committees={committees}
+                                member={member}
+                                onUpdated={(nextMessage) => {
+                                  setError(null);
+                                  setMessage(nextMessage);
+                                  router.refresh();
+                                }}
+                                organizationId={organizationId}
+                                roleOptions={
+                                  capabilities.assignableOrganizationRoles
+                                }
+                              />
+                            ) : null}
+                            {capabilities.canRemove ? (
+                              <ActionMenu align="right">
+                                <button
+                                  className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
+                                  disabled={
+                                    loadingKey === `remove-${member.user_id}`
+                                  }
+                                  onClick={() => removeMember(member)}
+                                  type="button"
+                                >
+                                  {loadingKey === `remove-${member.user_id}`
+                                    ? "Fjerner..."
+                                    : "Fjern medlem"}
+                                </button>
+                              </ActionMenu>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-muted">Kun læseadgang</span>
                         )}

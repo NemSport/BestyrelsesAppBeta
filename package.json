@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src next.config.ts tailwind.config.ts eslint.config.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:issue-18": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-18/*.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",
