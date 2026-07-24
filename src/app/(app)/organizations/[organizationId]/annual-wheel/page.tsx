@@ -8,7 +8,7 @@ export default async function AnnualWheelPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ year?: string; committeeId?: string }>;
+  searchParams: Promise<{ year?: string }>;
 }) {
   const { organizationId } = await params;
   const query = await searchParams;
@@ -25,11 +25,7 @@ export default async function AnnualWheelPage({
         eyebrow="Strategisk planlægning"
         title={`Årshjul ${data.year}`}
       />
-      <AnnualWheel
-        data={data}
-        initialCommitteeId={query.committeeId}
-        organizationId={organizationId}
-      />
+      <AnnualWheel data={data} organizationId={organizationId} />
     </>
   );
 }

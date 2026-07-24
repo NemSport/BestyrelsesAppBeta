@@ -2,21 +2,30 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   annualWheelDeadlineState,
   annualWheelPriorityLabels,
   annualWheelRecurrenceLabels,
+  canEditAnnualWheelEvent,
   type AnnualWheelPriority,
   type AnnualWheelRecurrence,
 } from "@/lib/annual-wheel";
+import {
+  annualWheelSearchParams,
+  parseAnnualWheelState,
+  type AnnualWheelKind,
+  type AnnualWheelState,
+  type AnnualWheelView,
+} from "@/lib/annual-wheel-state";
 import {
   Button,
   buttonClassName,
   EmptyState,
   Input,
   Modal,
+  MutationFeedback,
   Select,
   StatusBadge,
   Textarea,
@@ -26,8 +35,18 @@ import type {
   AnnualWheelEventView,
   AnnualWheelOverview,
 } from "@/types/domain";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+  type MutationFeedbackState,
+} from "@/hooks/use-mutation-feedback";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 
-type ViewMode = "year" | "quarter" | "month";
 type AiResult = {
   activitySuggestions: Array<{
     title: string;
@@ -192,8 +211,7 @@ function draftFromEvent(event: AnnualWheelEventView): EventDraft {
       id: template.id,
       title: template.title,
       description: template.description,
-      suggestedResponsibleUserId:
-        template.suggested_responsible_user_id ?? "",
+      suggestedResponsibleUserId: template.suggested_responsible_user_id ?? "",
       deadlineAnchor: template.deadline_anchor,
       deadlineOffsetDays: template.deadline_offset_days,
     })),
@@ -264,13 +282,22 @@ export function AnnualWheel({
   data: AnnualWheelOverview;
   initialCommitteeId?: string;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
-  const [view, setView] = useState<ViewMode>("year");
-  const [focusMonth, setFocusMonth] = useState(new Date().getMonth());
-  const [committeeId, setCommitteeId] = useState(initialCommitteeId);
-  const [responsibleId, setResponsibleId] = useState("");
-  const [kind, setKind] = useState("");
+  const searchParams = useSearchParams();
+  const initialState = parseAnnualWheelState(
+    new URLSearchParams(searchParams.toString()),
+    initialCommitteeId,
+  );
+  const [view, setView] = useState<AnnualWheelView>(initialState.view);
+  const [focusMonth, setFocusMonth] = useState(initialState.focusMonth);
+  const [committeeId, setCommitteeId] = useState(initialState.committeeId);
+  const [responsibleId, setResponsibleId] = useState(
+    initialState.responsibleId,
+  );
+  const [kind, setKind] = useState<AnnualWheelKind>(initialState.kind);
   const [draft, setDraft] = useState<EventDraft | null>(null);
+  const [draftBaseline, setDraftBaseline] = useState<EventDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +307,25 @@ export function AnnualWheel({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const mutation = useMutationFeedback();
+  const draftIsDirty =
+    Boolean(draft && draftBaseline) &&
+    JSON.stringify(draft) !== JSON.stringify(draftBaseline);
+  const confirmDiscard = useUnsavedChanges(
+    draftIsDirty && !mutation.pending && !saving,
+  );
+
+  useEffect(() => {
+    const next = parseAnnualWheelState(
+      new URLSearchParams(searchParams.toString()),
+      initialCommitteeId,
+    );
+    setView(next.view);
+    setFocusMonth(next.focusMonth);
+    setCommitteeId(next.committeeId);
+    setResponsibleId(next.responsibleId);
+    setKind(next.kind);
+  }, [initialCommitteeId, searchParams]);
 
   const canCreate =
     data.canEditOrganization || data.editableCommitteeIds.length > 0;
@@ -287,9 +333,7 @@ export function AnnualWheel({
     view === "year"
       ? monthNames.map((_, index) => index)
       : view === "quarter"
-        ? [0, 1, 2].map(
-            (offset) => Math.floor(focusMonth / 3) * 3 + offset,
-          )
+        ? [0, 1, 2].map((offset) => Math.floor(focusMonth / 3) * 3 + offset)
         : [focusMonth];
 
   const items = useMemo<AnnualWheelTimelineItem[]>(() => {
@@ -311,21 +355,94 @@ export function AnnualWheel({
     return [...activities, ...calendar]
       .filter((item) => !committeeId || item.committeeId === committeeId)
       .filter(
-        (item) =>
-          !responsibleId || item.responsibleUserId === responsibleId,
+        (item) => !responsibleId || item.responsibleUserId === responsibleId,
       )
       .filter((item) => !kind || item.kind === kind)
       .sort((left, right) => left.date.localeCompare(right.date));
   }, [committeeId, data.calendarItems, data.events, kind, responsibleId]);
 
   const deadlines = items
-    .filter((item) => item.kind !== "meeting")
+    .filter(
+      (item) =>
+        item.kind !== "meeting" &&
+        visibleMonths.includes(Number(item.date.slice(5, 7)) - 1),
+    )
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 12);
 
   const selectedMonthItems =
     selectedMonth === null ? [] : getMonthItems(items, selectedMonth);
   const selectedMonthGroups = splitMonthItems(selectedMonthItems);
+  const visibleItemCount = items.filter((item) =>
+    visibleMonths.includes(Number(item.date.slice(5, 7)) - 1),
+  ).length;
+  const hasActiveFilters =
+    committeeId !== initialCommitteeId || responsibleId !== "" || kind !== "";
+  const selectedScopeLabel = committeeId
+    ? (data.committees.find((committee) => committee.id === committeeId)
+        ?.name ?? "Valgt udvalg")
+    : initialCommitteeId
+      ? (data.committees.find(
+          (committee) => committee.id === initialCommitteeId,
+        )?.name ?? "Valgt udvalg")
+      : "Organisationen og alle synlige udvalg";
+  const selectedPeriodLabel =
+    view === "year"
+      ? `Hele ${data.year}`
+      : view === "quarter"
+        ? `${Math.floor(focusMonth / 3) + 1}. kvartal ${data.year}`
+        : `${monthNames[focusMonth]} ${data.year}`;
+
+  function replaceAnnualWheelState(patch: Partial<AnnualWheelState>) {
+    const nextState: AnnualWheelState = {
+      view,
+      focusMonth,
+      committeeId,
+      responsibleId,
+      kind,
+      ...patch,
+    };
+    setView(nextState.view);
+    setFocusMonth(nextState.focusMonth);
+    setCommitteeId(nextState.committeeId);
+    setResponsibleId(nextState.responsibleId);
+    setKind(nextState.kind);
+    const next = annualWheelSearchParams(
+      new URLSearchParams(searchParams.toString()),
+      nextState,
+      initialCommitteeId,
+    );
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }
+
+  function resetFilters() {
+    replaceAnnualWheelState({
+      committeeId: initialCommitteeId,
+      responsibleId: "",
+      kind: "",
+    });
+  }
+
+  function yearHref(year: number) {
+    const next = annualWheelSearchParams(
+      new URLSearchParams(searchParams.toString()),
+      { view, focusMonth, committeeId, responsibleId, kind },
+      initialCommitteeId,
+    );
+    next.set("year", String(year));
+    return `${pathname}?${next.toString()}`;
+  }
+
+  function eventCanEdit(event: AnnualWheelEventView) {
+    return canEditAnnualWheelEvent(
+      data.canEditOrganization,
+      data.editableCommitteeIds,
+      event.committee_id,
+    );
+  }
 
   function itemHref(item: AnnualWheelTimelineItem) {
     if (item.kind === "task") {
@@ -350,21 +467,38 @@ export function AnnualWheel({
       item.kind === "meeting"
         ? null
         : closedTask
-        ? null
-        : item.event && ["completed", "cancelled"].includes(item.event.status)
           ? null
-        : annualWheelDeadlineState(item.date, item.priority);
+          : item.event && ["completed", "cancelled"].includes(item.event.status)
+            ? null
+            : annualWheelDeadlineState(item.date, item.priority);
+    const scopeLabel = item.committeeId
+      ? `Udvalg · ${
+          data.committees.find((committee) => committee.id === item.committeeId)
+            ?.name ?? "Ukendt udvalg"
+        }`
+      : "Organisation";
+    const responsibleLabel = item.responsibleUserId
+      ? data.members.find((member) => member.user_id === item.responsibleUserId)
+          ?.full_name ||
+        data.members.find((member) => member.user_id === item.responsibleUserId)
+          ?.email ||
+        "Ukendt ansvarlig"
+      : "Ingen ansvarlig";
     const content = (
       <>
         <div className="flex min-w-0 flex-1 items-start gap-2">
           <span className="mt-0.5 w-12 shrink-0 text-xs font-semibold text-muted">
-            {variant === "detail" ? shortDate(item.date) : item.date.slice(8, 10)}
+            {variant === "detail"
+              ? shortDate(item.date)
+              : item.date.slice(8, 10)}
           </span>
           <div className="min-w-0 flex-1">
             <p className="break-words text-sm font-medium text-ink">
               {item.title}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <StatusBadge tone="neutral">{scopeLabel}</StatusBadge>
+              <span>Ansvarlig: {responsibleLabel}</span>
               {item.kind === "meeting" ? (
                 <StatusBadge tone="neutral">Møde</StatusBadge>
               ) : (
@@ -452,9 +586,12 @@ export function AnnualWheel({
     otherItems: AnnualWheelTimelineItem[],
     variant: "card" | "detail" = "card",
   ) {
-    const visibleMeetings = variant === "card" ? meetings.slice(0, 3) : meetings;
+    const visibleMeetings =
+      variant === "card" ? meetings.slice(0, 3) : meetings;
     const visibleOtherItems =
-      variant === "card" ? otherItems.slice(0, Math.max(0, 5 - visibleMeetings.length)) : otherItems;
+      variant === "card"
+        ? otherItems.slice(0, Math.max(0, 5 - visibleMeetings.length))
+        : otherItems;
     const hiddenCount =
       meetings.length +
       otherItems.length -
@@ -493,18 +630,32 @@ export function AnnualWheel({
   function openCreate() {
     const defaultCommittee =
       initialCommitteeId ||
-      (data.canEditOrganization ? "" : data.editableCommitteeIds[0] ?? "");
+      (data.canEditOrganization ? "" : (data.editableCommitteeIds[0] ?? ""));
     setError(null);
     setNotice(null);
     setFieldErrors({});
-    setDraft(emptyDraft(defaultCommittee));
+    const nextDraft = emptyDraft(defaultCommittee);
+    mutation.reset();
+    setDraftBaseline(nextDraft);
+    setDraft(nextDraft);
   }
 
   function openEdit(event: AnnualWheelEventView) {
     setError(null);
     setNotice(null);
     setFieldErrors({});
-    setDraft(draftFromEvent(event));
+    const nextDraft = draftFromEvent(event);
+    mutation.reset();
+    setDraftBaseline(nextDraft);
+    setDraft(nextDraft);
+  }
+
+  function closeDraft() {
+    if (!confirmDiscard()) return;
+    setDraft(null);
+    setDraftBaseline(null);
+    setError(null);
+    setFieldErrors({});
   }
 
   async function analyzeAnnualWheel() {
@@ -535,14 +686,15 @@ export function AnnualWheel({
   ) {
     const month = String(suggestion.suggestedMonth).padStart(2, "0");
     const startsOn = `${data.year}-${month}-01`;
+    const baseline = emptyDraft(
+      committeeId ||
+        initialCommitteeId ||
+        (data.canEditOrganization ? "" : (data.editableCommitteeIds[0] ?? "")),
+    );
+    mutation.reset();
+    setDraftBaseline(baseline);
     setDraft({
-      ...emptyDraft(
-        committeeId ||
-          initialCommitteeId ||
-          (data.canEditOrganization
-            ? ""
-            : data.editableCommitteeIds[0] ?? ""),
-      ),
+      ...baseline,
       title: suggestion.title,
       description: suggestion.description,
       startsOn,
@@ -558,76 +710,98 @@ export function AnnualWheel({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
-    setSaving(true);
+    if (!mutation.begin("Aktiviteten gemmes...")) return;
     setError(null);
     setFieldErrors({});
-    const response = await fetch(
-      draft.id
-        ? `/api/annual-wheel/${draft.id}`
-        : `/api/organizations/${organizationId}/annual-wheel`,
-      {
-        method: draft.id ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          committeeId: draft.committeeId || null,
-          title: draft.title,
-          description: draft.description,
-          startsOn: draft.startsOn,
-          endsOn: draft.endsOn,
-          responsibleUserId: draft.responsibleUserId || null,
-          category: draft.category || null,
-          priority: draft.priority,
-          status: draft.status,
-          recurrence: draft.recurrence,
-          recurrenceInterval: draft.recurrenceInterval,
-          taskTemplates: draft.taskTemplates.map((template) => ({
-            id: template.id,
-            title: template.title,
-            description: template.description,
-            suggestedResponsibleUserId:
-              template.suggestedResponsibleUserId || null,
-            deadlineAnchor: template.deadlineAnchor,
-            deadlineOffsetDays: template.deadlineOffsetDays,
-          })),
-          keyPeople: draft.keyPeople.map((person) => ({
-            id: person.id,
-            userId: person.userId || null,
-            name: person.name,
-            roleTitle: person.roleTitle,
-            phone: person.phone || null,
-            email: person.email || null,
-          })),
-        }),
-      },
-    );
-    const payload = await response.json().catch(() => ({}));
-    setSaving(false);
-    if (!response.ok) {
-      setError(payload.error ?? "Aktiviteten kunne ikke gemmes.");
-      setFieldErrors(
-        Object.fromEntries(
-          Object.entries(payload.fieldErrors ?? {}).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value[0] : String(value),
-          ]),
+    try {
+      await readMutationResponse(
+        await fetch(
+          draft.id
+            ? `/api/annual-wheel/${draft.id}`
+            : `/api/organizations/${organizationId}/annual-wheel`,
+          {
+            method: draft.id ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              organizationId,
+              committeeId: draft.committeeId || null,
+              title: draft.title,
+              description: draft.description,
+              startsOn: draft.startsOn,
+              endsOn: draft.endsOn,
+              responsibleUserId: draft.responsibleUserId || null,
+              category: draft.category || null,
+              priority: draft.priority,
+              status: draft.status,
+              recurrence: draft.recurrence,
+              recurrenceInterval: draft.recurrenceInterval,
+              taskTemplates: draft.taskTemplates.map((template) => ({
+                id: template.id,
+                title: template.title,
+                description: template.description,
+                suggestedResponsibleUserId:
+                  template.suggestedResponsibleUserId || null,
+                deadlineAnchor: template.deadlineAnchor,
+                deadlineOffsetDays: template.deadlineOffsetDays,
+              })),
+              keyPeople: draft.keyPeople.map((person) => ({
+                id: person.id,
+                userId: person.userId || null,
+                name: person.name,
+                roleTitle: person.roleTitle,
+                phone: person.phone || null,
+                email: person.email || null,
+              })),
+            }),
+          },
         ),
+        "Aktiviteten kunne ikke gemmes. Prøv igen.",
       );
-      return;
+      setDraftBaseline(null);
+      setDraft(null);
+      mutation.succeed("Aktiviteten er gemt.");
+      router.refresh();
+    } catch (caught) {
+      if (caught instanceof MutationRequestError) {
+        setFieldErrors(caught.fieldErrors);
+        mutation.fail(caught.message);
+        focusInvalidField(
+          firstFieldError(caught.fieldErrors, [
+            "title",
+            "startsOn",
+            "endsOn",
+            "committeeId",
+            "responsibleUserId",
+          ])
+            ? `annual-wheel-${firstFieldError(caught.fieldErrors, [
+                "title",
+                "startsOn",
+                "endsOn",
+                "committeeId",
+                "responsibleUserId",
+              ])}`
+            : null,
+        );
+      } else {
+        mutation.fail(
+          "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
+        );
+      }
     }
-    setDraft(null);
-    router.refresh();
   }
 
   async function activateTasks(eventId: string) {
     setActivating(true);
     setError(null);
     setNotice(null);
-    const response = await fetch(`/api/annual-wheel/${eventId}/activate-tasks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ organizationId, year: data.year }),
-    });
+    const response = await fetch(
+      `/api/annual-wheel/${eventId}/activate-tasks`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId, year: data.year }),
+      },
+    );
     const payload = await response.json().catch(() => ({}));
     setActivating(false);
     if (!response.ok) {
@@ -660,6 +834,7 @@ export function AnnualWheel({
       return;
     }
     setDraft(null);
+    setDraftBaseline(null);
     router.refresh();
   }
 
@@ -672,40 +847,56 @@ export function AnnualWheel({
         )),
   );
   const draftEvent = draft?.id
-    ? data.events.find((event) => event.id === draft.id) ?? null
+    ? (data.events.find((event) => event.id === draft.id) ?? null)
     : null;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <Link
-            className="button-secondary"
-            href={`?year=${data.year - 1}${initialCommitteeId ? `&committeeId=${initialCommitteeId}` : ""}`}
+            className="button-secondary justify-center"
+            href={yearHref(data.year - 1)}
           >
             ← {data.year - 1}
           </Link>
-          {(["year", "quarter", "month"] as const).map((mode) => (
+          <div
+            aria-label="Vælg periodevisning"
+            className="order-3 col-span-2 grid grid-cols-3 gap-2 sm:order-none sm:flex sm:flex-wrap"
+            role="group"
+          >
+            {(["year", "quarter", "month"] as const).map((mode) => (
               <Button
+                aria-pressed={view === mode}
                 key={mode}
-                onClick={() => setView(mode)}
+                onClick={() => replaceAnnualWheelState({ view: mode })}
                 variant={view === mode ? "primary" : "secondary"}
               >
-                {mode === "year"
-                  ? "Årsvisning"
-                  : mode === "quarter"
-                    ? "Kvartalsvisning"
-                    : "Månedsvisning"}
+                <span className="sm:hidden">
+                  {mode === "year"
+                    ? "År"
+                    : mode === "quarter"
+                      ? "Kvartal"
+                      : "Måned"}
+                </span>
+                <span className="hidden sm:inline">
+                  {mode === "year"
+                    ? "Årsvisning"
+                    : mode === "quarter"
+                      ? "Kvartalsvisning"
+                      : "Månedsvisning"}
+                </span>
               </Button>
             ))}
+          </div>
           <Link
-            className="button-secondary"
-            href={`?year=${data.year + 1}${initialCommitteeId ? `&committeeId=${initialCommitteeId}` : ""}`}
+            className="button-secondary justify-center"
+            href={yearHref(data.year + 1)}
           >
             {data.year + 1} →
           </Link>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden flex-wrap items-center gap-2 sm:flex">
           <Link
             className={buttonClassName({
               size: "sm",
@@ -728,24 +919,68 @@ export function AnnualWheel({
             <Button onClick={openCreate}>Opret aktivitet</Button>
           ) : null}
         </div>
+        <div className="flex w-full items-start gap-2 sm:hidden">
+          <details className="relative flex-1 rounded-[var(--radius-control)] border border-line bg-surface">
+            <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-center text-sm font-semibold">
+              Eksportér PDF
+            </summary>
+            <div className="space-y-2 border-t border-line p-2">
+              <Link
+                className={buttonClassName({
+                  size: "sm",
+                  variant: "secondary",
+                })}
+                href={`/api/organizations/${organizationId}/annual-wheel/pdf/overview?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
+              >
+                Download overblik
+              </Link>
+              <Link
+                className={buttonClassName({
+                  size: "sm",
+                  variant: "secondary",
+                })}
+                href={`/api/organizations/${organizationId}/annual-wheel/pdf/wheel?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
+              >
+                Download årshjul
+              </Link>
+            </div>
+          </details>
+          {canCreate ? (
+            <Button className="flex-1" onClick={openCreate}>
+              Opret aktivitet
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Select
           aria-label="Filtrér på udvalg"
-          onChange={(event) => setCommitteeId(event.target.value)}
+          disabled={Boolean(initialCommitteeId)}
+          onChange={(event) =>
+            replaceAnnualWheelState({ committeeId: event.target.value })
+          }
           value={committeeId}
         >
-          <option value="">Alle udvalg og organisationen</option>
-          {data.committees.map((committee) => (
-            <option key={committee.id} value={committee.id}>
-              {committee.name}
-            </option>
-          ))}
+          {initialCommitteeId ? null : (
+            <option value="">Alle udvalg og organisationen</option>
+          )}
+          {data.committees
+            .filter(
+              (committee) =>
+                !initialCommitteeId || committee.id === initialCommitteeId,
+            )
+            .map((committee) => (
+              <option key={committee.id} value={committee.id}>
+                {committee.name}
+              </option>
+            ))}
         </Select>
         <Select
           aria-label="Filtrér på ansvarlig"
-          onChange={(event) => setResponsibleId(event.target.value)}
+          onChange={(event) =>
+            replaceAnnualWheelState({ responsibleId: event.target.value })
+          }
           value={responsibleId}
         >
           <option value="">Alle ansvarlige</option>
@@ -757,7 +992,11 @@ export function AnnualWheel({
         </Select>
         <Select
           aria-label="Filtrér på aktivitetstype"
-          onChange={(event) => setKind(event.target.value)}
+          onChange={(event) =>
+            replaceAnnualWheelState({
+              kind: event.target.value as AnnualWheelKind,
+            })
+          }
           value={kind}
         >
           <option value="">Alle typer</option>
@@ -769,7 +1008,11 @@ export function AnnualWheel({
         <Select
           aria-label="Vælg måned"
           disabled={view === "year"}
-          onChange={(event) => setFocusMonth(Number(event.target.value))}
+          onChange={(event) =>
+            replaceAnnualWheelState({
+              focusMonth: Number(event.target.value),
+            })
+          }
           value={focusMonth}
         >
           {monthNames.map((name, index) => (
@@ -779,17 +1022,32 @@ export function AnnualWheel({
           ))}
         </Select>
       </div>
+      <div
+        aria-live="polite"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-subtle px-3 py-2 text-sm"
+      >
+        <p>
+          <span className="font-semibold">{visibleItemCount} elementer</span>
+          <span className="text-muted">
+            {" "}
+            · {selectedPeriodLabel} · {selectedScopeLabel}
+          </span>
+        </p>
+        {hasActiveFilters ? (
+          <Button onClick={resetFilters} size="sm" variant="secondary">
+            Nulstil filtre
+          </Button>
+        ) : null}
+      </div>
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-brand/20 bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-4 bg-brand-soft px-4 py-4">
           <div>
             <p className="page-eyebrow">AI-planlægningsassistent</p>
-            <h2 className="mt-1 font-semibold">
-              Find mangler i årets plan
-            </h2>
+            <h2 className="mt-1 font-semibold">Find mangler i årets plan</h2>
             <p className="mt-1 text-sm text-muted">
-              AI foreslår aktiviteter og dagsordenspunkter. Intet oprettes
-              uden din godkendelse.
+              AI foreslår aktiviteter og dagsordenspunkter. Intet oprettes uden
+              din godkendelse.
             </p>
           </div>
           <Button
@@ -825,7 +1083,8 @@ export function AnnualWheel({
                         {suggestion.rationale}
                       </p>
                       <p className="mt-1 text-xs text-muted">
-                        Foreslået måned: {monthNames[suggestion.suggestedMonth - 1]}
+                        Foreslået måned:{" "}
+                        {monthNames[suggestion.suggestedMonth - 1]}
                       </p>
                       <p className="mt-1 text-xs text-muted">
                         Kilder:{" "}
@@ -893,52 +1152,74 @@ export function AnnualWheel({
         ) : null}
       </section>
 
-      <div
-        className={`grid gap-4 ${view === "year" ? "md:grid-cols-3 xl:grid-cols-4" : view === "quarter" ? "md:grid-cols-3" : "grid-cols-1"}`}
-      >
-        {visibleMonths.map((month) => {
-          const monthItems = getMonthItems(items, month);
-          const { meetings, activities, otherItems } =
-            splitMonthItems(monthItems);
-          return (
-            <section
-              className="min-h-44 border-b border-line bg-surface px-3 py-4 sm:px-4"
-              key={month}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <button
-                  className="min-w-0 text-left hover:text-brand"
-                  onClick={() => setSelectedMonth(month)}
-                  type="button"
-                >
-                  <h2 className="font-semibold">
-                    {monthNames[month]} {data.year}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {monthItems.length
-                      ? `${monthItems.length} elementer`
-                      : "Ingen planlagte aktiviteter"}
+      {visibleItemCount === 0 ? (
+        <EmptyState
+          action={
+            hasActiveFilters ? (
+              <Button onClick={resetFilters} variant="secondary">
+                Nulstil filtre
+              </Button>
+            ) : undefined
+          }
+          description={
+            hasActiveFilters
+              ? "Der findes ingen elementer, som matcher de valgte filtre i perioden."
+              : "Der er endnu ikke planlagt aktiviteter, møder, opgaver eller beslutningsdeadlines i perioden."
+          }
+          title={
+            hasActiveFilters
+              ? "Ingen resultater med de valgte filtre"
+              : "Perioden er tom"
+          }
+        />
+      ) : (
+        <div
+          className={`grid gap-4 ${view === "year" ? "md:grid-cols-3 xl:grid-cols-4" : view === "quarter" ? "md:grid-cols-3" : "grid-cols-1"}`}
+        >
+          {visibleMonths.map((month) => {
+            const monthItems = getMonthItems(items, month);
+            const { meetings, activities, otherItems } =
+              splitMonthItems(monthItems);
+            return (
+              <section
+                className="min-h-44 border-b border-line bg-surface px-3 py-4 sm:px-4"
+                key={month}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    className="min-w-0 text-left hover:text-brand"
+                    onClick={() => setSelectedMonth(month)}
+                    type="button"
+                  >
+                    <h2 className="font-semibold">
+                      {monthNames[month]} {data.year}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {monthItems.length
+                        ? `${monthItems.length} elementer`
+                        : "Ingen planlagte aktiviteter"}
+                    </p>
+                  </button>
+                  <Button
+                    onClick={() => setSelectedMonth(month)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Vis måned
+                  </Button>
+                </div>
+                {monthItems.length ? (
+                  renderMonthList(meetings, [...activities, ...otherItems])
+                ) : (
+                  <p className="mt-3 text-sm text-muted">
+                    Ingen planlagte aktiviteter.
                   </p>
-                </button>
-                <Button
-                  onClick={() => setSelectedMonth(month)}
-                  size="sm"
-                  variant="secondary"
-                >
-                  Vis måned
-                </Button>
-              </div>
-              {monthItems.length ? (
-                renderMonthList(meetings, [...activities, ...otherItems])
-              ) : (
-                <p className="mt-3 text-sm text-muted">
-                  Ingen planlagte aktiviteter.
-                </p>
-              )}
-            </section>
-          );
-        })}
-      </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
 
       <section className="border-t border-line pt-6">
         <h2 className="section-title">Deadline-overblik</h2>
@@ -977,10 +1258,10 @@ export function AnnualWheel({
                         : taskStatus === "cancelled"
                           ? "neutral"
                           : state === "overdue"
-                        ? "danger"
-                        : state === "critical"
-                          ? "warning"
-                          : "neutral"
+                            ? "danger"
+                            : state === "critical"
+                              ? "warning"
+                              : "neutral"
                     }
                   >
                     {taskStatus === "completed"
@@ -988,12 +1269,12 @@ export function AnnualWheel({
                       : taskStatus === "cancelled"
                         ? "Annulleret"
                         : state === "overdue"
-                      ? "Forsinket"
-                      : state === "critical"
-                        ? "Kritisk deadline"
-                        : state === "upcoming"
-                          ? "Kommende"
-                          : "Planlagt"}
+                          ? "Forsinket"
+                          : state === "critical"
+                            ? "Kritisk deadline"
+                            : state === "upcoming"
+                              ? "Kommende"
+                              : "Planlagt"}
                   </StatusBadge>
                 </div>
               );
@@ -1004,13 +1285,16 @@ export function AnnualWheel({
         )}
       </section>
 
+      {!draft ? <MutationFeedback feedback={mutation.feedback} /> : null}
       <EventModal
         data={data}
         draft={draft}
+        canEdit={draftEvent ? eventCanEdit(draftEvent) : canCreate}
         error={error}
         fieldErrors={fieldErrors}
         notice={notice}
-        onClose={() => setDraft(null)}
+        feedback={mutation.feedback}
+        onClose={closeDraft}
         onActivate={(eventId) => void activateTasks(eventId)}
         onDraft={setDraft}
         onRemove={() => void remove()}
@@ -1020,7 +1304,7 @@ export function AnnualWheel({
         currentEvent={draftEvent}
         activationYear={data.year}
         responsibleOptions={responsibleOptions}
-        saving={saving}
+        saving={saving || mutation.pending}
       />
       <Modal
         description="Møder og aktiviteter står øverst. Opgaver og deadlines kan foldes ud efter behov."
@@ -1072,9 +1356,7 @@ export function AnnualWheel({
                 <span>
                   Opgaver og deadlines ({selectedMonthGroups.otherItems.length})
                 </span>
-                <span className="text-xs font-normal text-muted">
-                  Fold ud
-                </span>
+                <span className="text-xs font-normal text-muted">Fold ud</span>
               </summary>
               {selectedMonthGroups.otherItems.length ? (
                 renderMonthList([], selectedMonthGroups.otherItems, "detail")
@@ -1096,10 +1378,12 @@ export function AnnualWheel({
 function EventModal({
   activating,
   activationYear,
+  canEdit,
   currentEvent,
   data,
   draft,
   error,
+  feedback,
   fieldErrors,
   notice,
   onActivate,
@@ -1113,10 +1397,12 @@ function EventModal({
 }: {
   activating: boolean;
   activationYear: number;
+  canEdit: boolean;
   currentEvent: AnnualWheelEventView | null;
   data: AnnualWheelOverview;
   draft: EventDraft | null;
   error: string | null;
+  feedback: MutationFeedbackState;
   fieldErrors: Record<string, string>;
   notice: string | null;
   onActivate: (eventId: string) => void;
@@ -1166,6 +1452,7 @@ function EventModal({
         <AnnualWheelEventReadView
           activating={activating}
           activationYear={activationYear}
+          canEdit={canEdit}
           currentEvent={currentEvent}
           data={data}
           error={error}
@@ -1175,8 +1462,11 @@ function EventModal({
           organizationId={organizationId}
         />
       ) : draft ? (
-        <form className="space-y-4" onSubmit={onSubmit}>
-          {error ? <div className="alert-danger p-3 text-sm">{error}</div> : null}
+        <form className="space-y-4" noValidate onSubmit={onSubmit}>
+          <MutationFeedback feedback={feedback} />
+          {error ? (
+            <div className="alert-danger p-3 text-sm">{error}</div>
+          ) : null}
           {notice ? (
             <div className="rounded-[var(--radius-control)] bg-success/10 p-3 text-sm text-success">
               {notice}
@@ -1188,16 +1478,36 @@ function EventModal({
               annulleret, når den ikke længere skal vises som forsinket.
             </div>
           ) : null}
-          <Field error={fieldErrors.title} label="Titel">
+          <Field
+            error={fieldErrors.title}
+            errorId="annual-wheel-title-error"
+            label="Titel"
+          >
             <Input
+              aria-describedby={
+                fieldErrors.title ? "annual-wheel-title-error" : undefined
+              }
+              aria-invalid={Boolean(fieldErrors.title)}
+              id="annual-wheel-title"
               onChange={(event) =>
                 onDraft({ ...draft, title: event.target.value })
               }
               value={draft.title}
             />
           </Field>
-          <Field error={fieldErrors.description} label="Beskrivelse">
+          <Field
+            error={fieldErrors.description}
+            errorId="annual-wheel-description-error"
+            label="Beskrivelse"
+          >
             <Textarea
+              aria-describedby={
+                fieldErrors.description
+                  ? "annual-wheel-description-error"
+                  : undefined
+              }
+              aria-invalid={Boolean(fieldErrors.description)}
+              id="annual-wheel-description"
               onChange={(event) =>
                 onDraft({ ...draft, description: event.target.value })
               }
@@ -1205,8 +1515,19 @@ function EventModal({
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field error={fieldErrors.startsOn} label="Startdato">
+            <Field
+              error={fieldErrors.startsOn}
+              errorId="annual-wheel-startsOn-error"
+              label="Startdato"
+            >
               <Input
+                aria-describedby={
+                  fieldErrors.startsOn
+                    ? "annual-wheel-startsOn-error"
+                    : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.startsOn)}
+                id="annual-wheel-startsOn"
                 onChange={(event) =>
                   onDraft({ ...draft, startsOn: event.target.value })
                 }
@@ -1214,8 +1535,17 @@ function EventModal({
                 value={draft.startsOn}
               />
             </Field>
-            <Field error={fieldErrors.endsOn} label="Slutdato">
+            <Field
+              error={fieldErrors.endsOn}
+              errorId="annual-wheel-endsOn-error"
+              label="Slutdato"
+            >
               <Input
+                aria-describedby={
+                  fieldErrors.endsOn ? "annual-wheel-endsOn-error" : undefined
+                }
+                aria-invalid={Boolean(fieldErrors.endsOn)}
+                id="annual-wheel-endsOn"
                 onChange={(event) =>
                   onDraft({ ...draft, endsOn: event.target.value })
                 }
@@ -1227,6 +1557,7 @@ function EventModal({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Relateret udvalg">
               <Select
+                id="annual-wheel-committeeId"
                 onChange={(event) =>
                   onDraft({
                     ...draft,
@@ -1252,6 +1583,7 @@ function EventModal({
             </Field>
             <Field label="Ansvarlig">
               <Select
+                id="annual-wheel-responsibleUserId"
                 onChange={(event) =>
                   onDraft({ ...draft, responsibleUserId: event.target.value })
                 }
@@ -1272,7 +1604,8 @@ function EventModal({
                 onChange={(event) =>
                   onDraft({
                     ...draft,
-                    status: event.target.value as AnnualWheelEventView["status"],
+                    status: event.target
+                      .value as AnnualWheelEventView["status"],
                   })
                 }
                 value={draft.status}
@@ -1350,8 +1683,8 @@ function EventModal({
           </div>
           {draft.id && draft.recurrence !== "none" ? (
             <p className="text-xs text-muted">
-              Ændringen gælder kun den valgte forekomst. Historiske
-              forekomster bevares.
+              Ændringen gælder kun den valgte forekomst. Historiske forekomster
+              bevares.
             </p>
           ) : null}
           <AnnualWheelKeyPeopleEditor
@@ -1368,6 +1701,7 @@ function EventModal({
             <AnnualWheelActivatedTasks
               activating={activating}
               activationYear={activationYear}
+              canActivate={canEdit}
               currentEvent={currentEvent}
               onActivate={onActivate}
               organizationId={organizationId}
@@ -1409,6 +1743,7 @@ function EventModal({
 function AnnualWheelEventReadView({
   activating,
   activationYear,
+  canEdit,
   currentEvent,
   data,
   error,
@@ -1419,6 +1754,7 @@ function AnnualWheelEventReadView({
 }: {
   activating: boolean;
   activationYear: number;
+  canEdit: boolean;
   currentEvent: AnnualWheelEventView;
   data: AnnualWheelOverview;
   error: string | null;
@@ -1474,9 +1810,13 @@ function AnnualWheelEventReadView({
           >
             Download som PDF
           </Link>
-          <Button onClick={onEdit} type="button">
-            Rediger aktivitet
-          </Button>
+          {canEdit ? (
+            <Button onClick={onEdit} type="button">
+              Rediger aktivitet
+            </Button>
+          ) : (
+            <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge>
+          )}
         </div>
       </div>
 
@@ -1565,18 +1905,9 @@ function AnnualWheelEventReadView({
                     key={person.id}
                   >
                     <ReadListCell label="Navn" value={person.name} />
-                    <ReadListCell
-                      label="Funktion"
-                      value={person.role_title}
-                    />
-                    <ReadListCell
-                      label="Telefon"
-                      value={person.phone || "—"}
-                    />
-                    <ReadListCell
-                      label="E-mail"
-                      value={person.email || "—"}
-                    />
+                    <ReadListCell label="Funktion" value={person.role_title} />
+                    <ReadListCell label="Telefon" value={person.phone || "—"} />
+                    <ReadListCell label="E-mail" value={person.email || "—"} />
                   </div>
                 ))}
               </div>
@@ -1606,8 +1937,7 @@ function AnnualWheelEventReadView({
                 {currentEvent.taskTemplates.map((template) => {
                   const suggestedResponsible = data.members.find(
                     (member) =>
-                      member.user_id ===
-                      template.suggested_responsible_user_id,
+                      member.user_id === template.suggested_responsible_user_id,
                   );
                   return (
                     <div className="py-3" key={template.id}>
@@ -1649,6 +1979,7 @@ function AnnualWheelEventReadView({
           <AnnualWheelActivatedTasks
             activating={activating}
             activationYear={activationYear}
+            canActivate={canEdit}
             currentEvent={currentEvent}
             onActivate={onActivate}
             organizationId={organizationId}
@@ -1722,9 +2053,7 @@ function AnnualWheelKeyPeopleEditor({
     <section className="border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">
-            Ansvarlige og nøglepersoner
-          </h3>
+          <h3 className="text-sm font-semibold">Ansvarlige og nøglepersoner</h3>
           <p className="mt-1 text-sm text-muted">
             Gem praktiske kontaktpersoner til aktiviteten, fx kasserer,
             bogholder eller revisor.
@@ -1942,119 +2271,117 @@ function AnnualWheelTaskTemplateEditor({
                 className="border border-line bg-subtle/30 p-3"
                 key={template.id ?? index}
               >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Titel">
-                  <Input
-                    id={`annual-wheel-task-template-title-${template.id ?? index}`}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Titel">
+                    <Input
+                      id={`annual-wheel-task-template-title-${template.id ?? index}`}
+                      onChange={(event) =>
+                        updateTemplate(index, { title: event.target.value })
+                      }
+                      value={template.title}
+                    />
+                  </Field>
+                  <Field label="Foreslået ansvarlig">
+                    <Select
+                      onChange={(event) =>
+                        updateTemplate(index, {
+                          suggestedResponsibleUserId: event.target.value,
+                        })
+                      }
+                      value={template.suggestedResponsibleUserId}
+                    >
+                      <option value="">Brug aktivitetens ansvarlige</option>
+                      {responsibleOptions.map((member) => (
+                        <option key={member.user_id} value={member.user_id}>
+                          {member.full_name || member.email}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </div>
+                <Field label="Beskrivelse">
+                  <Textarea
                     onChange={(event) =>
-                      updateTemplate(index, { title: event.target.value })
+                      updateTemplate(index, { description: event.target.value })
                     }
-                    value={template.title}
+                    value={template.description}
                   />
                 </Field>
-                <Field label="Foreslået ansvarlig">
-                  <Select
-                    onChange={(event) =>
-                      updateTemplate(index, {
-                        suggestedResponsibleUserId: event.target.value,
-                      })
-                    }
-                    value={template.suggestedResponsibleUserId}
-                  >
-                    <option value="">Brug aktivitetens ansvarlige</option>
-                    {responsibleOptions.map((member) => (
-                      <option key={member.user_id} value={member.user_id}>
-                        {member.full_name || member.email}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              </div>
-              <Field label="Beskrivelse">
-                <Textarea
-                  onChange={(event) =>
-                    updateTemplate(index, { description: event.target.value })
-                  }
-                  value={template.description}
-                />
-              </Field>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[0.75fr_0.9fr_1fr_auto]">
-                <Field label="Deadline fra">
-                  <Select
-                    onChange={(event) =>
-                      updateTemplate(index, {
-                        deadlineAnchor: event.target.value as "start" | "end",
-                      })
-                    }
-                    value={template.deadlineAnchor}
-                  >
-                    <option value="start">Aktivitetens start</option>
-                    <option value="end">Aktivitetens slutning</option>
-                  </Select>
-                </Field>
-                <Field label="Retning">
-                  <Select
-                    onChange={(event) => {
-                      const currentDays = Math.abs(
-                        template.deadlineOffsetDays ?? 0,
-                      );
-                      updateTemplate(index, {
-                        deadlineOffsetDays:
-                          event.target.value === "before"
-                            ? -currentDays
-                            : currentDays,
-                      });
-                    }}
-                    value={deadlineDirection}
-                  >
-                    <option value="before">Før</option>
-                    <option value="after">Efter</option>
-                  </Select>
-                </Field>
-                <Field label="Antal dage">
-                  <Input
-                    onChange={(event) =>
-                      updateTemplate(index, {
-                        deadlineOffsetDays: event.target.value
-                          ? (deadlineDirection === "before" ? -1 : 1) *
-                            Math.abs(Number(event.target.value))
-                          : null,
-                      })
-                    }
-                    min={0}
-                    placeholder="fx 14"
-                    type="number"
-                    value={deadlineAbsDays}
-                  />
-                  <p className="mt-1 text-xs text-muted">
-                    {annualWheelTaskDeadlineLabel(template, draft)}
-                  </p>
-                </Field>
-                <div className="flex items-end">
-                  <Button
-                    onClick={() =>
-                      onDraft({
-                        ...draft,
-                        taskTemplates: draft.taskTemplates.filter(
-                          (_, currentIndex) => currentIndex !== index,
-                        ),
-                      })
-                    }
-                    type="button"
-                    variant="ghost"
-                  >
-                    Fjern
-                  </Button>
+                <div className="mt-3 grid gap-3 sm:grid-cols-[0.75fr_0.9fr_1fr_auto]">
+                  <Field label="Deadline fra">
+                    <Select
+                      onChange={(event) =>
+                        updateTemplate(index, {
+                          deadlineAnchor: event.target.value as "start" | "end",
+                        })
+                      }
+                      value={template.deadlineAnchor}
+                    >
+                      <option value="start">Aktivitetens start</option>
+                      <option value="end">Aktivitetens slutning</option>
+                    </Select>
+                  </Field>
+                  <Field label="Retning">
+                    <Select
+                      onChange={(event) => {
+                        const currentDays = Math.abs(
+                          template.deadlineOffsetDays ?? 0,
+                        );
+                        updateTemplate(index, {
+                          deadlineOffsetDays:
+                            event.target.value === "before"
+                              ? -currentDays
+                              : currentDays,
+                        });
+                      }}
+                      value={deadlineDirection}
+                    >
+                      <option value="before">Før</option>
+                      <option value="after">Efter</option>
+                    </Select>
+                  </Field>
+                  <Field label="Antal dage">
+                    <Input
+                      onChange={(event) =>
+                        updateTemplate(index, {
+                          deadlineOffsetDays: event.target.value
+                            ? (deadlineDirection === "before" ? -1 : 1) *
+                              Math.abs(Number(event.target.value))
+                            : null,
+                        })
+                      }
+                      min={0}
+                      placeholder="fx 14"
+                      type="number"
+                      value={deadlineAbsDays}
+                    />
+                    <p className="mt-1 text-xs text-muted">
+                      {annualWheelTaskDeadlineLabel(template, draft)}
+                    </p>
+                  </Field>
+                  <div className="flex items-end">
+                    <Button
+                      onClick={() =>
+                        onDraft({
+                          ...draft,
+                          taskTemplates: draft.taskTemplates.filter(
+                            (_, currentIndex) => currentIndex !== index,
+                          ),
+                        })
+                      }
+                      type="button"
+                      variant="ghost"
+                    >
+                      Fjern
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
       ) : (
-        <p className="mt-3 text-sm text-muted">
-          Ingen faste opgaver endnu.
-        </p>
+        <p className="mt-3 text-sm text-muted">Ingen faste opgaver endnu.</p>
       )}
     </section>
   );
@@ -2063,19 +2390,22 @@ function AnnualWheelTaskTemplateEditor({
 function AnnualWheelActivatedTasks({
   activating,
   activationYear,
+  canActivate,
   currentEvent,
   onActivate,
   organizationId,
 }: {
   activating: boolean;
   activationYear: number;
+  canActivate: boolean;
   currentEvent: AnnualWheelEventView | null;
   onActivate: (eventId: string) => void;
   organizationId: string;
 }) {
-  const activatedTasks = currentEvent?.activatedTasks.filter(
-    (task) => task.annual_wheel_activation_year === activationYear,
-  ) ?? [];
+  const activatedTasks =
+    currentEvent?.activatedTasks.filter(
+      (task) => task.annual_wheel_activation_year === activationYear,
+    ) ?? [];
 
   return (
     <section className="border-t border-line pt-4">
@@ -2089,7 +2419,7 @@ function AnnualWheelActivatedTasks({
             opgaver.
           </p>
         </div>
-        {currentEvent ? (
+        {currentEvent && canActivate ? (
           <Button
             disabled={activating || currentEvent.taskTemplates.length === 0}
             onClick={() => onActivate(currentEvent.id)}
@@ -2135,17 +2465,23 @@ function AnnualWheelActivatedTasks({
 function Field({
   children,
   error,
+  errorId,
   label,
 }: {
   children: React.ReactNode;
   error?: string;
+  errorId?: string;
   label: string;
 }) {
   return (
     <label className="block space-y-1.5 text-sm font-medium">
       <span>{label}</span>
       {children}
-      {error ? <span className="block text-xs text-danger">{error}</span> : null}
+      {error ? (
+        <span className="block text-xs text-danger" id={errorId}>
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
