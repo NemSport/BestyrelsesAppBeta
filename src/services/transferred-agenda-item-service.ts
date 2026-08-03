@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, NotFoundError } from "@/lib/errors";
 import { scheduleTransferredAgendaItemSchema } from "@/lib/validation";
+import type { PdfTransferredAgendaItemHistory } from "@/lib/meeting-document-pdf";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { TransferredAgendaItemRepository } from "@/repositories/transferred-agenda-item-repository";
 import { AuthService } from "@/services/auth-service";
@@ -156,6 +157,79 @@ export class TransferredAgendaItemService {
           status,
         })),
     };
+  }
+
+  async listPdfHistoryForMeeting(
+    organizationId: string,
+    committeeId: string,
+    meetingId: string,
+  ): Promise<PdfTransferredAgendaItemHistory[]> {
+    const result = await this.listForMeeting(
+      organizationId,
+      committeeId,
+      meetingId,
+    );
+    const transfers = await this.transfers.listByTargetMeeting(meetingId);
+    const sourceAgendaItemIds = transfers.map(
+      (transfer) => transfer.source_agenda_item_id,
+    );
+    const [sourceMinutes, sourceDecisions, sourceTasks] = await Promise.all([
+      this.transfers.listSourceMinutes(
+        transfers.map((transfer) => transfer.source_agenda_item_minutes_id),
+      ),
+      this.transfers.listSourceDecisions(sourceAgendaItemIds),
+      this.transfers.listSourceTasks(sourceAgendaItemIds),
+    ]);
+    const transferById = new Map(
+      transfers.map((transfer) => [transfer.id, transfer]),
+    );
+    const minutesById = new Map(
+      sourceMinutes.map((minutes) => [minutes.id, minutes]),
+    );
+
+    return result.incomingItems.flatMap((item) => {
+      const transfer = transferById.get(item.id);
+      const minutes = transfer
+        ? minutesById.get(transfer.source_agenda_item_minutes_id)
+        : null;
+      if (
+        !item.targetAgendaItemId ||
+        !item.sourceMeeting ||
+        !item.sourceAgendaItem ||
+        !minutes
+      ) {
+        return [];
+      }
+      return [
+        {
+          targetAgendaItemId: item.targetAgendaItemId,
+          transferReason: item.transferReason,
+          sourceMeetingTitle: item.sourceMeeting.title,
+          sourceMeetingDate: item.sourceMeeting.starts_at,
+          sourceAgendaItemTitle: item.sourceAgendaItem.title,
+          previousNotes: minutes.notes,
+          previousDecision: minutes.decision,
+          previousFollowUp: minutes.follow_up,
+          previousDecisions: sourceDecisions
+            .filter(
+              (decision) =>
+                decision.agenda_item_id === item.sourceAgendaItem!.id,
+            )
+            .map(({ title, description, deadline }) => ({
+              title,
+              description,
+              deadline,
+            })),
+          previousTasks: sourceTasks
+            .filter((task) => task.agenda_item_id === item.sourceAgendaItem!.id)
+            .map(({ title, description, deadline }) => ({
+              title,
+              description,
+              deadline,
+            })),
+        },
+      ];
+    });
   }
 
   async schedule(input: unknown) {

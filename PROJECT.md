@@ -921,6 +921,25 @@ items include public purpose and background text when present, rendered through
 the rich-text/plain-text helpers so HTML is not exposed and internal notes stay
 out of the invitation/export.
 
+Agenda and minutes render every agenda item through the same complete,
+multi-page point-card primitive. They share card header, content insets,
+section rhythm, continuation marker, borders, page background, report header,
+and footer; minutes add the post-meeting sections for notes, decisions, tasks,
+responsibility, and deadlines. Scheduled transferred items include a separate
+nested history box with source meeting, transfer reason, previous public
+minutes, legacy decision/follow-up, and linked decisions/tasks when present.
+Those values are read through
+the authenticated transfer service and RLS policies; private agenda-item notes
+are never queried.
+
+`src/lib/pdf-theme.ts` is the single PDF theme resolver. It consumes the
+organization logo plus primary, secondary, accent, and controlled font choice
+from `organization_branding`, derives print-safe tints and contrast-safe text
+colors, and supplies a neutral fallback when branding is absent or invalid.
+The requested browser font remains theme metadata, while the rendered font is
+the embedded Unicode-safe Noto Sans family until a controlled font has a
+verified PDF-compatible TTF asset.
+
 V1.1 PDF polish adds appendix handling for agenda and minutes PDFs. Authorized
 exports can append supported agenda/minutes attachments after the main report
 under a clear `Bilag` section, numbered by agenda order and point reference.

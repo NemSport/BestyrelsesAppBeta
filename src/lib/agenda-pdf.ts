@@ -9,6 +9,10 @@ import {
   type PdfReportAttachment,
 } from "@/lib/pdf-report";
 import { richTextToPdfBlocks } from "@/lib/rich-text";
+import {
+  addTransferredAgendaItemHistory,
+  type PdfTransferredAgendaItemHistory,
+} from "@/lib/meeting-document-pdf";
 import type { MeetingWithAgenda } from "@/types/domain";
 
 type PdfInput = {
@@ -18,6 +22,7 @@ type PdfInput = {
   branding?: PdfReportBranding;
   attachments?: PdfReportAttachment[];
   generatedAt?: Date;
+  transferredHistories?: PdfTransferredAgendaItemHistory[];
 };
 
 export async function generateMeetingAgendaPdf(input: PdfInput) {
@@ -57,7 +62,7 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const typeLabel = getAgendaItemTypeLabel(item.item_type);
-    report.addAgendaItemHeader({
+    report.beginAgendaItemCard({
       number: occurrenceIndex + 1,
       typeLabel: typeLabel.short,
       title: item.title,
@@ -75,6 +80,11 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
       report.addSubsection("Baggrund");
       report.addProse(descriptionBlocks);
     }
+    const history = input.transferredHistories?.find(
+      (candidate) => candidate.targetAgendaItemId === item.id,
+    );
+    if (history) addTransferredAgendaItemHistory(report, history);
+    report.endAgendaItemCard();
   }
 
   await report.addAttachments(input.attachments ?? []);

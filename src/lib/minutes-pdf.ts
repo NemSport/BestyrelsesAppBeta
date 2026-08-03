@@ -12,6 +12,10 @@ import {
 } from "@/lib/pdf-report";
 import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
 import { taskStatusLabels } from "@/lib/tasks";
+import {
+  addTransferredAgendaItemHistory,
+  type PdfTransferredAgendaItemHistory,
+} from "@/lib/meeting-document-pdf";
 import type {
   AgendaItemMinutes,
   DecisionView,
@@ -39,6 +43,7 @@ type PdfInput = {
   externalAttendees: MeetingExternalAttendee[];
   branding?: PdfReportBranding;
   generatedAt?: Date;
+  transferredHistories?: PdfTransferredAgendaItemHistory[];
 };
 
 function approvalSummary(approvals: MeetingMinuteApprovalView[]) {
@@ -266,14 +271,29 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     if (!item) continue;
     const minutes = minutesByAgendaItem.get(item.id);
 
-    report.addAgendaItemHeader({
+    report.beginAgendaItemCard({
       number: occurrenceIndex + 1,
       typeLabel: agendaItemTypeLabels[item.item_type].short,
       title: item.title,
-      subtitle: item.objective || item.description || undefined,
+      subtitle: agendaItemTypeLabels[item.item_type].label,
     });
+    const objective = richTextToPdfBlocks(item.objective);
+    const background = richTextToPdfBlocks(item.description);
+    if (objective.length) {
+      report.addSubsection("Formål");
+      report.addProse(objective);
+    }
+    if (background.length) {
+      report.addSubsection("Baggrund");
+      report.addProse(background);
+    }
+    const history = input.transferredHistories?.find(
+      (candidate) => candidate.targetAgendaItemId === item.id,
+    );
+    if (history) addTransferredAgendaItemHistory(report, history);
     if (!minutes) {
       report.addParagraph("Der er ikke gemt et punktreferat.");
+      report.endAgendaItemCard();
       continue;
     }
 
@@ -371,6 +391,7 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
         "",
       );
     }
+    report.endAgendaItemCard();
   }
 
   report.addSection("Godkendelsesstatus");

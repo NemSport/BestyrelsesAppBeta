@@ -1,9 +1,10 @@
-import type { PdfReportBranding } from "@/lib/pdf-report";
+import type { PdfReportBranding } from "@/lib/pdf-theme";
 import { organizationBrandFonts } from "@/lib/organization-branding";
 import type { OrganizationBranding } from "@/types/domain";
 
 const fallbackPrimary = "#12313e";
 const fallbackAccent = "#476f65";
+const fallbackSecondary = "#d8e2df";
 const maxLogoBytes = 2 * 1024 * 1024;
 
 function safeHexColor(value: string | null | undefined, fallback: string) {
@@ -43,7 +44,8 @@ async function loadLogo(logoUrl: string | null) {
     });
     if (!response.ok) return null;
 
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
     const supported =
       contentType.includes("image/png") || contentType.includes("image/jpeg");
     if (!supported) return null;
@@ -80,6 +82,7 @@ export async function resolvePdfReportBranding(
     logoBytes: logo?.bytes ?? null,
     logoMimeType: logo?.mimeType ?? null,
     primaryColor: safeHexColor(branding?.primary_color, fallbackPrimary),
+    secondaryColor: safeHexColor(branding?.secondary_color, fallbackSecondary),
     accentColor: safeHexColor(branding?.accent_color, fallbackAccent),
     fontFamily: safeFontFamily(branding?.font_family),
   };

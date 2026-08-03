@@ -151,7 +151,39 @@ const role = {
 };
 
 export async function generateIssue12Fixtures() {
-  const branding = { organizationName: `UX Testorganisation ${unicodeMarker}` };
+  const branding = {
+    organizationName: `UX Testorganisation ${unicodeMarker}`,
+    primaryColor: "#174f45",
+    secondaryColor: "#d6b45f",
+    accentColor: "#8b3d63",
+    fontFamily: "Source Sans 3",
+  };
+  const transferredHistories = [
+    {
+      targetAgendaItemId: agendaItems[0].id,
+      transferReason: "decision_requires_follow_up" as const,
+      sourceMeetingTitle: `Tidligere møde ${unicodeMarker}`,
+      sourceMeetingDate: "2026-06-15T17:00:00.000Z",
+      sourceAgendaItemTitle: `Tidligere punkt om økonomi ${unicodeMarker}`,
+      previousNotes: `<p>Tidligere noter: ${longParagraph}</p>`,
+      previousDecision: `<p>Tidligere beslutning: ${longParagraph}</p>`,
+      previousFollowUp: `<p>Tidligere opfølgning: ${longParagraph}</p>`,
+      previousDecisions: [
+        {
+          title: `Tidligere relateret beslutning ${unicodeMarker}`,
+          description: richLongParagraph,
+          deadline: "2026-08-01",
+        },
+      ],
+      previousTasks: [
+        {
+          title: `Tidligere relateret opgave ${unicodeMarker}`,
+          description: richLongParagraph,
+          deadline: "2026-08-01",
+        },
+      ],
+    },
+  ];
   const minutes = {
     id: "minutes-1",
     status: "approved",
@@ -173,6 +205,7 @@ export async function generateIssue12Fixtures() {
     committeeName: "UX Testudvalg",
     organizationName: branding.organizationName,
     branding,
+    transferredHistories,
     generatedAt: fixtureDate,
   });
   pdfs["minutes"] = await generateMeetingMinutesPdf({
@@ -180,8 +213,25 @@ export async function generateIssue12Fixtures() {
     committeeName: "UX Testudvalg",
     meetingMinutes: minutes as never,
     agendaItemMinutes: agendaItemMinutes as never,
-    decisions: [],
-    tasks: [],
+    decisions: [
+      {
+        id: "decision-1",
+        agenda_item_id: agendaItems[0].id,
+        title: `Beslutning med symboler ${unicodeMarker}`,
+        description: richLongParagraph,
+        status: "active",
+        category: "Økonomi",
+        responsible_user_id: "user-1",
+        responsible: { full_name: members[0].full_name },
+        deadline: "2026-09-01",
+      } as never,
+    ],
+    tasks: [
+      {
+        ...tasks[0],
+        agenda_item_id: agendaItems[0].id,
+      } as never,
+    ],
     approvals: [
       {
         status: "approved",
@@ -210,6 +260,7 @@ export async function generateIssue12Fixtures() {
       } as never,
     ],
     branding,
+    transferredHistories,
     generatedAt: fixtureDate,
   });
   pdfs["tasks"] = await generateMeetingTasklistPdf({

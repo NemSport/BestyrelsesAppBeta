@@ -10,6 +10,7 @@ import { AuthorizationService } from "@/services/authorization-service";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 import { MeetingService } from "@/services/meeting-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
+import { TransferredAgendaItemService } from "@/services/transferred-agenda-item-service";
 
 export async function GET(
   request: Request,
@@ -40,18 +41,26 @@ export async function GET(
       organizationContext.organization.id,
       organizationContext.organization.name,
     );
-    const attachments = await new MeetingMinutesService(db).getPdfAttachments(
-      organizationId,
-      committeeId,
-      meetingId,
-      { includeMeetingAttachments: false },
-    );
+    const [attachments, transferredHistories] = await Promise.all([
+      new MeetingMinutesService(db).getPdfAttachments(
+        organizationId,
+        committeeId,
+        meetingId,
+        { includeMeetingAttachments: false },
+      ),
+      new TransferredAgendaItemService(db).listPdfHistoryForMeeting(
+        organizationId,
+        committeeId,
+        meetingId,
+      ),
+    ]);
     const pdf = await generateMeetingAgendaPdf({
       meeting,
       committeeName: committeeContext.committee.name,
       organizationName: organizationContext.organization.name,
       branding,
       attachments,
+      transferredHistories,
     });
     const fileName = `dagsorden-${formatDanishDateKey(meeting.starts_at)}.pdf`;
 
