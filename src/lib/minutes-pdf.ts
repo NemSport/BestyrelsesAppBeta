@@ -38,11 +38,13 @@ type PdfInput = {
   attendeeIds: string[];
   externalAttendees: MeetingExternalAttendee[];
   branding?: PdfReportBranding;
+  generatedAt?: Date;
 };
 
 function approvalSummary(approvals: MeetingMinuteApprovalView[]) {
-  const approved = approvals.filter((approval) => approval.status === "approved")
-    .length;
+  const approved = approvals.filter(
+    (approval) => approval.status === "approved",
+  ).length;
   const changeRequests = approvals.filter(
     (approval) => approval.status === "change_requested",
   ).length;
@@ -61,7 +63,9 @@ function statusTone(status: MeetingMinuteApprovalView["status"]) {
 
 function approvedDate(approvals: MeetingMinuteApprovalView[]) {
   const approvedResponses = approvals
-    .filter((approval) => approval.status === "approved" && approval.responded_at)
+    .filter(
+      (approval) => approval.status === "approved" && approval.responded_at,
+    )
     .map((approval) => approval.responded_at!)
     .sort();
   return approvedResponses.at(-1) ?? null;
@@ -158,7 +162,7 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     subtitle: meetingDate,
     organizationName: input.branding?.organizationName,
     committeeName: input.committeeName,
-    generatedAt: new Date(),
+    generatedAt: input.generatedAt ?? new Date(),
     branding: input.branding,
     meta: [
       { label: "Organisation", value: input.branding?.organizationName ?? "" },
@@ -185,25 +189,19 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
       "success",
     );
   } else if (input.meetingMinutes.status === "ready_for_approval") {
-    report.addBadge(
-      "Foreløbigt referat - afventer godkendelse",
-      "warning",
-    );
+    report.addBadge("Foreløbigt referat - afventer godkendelse", "warning");
     report.addParagraph(
       "Dette referat er sendt til godkendelse, men er endnu ikke endeligt godkendt af alle relevante medlemmer.",
     );
   }
 
   const attendeeNames = input.attendeeIds
-    .map((id) => input.responsiblePeople.find((person) => person.id === id)?.name)
+    .map(
+      (id) => input.responsiblePeople.find((person) => person.id === id)?.name,
+    )
     .filter((name): name is string => Boolean(name));
   const externalAttendeeLines = input.externalAttendees.map((attendee) =>
-    [
-      attendee.name,
-      attendee.role_note,
-      attendee.email,
-      attendee.mobile,
-    ]
+    [attendee.name, attendee.role_note, attendee.email, attendee.mobile]
       .filter(Boolean)
       .join(" - "),
   );
@@ -252,7 +250,7 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     const agendaItemId =
       task.agenda_item_id ||
       (task.decision_id
-        ? agendaItemIdByDecisionId.get(task.decision_id) ?? null
+        ? (agendaItemIdByDecisionId.get(task.decision_id) ?? null)
         : null);
     if (!agendaItemId) continue;
     const current = tasksByAgendaItem.get(agendaItemId) ?? [];
@@ -288,7 +286,9 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     report.addMetaGrid([
       {
         label: "Ansvarlig",
-        value: responsible?.name ?? (minutes.responsible_user_id ? "Ukendt medlem" : ""),
+        value:
+          responsible?.name ??
+          (minutes.responsible_user_id ? "Ukendt medlem" : ""),
       },
       { label: "Deadline", value: minutes.deadline ?? "" },
     ]);

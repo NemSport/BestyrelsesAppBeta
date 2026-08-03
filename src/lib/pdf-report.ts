@@ -1,6 +1,5 @@
 import {
   PDFDocument,
-  StandardFonts,
   rgb,
   type PDFFont,
   type PDFImage,
@@ -8,10 +7,8 @@ import {
   type RGB,
 } from "pdf-lib";
 
-import {
-  formatDanishDate,
-  formatDanishDateTime,
-} from "@/lib/date-format";
+import { formatDanishDate, formatDanishDateTime } from "@/lib/date-format";
+import { embedPdfFonts } from "@/lib/pdf-fonts";
 
 export type PdfMetaItem = {
   label: string;
@@ -81,7 +78,6 @@ type TableColumn<T> = {
 
 const pageSize: [number, number] = [595.28, 841.89];
 const margin = 46;
-const headerHeight = 86;
 const footerHeight = 34;
 const palette = {
   ink: rgb(0.09, 0.12, 0.12),
@@ -127,63 +123,11 @@ function softRgbFromHex(
   return rgb(channels[0], channels[1], channels[2]);
 }
 
-function resolvePdfFontNames(fontFamily: string | null | undefined) {
-  if (fontFamily === "Courier New") {
-    return {
-      regular: StandardFonts.Courier,
-      bold: StandardFonts.CourierBold,
-      italic: StandardFonts.CourierOblique,
-      boldItalic: StandardFonts.CourierBoldOblique,
-    };
-  }
-
-  if (
-    fontFamily === "Georgia" ||
-    fontFamily === "Merriweather" ||
-    fontFamily === "Times New Roman"
-  ) {
-    return {
-      regular: StandardFonts.TimesRoman,
-      bold: StandardFonts.TimesRomanBold,
-      italic: StandardFonts.TimesRomanItalic,
-      boldItalic: StandardFonts.TimesRomanBoldItalic,
-    };
-  }
-
-  return {
-    regular: StandardFonts.Helvetica,
-    bold: StandardFonts.HelveticaBold,
-    italic: StandardFonts.HelveticaOblique,
-    boldItalic: StandardFonts.HelveticaBoldOblique,
-  };
-}
-
-async function resolvePdfFonts(
-  document: PDFDocument,
-  fontFamily: string | null | undefined,
-) {
-  if (
-    fontFamily &&
-    fontFamily !== "Courier New" &&
-    fontFamily !== "Georgia" &&
-    fontFamily !== "Times New Roman"
-  ) {
-    console.warn(
-      `[pdf-report] Brandingfont '${fontFamily}' kan ikke embeddes sikkert i PDF og falder tilbage til en sikker PDF-standardfont.`,
-    );
-  }
-
-  const fontNames = resolvePdfFontNames(fontFamily);
-  return {
-    regular: await document.embedFont(fontNames.regular),
-    bold: await document.embedFont(fontNames.bold),
-    italic: await document.embedFont(fontNames.italic),
-    boldItalic: await document.embedFont(fontNames.boldItalic),
-  };
-}
-
 export function safePdfText(value: string) {
-  return value.replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, "?");
+  return value
+    .normalize("NFC")
+    .replace(/\t/g, "    ")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "�");
 }
 
 export function formatPdfDate(value: string | Date, withTime = false) {
@@ -236,24 +180,28 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   return lines;
 }
 
-function clampLines(lines: string[], maxLines: number) {
-  if (lines.length <= maxLines) return lines;
-  const visible = lines.slice(0, maxLines);
-  visible[visible.length - 1] = `${visible[visible.length - 1].replace(/\.*$/, "")}...`;
-  return visible;
-}
-
 export async function createPdfReport(options: PdfReportOptions) {
   const document = await PDFDocument.create();
-  const { regular, bold, italic, boldItalic } = await resolvePdfFonts(
-    document,
-    options.branding?.fontFamily,
-  );
+  const { regular, bold, italic, boldItalic, drawText } =
+    await embedPdfFonts(document);
+  const generatedAt = options.generatedAt ?? new Date();
+  document.setCreationDate(generatedAt);
+  document.setModificationDate(generatedAt);
+  document.setCreator("BestyrelsesApp");
+  document.setProducer("BestyrelsesApp PDF export");
+  document.setTitle(safePdfText(options.title));
   const reportPalette = {
     ...palette,
     brand: rgbFromHex(options.branding?.primaryColor, palette.brand),
-    brandSoft: softRgbFromHex(options.branding?.primaryColor, palette.brandSoft),
-    brandHeader: softRgbFromHex(options.branding?.primaryColor, palette.subtle, 0.22),
+    brandSoft: softRgbFromHex(
+      options.branding?.primaryColor,
+      palette.brandSoft,
+    ),
+    brandHeader: softRgbFromHex(
+      options.branding?.primaryColor,
+      palette.subtle,
+      0.22,
+    ),
     accent: rgbFromHex(options.branding?.accentColor, palette.brand),
   };
   let logoImage: PDFImage | null = null;
@@ -268,17 +216,33 @@ export async function createPdfReport(options: PdfReportOptions) {
     }
   }
   const contentWidth = pageSize[0] - margin * 2;
+  const headerTextWidth = logoImage ? contentWidth - 96 : contentWidth;
+  const titleLines = wrapText(options.title, bold, 14.5, headerTextWidth);
+  const context = [
+    options.branding?.organizationName ?? options.organizationName,
+    options.committeeName,
+    options.subtitle,
+  ]
+    .filter(Boolean)
+    .join("  |  ");
+  const contextLines = context
+    ? wrapText(context, regular, 8.8, headerTextWidth)
+    : [];
+  const reportHeaderHeight = Math.max(
+    86,
+    43 + titleLines.length * 16 + contextLines.length * 11,
+  );
   let page: PDFPage;
-  let y = pageSize[1] - margin - headerHeight;
+  let y = pageSize[1] - margin - reportHeaderHeight;
   let pageNumber = 0;
   let finalized = false;
 
   const drawHeader = () => {
     page.drawRectangle({
       x: 0,
-      y: pageSize[1] - headerHeight,
+      y: pageSize[1] - reportHeaderHeight,
       width: pageSize[0],
-      height: headerHeight,
+      height: reportHeaderHeight,
       color: reportPalette.brandHeader,
     });
     page.drawRectangle({
@@ -290,7 +254,6 @@ export async function createPdfReport(options: PdfReportOptions) {
     });
     const logoMaxWidth = 78;
     const logoMaxHeight = 38;
-    const textWidth = logoImage ? contentWidth - logoMaxWidth - 18 : contentWidth;
     if (logoImage) {
       const scale = Math.min(
         logoMaxWidth / logoImage.width,
@@ -306,17 +269,20 @@ export async function createPdfReport(options: PdfReportOptions) {
         height,
       });
     }
-    page.drawText(safePdfText(options.documentType.toLocaleUpperCase("da-DK")), {
-      x: margin,
-      y: pageSize[1] - 32,
-      font: bold,
-      size: 8.5,
-      color: reportPalette.brand,
-    });
-    const titleLines = clampLines(wrapText(options.title, bold, 14.5, textWidth), 2);
+    drawText(
+      page,
+      safePdfText(options.documentType.toLocaleUpperCase("da-DK")),
+      {
+        x: margin,
+        y: pageSize[1] - 32,
+        font: bold,
+        size: 8.5,
+        color: reportPalette.brand,
+      },
+    );
     let titleY = pageSize[1] - 50;
     for (const line of titleLines) {
-      page.drawText(line, {
+      drawText(page, line, {
         x: margin,
         y: titleY,
         font: bold,
@@ -325,47 +291,40 @@ export async function createPdfReport(options: PdfReportOptions) {
       });
       titleY -= 14;
     }
-    const context = [
-      options.branding?.organizationName ?? options.organizationName,
-      options.committeeName,
-      options.subtitle,
-    ]
-      .filter(Boolean)
-      .join("  |  ");
-    if (context) {
-      const contextLines = clampLines(wrapText(context, regular, 8.8, textWidth), 1);
-      page.drawText(contextLines[0], {
+    let contextY = titleY - 1;
+    for (const line of contextLines) {
+      drawText(page, line, {
         x: margin,
-        y: pageSize[1] - 76,
+        y: contextY,
         font: regular,
         size: 8.8,
         color: reportPalette.muted,
       });
+      contextY -= 11;
     }
     page.drawLine({
-      start: { x: margin, y: pageSize[1] - headerHeight },
-      end: { x: pageSize[0] - margin, y: pageSize[1] - headerHeight },
+      start: { x: margin, y: pageSize[1] - reportHeaderHeight },
+      end: { x: pageSize[0] - margin, y: pageSize[1] - reportHeaderHeight },
       thickness: 0.7,
       color: reportPalette.line,
     });
   };
 
   const drawFooter = () => {
-    const generatedAt = options.generatedAt ?? new Date();
     page.drawLine({
       start: { x: margin, y: footerHeight + 8 },
       end: { x: pageSize[0] - margin, y: footerHeight + 8 },
       thickness: 0.5,
       color: reportPalette.line,
     });
-    page.drawText(`Eksporteret ${formatPdfDate(generatedAt)}`, {
+    drawText(page, `Eksporteret ${formatPdfDate(generatedAt)}`, {
       x: margin,
       y: footerHeight - 7,
       font: regular,
       size: 8,
       color: reportPalette.muted,
     });
-    page.drawText(`Side ${pageNumber}`, {
+    drawText(page, `Side ${pageNumber}`, {
       x: pageSize[0] - margin - 36,
       y: footerHeight - 7,
       font: regular,
@@ -378,7 +337,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     if (pageNumber > 0) drawFooter();
     page = document.addPage(pageSize);
     pageNumber += 1;
-    y = pageSize[1] - margin - headerHeight;
+    y = pageSize[1] - margin - reportHeaderHeight;
     drawHeader();
   };
 
@@ -466,7 +425,9 @@ export async function createPdfReport(options: PdfReportOptions) {
     };
 
     for (const run of runs.length ? runs : [{ text: "" }]) {
-      for (const token of safePdfText(run.text).split(/(\n|\s+)/).filter(Boolean)) {
+      for (const token of safePdfText(run.text)
+        .split(/(\n|\s+)/)
+        .filter(Boolean)) {
         appendToken(token, run);
       }
     }
@@ -484,7 +445,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     let cursor = x;
     for (const run of runs) {
       const font = fontForRun(run);
-      page.drawText(run.text, {
+      drawText(page, run.text, {
         x: cursor,
         y: lineY,
         font,
@@ -507,9 +468,12 @@ export async function createPdfReport(options: PdfReportOptions) {
       size,
       textOptions.maxWidth ?? contentWidth - indent,
     );
-    ensureSpace(lines.length * lineHeight + (textOptions.gapAfter ?? 0));
-    for (const line of lines) {
-      page.drawText(line, {
+    for (const [index, line] of lines.entries()) {
+      ensureSpace(
+        lineHeight +
+          (index === lines.length - 1 ? (textOptions.gapAfter ?? 0) : 0),
+      );
+      drawText(page, line, {
         x: margin + indent,
         y,
         font,
@@ -544,17 +508,20 @@ export async function createPdfReport(options: PdfReportOptions) {
       const lines = options.runs?.length
         ? wrapRuns(options.runs, size, maxWidth)
         : wrapText(text, font, size, maxWidth).map((line) => [{ text: line }]);
-      ensureSpace(lines.length * lineHeight + (options.gapAfter ?? 0));
-      if (options.bullet) {
-        page.drawText(safePdfText(options.bullet), {
-          x: margin + indent,
-          y,
-          font: bold,
-          size,
-          color: options.color ?? reportPalette.ink,
-        });
-      }
       for (const [index, line] of lines.entries()) {
+        ensureSpace(
+          lineHeight +
+            (index === lines.length - 1 ? (options.gapAfter ?? 0) : 0),
+        );
+        if (index === 0 && options.bullet) {
+          drawText(page, safePdfText(options.bullet), {
+            x: margin + indent,
+            y,
+            font: bold,
+            size,
+            color: options.color ?? reportPalette.ink,
+          });
+        }
         if (options.runs?.length) {
           drawRunLine(
             line,
@@ -564,7 +531,7 @@ export async function createPdfReport(options: PdfReportOptions) {
             options.color ?? reportPalette.ink,
           );
         } else {
-          page.drawText(line[0]?.text ?? "", {
+          drawText(page, line[0]?.text ?? "", {
             x: margin + indent + bulletWidth,
             y,
             font,
@@ -573,9 +540,6 @@ export async function createPdfReport(options: PdfReportOptions) {
           });
         }
         y -= lineHeight;
-        if (index === 0 && options.bullet) {
-          // Subsequent wrapped lines align with the text, not the marker.
-        }
       }
       y -= options.gapAfter ?? 0;
     };
@@ -648,7 +612,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       height: 18,
       color: reportPalette.brand,
     });
-    page.drawText(safePdfText(title), {
+    drawText(page, safePdfText(title), {
       x: margin + 12,
       y,
       font: bold,
@@ -667,7 +631,7 @@ export async function createPdfReport(options: PdfReportOptions) {
 
   const addSubsection = (title: string) => {
     ensureSpace(24);
-    page.drawText(safePdfText(title), {
+    drawText(page, safePdfText(title), {
       x: margin,
       y,
       font: bold,
@@ -686,9 +650,11 @@ export async function createPdfReport(options: PdfReportOptions) {
     const title = `${input.number}. (${input.typeLabel}) ${input.title}`;
     const titleLines = wrapText(title, bold, 11.2, contentWidth - 22);
     const subtitleLines = input.subtitle
-      ? clampLines(wrapText(input.subtitle, regular, 8.6, contentWidth - 22), 2)
+      ? wrapText(input.subtitle, regular, 8.6, contentWidth - 22)
       : [];
-    const boxHeight = 22 + titleLines.length * 13 + subtitleLines.length * 11;
+    const inlineSubtitleLines = subtitleLines.length <= 4 ? subtitleLines : [];
+    const boxHeight =
+      22 + titleLines.length * 13 + inlineSubtitleLines.length * 11;
     ensureSpace(boxHeight + 12);
     y -= 2;
     page.drawRectangle({
@@ -709,7 +675,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     });
     let localY = y - 8;
     for (const line of titleLines) {
-      page.drawText(line, {
+      drawText(page, line, {
         x: margin + 12,
         y: localY,
         font: bold,
@@ -718,8 +684,8 @@ export async function createPdfReport(options: PdfReportOptions) {
       });
       localY -= 13;
     }
-    for (const line of subtitleLines) {
-      page.drawText(line, {
+    for (const line of inlineSubtitleLines) {
+      drawText(page, line, {
         x: margin + 12,
         y: localY,
         font: regular,
@@ -729,6 +695,15 @@ export async function createPdfReport(options: PdfReportOptions) {
       localY -= 11;
     }
     y -= boxHeight + 6;
+    if (subtitleLines.length > inlineSubtitleLines.length && input.subtitle) {
+      addText(input.subtitle, {
+        size: 8.6,
+        color: reportPalette.muted,
+        indent: 12,
+        maxWidth: contentWidth - 22,
+        gapAfter: 8,
+      });
+    }
   };
 
   const addMetaGrid = (items: PdfMetaItem[]) => {
@@ -739,15 +714,21 @@ export async function createPdfReport(options: PdfReportOptions) {
       const row = visible.slice(index, index + 2);
       const prepared = row.map((item) => ({
         item,
-        valueLines: clampLines(
-          wrapText(item.value, regular, 8.8, columnWidth - 16),
-          3,
-        ),
+        valueLines: wrapText(item.value, regular, 8.8, columnWidth - 16),
       }));
       const rowHeight = Math.max(
         36,
         Math.max(...prepared.map((item) => item.valueLines.length)) * 10.5 + 21,
       );
+      const maxCardHeight =
+        pageSize[1] - reportHeaderHeight - footerHeight - margin * 2 - 20;
+      if (rowHeight > maxCardHeight) {
+        for (const item of row) {
+          addSubsection(item.label);
+          addText(item.value, { size: 8.8, gapAfter: 8 });
+        }
+        continue;
+      }
       ensureSpace(rowHeight + 8);
       row.forEach((item, column) => {
         const valueLines = prepared[column].valueLines;
@@ -759,7 +740,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           height: rowHeight,
           color: reportPalette.subtle,
         });
-        page.drawText(safePdfText(item.label.toLocaleUpperCase("da-DK")), {
+        drawText(page, safePdfText(item.label.toLocaleUpperCase("da-DK")), {
           x: x + 8,
           y: y - 2,
           font: bold,
@@ -768,7 +749,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         });
         let valueY = y - 16;
         for (const line of valueLines) {
-          page.drawText(line, {
+          drawText(page, line, {
             x: x + 8,
             y: valueY,
             font: regular,
@@ -812,7 +793,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       borderColor: reportPalette.line,
       borderWidth: 0.3,
     });
-    page.drawText(safePdfText(label), {
+    drawText(page, safePdfText(label), {
       x: margin + 8,
       y: y - 3,
       font: bold,
@@ -822,7 +803,11 @@ export async function createPdfReport(options: PdfReportOptions) {
     y -= 24;
   };
 
-  const addTable = <T>(columns: TableColumn<T>[], rows: T[], emptyText: string) => {
+  const addTable = <T>(
+    columns: TableColumn<T>[],
+    rows: T[],
+    emptyText: string,
+  ) => {
     if (!rows.length) {
       addParagraph(emptyText);
       return;
@@ -830,7 +815,6 @@ export async function createPdfReport(options: PdfReportOptions) {
 
     const headerHeight = 22;
     const lineHeight = 12;
-    const maxCellLines = 6;
     let shouldDrawHeader = true;
     const drawTableHeader = () => {
       page.drawRectangle({
@@ -842,7 +826,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       });
       let headerX = margin;
       for (const column of columns) {
-        page.drawText(safePdfText(column.label), {
+        drawText(page, safePdfText(column.label), {
           x: headerX + 6,
           y: y - 8,
           font: bold,
@@ -855,78 +839,94 @@ export async function createPdfReport(options: PdfReportOptions) {
       shouldDrawHeader = false;
     };
 
-    const usablePageHeight = pageSize[1] - headerHeight - footerHeight - margin * 2;
     for (const row of rows) {
       const cells = columns.map((column) =>
-        clampLines(
-          wrapText(column.getValue(row) || "-", regular, 8.5, column.width - 10),
-          maxCellLines,
-        ),
+        wrapText(column.getValue(row) || "-", regular, 8.5, column.width - 10),
       );
-      const rowHeight =
-        Math.min(
-          usablePageHeight - headerHeight - 18,
-          Math.max(26, Math.max(...cells.map((cell) => cell.length)) * lineHeight + 12),
-        );
-      const startedNewPage = ensureSpace(
-        (shouldDrawHeader ? headerHeight : 0) + rowHeight + 12,
-      );
-      if (startedNewPage) shouldDrawHeader = true;
-
-      if (shouldDrawHeader) drawTableHeader();
-
-      page.drawRectangle({
-        x: margin,
-        y: y - rowHeight + 4,
-        width: contentWidth,
-        height: rowHeight,
-        color: rgb(1, 1, 1),
-        borderColor: reportPalette.line,
-        borderWidth: 0.35,
-      });
-      let cellX = margin;
-      cells.forEach((cellLines, index) => {
-        let cellY = y - 9;
-        for (const line of cellLines) {
-          page.drawText(line, {
-            x: cellX + 6,
-            y: cellY,
-            font: regular,
-            size: 8.5,
-            color: reportPalette.ink,
-          });
-          cellY -= lineHeight;
+      const lineCount = Math.max(...cells.map((cell) => cell.length));
+      let lineOffset = 0;
+      while (lineOffset < lineCount) {
+        if (shouldDrawHeader) {
+          ensureSpace(headerHeight + 26);
+          drawTableHeader();
         }
-        cellX += columns[index].width;
-      });
-      y -= rowHeight;
+        const availableHeight = y - (footerHeight + margin) - 12;
+        const linesOnPage = Math.max(
+          1,
+          Math.min(
+            lineCount - lineOffset,
+            Math.floor((availableHeight - 12) / lineHeight),
+          ),
+        );
+        const rowHeight = Math.max(26, linesOnPage * lineHeight + 12);
+        if (availableHeight < rowHeight) {
+          newPage();
+          shouldDrawHeader = true;
+          continue;
+        }
+
+        page.drawRectangle({
+          x: margin,
+          y: y - rowHeight + 4,
+          width: contentWidth,
+          height: rowHeight,
+          color: rgb(1, 1, 1),
+          borderColor: reportPalette.line,
+          borderWidth: 0.35,
+        });
+        let cellX = margin;
+        cells.forEach((cellLines, index) => {
+          let cellY = y - 9;
+          for (const line of cellLines.slice(
+            lineOffset,
+            lineOffset + linesOnPage,
+          )) {
+            drawText(page, line, {
+              x: cellX + 6,
+              y: cellY,
+              font: regular,
+              size: 8.5,
+              color: reportPalette.ink,
+            });
+            cellY -= lineHeight;
+          }
+          cellX += columns[index].width;
+        });
+        y -= rowHeight;
+        lineOffset += linesOnPage;
+        if (lineOffset < lineCount) {
+          newPage();
+          shouldDrawHeader = true;
+        }
+      }
     }
     y -= 8;
   };
 
   const addAttachmentTitle = (attachment: PdfReportAttachment) => {
     const title = `Bilag ${attachment.appendixNumber} - ${attachment.pointLabel}: ${attachment.fileName}`;
-    ensureSpace(46);
+    const titleLines = wrapText(title, bold, 10.2, contentWidth - 22);
+    const boxHeight = Math.max(32, titleLines.length * 11.5 + 14);
+    ensureSpace(boxHeight + 14);
     page.drawRectangle({
       x: margin,
-      y: y - 25,
+      y: y - boxHeight + 7,
       width: contentWidth,
-      height: 32,
+      height: boxHeight,
       color: reportPalette.brandSoft,
       borderColor: reportPalette.line,
       borderWidth: 0.35,
     });
     page.drawRectangle({
       x: margin,
-      y: y - 25,
+      y: y - boxHeight + 7,
       width: 3,
-      height: 32,
+      height: boxHeight,
       color: reportPalette.brand,
     });
-    const titleLines = clampLines(wrapText(title, bold, 10.2, contentWidth - 22), 2);
     let titleY = y - 6;
     for (const line of titleLines) {
-      page.drawText(line, {
+      drawText(page, line, {
         x: margin + 12,
         y: titleY,
         font: bold,
@@ -935,7 +935,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       });
       titleY -= 11.5;
     }
-    y -= 42;
+    y -= boxHeight + 10;
   };
 
   const addImageAttachment = async (attachment: PdfReportAttachment) => {
@@ -962,7 +962,11 @@ export async function createPdfReport(options: PdfReportOptions) {
 
     const availableHeight = y - (footerHeight + margin);
     const maxHeight = Math.max(120, availableHeight);
-    const scale = Math.min(contentWidth / image.width, maxHeight / image.height, 1);
+    const scale = Math.min(
+      contentWidth / image.width,
+      maxHeight / image.height,
+      1,
+    );
     const width = image.width * scale;
     const height = image.height * scale;
     if (height > availableHeight) {
@@ -983,7 +987,9 @@ export async function createPdfReport(options: PdfReportOptions) {
     hasMoreAttachments: boolean,
   ) => {
     if (!attachment.bytes) {
-      addParagraph("PDF-bilaget kunne ikke hentes og er derfor ikke indlejret.");
+      addParagraph(
+        "PDF-bilaget kunne ikke hentes og er derfor ikke indlejret.",
+      );
       return;
     }
 
@@ -991,7 +997,10 @@ export async function createPdfReport(options: PdfReportOptions) {
       const source = await PDFDocument.load(attachment.bytes, {
         ignoreEncryption: true,
       });
-      const copiedPages = await document.copyPages(source, source.getPageIndices());
+      const copiedPages = await document.copyPages(
+        source,
+        source.getPageIndices(),
+      );
       addParagraph("PDF-bilaget er indsat på de følgende sider.");
       for (const copiedPage of copiedPages) {
         document.addPage(copiedPage);
@@ -1006,7 +1015,9 @@ export async function createPdfReport(options: PdfReportOptions) {
         mimeType: attachment.mimeType,
         error: error instanceof Error ? error.message : String(error),
       });
-      addParagraph("PDF-bilaget kunne ikke indlejres. Se den originale fil i appen.");
+      addParagraph(
+        "PDF-bilaget kunne ikke indlejres. Se den originale fil i appen.",
+      );
     }
   };
 
