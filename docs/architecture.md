@@ -542,6 +542,18 @@ chrome, and personal task summaries should use lightweight emphasis instead of
 large dashboard cards. These are presentation rules only and do not alter
 authorization, services, repositories, or data ownership.
 
+Issue 3 adds a small information-hierarchy layer to that composition contract.
+`PageHeader` and `PageSection` own the responsive title/action relationship;
+semantic CSS classes own metric strips, entity headers, metadata grids,
+workflow callouts, filter result bars, and action/status clusters. The
+organization registers use `page-flow` instead of route-specific bottom
+margins, and the custom meeting header consumes the same page typography.
+Task summary metrics render as a visible grid on mobile, while the deliberate
+horizontal interaction model of Task View remains unchanged. Status continues
+to include text, focus-visible remains token-driven, and DOM order does not
+change between viewports. No query, mutation, capability, URL-state, PDF,
+database, or RLS boundary is part of this layer.
+
 Phase 7R.8 extends the same polish principle to PDF exports. The shared
 `pdf-report` foundation remains the only report layout system for existing
 minutes and Job Card downloads, but it now wraps long words and URLs, constrains

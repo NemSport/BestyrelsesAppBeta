@@ -19,7 +19,7 @@ export function DashboardPriorityPanel({
       className="border-y border-brand/25 bg-brand-soft/35 px-3 py-4 sm:px-5 sm:py-5"
       data-dashboard-priority={eyebrow}
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="section-header flex-col lg:flex-row">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
             {eyebrow}
@@ -32,7 +32,7 @@ export function DashboardPriorityPanel({
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {action ? <div className="section-actions">{action}</div> : null}
       </div>
       <div className="mt-4">{children}</div>
     </section>

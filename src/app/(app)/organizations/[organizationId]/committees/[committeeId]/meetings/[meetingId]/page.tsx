@@ -9,11 +9,7 @@ import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-sec
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
-import {
-  PageSection,
-  StatusBadge,
-  buttonClassName,
-} from "@/components/ui";
+import { PageSection, StatusBadge, buttonClassName } from "@/components/ui";
 import {
   agendaItemMinutesStatusLabels,
   agendaItemTransferReasonLabels,
@@ -120,17 +116,12 @@ function MeetingWorkOverview({
           </p>
         </div>
       </div>
-      <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+      <dl className="metric-strip">
         {items.map((item) => (
-          <div
-            className="border-l-2 border-line bg-subtle/25 px-3 py-2"
-            key={item.label}
-          >
-            <dt className="text-xs font-medium text-muted">{item.label}</dt>
+          <div className="metric-item" key={item.label}>
+            <dt className="metric-label">{item.label}</dt>
             <dd className="mt-1 flex items-baseline gap-2">
-              <span className="text-xl font-semibold text-ink">
-                {item.value}
-              </span>
+              <span className="metric-value">{item.value}</span>
               {item.attention ? (
                 <span className="text-xs font-semibold text-warning">
                   Kræver blik

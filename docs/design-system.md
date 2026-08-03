@@ -36,21 +36,21 @@ RGB channels so Tailwind opacity modifiers continue to work.
 
 ### Brand colors
 
-| Token | Purpose |
-|---|---|
-| `--brand-primary` | Primary actions and strong navigation emphasis |
-| `--brand-primary-hover` | Primary action hover state |
-| `--brand-secondary` | Supporting emphasis |
-| `--brand-accent` | Focus, highlights, and restrained active states |
-| `--brand-accent-soft` | Quiet accent surfaces |
-| `--brand-background` | Application background |
-| `--brand-surface` | Panels, documents, dialogs, and fields |
-| `--brand-surface-subtle` | Secondary surfaces and quiet toolbars |
-| `--brand-text` | Primary text |
-| `--brand-text-muted` | Metadata and secondary text |
-| `--brand-text-subtle` | Placeholders and low-emphasis text |
-| `--brand-border` | Standard separators and borders |
-| `--brand-border-strong` | Interactive control borders |
+| Token                    | Purpose                                         |
+| ------------------------ | ----------------------------------------------- |
+| `--brand-primary`        | Primary actions and strong navigation emphasis  |
+| `--brand-primary-hover`  | Primary action hover state                      |
+| `--brand-secondary`      | Supporting emphasis                             |
+| `--brand-accent`         | Focus, highlights, and restrained active states |
+| `--brand-accent-soft`    | Quiet accent surfaces                           |
+| `--brand-background`     | Application background                          |
+| `--brand-surface`        | Panels, documents, dialogs, and fields          |
+| `--brand-surface-subtle` | Secondary surfaces and quiet toolbars           |
+| `--brand-text`           | Primary text                                    |
+| `--brand-text-muted`     | Metadata and secondary text                     |
+| `--brand-text-subtle`    | Placeholders and low-emphasis text              |
+| `--brand-border`         | Standard separators and borders                 |
+| `--brand-border-strong`  | Interactive control borders                     |
 
 Status tokens are provided for danger, success, warning, information, and
 progress, each with a matching soft surface.
@@ -70,24 +70,54 @@ progress, each with a matching soft surface.
 
 Shared primitives are exported from `src/components/ui`.
 
-| Component | Use |
-|---|---|
-| `AppShell` | Authenticated application frame and navigation |
-| `PageHeader` | Page title, context, and primary actions |
-| `PageSection` | Major content section with optional actions |
-| `ContentPanel` | Bounded application workflow |
-| `DocumentPanel` | Minutes and document-like content |
-| `ActionBar` | Form or section actions separated from content |
-| `Button` | Primary, secondary, danger, and ghost actions |
-| `Input`, `Textarea`, `Select` | Standard form controls |
-| `StatusBadge` | Compact semantic state |
-| `EmptyState` | Helpful absence of content, optionally with one action |
-| `Table` components | Member and administration data |
-| `Modal` | Focused create/edit/read workflows without navigation |
-| `Dropdown` | Compact secondary actions |
+| Component                     | Use                                                    |
+| ----------------------------- | ------------------------------------------------------ |
+| `AppShell`                    | Authenticated application frame and navigation         |
+| `PageHeader`                  | Page title, context, and primary actions               |
+| `PageSection`                 | Major content section with optional actions            |
+| `ContentPanel`                | Bounded application workflow                           |
+| `DocumentPanel`               | Minutes and document-like content                      |
+| `ActionBar`                   | Form or section actions separated from content         |
+| `Button`                      | Primary, secondary, danger, and ghost actions          |
+| `Input`, `Textarea`, `Select` | Standard form controls                                 |
+| `StatusBadge`                 | Compact semantic state                                 |
+| `EmptyState`                  | Helpful absence of content, optionally with one action |
+| `Table` components            | Member and administration data                         |
+| `Modal`                       | Focused create/edit/read workflows without navigation  |
+| `Dropdown`                    | Compact secondary actions                              |
 
 Domain components should compose these primitives instead of reproducing their
 base borders, spacing, colors, and interaction states.
+
+## Information Hierarchy Contract
+
+Issue 3 standardizes the hierarchy used by dashboards, meeting workspaces, and
+organization registers:
+
+1. A page starts with eyebrow, one `h1`, a short lead, and its permitted
+   primary action. Actions follow the text on mobile and align right on wider
+   screens without changing DOM order.
+2. A major section uses one `h2`, optional supporting text, and an action slot.
+   Supporting text is quieter than titles and never replaces a status label.
+3. A record starts with its title and primary lifecycle status. Scope,
+   category, dates, and ownership belong in the metadata grid or a quieter
+   status cluster. Repeated secondary values should not all receive primary
+   badge weight.
+4. Summary metrics use the shared metric strip: short label, prominent value,
+   and optional textual qualifier. Mobile renders the same metrics as a
+   two-column grid rather than hiding them in horizontal scrolling.
+5. Filters use a quiet bounded surface. Result count, active filters, view
+   switch, and the capability-gated primary action share one summary bar.
+6. Surfaces have three levels: the page background, flat divider-based
+   sections/records, and bounded workflow or document surfaces. Elevation is
+   reserved for dialogs and genuinely interactive full-surface links.
+
+The shared classes are `page-flow`, `page-header`, `section-header`,
+`page-actions`, `section-actions`, `action-cluster`, `status-cluster`,
+`metric-strip`, `entity-record`, `entity-header`, `entity-metadata-grid`,
+`workflow-panel`, `register-summary-bar`, and `filter-result-bar`. They are
+presentation-only. Capability checks, URL state, service authorization, and
+RLS remain in their existing owners.
 
 ## Meeting and Minutes UI
 

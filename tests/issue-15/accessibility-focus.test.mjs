@@ -56,7 +56,10 @@ test("global disclosures and quick actions have keyboard dismissal", () => {
 
 test("core form controls retain labels, descriptions, and error relations", () => {
   for (const label of ["Navn", "E-mail", "Mobil", "Funktion eller notat"]) {
-    assert.match(participants, new RegExp(`>${label}<|\\n\\s+${label}\\n`));
+    assert.match(
+      participants,
+      new RegExp(`>${label}<|\\r?\\n\\s+${label}\\r?\\n`),
+    );
   }
   assert.match(resourceForm, /aria-labelledby=\{labelId\}/);
   assert.match(resourceForm, /\[helpId, errorId\]\.filter\(Boolean\)/);

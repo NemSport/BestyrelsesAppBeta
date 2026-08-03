@@ -14,14 +14,13 @@ export default async function TasksPage({
   );
 
   return (
-    <>
+    <div className="page-flow">
       <PageHeader
-        className="mb-8"
         description="Saml organisationens opgaver, ansvar og deadlines på tværs af udvalg."
         eyebrow="Handling og eksekvering"
         title="Opgaver"
       />
       <TaskRegister data={data} organizationId={organizationId} />
-    </>
+    </div>
   );
 }

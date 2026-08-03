@@ -850,6 +850,16 @@ Business workflows and authorization remain in the existing page, service,
 repository, and RLS layers; the UI components contain presentation behavior
 only.
 
+Issue 3 makes this hierarchy explicit across dashboards, meetings, tasks,
+decisions, members, Annual Wheel, and Job Cards. Pages and sections now share
+the same title/action alignment, records use a common title-status-metadata
+order, filter results use one summary/action bar, and metrics keep the same
+semantic order in a visible mobile grid. Secondary metadata is smaller and
+status badges are more restrained while retaining textual labels, contrast,
+and the existing focus-visible outline. The change is presentation-only: no
+capability, URL-state, service, repository, RLS, database, or PDF contract is
+changed.
+
 Phase 1.6-A4 applies this foundation to meetings, agendas, and minutes. A
 meeting uses one document header for title, committee, date, meeting status,
 minutes status, location, attendee count, agenda count, and transfer count.

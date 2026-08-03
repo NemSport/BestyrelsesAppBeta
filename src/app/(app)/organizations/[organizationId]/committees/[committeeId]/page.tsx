@@ -211,18 +211,16 @@ export default async function CommitteeDashboardPage({
         root={root}
       />
 
-      <div className="grid divide-y divide-line border-y border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <div className="px-1 py-4 sm:px-5">
-          <p className="metadata">Kommende møder</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {upcomingMeetings.length}
-          </p>
+      <div className="metric-strip sm:grid-cols-3 xl:grid-cols-3">
+        <div className="metric-item">
+          <p className="metric-label">Kommende møder</p>
+          <p className="metric-value">{upcomingMeetings.length}</p>
         </div>
         {dashboardAudience === "viewer" ? (
           <>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Godkendte referater</p>
-              <p className="mt-1 text-2xl font-semibold">
+            <div className="metric-item">
+              <p className="metric-label">Godkendte referater</p>
+              <p className="metric-value">
                 {
                   overview.recentMinutes.filter(
                     (minutes) => minutes.status === "approved",
@@ -230,8 +228,8 @@ export default async function CommitteeDashboardPage({
                 }
               </p>
             </div>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Læserolle</p>
+            <div className="metric-item">
+              <p className="metric-label">Læserolle</p>
               <p className="mt-1 text-sm font-semibold">
                 Ingen skrivehandlinger
               </p>
@@ -239,34 +237,28 @@ export default async function CommitteeDashboardPage({
           </>
         ) : dashboardAudience === "member" ? (
           <>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Mine åbne opgaver</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {overview.myOpenTasks.length}
-              </p>
+            <div className="metric-item">
+              <p className="metric-label">Mine åbne opgaver</p>
+              <p className="metric-value">{overview.myOpenTasks.length}</p>
             </div>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Aktive beslutninger</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {overview.activeDecisions.length}
-              </p>
+            <div className="metric-item">
+              <p className="metric-label">Aktive beslutninger</p>
+              <p className="metric-value">{overview.activeDecisions.length}</p>
             </div>
           </>
         ) : (
           <>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Punkter der kræver handling</p>
-              <p className="mt-1 text-2xl font-semibold">
+            <div className="metric-item">
+              <p className="metric-label">Punkter der kræver handling</p>
+              <p className="metric-value">
                 {overview.openFollowUps.length +
                   overview.decisionsRequired.length +
                   overview.transfers.length}
               </p>
             </div>
-            <div className="px-1 py-4 sm:px-5">
-              <p className="metadata">Medlemmer</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {overview.members.length}
-              </p>
+            <div className="metric-item">
+              <p className="metric-label">Medlemmer</p>
+              <p className="metric-value">{overview.members.length}</p>
             </div>
           </>
         )}
