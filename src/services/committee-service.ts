@@ -9,6 +9,8 @@ import { NotFoundError } from "@/lib/errors";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
+import { DecisionRepository } from "@/repositories/decision-repository";
+import { TaskRepository } from "@/repositories/task-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import type { Database } from "@/types/database";
 import type { CommitteeOverview } from "@/types/domain";
@@ -19,6 +21,8 @@ export class CommitteeService {
   private readonly committees: CommitteeRepository;
   private readonly agendaItems: AgendaItemRepository;
   private readonly meetings: MeetingRepository;
+  private readonly decisions: DecisionRepository;
+  private readonly tasks: TaskRepository;
   private readonly organizationMembers: OrganizationMemberRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
@@ -27,6 +31,8 @@ export class CommitteeService {
     this.committees = new CommitteeRepository(db);
     this.agendaItems = new AgendaItemRepository(db);
     this.meetings = new MeetingRepository(db);
+    this.decisions = new DecisionRepository(db);
+    this.tasks = new TaskRepository(db);
     this.organizationMembers = new OrganizationMemberRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
@@ -41,7 +47,10 @@ export class CommitteeService {
   async create(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = committeeInputSchema.parse(input);
-    await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+    );
     return this.committees.create(
       parsed.organizationId,
       parsed.name,
@@ -67,6 +76,8 @@ export class CommitteeService {
       agendaItemMinutes,
       transfers,
       organizationMembers,
+      responsibleTasks,
+      decisions,
     ] = await Promise.all([
       this.meetings.listByCommittee(committeeId),
       this.agendaItems.listByCommittee(committeeId),
@@ -74,9 +85,13 @@ export class CommitteeService {
       this.committees.listAgendaItemMinutes(committeeId),
       this.committees.listActiveTransfers(committeeId),
       this.organizationMembers.listMembers(organizationId),
+      this.tasks.listByResponsible(organizationId, user.id),
+      this.decisions.listByCommittee(organizationId, committeeId),
     ]);
 
-    const meetingsById = new Map(meetings.map((meeting) => [meeting.id, meeting]));
+    const meetingsById = new Map(
+      meetings.map((meeting) => [meeting.id, meeting]),
+    );
     const agendaItemsById = new Map(
       agendaItems.map((agendaItem) => [agendaItem.id, agendaItem]),
     );
@@ -159,13 +174,33 @@ export class CommitteeService {
             ]
           : [];
       }),
+      myOpenTasks: responsibleTasks
+        .filter(
+          (task) =>
+            task.committee_id === committeeId &&
+            !task.archived_at &&
+            task.status !== "completed" &&
+            task.status !== "cancelled",
+        )
+        .slice(0, 5),
+      activeDecisions: decisions
+        .filter(
+          (decision) =>
+            !decision.archived_at &&
+            decision.status !== "completed" &&
+            decision.status !== "cancelled",
+        )
+        .slice(0, 5),
     };
   }
 
   async update(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = committeeUpdateSchema.parse(input);
-    await this.authorization.requireOrganizationAdmin(parsed.organizationId, user.id);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+    );
     const committee = await this.committees.findById(parsed.committeeId);
     if (!committee || committee.organization_id !== parsed.organizationId) {
       throw new NotFoundError("Udvalget");

@@ -116,6 +116,16 @@ across the committees visible to the current user. This is a presentation read
 model only; committee membership and PostgreSQL Row Level Security still
 determine which underlying records are returned.
 
+Issue 4 makes both overview levels role- and capability-aware without adding
+rights or a separate recommendation model. A viewer is led to upcoming and
+approved reading material, a member to their own open tasks and relevant active
+decisions, a chair to meeting preparation, participants, and minutes approval
+in committees they manage, and an administrator to organization-wide
+operations while retaining committee context. Empty states and calls to action
+use the same server-derived capabilities as their destination workflows. The
+viewer presentation omits write actions and action-detail titles rather than
+merely hiding them in the browser.
+
 ### Committee Workspace
 
 The operational home for a committee's meetings, agenda items, tasks, Annual

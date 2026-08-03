@@ -731,6 +731,14 @@ for next meeting, upcoming meetings, recent minutes, action-required points,
 and committee members. No new table, lifecycle, permission, or mutation flow
 is introduced; PostgreSQL RLS remains the final visibility boundary.
 
+Issue 4 extends that read model after the membership check with two parallel,
+existing repository reads: tasks assigned to the current user and active
+decisions in the current committee. Both remain organization-/committee-scoped
+and RLS-protected. A shared dashboard-priority presentation resolves viewer,
+member, chair, or admin from organization role, committee role, and the same
+meeting capabilities used by server workflows. It changes ordering, copy, and
+links only; it does not move mutation authorization into React components.
+
 ### Organization Overview Read Model
 
 Phase 1.6-B2 adds an organization-scoped read model without adding dashboard
@@ -741,6 +749,22 @@ maps these records into compact organization metrics, committee summaries,
 upcoming meetings, recent minutes, and action-required agenda items. Data from
 committees the current user cannot access is excluded by the existing
 PostgreSQL policies.
+
+Issue 4 reuses those records and the existing per-committee capabilities to put
+the next permitted action first. Viewer output includes only readable meeting
+and approved-minutes destinations; member output prioritizes the current
+user's tasks before RLS-visible decisions; chair output prioritizes preparation,
+participants, and approval within managed committees; admin output prioritizes
+cross-committee operational attention. Capability-aware empty states never
+offer a write destination that the corresponding server workflow would reject.
+Loading and error boundaries cover the organization route, and the shared
+priority surface preserves the same content order at mobile widths.
+
+This change deliberately adds no dashboard table, policy, RPC, mutation, or
+cross-tenant query. It also avoids a new recommendation engine. The existing
+organization overview still performs its established per-committee capability
+resolution; reducing those round trips would require a measured repository or
+RPC optimization and is not part of the presentation change.
 
 Phase 3 extends this presentation read model with active decisions, open
 organization tasks, and open tasks assigned to the current user. The data is
