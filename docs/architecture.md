@@ -2210,3 +2210,13 @@ and pay for the service.
 
 **Success criterion:** The system supports complex organizations while
 preserving reliable committee memory, accountability, and tenant isolation.
+
+# Issue 13 Presentation-state Boundary
+
+The shared empty-state component models `empty`, `filtered`, `read-only`, and
+`error` as presentation semantics. Route and domain components remain
+responsible for passing existing capability decisions and valid destinations.
+The component never queries data, derives roles, or authorizes mutations.
+Loading remains a distinct route state with `aria-busy`, while errors retain
+alert semantics and retry/navigation actions. No database, repository, service,
+RLS, tenant-scope, or committee-scope changes are introduced.

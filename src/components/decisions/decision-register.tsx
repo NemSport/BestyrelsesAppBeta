@@ -986,6 +986,13 @@ export function DecisionRegister({
               <Button onClick={resetFilters} variant="secondary">
                 Nulstil filtre
               </Button>
+            ) : decisions.length ? (
+              <Button
+                onClick={() => updateFilter("showArchived", true)}
+                variant="secondary"
+              >
+                Vis arkiverede beslutninger
+              </Button>
             ) : canCreate ? (
               <Button onClick={openCreate}>Opret fra dagsordenspunkt</Button>
             ) : null
@@ -998,6 +1005,9 @@ export function DecisionRegister({
                 : canCreate
                   ? "Opret den første beslutning fra det dagsordenspunkt, hvor den blev truffet."
                   : "Der er endnu ikke registreret beslutninger i de udvalg, du har adgang til."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters

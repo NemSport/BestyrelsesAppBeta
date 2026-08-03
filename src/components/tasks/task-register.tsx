@@ -1152,6 +1152,22 @@ export function TaskRegister({
         )
       ) : (
         <EmptyState
+          action={
+            hasActiveFilters ? (
+              <Button onClick={resetFilters} variant="secondary">
+                Nulstil filtre
+              </Button>
+            ) : tasks.length ? (
+              <Button
+                onClick={() => updateFilter("showArchived", true)}
+                variant="secondary"
+              >
+                Vis arkiverede opgaver
+              </Button>
+            ) : canCreate ? (
+              <Button onClick={openCreate}>Opret første opgave</Button>
+            ) : undefined
+          }
           description={
             tasks.length && hasActiveFilters
               ? "Ingen opgaver matcher de valgte filtre. Ryd et eller flere filtre for at udvide visningen."
@@ -1160,6 +1176,9 @@ export function TaskRegister({
                 : canCreate
                   ? "Opret den første opgave og gør ansvar og deadline tydelig."
                   : "Der er endnu ikke registreret opgaver i de udvalg, du har adgang til."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters

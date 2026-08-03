@@ -201,3 +201,22 @@ Missing Supabase sessions are treated as normal unauthenticated state rather
 than repository failures. This preserves the login redirect and prevents
 protected routes from rendering a server error when a session is absent or
 has been cleared.
+
+# Empty, Filtered, Read-only, and Error States
+
+Issue 13 uses the shared `EmptyState` component for four explicit presentation
+states:
+
+- `empty`: no in-scope records exist; explain what creates the first record and
+  show a create action only when an existing capability allows it.
+- `filtered`: in-scope records exist but the current filters return nothing;
+  announce the result politely and offer reset before creation.
+- `read-only`: the user can read the area but cannot perform the relevant
+  mutation; explain that an authorized responsible person can make the change,
+  without exposing policy internals.
+- `error`: loading failed; use alert semantics and a retry or safe navigation
+  action. Loading skeletons remain separate and use `aria-busy`.
+
+Actions must point to existing destinations or invoke existing workflows. The
+caller supplies server-derived capabilities; `EmptyState` contains no role or
+authorization logic.

@@ -88,6 +88,17 @@ export function CommitteeDashboardPriority({
               </Link>
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`${root}/meetings`}
+                  >
+                    Se mødeoversigt
+                  </Link>
+                }
                 compact
                 description="Når udvalget planlægger et møde, vises det her."
                 title="Der er intet kommende møde at læse."
@@ -107,6 +118,17 @@ export function CommitteeDashboardPriority({
               </Link>
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`${root}/meetings`}
+                  >
+                    Se referatoversigt
+                  </Link>
+                }
                 compact
                 description="Godkendte referater vises her, når de er tilgængelige."
                 title="Der er intet godkendt referat endnu."
@@ -125,6 +147,17 @@ export function CommitteeDashboardPriority({
                 />
               ) : (
                 <EmptyState
+                  action={
+                    <Link
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
+                      href={`/organizations/${organizationId}/tasks/my`}
+                    >
+                      Se mine opgaver
+                    </Link>
+                  }
                   compact
                   description="Der vises kun opgaver i dette udvalg, som er tildelt dig."
                   title="Du har ingen åbne opgaver her."
@@ -141,6 +174,17 @@ export function CommitteeDashboardPriority({
                 />
               ) : (
                 <EmptyState
+                  action={
+                    <Link
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "secondary",
+                      })}
+                      href={`/organizations/${organizationId}/decisions`}
+                    >
+                      Se beslutningsregister
+                    </Link>
+                  }
                   compact
                   description="Beslutninger vises, når de er aktive og tilgængelige for dig."
                   title="Der er ingen aktive beslutninger."

@@ -1397,3 +1397,13 @@ repositories, tests, and UI copy.
 The legacy organizational term beginning with `B` must not be introduced in
 domain naming. A Kanban-style task interface should be called **Task View** or
 **Task Workflow**, not by terminology that conflicts with the Committee model.
+
+# Issue 13: Actionable Empty-state Guidance
+
+Issue 13 distinguishes genuinely empty data, filter no-results, read-only
+guidance, loading, and errors. Calls to action are selected from existing
+server-derived organization and committee capabilities, so viewers and members
+do not receive permanently forbidden editor actions. Meeting-minutes guidance
+also distinguishes reading from official-minutes editing and referent control.
+This is a presentation and navigation change only; repositories, service
+authorization, Row Level Security, and tenant scope are unchanged.

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,8 +15,12 @@ import {
   TableHead,
   TableHeaderCell,
   TableRow,
+  buttonClassName,
 } from "@/components/ui";
-import type { OrganizationTrashData, OrganizationTrashItem } from "@/types/domain";
+import type {
+  OrganizationTrashData,
+  OrganizationTrashItem,
+} from "@/types/domain";
 
 const typeLabels: Record<OrganizationTrashItem["type"], string> = {
   organization: "Organisation",
@@ -63,16 +68,19 @@ export function OrganizationTrash({
     setRestoringId(item.id);
     setError(null);
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/trash`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          type: item.type,
-          id: item.id,
-          committeeId: item.committeeId,
-        }),
-      });
+      const response = await fetch(
+        `/api/organizations/${organizationId}/trash`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizationId,
+            type: item.type,
+            id: item.id,
+            committeeId: item.committeeId,
+          }),
+        },
+      );
       const result = (await response.json().catch(() => ({}))) as {
         error?: string;
       };
@@ -82,7 +90,8 @@ export function OrganizationTrash({
       }
       setItems((current) =>
         current.filter(
-          (candidate) => candidate.id !== item.id || candidate.type !== item.type,
+          (candidate) =>
+            candidate.id !== item.id || candidate.type !== item.type,
         ),
       );
       router.refresh();
@@ -96,7 +105,15 @@ export function OrganizationTrash({
   if (!items.length) {
     return (
       <EmptyState
-        description="Når organisationer, udvalg, møder eller dagsordenspunkter flyttes til papirkurven, vises de her i 30 dage."
+        action={
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href={`/organizations/${organizationId}`}
+          >
+            Tilbage til overblik
+          </Link>
+        }
+        description="Der er intet at gendanne. Når et element flyttes hertil, bliver det vist i op til 30 dage."
         title="Papirkurven er tom"
       />
     );
@@ -105,7 +122,10 @@ export function OrganizationTrash({
   return (
     <div className="space-y-4">
       {error ? (
-        <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
+        <div
+          className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}

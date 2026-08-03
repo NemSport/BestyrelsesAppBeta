@@ -948,6 +948,7 @@ export function JobCardRegister({
               }
               compact
               description="Prøv at rydde filtrene eller søge efter en anden rolle, et udvalg eller et ansvarsområde."
+              kind="filtered"
               title="Ingen jobkort matcher din søgning"
             />
           )}
@@ -966,6 +967,7 @@ export function JobCardRegister({
               ? "Start med den rolle, der har størst behov for tydeligt formål, ansvar og onboarding."
               : "En ejer eller administrator kan oprette organisationens første jobkort."
           }
+          kind={data.canManage ? "empty" : "read-only"}
           title="Der er endnu ikke oprettet jobkort i organisationen"
         />
       )}

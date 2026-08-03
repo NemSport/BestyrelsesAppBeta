@@ -101,6 +101,17 @@ export function OrganizationDashboardPriority({
               </Link>
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`${organizationRoot}/meetings`}
+                  >
+                    Se mødeoversigt
+                  </Link>
+                }
                 compact
                 description="Når et udvalg planlægger et møde, vises det her."
                 title="Der er intet kommende møde at læse endnu."
@@ -120,6 +131,17 @@ export function OrganizationDashboardPriority({
               </Link>
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href={`${organizationRoot}/meetings`}
+                  >
+                    Se referatoversigt
+                  </Link>
+                }
                 compact
                 description="Godkendte referater vises her, når de er tilgængelige for dig."
                 title="Der er intet godkendt referat endnu."
@@ -147,6 +169,17 @@ export function OrganizationDashboardPriority({
             </div>
           ) : (
             <EmptyState
+              action={
+                <Link
+                  className={buttonClassName({
+                    size: "sm",
+                    variant: "secondary",
+                  })}
+                  href={`${organizationRoot}/meetings`}
+                >
+                  Se kommende møder
+                </Link>
+              }
               compact
               description="Der vises kun opgaver, som er tildelt dig. Brug kommende møder som næste kontekst."
               title="Du har ingen åbne opgaver."
@@ -251,8 +284,16 @@ export function OrganizationDashboardPriority({
             })}
             {!committeeByAttention.length ? (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({ size: "sm" })}
+                    href={`${organizationRoot}/committees/new`}
+                  >
+                    Opret første udvalg
+                  </Link>
+                }
                 compact
-                description="Opret eller tilknyt et udvalg for at få driftsoversigt."
+                description="Opret organisationens første udvalg for at få møder, opgaver og beslutninger i driftsoversigten."
                 title="Organisationen har ingen synlige udvalg."
               />
             ) : null}

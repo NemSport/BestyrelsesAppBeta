@@ -1156,12 +1156,17 @@ export function AnnualWheel({
               <Button onClick={resetFilters} variant="secondary">
                 Nulstil filtre
               </Button>
+            ) : canCreate ? (
+              <Button onClick={openCreate}>Opret første aktivitet</Button>
             ) : undefined
           }
           description={
             hasActiveFilters
               ? "Der findes ingen elementer, som matcher de valgte filtre i perioden."
               : "Der er endnu ikke planlagt aktiviteter, møder, opgaver eller beslutningsdeadlines i perioden."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters
