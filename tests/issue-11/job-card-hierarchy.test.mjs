@@ -73,11 +73,13 @@ test("job card PDF leads with purpose, responsibility, expectations and next ste
   const purpose = pdf.indexOf('addRichKeyValue("Formål"');
   const responsibility = pdf.indexOf('addRichKeyValue("Ansvar"');
   const expectations = pdf.indexOf('addRichKeyValue("Forventninger"');
-  const nextSteps = pdf.indexOf(
-    'addRichKeyValue(\n    "Næste skridt - de første 30 dage"',
-  );
+  const nextSteps = pdf.indexOf('"Næste skridt - de første 30 dage"');
 
   assert.ok(overview > 0);
+  assert.ok(purpose > 0);
+  assert.ok(responsibility > 0);
+  assert.ok(expectations > 0);
+  assert.ok(nextSteps > 0);
   assert.ok(overview < purpose);
   assert.ok(purpose < responsibility);
   assert.ok(responsibility < expectations);

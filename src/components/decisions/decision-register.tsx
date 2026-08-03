@@ -520,6 +520,7 @@ export function DecisionRegister({
   const canCreate = data.agendaItems.some((item) =>
     data.editableCommitteeIds.includes(item.committee_id),
   );
+  const isReadOnly = data.editableCommitteeIds.length === 0;
 
   return (
     <div className="space-y-6">
@@ -720,6 +721,7 @@ export function DecisionRegister({
               >
                 {filteredDecisions.length} af {decisions.length} beslutninger
               </span>
+              {isReadOnly ? <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge> : null}
               {hasModifiedFilterState ? (
                 <Button onClick={resetFilters} size="sm" variant="secondary">
                   Nulstil alle filtre
@@ -812,7 +814,7 @@ export function DecisionRegister({
                       {decision.archived_at ? (
                         <StatusBadge>Arkiveret</StatusBadge>
                       ) : null}
-                      {!canEdit ? (
+                      {!canEdit && !isReadOnly ? (
                         <StatusBadge tone="neutral">
                           Skrivebeskyttet
                         </StatusBadge>

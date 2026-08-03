@@ -50,15 +50,15 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
 
   report.addSection("Rollen kort fortalt");
   addRichKeyValue("Formål", input.role.purpose);
-  report.addKeyValue(
-    "Ansvarsområder",
-    listOrEmpty(input.role.responsibilityAreas.map((area) => area.name)),
-  );
   addRichKeyValue("Ansvar", input.role.responsibilities);
   addRichKeyValue("Forventninger", input.role.meeting_expectations);
   addRichKeyValue(
     "Næste skridt - de første 30 dage",
     input.role.onboardingGuide?.first_30_days ?? "",
+  );
+  report.addKeyValue(
+    "Ansvarsområder",
+    listOrEmpty(input.role.responsibilityAreas.map((area) => area.name)),
   );
 
   report.addSection("Rammer og samarbejde");
