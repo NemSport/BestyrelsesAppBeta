@@ -724,7 +724,7 @@ function HomeScreen({
           />
         ) : (
           <Text style={styles.muted}>
-            Der er ingen kommende mÃ¸der i denne organisation.
+            Der er ingen kommende møder i denne organisation.
           </Text>
         )}
       </SectionCard>

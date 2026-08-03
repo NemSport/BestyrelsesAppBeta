@@ -93,7 +93,7 @@ export function AgendaPreview({
   showNumber?: boolean;
 }) {
   if (!Array.isArray(meeting.agenda_item_occurrences)) {
-    return <Text style={styles.muted}>Ã…bn mÃ¸det for at se dagsordenen.</Text>;
+    return <Text style={styles.muted}>Åbn mødet for at se dagsordenen.</Text>;
   }
 
   const agenda = sortedAgendaItems(meeting);

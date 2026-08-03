@@ -181,7 +181,7 @@ export class TaskService {
       meeting.organization_id !== organizationId ||
       meeting.committee_id !== committeeId
     ) {
-      throw new NotFoundError("MÃ¸det");
+      throw new NotFoundError("Mødet");
     }
 
     const [committeeTasks, meetingDecisions] = await Promise.all([
@@ -450,7 +450,7 @@ export class TaskService {
     decisionTitles: Map<string, string>,
   ) {
     const sources = [];
-    if (task.meeting_id === meetingId) sources.push("MÃ¸de");
+    if (task.meeting_id === meetingId) sources.push("Møde");
     if (task.agenda_item_id) {
       sources.push(
         `Punkt: ${agendaItemTitles.get(task.agenda_item_id) ?? task.agendaItem?.title ?? "Ukendt punkt"}`,

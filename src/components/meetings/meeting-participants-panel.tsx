@@ -547,7 +547,7 @@ export function MeetingParticipantsPanel({
                         <p className="text-xs text-muted">
                           {[attendee.roleNote, attendee.email, attendee.mobile]
                             .filter(Boolean)
-                            .join(" Â· ") || "Ingen kontaktoplysninger"}
+                            .join(" · ") || "Ingen kontaktoplysninger"}
                         </p>
                       </div>
                     )}
