@@ -163,9 +163,13 @@ export function ResourceForm({
           fieldValues[field.visibleWhen.field] === field.visibleWhen.equals;
         if (!visible) return null;
 
-        const describedBy = fieldErrors[field.name]
+        const errorId = fieldErrors[field.name]
           ? `${field.name}-error`
           : undefined;
+        const helpId = field.helpText ? `${field.name}-help` : undefined;
+        const describedBy =
+          [helpId, errorId].filter(Boolean).join(" ") || undefined;
+        const labelId = `${field.name}-label`;
         const sharedProps = {
           "aria-describedby": describedBy,
           "aria-invalid": Boolean(fieldErrors[field.name]),
@@ -175,16 +179,25 @@ export function ResourceForm({
 
         return (
           <div key={field.name}>
-            <label className="label" htmlFor={field.name}>
-              {field.label}
-            </label>
+            {field.type === "radio" ? (
+              <p className="label" id={labelId}>
+                {field.label}
+              </p>
+            ) : (
+              <label className="label" htmlFor={field.name}>
+                {field.label}
+              </label>
+            )}
             {field.helpText ? (
-              <p className="mb-2 text-xs text-muted">{field.helpText}</p>
+              <p className="mb-2 text-xs text-muted" id={helpId}>
+                {field.helpText}
+              </p>
             ) : null}
             {field.type === "radio" ? (
               <div
                 aria-describedby={describedBy}
                 aria-invalid={Boolean(fieldErrors[field.name])}
+                aria-labelledby={labelId}
                 className="flex flex-wrap gap-3"
                 id={field.name}
                 role="radiogroup"

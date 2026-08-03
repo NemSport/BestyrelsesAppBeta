@@ -46,6 +46,15 @@ change their own access or any owner's access, and only an owner may grant or
 remove the owner role. Committee chairs and secretaries retain their ordinary
 committee-manager capabilities but do not administer committee memberships.
 
+Issue 9 keeps that access model intact while making the member directory
+responsive. Active members and pending invitations use one native table DOM:
+below the desktop breakpoint each row is presented as a labelled vertical card,
+while desktop retains column headers and compact table scanning. Names,
+e-mails, organization roles, statuses, and committee assignments wrap without
+requiring horizontal scrolling. Access editing and destructive removal remain
+separate, capability-filtered controls, and mutation feedback continues through
+the Issue 17 pattern.
+
 ## Central Entity
 
 The **Agenda Item** is the central product entity.
@@ -358,6 +367,57 @@ pages, related work is progressively disclosed, the whole-minutes AI action is
 the primary extraction entry, and point-specific AI analysis moves under
 secondary actions. No domain state, route, or permission model changes.
 
+Issue 2 keeps the Phase 3 organization navigation compact on mobile. Below the
+desktop breakpoint, the full sidebar is replaced by a short context bar that
+keeps the active organization, optional committee, and active destination
+visible. The menu opens as a scrollable modal drawer with focus containment,
+Escape and backdrop dismissal, focus return, and background scroll locking.
+It reuses the existing route matching and capability-filtered destinations;
+desktop navigation, URLs, browser history, authorization, and RLS are
+unchanged.
+
+Issue 15 strengthens keyboard and assistive-technology behavior across the
+shared application shell and core editing flows. Modal dialogs and the mobile
+navigation drawer use one focus-management pattern for initial focus, Tab and
+Shift+Tab containment, topmost-overlay Escape handling, background scroll
+locking, and focus return. Global disclosure menus support Escape and outside
+dismissal without claiming an unsupported ARIA menu pattern. Shared fields,
+participant editing, tables, feedback, and focus-visible styling expose
+persistent labels, descriptions, column scope, live status, and a distinct
+keyboard focus indicator. Capability filtering, mutation authorization, and
+RLS remain unchanged.
+
+Issue 14 establishes a shared visual and semantic distinction between
+interactive and informational surfaces. True full-card destinations use native
+links with persistent action cues, pointer/touch feedback, and the shared focus
+indicator. Rows that contain separate links, status information, or nested
+action menus remain non-focusable static articles; only their explicit links
+and buttons are interactive. Read-only task and decision cards are labelled as
+such, and compact actions use a 44-pixel minimum target. Capability filtering,
+routes, mutation authorization, services, repositories, and RLS are unchanged.
+
+Issue 6 adds compact in-page navigation to long meeting documents. Native hash
+links target the participant summary, agenda minutes, general minutes, and
+relevant task or decision sections already returned by the authorized meeting
+read model. Deep links open ancestor disclosures and React-controlled agenda or
+general-minutes panels before moving visible focus to the target. Hash changes
+use browser history and do not remount editors, discard local drafts, trigger
+autosave writes, or pass through the dirty-form leave guard. The navigation is
+non-sticky and horizontally contained on mobile so it cannot cover form fields
+or the software keyboard.
+
+Issue 5 gives organization and committee meeting lists one responsive row
+pattern with explicit title, date/time, committee, agenda count, textual status,
+time grouping, and a capability-derived next step. The documented default order
+is nearest upcoming meeting first, then newest held meeting first; cancelled
+meetings are separated. URL query parameters filter by period, status, and exact
+date, so reload, deep links, and browser history preserve the result. Filtered
+empty results remain distinct from an organization or committee with no
+meetings. Organization rows reuse the per-committee Issue 16 capabilities
+already assembled by the authorized overview, while committee rows use the
+authorized committee context. Existing repository organization/committee
+filters, server checks, and RLS remain unchanged.
+
 The first AI Assistant for committee memory lives on the Agenda Item page. It
 builds an authorized preparation brief from the agenda item's prior meeting
 occurrences, accessible point minutes, related decisions, and open tasks.
@@ -474,6 +534,16 @@ archived records, and cancelled records are marked explicitly, while empty
 states distinguish an empty register from filters that return no matches.
 Filtering operates only on the RLS-scoped register read model already returned
 to the authenticated user.
+
+Issue 7 makes Agenda Item context mandatory for every newly created decision.
+The register and agenda-item workspace require an explicit authorized agenda
+item before submission, the service validates its organization and committee,
+and a PostgreSQL insert trigger independently rejects a missing relation.
+Historical decisions with a null `agenda_item_id` remain readable and editable;
+no existing row is rewritten or deleted, and an established agenda relation is
+preserved if an update omits it. Register filters are URL-backed, show active
+chips and result counts, and distinguish an empty register from a filtered
+empty result. Viewer create/edit controls remain absent.
 
 Phase 2A.5 lets authorized users turn current minutes text into an editable
 decision proposal without AI or editor coupling. From an agenda item, the
@@ -1052,7 +1122,9 @@ the primary creation action visible, moves PDF, AI update, and edit actions
 behind the shared action menu, and presents onboarding, task templates,
 documents, Annual Wheel links, and decision context as quieter role-profile
 sections. Existing Job Card CRUD, AI draft review, task-template instantiation,
-PDF export, services, permissions, and RLS behavior are unchanged.
+PDF export, services, permissions, and RLS behavior are unchanged. The register
+shows task-template creation only for committees where the current user already
+has agenda-item editor capability; read-only members get no write signal.
 
 Phase 7R.6 aligns secondary organization surfaces with the same admin layout.
 Member administration now uses flatter invitation and manual-creation sections,

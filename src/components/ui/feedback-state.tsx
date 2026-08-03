@@ -25,11 +25,21 @@ export function FeedbackState({
 }) {
   return (
     <div
+      aria-live={
+        tone === "danger"
+          ? "assertive"
+          : tone === "success"
+            ? "polite"
+            : undefined
+      }
       className={clsx(
         "flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-control)] border px-4 py-3 text-sm",
         toneClassName[tone],
         className,
       )}
+      role={
+        tone === "danger" ? "alert" : tone === "success" ? "status" : undefined
+      }
     >
       <div className="min-w-0">
         <p className="font-semibold">{title}</p>

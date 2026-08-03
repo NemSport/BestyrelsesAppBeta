@@ -5,6 +5,8 @@ import {
   EmptyState,
   PageHeader,
   buttonClassName,
+  primarySurfaceLinkClassName,
+  staticSurfaceClassName,
 } from "@/components/ui";
 import { isOrganizationAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
@@ -48,22 +50,28 @@ export default async function CommitteesPage({
         <div className="divide-y divide-line border-y border-line">
           {committees.map((committee) => (
             <article
-              className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              className={staticSurfaceClassName(
+                "grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+              )}
               key={committee.id}
             >
               <div className="min-w-0">
                 <Link
-                  className="text-base font-semibold text-ink hover:text-brand hover:underline"
+                  className={primarySurfaceLinkClassName("text-base")}
                   href={`${root}/${committee.id}`}
                 >
                   {committee.name}
                 </Link>
                 <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">
-                  {committee.description || "Der er endnu ingen beskrivelse af udvalget."}
+                  {committee.description ||
+                    "Der er endnu ingen beskrivelse af udvalget."}
                 </p>
               </div>
               <Link
-                className={buttonClassName({ variant: "secondary", size: "sm" })}
+                className={buttonClassName({
+                  variant: "secondary",
+                  size: "sm",
+                })}
                 href={`${root}/${committee.id}`}
               >
                 Åbn udvalg

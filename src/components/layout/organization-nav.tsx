@@ -3,69 +3,118 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-const items = [
-  { label: "Overblik", suffix: "" },
-  { label: "Udvalg", suffix: "/committees" },
-  { label: "Møder", suffix: "/meetings" },
-  { label: "Beslutninger", suffix: "/decisions" },
-  { label: "Opgaver", match: "exact", suffix: "/tasks" },
-  { label: "Mine opgaver", suffix: "/tasks/my" },
-  { label: "Årshjul", suffix: "/annual-wheel" },
-  { label: "Jobkort", suffix: "/job-cards" },
-  { label: "Medlemmer", suffix: "/members" },
-  { label: "Papirkurv", suffix: "/trash" },
-] as const;
+import { useDialogFocus } from "@/hooks/use-dialog-focus";
+import {
+  getActiveCommitteeId,
+  isOrganizationNavItemActive,
+  organizationNavItems,
+} from "@/lib/organization-navigation";
 
 export function OrganizationNav({
   canManageTrash = false,
+  committees = [],
   organizationId,
   organizationName,
 }: {
   logoUrl?: string | null;
   canManageTrash?: boolean;
+  committees?: Array<{ id: string; name: string }>;
   organizationId: string;
   organizationName?: string;
 }) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const root = `/organizations/${organizationId}`;
+  const items = useMemo(
+    () =>
+      organizationNavItems.filter(
+        (item) => item.suffix !== "/trash" || canManageTrash,
+      ),
+    [canManageTrash],
+  );
+  const activeItem =
+    items.find((item) => isOrganizationNavItemActive(pathname, root, item)) ??
+    items[0];
+  const activeCommitteeId = getActiveCommitteeId(pathname, root);
+  const activeCommittee = committees.find(
+    (committee) => committee.id === activeCommitteeId,
+  );
+  useDialogFocus({
+    active: mobileOpen,
+    containerRef: drawerRef,
+    onEscape: () => setMobileOpen(false),
+    returnFocusRef: triggerRef,
+  });
 
-  const isActive = (item: (typeof items)[number]) => {
-    const suffix = item.suffix;
-    const href = `${root}${suffix}`;
-    if (suffix === "") return pathname === root;
-    if (item.label === "Udvalg") {
-      if (pathname === href || pathname === `${href}/new`) return true;
-      if (!pathname.startsWith(`${href}/`)) return false;
-      return (
-        !pathname.includes("/meetings") && !pathname.includes("/annual-wheel")
-      );
-    }
-    if (item.label === "Møder") {
-      return (
-        pathname === href ||
-        pathname.startsWith(`${href}/`) ||
-        (pathname.startsWith(`${root}/committees/`) &&
-          pathname.includes("/meetings"))
-      );
-    }
-    if (item.label === "Årshjul") {
-      return (
-        pathname === href ||
-        pathname.startsWith(`${href}/`) ||
-        (pathname.startsWith(`${root}/committees/`) &&
-          pathname.includes("/annual-wheel"))
-      );
-    }
-    if ("match" in item && item.match === "exact") return pathname === href;
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
-  const activeItem = items.find((item) => isActive(item)) ?? items[0];
+  useEffect(() => {
+    const desktopMedia = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setMobileOpen(false);
+    };
+    desktopMedia.addEventListener("change", closeOnDesktop);
+    return () => desktopMedia.removeEventListener("change", closeOnDesktop);
+  }, []);
+
+  const navLinks = (onNavigate?: () => void) => (
+    <div className="org-nav-list">
+      {items.map((item) => {
+        const href = `${root}${item.suffix}`;
+        const active = isOrganizationNavItemActive(pathname, root, item);
+
+        return (
+          <Link
+            aria-current={active ? "page" : undefined}
+            className={clsx("org-nav-link", active && "org-nav-link-active")}
+            href={href}
+            key={item.label}
+            onClick={onNavigate}
+          >
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
 
   return (
     <aside className="org-sidebar">
-      <nav aria-label="Organisationsnavigation">
+      <div className="org-mobile-context">
+        <div className="min-w-0">
+          <p className="org-mobile-organization truncate">
+            {organizationName ?? "Organisation"}
+          </p>
+          <p className="org-mobile-location truncate">
+            {activeCommittee ? `${activeCommittee.name} · ` : ""}
+            {activeItem.label}
+          </p>
+        </div>
+        <button
+          aria-controls="organization-mobile-navigation"
+          aria-expanded={mobileOpen}
+          aria-haspopup="dialog"
+          className="org-mobile-menu-trigger"
+          onClick={() => setMobileOpen(true)}
+          ref={triggerRef}
+          type="button"
+        >
+          Menu
+          <span aria-hidden>☰</span>
+        </button>
+      </div>
+
+      <nav
+        aria-label="Organisationsnavigation"
+        className="org-desktop-navigation"
+      >
         <div className="org-sidebar-header">
           <p className="org-sidebar-kicker text-[0.62rem] font-semibold uppercase tracking-[0.16em]">
             Organisation
@@ -77,29 +126,55 @@ export function OrganizationNav({
             Aktuel side: <span>{activeItem.label}</span>
           </p>
         </div>
-        <div className="org-nav-list">
-          {items
-            .filter((item) => item.suffix !== "/trash" || canManageTrash)
-            .map((item) => {
-              const href = `${root}${item.suffix}`;
-              const active = isActive(item);
-
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  className={clsx(
-                    "org-nav-link",
-                    active && "org-nav-link-active",
-                  )}
-                  href={href}
-                  key={item.label}
-                >
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-        </div>
+        {navLinks()}
       </nav>
+
+      {mobileOpen ? (
+        <div
+          className="org-mobile-overlay"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setMobileOpen(false);
+          }}
+        >
+          <div
+            aria-labelledby={titleId}
+            aria-modal="true"
+            className="org-mobile-drawer"
+            id="organization-mobile-navigation"
+            ref={drawerRef}
+            role="dialog"
+          >
+            <div className="org-mobile-drawer-header">
+              <div className="min-w-0">
+                <p className="org-sidebar-kicker text-xs font-semibold uppercase tracking-[0.14em]">
+                  Organisation
+                </p>
+                <h2
+                  className="org-sidebar-title mt-1 truncate text-base font-semibold"
+                  id={titleId}
+                >
+                  {organizationName ?? "Organisation"}
+                </h2>
+                <p className="org-sidebar-current mt-1 text-sm">
+                  {activeCommittee ? `${activeCommittee.name} · ` : ""}
+                  <span>{activeItem.label}</span>
+                </p>
+              </div>
+              <button
+                aria-label="Luk navigation"
+                className="org-mobile-close"
+                onClick={() => setMobileOpen(false)}
+                type="button"
+              >
+                Luk
+              </button>
+            </div>
+            <nav aria-label="Mobil organisationsnavigation">
+              {navLinks(() => setMobileOpen(false))}
+            </nav>
+          </div>
+        </div>
+      ) : null}
     </aside>
   );
 }

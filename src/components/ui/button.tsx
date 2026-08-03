@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 import clsx from "clsx";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
@@ -16,7 +16,7 @@ export function buttonClassName({
   return clsx(
     "inline-flex items-center justify-center font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
     size === "sm"
-      ? "min-h-9 rounded-[var(--radius-control)] px-3 py-2 text-sm"
+      ? "min-h-11 rounded-[var(--radius-control)] px-3 py-2 text-sm"
       : "min-h-[2.625rem] rounded-[var(--radius-control)] px-4 py-2.5 text-sm",
     variant === "primary" &&
       "bg-brand text-white shadow-sm hover:bg-brand-hover",
@@ -36,7 +36,7 @@ export function Button({
   variant,
   type = "button",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ComponentPropsWithRef<"button"> & {
   size?: ButtonSize;
   variant?: ButtonVariant;
 }) {

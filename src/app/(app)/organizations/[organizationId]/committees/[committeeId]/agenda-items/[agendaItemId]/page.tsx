@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
 import { AgendaItemAssistant } from "@/components/agenda-items/agenda-item-assistant";
 import { EditAgendaItemModal } from "@/components/agenda-items/edit-agenda-item-modal";
+import { DecisionCreateModal } from "@/components/decisions/decision-create-modal";
 import { DecisionHistory } from "@/components/decisions/decision-history";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
@@ -74,6 +75,24 @@ export default async function AgendaItemPage({
         <PageHeader
           actions={
             <div className="flex flex-wrap gap-2">
+              {canEdit ? (
+                <DecisionCreateModal
+                  agendaItems={[{ id: item.id, title: item.title }]}
+                  categorySource={decisionHistory.decisions}
+                  committeeId={committeeId}
+                  initialAgendaItemId={item.id}
+                  initialDescription={item.description}
+                  initialTitle={item.title}
+                  meetingDate={
+                    item.agenda_item_occurrences[0]?.meetings?.starts_at
+                  }
+                  meetingId={item.agenda_item_occurrences[0]?.meetings?.id}
+                  organizationId={organizationId}
+                  responsiblePeople={taskContext.responsiblePeople}
+                  sourceLabel="dagsordenspunktet"
+                  triggerLabel="Opret beslutning fra dette punkt"
+                />
+              ) : null}
               {taskContext.canEdit ? (
                 <TaskCreateModal
                   agendaItems={[{ id: item.id, title: item.title }]}
@@ -85,8 +104,9 @@ export default async function AgendaItemPage({
                     item.agenda_item_occurrences[0]?.meetings?.id ?? ""
                   }
                   initialTitle={item.title}
-                  meetings={item.agenda_item_occurrences.flatMap((occurrence) =>
-                    occurrence.meetings ? [occurrence.meetings] : [],
+                  meetings={item.agenda_item_occurrences.flatMap(
+                    (occurrence) =>
+                      occurrence.meetings ? [occurrence.meetings] : [],
                   )}
                   organizationId={organizationId}
                   responsiblePeople={taskContext.responsiblePeople}
@@ -124,10 +144,7 @@ export default async function AgendaItemPage({
             </span>
           }
           title={
-            <AgendaItemDocumentTitle
-              title={item.title}
-              type={item.item_type}
-            />
+            <AgendaItemDocumentTitle title={item.title} type={item.item_type} />
           }
         />
 
@@ -170,7 +187,9 @@ export default async function AgendaItemPage({
                       {occurrenceStatusLabels[occurrence.meeting_status]}
                     </p>
                     {occurrence.outcome_summary ? (
-                      <p className="mt-3 text-sm">{occurrence.outcome_summary}</p>
+                      <p className="mt-3 text-sm">
+                        {occurrence.outcome_summary}
+                      </p>
                     ) : null}
                   </Link>
                 );

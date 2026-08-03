@@ -2,20 +2,34 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   Button,
   EmptyState,
+  FieldError,
   Input,
   Modal,
+  MutationFeedback,
+  primarySurfaceLinkClassName,
   Select,
   StatusBadge,
+  staticSurfaceClassName,
   Textarea,
 } from "@/components/ui";
+import {
+  focusInvalidField,
+  useMutationFeedback,
+  useUnsavedChanges,
+} from "@/hooks/use-mutation-feedback";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
 import { formatDanishDate } from "@/lib/date-format";
+import {
+  decisionRegisterSearchParams,
+  emptyDecisionFilters,
+  parseDecisionRegisterState,
+} from "@/lib/decision-register-state";
 import {
   decisionStatusLabels,
   decisionStatusOptions,
@@ -28,6 +42,11 @@ import {
   type DecisionSort,
   type DecisionStatus,
 } from "@/lib/decisions";
+import {
+  firstFieldError,
+  MutationRequestError,
+  readMutationResponse,
+} from "@/lib/mutation-feedback";
 import type {
   DecisionRegisterData,
   DecisionView,
@@ -73,27 +92,12 @@ function formatDate(value: string | null) {
   return formatDanishDate(value);
 }
 
-const emptyFilters = (): DecisionRegisterFilters => ({
-  search: "",
-  status: "",
-  committeeId: "",
-  responsibleUserId: "",
-  meetingId: "",
-  category: "",
-  decisionDateFrom: "",
-  decisionDateTo: "",
-  deadlineFrom: "",
-  deadlineTo: "",
-  showArchived: false,
-  sort: "decision_date_desc",
-});
-
 function draftFromDecision(decision: DecisionView): DecisionDraft {
   return {
     id: decision.id,
     committeeId: decision.committee_id,
-    meetingId: decision.meeting ? decision.meeting_id ?? "" : "",
-    agendaItemId: decision.agendaItem ? decision.agenda_item_id ?? "" : "",
+    meetingId: decision.meeting ? (decision.meeting_id ?? "") : "",
+    agendaItemId: decision.agendaItem ? (decision.agenda_item_id ?? "") : "",
     title: decision.title,
     description: decision.description,
     status: decision.status,
@@ -114,18 +118,40 @@ export function DecisionRegister({
   data: DecisionRegisterData;
   taskData: TaskRegisterData;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [decisions, setDecisions] = useState(data.decisions);
-  const [filters, setFilters] = useState<DecisionRegisterFilters>(emptyFilters);
+  const [filters, setFilters] = useState<DecisionRegisterFilters>(() =>
+    parseDecisionRegisterState(new URLSearchParams(searchParams.toString())),
+  );
   const [draft, setDraft] = useState<DecisionDraft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [draftBaseline, setDraftBaseline] = useState<DecisionDraft | null>(
+    null,
+  );
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const mutation = useMutationFeedback();
+  const dirty = Boolean(
+    draft &&
+    draftBaseline &&
+    JSON.stringify(draft) !== JSON.stringify(draftBaseline),
+  );
+  const confirmDiscard = useUnsavedChanges(
+    dirty && !mutation.pending,
+    "Du har ændringer i beslutningen, som ikke er gemt. Vil du lukke uden at gemme?",
+  );
 
   useEffect(() => {
     setDecisions(data.decisions);
   }, [data.decisions]);
+
+  useEffect(() => {
+    setFilters(
+      parseDecisionRegisterState(new URLSearchParams(searchParams.toString())),
+    );
+  }, [searchParams]);
 
   const filteredDecisions = useMemo(() => {
     return filterAndSortDecisions(decisions, filters);
@@ -186,12 +212,126 @@ export function DecisionRegister({
     filters.deadlineFrom !== "" ||
     filters.deadlineTo !== "" ||
     filters.showArchived;
+  const hasModifiedFilterState =
+    hasActiveFilters || filters.sort !== "decision_date_desc";
+  const activeFilterLabels = [
+    filters.search
+      ? { key: "search" as const, label: `Søg: ${filters.search}` }
+      : null,
+    filters.status
+      ? {
+          key: "status" as const,
+          label:
+            decisionStatusLabels[filters.status as DecisionStatus] ??
+            filters.status,
+        }
+      : null,
+    filters.committeeId
+      ? {
+          key: "committeeId" as const,
+          label:
+            data.committees.find(
+              (committee) => committee.id === filters.committeeId,
+            )?.name ?? "Valgt udvalg",
+        }
+      : null,
+    filters.responsibleUserId
+      ? {
+          key: "responsibleUserId" as const,
+          label:
+            responsibleFilterOptions.find(
+              ([id]) => id === filters.responsibleUserId,
+            )?.[1] ?? "Valgt ansvarlig",
+        }
+      : null,
+    filters.meetingId
+      ? {
+          key: "meetingId" as const,
+          label:
+            data.meetings.find((meeting) => meeting.id === filters.meetingId)
+              ?.title ?? "Valgt møde",
+        }
+      : null,
+    filters.category
+      ? { key: "category" as const, label: filters.category }
+      : null,
+    filters.decisionDateFrom
+      ? {
+          key: "decisionDateFrom" as const,
+          label: `Fra ${formatDate(filters.decisionDateFrom)}`,
+        }
+      : null,
+    filters.decisionDateTo
+      ? {
+          key: "decisionDateTo" as const,
+          label: `Til ${formatDate(filters.decisionDateTo)}`,
+        }
+      : null,
+    filters.deadlineFrom
+      ? {
+          key: "deadlineFrom" as const,
+          label: `Deadline fra ${formatDate(filters.deadlineFrom)}`,
+        }
+      : null,
+    filters.deadlineTo
+      ? {
+          key: "deadlineTo" as const,
+          label: `Deadline til ${formatDate(filters.deadlineTo)}`,
+        }
+      : null,
+    filters.showArchived
+      ? { key: "showArchived" as const, label: "Arkiverede" }
+      : null,
+    filters.sort !== "decision_date_desc"
+      ? { key: "sort" as const, label: "Ændret sortering" }
+      : null,
+  ].filter(
+    (
+      item,
+    ): item is {
+      key: keyof DecisionRegisterFilters;
+      label: string;
+    } => Boolean(item),
+  );
 
   function updateFilter<K extends keyof DecisionRegisterFilters>(
     key: K,
     value: DecisionRegisterFilters[K],
   ) {
-    setFilters((current) => ({ ...current, [key]: value }));
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    replaceRegisterState(nextFilters);
+  }
+
+  function replaceRegisterState(nextFilters: DecisionRegisterFilters) {
+    const next = decisionRegisterSearchParams(
+      new URLSearchParams(searchParams.toString()),
+      nextFilters,
+    );
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }
+
+  function resetFilters() {
+    const nextFilters = emptyDecisionFilters();
+    setFilters(nextFilters);
+    replaceRegisterState(nextFilters);
+  }
+
+  function clearFilter(key: keyof DecisionRegisterFilters) {
+    const nextFilters = {
+      ...filters,
+      [key]:
+        key === "showArchived"
+          ? false
+          : key === "sort"
+            ? "decision_date_desc"
+            : "",
+    } as DecisionRegisterFilters;
+    setFilters(nextFilters);
+    replaceRegisterState(nextFilters);
   }
 
   const selectedCommitteeId = draft?.committeeId ?? "";
@@ -216,10 +356,30 @@ export function DecisionRegister({
 
   function openCreate() {
     const next = emptyDraft();
-    next.committeeId = data.editableCommitteeIds[0] ?? "";
+    next.committeeId =
+      data.agendaItems.find((item) =>
+        data.editableCommitteeIds.includes(item.committee_id),
+      )?.committee_id ?? "";
     setError(null);
     setFieldErrors({});
+    mutation.reset();
     setDraft(next);
+    setDraftBaseline(next);
+  }
+
+  function openEdit(decision: DecisionView) {
+    const next = draftFromDecision(decision);
+    setError(null);
+    setFieldErrors({});
+    mutation.reset();
+    setDraft(next);
+    setDraftBaseline(next);
+  }
+
+  function closeDraft() {
+    if (mutation.pending || !confirmDiscard()) return;
+    setDraft(null);
+    setDraftBaseline(null);
   }
 
   function updateDraft<K extends keyof DecisionDraft>(
@@ -244,57 +404,75 @@ export function DecisionRegister({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
-    setSaving(true);
+    if (!draft.id && !draft.agendaItemId) {
+      const nextFieldErrors = {
+        agendaItemId: "Vælg det dagsordenspunkt, beslutningen hører til.",
+      };
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(nextFieldErrors.agendaItemId);
+      focusInvalidField("decision-agendaItemId");
+      return;
+    }
+    if (!mutation.begin("Beslutningen gemmes...")) return;
     setError(null);
     setFieldErrors({});
 
     try {
-      const response = await fetch(
-        draft.id
-          ? `/api/decisions/${draft.id}`
-          : `/api/organizations/${organizationId}/decisions`,
-        {
-          method: draft.id ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            organizationId,
-            committeeId: draft.committeeId,
-            meetingId: draft.meetingId || null,
-            agendaItemId: draft.agendaItemId || null,
-            title: draft.title,
-            description: draft.description,
-            status: draft.status,
-            responsibleUserId: draft.responsibleUserId || null,
-            decisionDate: draft.decisionDate,
-            deadline: draft.deadline || null,
-            category: draft.category || null,
-            internalNote: draft.internalNote || null,
-          }),
-        },
+      await readMutationResponse(
+        await fetch(
+          draft.id
+            ? `/api/decisions/${draft.id}`
+            : `/api/organizations/${organizationId}/decisions`,
+          {
+            method: draft.id ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              organizationId,
+              committeeId: draft.committeeId,
+              meetingId: draft.meetingId || null,
+              agendaItemId: draft.agendaItemId || null,
+              title: draft.title,
+              description: draft.description,
+              status: draft.status,
+              responsibleUserId: draft.responsibleUserId || null,
+              decisionDate: draft.decisionDate,
+              deadline: draft.deadline || null,
+              category: draft.category || null,
+              internalNote: draft.internalNote || null,
+            }),
+          },
+        ),
+        "Beslutningen kunne ikke gemmes. Kontrollér felterne, og prøv igen.",
       );
-      const result = (await response.json()) as {
-        error?: string;
-        fieldErrors?: Record<string, string[]>;
-      };
-      if (!response.ok) {
-        setError(result.error || "Beslutningen kunne ikke gemmes.");
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(result.fieldErrors ?? {}).flatMap(([key, messages]) =>
-              messages[0] ? [[key, messages[0]]] : [],
-            ),
-          ),
-        );
-        return;
-      }
+      mutation.succeed(
+        draft.id ? "Beslutningen er opdateret." : "Beslutningen er oprettet.",
+      );
       setDraft(null);
+      setDraftBaseline(null);
       router.refresh();
-    } catch {
-      setError(
-        "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
+    } catch (caught) {
+      const nextFieldErrors =
+        caught instanceof MutationRequestError ? caught.fieldErrors : {};
+      setFieldErrors(nextFieldErrors);
+      mutation.fail(
+        caught instanceof Error
+          ? caught.message
+          : "Forbindelsen til serveren mislykkedes. Kontrollér din internetforbindelse, og prøv igen.",
       );
-    } finally {
-      setSaving(false);
+      const field = firstFieldError(nextFieldErrors, [
+        "agendaItemId",
+        "title",
+        "description",
+        "committeeId",
+        "status",
+        "decisionDate",
+        "deadline",
+        "responsibleUserId",
+        "category",
+        "meetingId",
+        "internalNote",
+      ]);
+      focusInvalidField(field ? `decision-${field}` : null);
     }
   }
 
@@ -339,17 +517,15 @@ export function DecisionRegister({
     }
   }
 
-  const canCreate = data.editableCommitteeIds.length > 0;
+  const canCreate = data.agendaItems.some((item) =>
+    data.editableCommitteeIds.includes(item.committee_id),
+  );
+  const isReadOnly = data.editableCommitteeIds.length === 0;
 
   return (
     <div className="space-y-6">
       <div className="module-filter-surface space-y-3">
-        <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto]">
-          <details className="group md:col-span-2">
-            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted transition hover:border-brand/40 hover:text-brand">
-              Vis filtre
-            </summary>
-            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2.5 md:grid-cols-3">
           <div>
             <label className="label" htmlFor="decision-search">
               Søg
@@ -397,51 +573,49 @@ export function DecisionRegister({
               ))}
             </Select>
           </div>
-          <div>
-            <label className="label" htmlFor="decision-responsible-filter">
-              Ansvarlig
-            </label>
-            <Select
-              id="decision-responsible-filter"
-              onChange={(event) =>
-                updateFilter("responsibleUserId", event.target.value)
-              }
-              value={filters.responsibleUserId}
-            >
-              <option value="">Alle ansvarlige</option>
-              {responsibleFilterOptions.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className="label" htmlFor="decision-sort">
-              Sortering
-            </label>
-            <Select
-              id="decision-sort"
-              onChange={(event) =>
-                updateFilter("sort", event.target.value as DecisionSort)
-              }
-              value={filters.sort}
-            >
-              <option value="decision_date_desc">Nyeste først</option>
-              <option value="decision_date_asc">Ældste først</option>
-              <option value="deadline_asc">Deadline nærmest først</option>
-              <option value="status">Status</option>
-            </Select>
-          </div>
-            </div>
-          </details>
         </div>
 
         <details className="group">
-          <summary className="inline-flex min-h-8 w-fit cursor-pointer list-none items-center rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-subtle">
-            Flere filtre
+          <summary className="inline-flex min-h-10 w-fit cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-brand transition hover:border-brand/40 hover:bg-subtle">
+            Avancerede filtre
           </summary>
           <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div>
+              <label className="label" htmlFor="decision-responsible-filter">
+                Ansvarlig
+              </label>
+              <Select
+                id="decision-responsible-filter"
+                onChange={(event) =>
+                  updateFilter("responsibleUserId", event.target.value)
+                }
+                value={filters.responsibleUserId}
+              >
+                <option value="">Alle ansvarlige</option>
+                {responsibleFilterOptions.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="label" htmlFor="decision-sort">
+                Sortering
+              </label>
+              <Select
+                id="decision-sort"
+                onChange={(event) =>
+                  updateFilter("sort", event.target.value as DecisionSort)
+                }
+                value={filters.sort}
+              >
+                <option value="decision_date_desc">Nyeste først</option>
+                <option value="decision_date_asc">Ældste først</option>
+                <option value="deadline_asc">Deadline nærmest først</option>
+                <option value="status">Status</option>
+              </Select>
+            </div>
             <div>
               <label className="label" htmlFor="decision-meeting-filter">
                 Møde
@@ -474,7 +648,10 @@ export function DecisionRegister({
               >
                 <option value="">Alle kategorier</option>
                 {categoryOptions.map((category) => (
-                  <option key={normalizeDecisionCategory(category)} value={category}>
+                  <option
+                    key={normalizeDecisionCategory(category)}
+                    value={category}
+                  >
                     {category}
                   </option>
                 ))}
@@ -535,7 +712,39 @@ export function DecisionRegister({
           </div>
         </details>
 
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                aria-live="polite"
+                className="text-sm font-semibold text-ink"
+              >
+                {filteredDecisions.length} af {decisions.length} beslutninger
+              </span>
+              {isReadOnly ? <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge> : null}
+              {hasModifiedFilterState ? (
+                <Button onClick={resetFilters} size="sm" variant="secondary">
+                  Nulstil alle filtre
+                </Button>
+              ) : null}
+            </div>
+            {activeFilterLabels.length ? (
+              <div aria-label="Aktive filtre" className="flex flex-wrap gap-2">
+                {activeFilterLabels.map((filter) => (
+                  <button
+                    className="inline-flex min-h-9 items-center gap-1 rounded-full border border-brand/30 bg-brand/5 px-3 text-xs font-semibold text-brand transition hover:bg-brand/10"
+                    key={filter.key}
+                    onClick={() => clearFilter(filter.key)}
+                    type="button"
+                  >
+                    {filter.label}
+                    <span aria-hidden="true">×</span>
+                    <span className="sr-only">Fjern filter</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted">
               <input
@@ -547,27 +756,19 @@ export function DecisionRegister({
               />
               Vis arkiverede beslutninger
             </label>
-            <span className="text-sm text-muted">
-              {filteredDecisions.length} af {decisions.length} beslutninger
-            </span>
-            {hasActiveFilters ? (
-              <Button
-                onClick={() => setFilters(emptyFilters())}
-                size="sm"
-                variant="secondary"
-              >
-                Ryd filtre
-              </Button>
+            {canCreate ? (
+              <Button onClick={openCreate}>Opret fra dagsordenspunkt</Button>
             ) : null}
           </div>
-          <Button disabled={!canCreate} onClick={openCreate}>
-            Opret beslutning
-          </Button>
         </div>
       </div>
 
+      {!draft ? <MutationFeedback feedback={mutation.feedback} /> : null}
       {error && !draft ? (
-        <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
+        <div
+          className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}
@@ -597,7 +798,7 @@ export function DecisionRegister({
               }));
             return (
               <article
-                className="module-card scroll-mt-24 p-4"
+                className={staticSurfaceClassName("scroll-mt-24 p-4")}
                 id={`decision-${decision.id}`}
                 key={decision.id}
               >
@@ -612,6 +813,11 @@ export function DecisionRegister({
                       </StatusBadge>
                       {decision.archived_at ? (
                         <StatusBadge>Arkiveret</StatusBadge>
+                      ) : null}
+                      {!canEdit && !isReadOnly ? (
+                        <StatusBadge tone="neutral">
+                          Skrivebeskyttet
+                        </StatusBadge>
                       ) : null}
                       {decision.cancelled_at &&
                       decision.status !== "cancelled" ? (
@@ -668,7 +874,7 @@ export function DecisionRegister({
                     <div className="mt-3 flex flex-wrap gap-3 text-sm">
                       {decision.meeting ? (
                         <Link
-                          className="font-semibold text-brand hover:underline"
+                          className={primarySurfaceLinkClassName("text-sm")}
                           href={`${committeeRoot}/meetings/${decision.meeting.id}`}
                         >
                           Åbn møde: {decision.meeting.title}
@@ -680,7 +886,7 @@ export function DecisionRegister({
                       ) : null}
                       {decision.agendaItem ? (
                         <Link
-                          className="font-semibold text-brand hover:underline"
+                          className={primarySurfaceLinkClassName("text-sm")}
                           href={`${committeeRoot}/agenda-items/${decision.agendaItem.id}`}
                         >
                           Åbn dagsordenspunkt: {decision.agendaItem.title}
@@ -693,7 +899,7 @@ export function DecisionRegister({
                     </div>
                   </div>
                   {canEdit ? (
-                    <div className="flex shrink-0 flex-wrap gap-2">
+                    <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                       <TaskCreateModal
                         agendaItems={taskData.agendaItems.filter(
                           (item) => item.committee_id === decision.committee_id,
@@ -702,14 +908,16 @@ export function DecisionRegister({
                         committeeId={decision.committee_id}
                         decisions={[decision]}
                         initialAgendaItemId={
-                          decision.agendaItem ? decision.agenda_item_id ?? "" : ""
+                          decision.agendaItem
+                            ? (decision.agenda_item_id ?? "")
+                            : ""
                         }
                         initialCategory={decision.category ?? ""}
                         initialDeadline={decision.deadline ?? ""}
                         initialDecisionId={decision.id}
                         initialDescription={decision.description}
                         initialMeetingId={
-                          decision.meeting ? decision.meeting_id ?? "" : ""
+                          decision.meeting ? (decision.meeting_id ?? "") : ""
                         }
                         initialResponsibleUserId={
                           decision.responsible_user_id ?? ""
@@ -726,11 +934,7 @@ export function DecisionRegister({
                         triggerLabel="Opret opgave fra beslutning"
                       />
                       <Button
-                        onClick={() => {
-                          setError(null);
-                          setFieldErrors({});
-                          setDraft(draftFromDecision(decision));
-                        }}
+                        onClick={() => openEdit(decision)}
                         size="sm"
                         variant="secondary"
                       >
@@ -777,13 +981,22 @@ export function DecisionRegister({
         </div>
       ) : (
         <EmptyState
+          action={
+            hasActiveFilters ? (
+              <Button onClick={resetFilters} variant="secondary">
+                Nulstil filtre
+              </Button>
+            ) : canCreate ? (
+              <Button onClick={openCreate}>Opret fra dagsordenspunkt</Button>
+            ) : null
+          }
           description={
             decisions.length && hasActiveFilters
               ? "Ingen beslutninger matcher de valgte filtre. Ryd et eller flere filtre for at udvide visningen."
               : decisions.length
                 ? "Der er ingen aktive beslutninger at vise. Arkiverede beslutninger kan vises via filteret."
                 : canCreate
-                  ? "Opret den første beslutning, når et udvalg har truffet den."
+                  ? "Opret den første beslutning fra det dagsordenspunkt, hvor den blev truffet."
                   : "Der er endnu ikke registreret beslutninger i de udvalg, du har adgang til."
           }
           title={
@@ -795,58 +1008,72 @@ export function DecisionRegister({
       )}
 
       <Modal
-        description="Beslutningen knyttes til et udvalg og kan valgfrit forbindes til et møde og dagsordenspunkt."
+        description={
+          draft?.id
+            ? "Bevar beslutningens autoritative dagsordenskontekst, når relationer ændres."
+            : "Vælg først det dagsordenspunkt, hvor beslutningen blev truffet. Beslutningen kan ikke oprettes uden denne relation."
+        }
         maxWidth="3xl"
-        onClose={() => setDraft(null)}
+        onClose={closeDraft}
         open={Boolean(draft)}
         title={draft?.id ? "Rediger beslutning" : "Opret beslutning"}
       >
         {draft ? (
           <form className="space-y-4" noValidate onSubmit={submit}>
-            {error ? (
-              <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
-                <p className="font-semibold">{error}</p>
-                {Object.values(fieldErrors).length ? (
-                  <ul className="mt-2 list-disc pl-5">
-                    {[...new Set(Object.values(fieldErrors))].map((message) => (
-                      <li key={message}>{message}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
+            <MutationFeedback feedback={mutation.feedback} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="label" htmlFor="decision-title">
                   Titel
                 </label>
                 <Input
+                  aria-describedby={
+                    fieldErrors.title ? "decision-title-error" : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.title)}
                   id="decision-title"
                   onChange={(event) => updateDraft("title", event.target.value)}
                   value={draft.title}
                 />
-                {fieldErrors.title ? (
-                  <p className="mt-1 text-sm text-danger">{fieldErrors.title}</p>
-                ) : null}
+                <FieldError
+                  id="decision-title-error"
+                  message={fieldErrors.title}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="label" htmlFor="decision-description">
                   Beskrivelse
                 </label>
                 <Textarea
+                  aria-describedby={
+                    fieldErrors.description
+                      ? "decision-description-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.description)}
                   id="decision-description"
                   onChange={(event) =>
                     updateDraft("description", event.target.value)
                   }
                   value={draft.description}
                 />
+                <FieldError
+                  id="decision-description-error"
+                  message={fieldErrors.description}
+                />
               </div>
               <div>
-                <label className="label" htmlFor="decision-committee">
+                <label className="label" htmlFor="decision-committeeId">
                   Udvalg
                 </label>
                 <Select
-                  id="decision-committee"
+                  aria-describedby={
+                    fieldErrors.committeeId
+                      ? "decision-committeeId-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.committeeId)}
+                  id="decision-committeeId"
                   onChange={(event) =>
                     updateDraft("committeeId", event.target.value)
                   }
@@ -863,12 +1090,20 @@ export function DecisionRegister({
                       </option>
                     ))}
                 </Select>
+                <FieldError
+                  id="decision-committeeId-error"
+                  message={fieldErrors.committeeId}
+                />
               </div>
               <div>
                 <label className="label" htmlFor="decision-status">
                   Status
                 </label>
                 <Select
+                  aria-describedby={
+                    fieldErrors.status ? "decision-status-error" : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.status)}
                   id="decision-status"
                   onChange={(event) =>
                     updateDraft("status", event.target.value as DecisionStatus)
@@ -881,18 +1116,32 @@ export function DecisionRegister({
                     </option>
                   ))}
                 </Select>
+                <FieldError
+                  id="decision-status-error"
+                  message={fieldErrors.status}
+                />
               </div>
               <div>
-                <label className="label" htmlFor="decision-date">
+                <label className="label" htmlFor="decision-decisionDate">
                   Beslutningsdato
                 </label>
                 <Input
-                  id="decision-date"
+                  aria-describedby={
+                    fieldErrors.decisionDate
+                      ? "decision-decisionDate-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.decisionDate)}
+                  id="decision-decisionDate"
                   onChange={(event) =>
                     updateDraft("decisionDate", event.target.value)
                   }
                   type="date"
                   value={draft.decisionDate}
+                />
+                <FieldError
+                  id="decision-decisionDate-error"
+                  message={fieldErrors.decisionDate}
                 />
               </div>
               <div>
@@ -900,6 +1149,10 @@ export function DecisionRegister({
                   Deadline
                 </label>
                 <Input
+                  aria-describedby={
+                    fieldErrors.deadline ? "decision-deadline-error" : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.deadline)}
                   id="decision-deadline"
                   onChange={(event) =>
                     updateDraft("deadline", event.target.value)
@@ -907,13 +1160,23 @@ export function DecisionRegister({
                   type="date"
                   value={draft.deadline}
                 />
+                <FieldError
+                  id="decision-deadline-error"
+                  message={fieldErrors.deadline}
+                />
               </div>
               <div>
-                <label className="label" htmlFor="decision-responsible">
+                <label className="label" htmlFor="decision-responsibleUserId">
                   Ansvarlig
                 </label>
                 <Select
-                  id="decision-responsible"
+                  aria-describedby={
+                    fieldErrors.responsibleUserId
+                      ? "decision-responsibleUserId-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.responsibleUserId)}
+                  id="decision-responsibleUserId"
                   onChange={(event) =>
                     updateDraft("responsibleUserId", event.target.value)
                   }
@@ -926,12 +1189,20 @@ export function DecisionRegister({
                     </option>
                   ))}
                 </Select>
+                <FieldError
+                  id="decision-responsibleUserId-error"
+                  message={fieldErrors.responsibleUserId}
+                />
               </div>
               <div>
                 <label className="label" htmlFor="decision-category">
                   Kategori
                 </label>
                 <Input
+                  aria-describedby={
+                    fieldErrors.category ? "decision-category-error" : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.category)}
                   autoComplete="off"
                   id="decision-category"
                   list="decision-category-suggestions"
@@ -941,9 +1212,16 @@ export function DecisionRegister({
                   placeholder="Skriv eller vælg en tidligere kategori"
                   value={draft.category}
                 />
+                <FieldError
+                  id="decision-category-error"
+                  message={fieldErrors.category}
+                />
                 <datalist id="decision-category-suggestions">
                   {categorySuggestions.map((category) => (
-                    <option key={category.toLocaleLowerCase("da-DK")} value={category} />
+                    <option
+                      key={category.toLocaleLowerCase("da-DK")}
+                      value={category}
+                    />
                   ))}
                 </datalist>
                 <p className="mt-1 text-xs text-muted">
@@ -951,11 +1229,17 @@ export function DecisionRegister({
                 </p>
               </div>
               <div>
-                <label className="label" htmlFor="decision-meeting">
+                <label className="label" htmlFor="decision-meetingId">
                   Relateret møde
                 </label>
                 <Select
-                  id="decision-meeting"
+                  aria-describedby={
+                    fieldErrors.meetingId
+                      ? "decision-meetingId-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.meetingId)}
+                  id="decision-meetingId"
                   onChange={(event) =>
                     updateDraft("meetingId", event.target.value)
                   }
@@ -968,51 +1252,84 @@ export function DecisionRegister({
                     </option>
                   ))}
                 </Select>
+                <FieldError
+                  id="decision-meetingId-error"
+                  message={fieldErrors.meetingId}
+                />
               </div>
               <div>
-                <label className="label" htmlFor="decision-agenda-item">
-                  Relateret dagsordenspunkt
+                <label className="label" htmlFor="decision-agendaItemId">
+                  Dagsordenspunkt <span aria-hidden="true">*</span>
                 </label>
                 <Select
-                  id="decision-agenda-item"
+                  aria-describedby="decision-agenda-context decision-agendaItemId-error"
+                  aria-invalid={Boolean(fieldErrors.agendaItemId)}
+                  id="decision-agendaItemId"
                   onChange={(event) =>
                     updateDraft("agendaItemId", event.target.value)
                   }
                   value={draft.agendaItemId}
                 >
-                  <option value="">Intet dagsordenspunkt</option>
+                  <option value="">Vælg dagsordenspunkt</option>
                   {agendaItemOptions.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.title}
                     </option>
                   ))}
                 </Select>
+                <p
+                  className="mt-1 text-xs text-muted"
+                  id="decision-agenda-context"
+                >
+                  Beslutningen gemmes som en del af dette punkts historik.
+                </p>
+                <FieldError
+                  id="decision-agendaItemId-error"
+                  message={fieldErrors.agendaItemId}
+                />
               </div>
               <div className="sm:col-span-2">
-                <label className="label" htmlFor="decision-internal-note">
+                <label className="label" htmlFor="decision-internalNote">
                   Intern note
                 </label>
                 <Textarea
-                  id="decision-internal-note"
+                  aria-describedby={
+                    fieldErrors.internalNote
+                      ? "decision-internalNote-error"
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.internalNote)}
+                  id="decision-internalNote"
                   onChange={(event) =>
                     updateDraft("internalNote", event.target.value)
                   }
                   value={draft.internalNote}
                 />
+                <FieldError
+                  id="decision-internalNote-error"
+                  message={fieldErrors.internalNote}
+                />
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
-              <Button
-                disabled={saving}
-                onClick={() => setDraft(null)}
-                type="button"
-                variant="secondary"
-              >
-                Annuller
-              </Button>
-              <Button disabled={saving} type="submit">
-                {saving ? "Gemmer..." : "Gem beslutning"}
-              </Button>
+            <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center justify-between gap-2 border-t border-line bg-surface/95 px-1 py-3 backdrop-blur">
+              <p className="text-xs text-muted" role="status">
+                {dirty
+                  ? "Der er ændringer, som ikke er gemt."
+                  : "Ingen ugemte ændringer."}
+              </p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  disabled={mutation.pending}
+                  onClick={closeDraft}
+                  type="button"
+                  variant="secondary"
+                >
+                  Annuller
+                </Button>
+                <Button disabled={mutation.pending} type="submit">
+                  {mutation.pending ? "Gemmer..." : "Gem beslutning"}
+                </Button>
+              </div>
             </div>
           </form>
         ) : null}

@@ -63,6 +63,7 @@ export type JobCardOverview = {
   members: OrganizationMemberDirectoryEntry[];
   annualWheelEvents: AnnualWheelEventView[];
   decisions: DecisionView[];
+  editableCommitteeIds: string[];
   canManage: boolean;
 };
 

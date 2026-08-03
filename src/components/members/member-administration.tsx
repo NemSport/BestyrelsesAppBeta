@@ -250,9 +250,13 @@ export function MemberAdministration({
         title="Aktive medlemmer"
       >
         {members.length > 0 ? (
-          <TableContainer>
-            <Table>
-              <TableHead>
+          <TableContainer
+            aria-label="Aktive medlemmer"
+            className="overflow-visible border-0 bg-transparent md:overflow-x-auto md:border-y"
+            tabIndex={-1}
+          >
+            <Table className="block min-w-0 md:table md:min-w-full">
+              <TableHead className="hidden md:table-header-group">
                 <TableRow>
                   <TableHeaderCell>Medlem</TableHeaderCell>
                   <TableHeaderCell>Udvalg</TableHeaderCell>
@@ -261,7 +265,7 @@ export function MemberAdministration({
                   <TableHeaderCell>Handlinger</TableHeaderCell>
                 </TableRow>
               </TableHead>
-              <TableBody>
+              <TableBody className="grid gap-3 md:table-row-group">
                 {members.map((member) => {
                   const isSelf = member.user_id === currentUserId;
                   const capabilities = getMemberAccessCapabilities({
@@ -273,9 +277,15 @@ export function MemberAdministration({
                   });
 
                   return (
-                    <TableRow key={member.user_id}>
-                      <TableCell className="min-w-56">
-                        <p className="font-semibold">
+                    <TableRow
+                      className="grid gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
+                      key={member.user_id}
+                    >
+                      <TableCell className="block min-w-0 p-0 md:table-cell md:min-w-56 md:px-5 md:py-4">
+                        <span className="metadata mb-1 block md:hidden">
+                          Medlem
+                        </span>
+                        <p className="break-words font-semibold">
                           {member.full_name || member.email}
                           {isSelf ? (
                             <span className="ml-2 text-xs font-normal text-muted">
@@ -283,15 +293,19 @@ export function MemberAdministration({
                             </span>
                           ) : null}
                         </p>
-                        <p className="mt-1 text-sm text-muted">
+                        <p className="mt-1 break-all text-sm text-muted">
                           {member.email}
                         </p>
                       </TableCell>
-                      <TableCell className="min-w-64">
+                      <TableCell className="block min-w-0 p-0 md:table-cell md:min-w-64 md:px-5 md:py-4">
+                        <span className="metadata mb-1 block md:hidden">
+                          Udvalg
+                        </span>
                         <div className="flex flex-wrap gap-1.5">
                           {member.committees.length > 0 ? (
                             member.committees.map((committee) => (
                               <StatusBadge
+                                className="max-w-full whitespace-normal break-words leading-4"
                                 key={committee.id}
                                 title={committeeRoleLabels[committee.role]}
                               >
@@ -305,15 +319,24 @@ export function MemberAdministration({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="min-w-44">
+                      <TableCell className="block min-w-0 p-0 md:table-cell md:min-w-44 md:px-5 md:py-4">
+                        <span className="metadata mb-1 block md:hidden">
+                          Organisationsrolle
+                        </span>
                         {organizationRoleLabels[member.role]}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="block min-w-0 p-0 md:table-cell md:px-5 md:py-4">
+                        <span className="metadata mb-1 block md:hidden">
+                          Status
+                        </span>
                         <StatusBadge tone="success">
                           {membershipStatusLabels[member.status]}
                         </StatusBadge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="block min-w-0 border-t border-line pt-3 md:table-cell md:border-t-0 md:px-5 md:py-4">
+                        <span className="metadata mb-2 block md:hidden">
+                          Handlinger
+                        </span>
                         {capabilities.canEditAccess ||
                         capabilities.canRemove ? (
                           <div className="flex flex-wrap items-center gap-2">
@@ -333,9 +356,14 @@ export function MemberAdministration({
                               />
                             ) : null}
                             {capabilities.canRemove ? (
-                              <ActionMenu align="right">
+                              <ActionMenu
+                                align="right"
+                                ariaLabel={`Flere handlinger for ${
+                                  member.full_name || member.email
+                                }`}
+                              >
                                 <button
-                                  className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
+                                  className="block min-h-11 w-full px-3 py-2 text-left text-sm font-semibold text-danger hover:bg-danger-soft"
                                   disabled={
                                     loadingKey === `remove-${member.user_id}`
                                   }
@@ -369,25 +397,43 @@ export function MemberAdministration({
         title="Afventende invitationer"
       >
         {invitations.length > 0 ? (
-          <TableContainer>
-            <Table>
-              <TableHead>
+          <TableContainer
+            aria-label="Afventende invitationer"
+            className="overflow-visible border-0 bg-transparent md:overflow-x-auto md:border-y"
+            tabIndex={-1}
+          >
+            <Table className="block min-w-0 md:table md:min-w-full">
+              <TableHead className="hidden md:table-header-group">
                 <TableRow>
                   <TableHeaderCell>E-mail</TableHeaderCell>
                   <TableHeaderCell>Rolle</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                 </TableRow>
               </TableHead>
-              <TableBody>
+              <TableBody className="grid gap-3 md:table-row-group">
                 {invitations.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell className="font-semibold">
-                      {invitation.email}
+                  <TableRow
+                    className="grid gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
+                    key={invitation.id}
+                  >
+                    <TableCell className="block min-w-0 p-0 md:table-cell md:px-5 md:py-4">
+                      <span className="metadata mb-1 block md:hidden">
+                        E-mail
+                      </span>
+                      <span className="break-all font-semibold">
+                        {invitation.email}
+                      </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="block min-w-0 p-0 md:table-cell md:px-5 md:py-4">
+                      <span className="metadata mb-1 block md:hidden">
+                        Organisationsrolle
+                      </span>
                       {organizationRoleLabels[invitation.role]}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="block min-w-0 p-0 md:table-cell md:px-5 md:py-4">
+                      <span className="metadata mb-1 block md:hidden">
+                        Invitationsstatus
+                      </span>
                       <StatusBadge tone="warning">
                         {invitationStatusLabels[invitation.status]}
                       </StatusBadge>

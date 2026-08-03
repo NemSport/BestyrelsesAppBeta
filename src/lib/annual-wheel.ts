@@ -116,3 +116,13 @@ export function annualWheelDeadlineState(
   if (days <= 30) return "upcoming" as const;
   return "future" as const;
 }
+
+export function canEditAnnualWheelEvent(
+  canEditOrganization: boolean,
+  editableCommitteeIds: readonly string[],
+  committeeId: string | null,
+) {
+  return committeeId
+    ? editableCommitteeIds.includes(committeeId)
+    : canEditOrganization;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -100,6 +101,8 @@ export function QuickActionMenu({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const submissionLockRef = useRef(false);
   const meetingDirty =
     meetingOpen &&
@@ -116,6 +119,37 @@ export function QuickActionMenu({
   const confirmQuickMeetingDiscard = useUnsavedChanges(
     quickMeetingDirty && !saving,
   );
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      menuTriggerRef.current?.focus();
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !menuContainerRef.current?.contains(event.target)
+      ) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [menuOpen]);
 
   function closeMeetingModal() {
     if (saving || !confirmMeetingDiscard()) return;
@@ -371,11 +405,12 @@ export function QuickActionMenu({
 
   return (
     <>
-      <div className="relative">
+      <div className="relative" ref={menuContainerRef}>
         <Button
+          aria-controls="quick-action-options"
           aria-expanded={menuOpen}
-          aria-haspopup="menu"
           onClick={() => setMenuOpen((current) => !current)}
+          ref={menuTriggerRef}
           size="sm"
         >
           + Opret
@@ -383,13 +418,12 @@ export function QuickActionMenu({
         {menuOpen ? (
           <div
             className="absolute right-0 z-30 mt-2 w-72 rounded-[var(--radius-control)] border border-line bg-surface p-2 shadow-dialog"
-            role="menu"
+            id="quick-action-options"
           >
             {canCreateMeeting ? (
               <button
                 className="quick-action-item"
                 onClick={openMeetingModal}
-                role="menuitem"
                 type="button"
               >
                 <span className="font-semibold text-ink">Nyt møde</span>
@@ -402,7 +436,6 @@ export function QuickActionMenu({
               <button
                 className="quick-action-item"
                 onClick={openQuickMeetingModal}
-                role="menuitem"
                 type="button"
               >
                 <span className="font-semibold text-ink">Hurtigt møde</span>
@@ -414,7 +447,6 @@ export function QuickActionMenu({
             <button
               className="quick-action-item disabled"
               disabled
-              role="menuitem"
               title="Opgaver oprettes fra opgave- eller mødekonteksten, hvor ansvarlige og relationer er tilgængelige."
               type="button"
             >
@@ -426,7 +458,6 @@ export function QuickActionMenu({
             <button
               className="quick-action-item disabled"
               disabled
-              role="menuitem"
               title="Beslutninger oprettes fra beslutningsregisteret eller en mødekontekst med dato og punktrelationer."
               type="button"
             >
@@ -444,7 +475,6 @@ export function QuickActionMenu({
                   setMenuOpen(false);
                   setAgendaItemOpen(true);
                 }}
-                role="menuitem"
                 title={
                   canCreateAgendaItem
                     ? "Opret dagsordenspunkt på det åbne møde."

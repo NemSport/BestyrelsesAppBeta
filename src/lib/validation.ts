@@ -511,7 +511,7 @@ const optionalDecisionText = (label: string, max: number) =>
     .nullable()
     .optional();
 
-export const decisionInputSchema = z.object({
+const decisionFieldsSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
   meetingId: uuidSchema.nullable().optional(),
@@ -538,7 +538,16 @@ export const decisionInputSchema = z.object({
   internalNote: optionalDecisionText("Intern note", 10000),
 });
 
-export const decisionUpdateSchema = decisionInputSchema.extend({
+export const decisionInputSchema = decisionFieldsSchema.extend({
+  agendaItemId: z
+    .string({
+      required_error: "Dagsordenspunkt skal vælges",
+      invalid_type_error: "Dagsordenspunkt skal vælges",
+    })
+    .uuid("Vælg et gyldigt dagsordenspunkt"),
+});
+
+export const decisionUpdateSchema = decisionFieldsSchema.extend({
   decisionId: uuidSchema,
 });
 

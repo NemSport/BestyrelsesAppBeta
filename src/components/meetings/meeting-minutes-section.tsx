@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 
-import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
 import { EditAgendaItemModal } from "@/components/agenda-items/edit-agenda-item-modal";
 import { DecisionCreateModal } from "@/components/decisions/decision-create-modal";
 import { DecisionHistory } from "@/components/decisions/decision-history";
@@ -38,6 +37,7 @@ import {
   type StatusTone,
 } from "@/components/ui";
 import { useOfflineAutosave } from "@/hooks/use-offline-autosave";
+import { useDismissibleDetails } from "@/hooks/use-dismissible-details";
 import {
   agendaItemMinutesNeedsAction,
   agendaItemMinutesStatusOptions,
@@ -46,6 +46,7 @@ import {
 } from "@/lib/agenda-item-minutes";
 import {
   agendaItemMinutesStatusLabels,
+  agendaItemTypeLabels,
   formatDate,
   meetingMinutesStatusLabels,
   standardAgendaItemLabels,
@@ -739,9 +740,11 @@ function AgendaMinutesCard({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [isOpen, setIsOpen] = useState(false);
+  const [isEditingMinutes, setIsEditingMinutes] = useState(false);
   const [activeActionPanel, setActiveActionPanel] =
     useState<AgendaActionPanel>(null);
+  const moreActionsRef = useRef<HTMLDetailsElement>(null);
+  useDismissibleDetails(moreActionsRef);
   const [deleting, setDeleting] = useState(false);
   const transferStatusRef = useRef<AgendaMinutesStatus | null>(
     initialMinutes &&
@@ -948,28 +951,30 @@ function AgendaMinutesCard({
   const fieldGuidance = agendaMinutesFieldGuidance[itemType];
 
   return (
-    <details
+    <article
+      aria-labelledby={`agenda-point-${occurrence.id}-heading`}
       className={clsx(
-        "group overflow-hidden rounded-[var(--radius-panel)] border bg-subtle/60 shadow-sm",
-        isStandardItem ? "border-line bg-subtle/70" : "border-line-strong",
+        "scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border-2 border-brand/35 bg-surface shadow-sm",
+        isStandardItem && "bg-subtle/20",
         isTransferredItem && "border-l-4 border-l-progress/40",
         isAnyOtherBusiness && "border-dashed",
       )}
       id={`agenda-point-${occurrence.id}`}
-      onToggle={(event) => setIsOpen(event.currentTarget.open)}
-      open={isOpen}
     >
-      <summary
+      <header
         className={clsx(
-          "grid cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)] items-start gap-2.5 px-3 py-2.5 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] [&::-webkit-details-marker]:hidden",
-          isStandardItem ? "bg-subtle/75" : "bg-subtle/45",
+          "grid grid-cols-[2.75rem_minmax(0,1fr)] items-start gap-3 border-b border-line bg-brand-soft/55 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:px-5 sm:py-4",
+          isStandardItem && "bg-subtle/60",
         )}
       >
-        <span className="font-document flex h-7 w-7 shrink-0 items-center justify-center border-r border-line text-base font-semibold text-brand">
+        <span className="font-document flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-brand bg-surface text-lg font-bold text-brand shadow-sm">
           {displayNumber}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="info">
+              {agendaItemTypeLabels[item.item_type].label}
+            </StatusBadge>
             {item.standard_key ? (
               <StatusBadge>
                 {standardAgendaItemLabels[item.standard_key]}
@@ -997,32 +1002,28 @@ function AgendaMinutesCard({
               </StatusBadge>
             ) : null}
           </div>
-          <h4
+          <h3
             className={clsx(
-              "mt-1.5 break-words text-base font-semibold leading-6",
+              "mt-2 break-words text-xl font-semibold leading-7 text-ink",
               isAnyOtherBusiness && "italic",
             )}
+            id={`agenda-point-${occurrence.id}-heading`}
+            tabIndex={-1}
           >
-            <AgendaItemDocumentTitle title={item.title} type={item.item_type} />
-          </h4>
+            {item.title}
+          </h3>
           {item.objective || item.description ? (
-            <p className="mt-1 line-clamp-1 text-xs text-muted">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">
               {item.objective || item.description}
             </p>
           ) : null}
         </div>
-        <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:flex-col sm:items-end">
+        <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:items-start">
           <StatusBadge tone={agendaStatusTones[status]}>
             {agendaItemMinutesStatusLabels[status]}
           </StatusBadge>
-          <span
-            aria-hidden="true"
-            className="text-lg text-muted transition group-open:rotate-180"
-          >
-            ⌄
-          </span>
         </div>
-      </summary>
+      </header>
 
       {item.standard_key === "previous_minutes_approval" ? (
         <PreviousMinutesReference
@@ -1031,7 +1032,128 @@ function AgendaMinutesCard({
         />
       ) : null}
 
-      {canEdit ? (
+      {canEdit && !isEditingMinutes ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-3 sm:px-5">
+          <Button
+            onClick={() => {
+              setActiveActionPanel(null);
+              setIsEditingMinutes(true);
+            }}
+            type="button"
+          >
+            Rediger referat
+          </Button>
+          {canEditDecisions ? (
+            <DecisionCreateModal
+              agendaItems={[{ id: item.id, title: item.title }]}
+              categorySource={decisionCategorySource}
+              committeeId={committeeId}
+              initialAgendaItemId={item.id}
+              initialCategory={decisionHistory.categories[0] ?? ""}
+              initialDeadline={minutes?.deadline ?? ""}
+              initialDescription={firstRichTextToPlainText(
+                minutes?.notes,
+                minutes?.decision,
+                minutes?.follow_up,
+              )}
+              initialResponsibleUserId={minutes?.responsible_user_id ?? ""}
+              initialTitle={item.title}
+              meetingDate={meetingDate}
+              meetingId={meetingId}
+              organizationId={organizationId}
+              responsiblePeople={responsiblePeople}
+              sourceLabel="punktreferatet"
+              trigger={(open) => (
+                <Button onClick={open} type="button" variant="secondary">
+                  Tilføj beslutning
+                </Button>
+              )}
+            />
+          ) : null}
+          {canEditTasks ? (
+            <TaskCreateModal
+              agendaItems={[{ id: item.id, title: item.title }]}
+              categorySource={taskCategorySource}
+              committeeId={committeeId}
+              decisions={relatedDecisions}
+              initialAgendaItemId={item.id}
+              initialDeadline={minutes?.deadline ?? ""}
+              initialDescription={firstRichTextToPlainText(
+                minutes?.follow_up,
+                minutes?.notes,
+                minutes?.decision,
+              )}
+              initialMeetingId={meetingId}
+              initialResponsibleUserId={minutes?.responsible_user_id ?? ""}
+              initialTitle={item.title}
+              instanceId={`agenda-task-read-${item.id}`}
+              meetings={[
+                {
+                  id: meetingId,
+                  title: "Aktuelt møde",
+                  starts_at: meetingDate,
+                },
+              ]}
+              organizationId={organizationId}
+              responsiblePeople={responsiblePeople}
+              sourceLabel="punktreferatet"
+              trigger={(open) => (
+                <Button onClick={open} type="button" variant="secondary">
+                  Opret opgave
+                </Button>
+              )}
+            />
+          ) : null}
+          <details className="group relative" ref={moreActionsRef}>
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
+              Flere handlinger
+            </summary>
+            <div className="absolute left-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg sm:left-auto sm:right-0">
+              <Link
+                className="block min-h-11 rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold text-brand hover:bg-subtle"
+                href={`${root}/agenda-items/${item.id}`}
+              >
+                Åbn dagsordenspunkt
+              </Link>
+              <AgendaPrivateNoteEditor
+                agendaItemId={item.id}
+                committeeId={committeeId}
+                initialPrivateNote={initialPrivateNote}
+                meetingId={meetingId}
+                organizationId={organizationId}
+                userId={userId}
+              />
+              {canEditTasks ? (
+                <div className="border-t border-line pt-3">
+                  <AiTaskReviewModal
+                    agendaItemId={item.id}
+                    categorySource={taskCategorySource}
+                    committeeId={committeeId}
+                    decisions={meetingDecisions}
+                    existingTasks={relatedTasks}
+                    meetingId={meetingId}
+                    minutesStatus={minutesStatus}
+                    organizationId={organizationId}
+                    responsiblePeople={responsiblePeople}
+                    source="agenda_item_minutes"
+                    sourceLabel={`punktreferatet “${item.title}”`}
+                  />
+                </div>
+              ) : null}
+              <div className="border-t border-line pt-3">
+                <EditAgendaItemModal
+                  committeeId={committeeId}
+                  compact
+                  item={item}
+                  organizationId={organizationId}
+                />
+              </div>
+            </div>
+          </details>
+        </div>
+      ) : null}
+
+      {canEdit && isEditingMinutes ? (
         <form
           className="space-y-3.5 border-t border-line p-3"
           onBlurCapture={() => void autosave.flush()}
@@ -1138,51 +1260,6 @@ function AgendaMinutesCard({
           </div>
           <div className="space-y-3 rounded-[var(--radius-panel)] bg-surface/75 p-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              {canEditDecisions ? (
-                <DecisionCreateModal
-                  agendaItems={[{ id: item.id, title: item.title }]}
-                  categorySource={decisionCategorySource}
-                  committeeId={committeeId}
-                  initialAgendaItemId={item.id}
-                  initialCategory={decisionHistory.categories[0] ?? ""}
-                  initialDeadline={deadline}
-                  initialDescription={firstRichTextToPlainText(notes)}
-                  initialResponsibleUserId={responsibleUserId}
-                  initialTitle={item.title}
-                  meetingDate={meetingDate}
-                  meetingId={meetingId}
-                  organizationId={organizationId}
-                  responsiblePeople={responsiblePeople}
-                  sourceLabel="punktnoterne"
-                  triggerLabel="+ Beslutning"
-                />
-              ) : null}
-              {canEditTasks ? (
-                <TaskCreateModal
-                  agendaItems={[{ id: item.id, title: item.title }]}
-                  categorySource={taskCategorySource}
-                  committeeId={committeeId}
-                  initialAgendaItemId={item.id}
-                  initialCategory={decisionHistory.categories[0] ?? ""}
-                  initialDeadline={deadline}
-                  initialDescription={firstRichTextToPlainText(notes)}
-                  initialMeetingId={meetingId}
-                  initialResponsibleUserId={responsibleUserId}
-                  initialTitle={item.title}
-                  instanceId={`agenda-task-${item.id}`}
-                  meetings={[
-                    {
-                      id: meetingId,
-                      title: "Aktuelt møde",
-                      starts_at: meetingDate,
-                    },
-                  ]}
-                  organizationId={organizationId}
-                  responsiblePeople={responsiblePeople}
-                  sourceLabel="punktnoterne"
-                  triggerLabel="+ Opgave"
-                />
-              ) : null}
               <MinutesAiAssistant
                 agendaItemId={item.id}
                 committeeId={committeeId}
@@ -1511,6 +1588,17 @@ function AgendaMinutesCard({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
+                onClick={() => {
+                  void autosave.flush();
+                  setActiveActionPanel(null);
+                  setIsEditingMinutes(false);
+                }}
+                type="button"
+                variant="secondary"
+              >
+                Luk redigering
+              </Button>
+              <Button
                 disabled={deleting || autosave.status === "saving"}
                 type="submit"
               >
@@ -1585,146 +1673,22 @@ function AgendaMinutesCard({
               </div>
             </details>
           ) : null}
-          <details className="group rounded-[var(--radius-control)] border border-line bg-subtle/30 md:col-span-2">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              <span>Interne noter</span>
-              <span className="text-xs font-semibold text-brand">
-                <span className="group-open:hidden">Åbn</span>
-                <span className="hidden group-open:inline">Skjul</span>
-              </span>
-            </summary>
-            <div className="border-t border-line p-3">
-              <AgendaPrivateNoteEditor
-                agendaItemId={item.id}
-                committeeId={committeeId}
-                initialPrivateNote={initialPrivateNote}
-                meetingId={meetingId}
-                organizationId={organizationId}
-                userId={userId}
-              />
-            </div>
-          </details>
           <div className="md:col-span-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                className="text-sm font-semibold text-forest hover:underline"
-                href={`${root}/agenda-items/${item.id}`}
-              >
-                Åbn dagsordenspunkt
-              </Link>
-              {canEditDecisions ? (
-                <DecisionCreateModal
-                  agendaItems={[{ id: item.id, title: item.title }]}
-                  categorySource={decisionCategorySource}
-                  committeeId={committeeId}
-                  initialAgendaItemId={item.id}
-                  initialCategory={decisionHistory.categories[0] ?? ""}
-                  initialDeadline={minutes?.deadline ?? ""}
-                  initialDescription={firstRichTextToPlainText(
-                    minutes?.decision,
-                    minutes?.notes,
-                    minutes?.follow_up,
-                  )}
-                  initialResponsibleUserId={minutes?.responsible_user_id ?? ""}
-                  initialTitle={item.title}
-                  meetingDate={meetingDate}
-                  meetingId={meetingId}
-                  organizationId={organizationId}
-                  responsiblePeople={responsiblePeople}
-                  sourceLabel="punktreferatet"
-                  triggerLabel="Opret beslutning fra referat"
-                />
-              ) : null}
-              {canEditTasks ? (
-                <>
-                  <TaskCreateModal
-                    agendaItems={[{ id: item.id, title: item.title }]}
-                    categorySource={taskCategorySource}
-                    committeeId={committeeId}
-                    initialAgendaItemId={item.id}
-                    initialCategory={decisionHistory.categories[0] ?? ""}
-                    initialDeadline={minutes?.deadline ?? ""}
-                    initialDescription={firstRichTextToPlainText(
-                      minutes?.follow_up,
-                      minutes?.notes,
-                      minutes?.decision,
-                    )}
-                    initialMeetingId={meetingId}
-                    initialResponsibleUserId={
-                      minutes?.responsible_user_id ?? ""
-                    }
-                    initialTitle={item.title}
-                    instanceId={`agenda-task-read-${item.id}`}
-                    meetings={[
-                      {
-                        id: meetingId,
-                        title: "Aktuelt møde",
-                        starts_at: meetingDate,
-                      },
-                    ]}
-                    organizationId={organizationId}
-                    responsiblePeople={responsiblePeople}
-                    sourceLabel="punktreferatet"
-                    triggerLabel="Opret opgave"
-                  />
-                  <details className="group relative">
-                    <summary className="min-h-9 cursor-pointer list-none rounded-[var(--radius-control)] bg-transparent px-3 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
-                      Flere handlinger
-                    </summary>
-                    <div className="absolute right-0 z-10 mt-2 min-w-72 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg">
-                      <p className="mb-2 text-xs text-muted">
-                        Analysér kun dette punkt med AI.
-                      </p>
-                      <AiTaskReviewModal
-                        agendaItemId={item.id}
-                        categorySource={taskCategorySource}
-                        committeeId={committeeId}
-                        decisions={meetingDecisions}
-                        existingTasks={meetingTasks.filter(
-                          (relatedTask) =>
-                            relatedTask.agenda_item_id === item.id,
-                        )}
-                        meetingId={meetingId}
-                        minutesStatus={minutesStatus}
-                        organizationId={organizationId}
-                        responsiblePeople={responsiblePeople}
-                        source="agenda_item_minutes"
-                        sourceLabel={`punktreferatet “${item.title}”`}
-                      />
-                    </div>
-                  </details>
-                </>
-              ) : null}
-            </div>
+            <Link
+              className="text-sm font-semibold text-forest hover:underline"
+              href={`${root}/agenda-items/${item.id}`}
+            >
+              Åbn dagsordenspunkt
+            </Link>
           </div>
         </div>
       )}
       {relatedDecisions.length > 0 || relatedTasks.length > 0 ? (
-        <details className="group border-t border-line bg-surface">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-5">
-            <span className="flex flex-wrap items-center gap-2">
-              Relationer
-              {relatedDecisions.length > 0 ? (
-                <span className="rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                  {relatedDecisions.length}{" "}
-                  {relatedDecisions.length === 1
-                    ? "beslutning"
-                    : "beslutninger"}
-                </span>
-              ) : null}
-              {relatedTasks.length > 0 ? (
-                <span className="rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
-                  {relatedTasks.length}{" "}
-                  {relatedTasks.length === 1 ? "opgave" : "opgaver"}
-                </span>
-              ) : null}
-            </span>
-            <span className="text-xs font-semibold text-brand">
-              <span className="group-open:hidden">Åbn</span>
-              <span className="hidden group-open:inline">Skjul</span>
-            </span>
-          </summary>
-          <div className="grid gap-4 border-t border-line px-4 py-3 sm:px-5 md:grid-cols-2">
+        <section
+          aria-label="Beslutninger og opgaver for punktet"
+          className="border-t border-line bg-surface px-4 py-4 sm:px-5"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
             {relatedDecisions.length > 0 ? (
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -1750,7 +1714,7 @@ function AgendaMinutesCard({
               </div>
             ) : null}
           </div>
-        </details>
+        </section>
       ) : null}
       <details className="group border-t border-line bg-subtle/20">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-5">
@@ -1770,25 +1734,19 @@ function AgendaMinutesCard({
           />
         </div>
       </details>
-      <details className="group border-t border-line bg-subtle/30">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-5">
-          <span>
-            Ekstra
-            {attachments.length > 0 ? (
-              <span className="ml-2 font-normal text-muted">
-                {attachments.length}{" "}
-                {attachments.length === 1 ? "vedhæftning" : "vedhæftninger"}
-              </span>
-            ) : null}
-          </span>
-          <span
-            aria-hidden="true"
-            className="text-muted transition group-open:rotate-180"
-          >
-            ⌄
-          </span>
-        </summary>
-        <div className="border-t border-line p-4 sm:p-5">
+      <section
+        aria-label="Bilag"
+        className="border-t border-line bg-subtle/30 p-4 sm:p-5"
+      >
+        <h4 className="mb-3 text-sm font-semibold">
+          Bilag
+          {attachments.length > 0 ? (
+            <span className="ml-2 font-normal text-muted">
+              {attachments.length}{" "}
+              {attachments.length === 1 ? "vedhæftning" : "vedhæftninger"}
+            </span>
+          ) : null}
+        </h4>
           <MinuteAttachments
             agendaItemId={item.id}
             attachments={attachments}
@@ -1797,23 +1755,12 @@ function AgendaMinutesCard({
             meetingId={meetingId}
             organizationId={organizationId}
           />
-          {canEdit ? (
-            <div className="mt-4 border-t border-line pt-4">
-              <EditAgendaItemModal
-                committeeId={committeeId}
-                compact
-                item={item}
-                organizationId={organizationId}
-              />
-            </div>
-          ) : null}
-        </div>
-      </details>
-    </details>
+      </section>
+    </article>
   );
 }
 
-export function MeetingMinutesSection({
+function LegacyMeetingMinutesSection({
   organizationId,
   userId,
   committeeId,
@@ -1897,7 +1844,9 @@ export function MeetingMinutesSection({
   const [isGeneralMinutesOpen, setIsGeneralMinutesOpen] = useState(
     () =>
       typeof window !== "undefined" &&
-      window.location.hash === "#general-minutes-content",
+      ["#general-minutes-content", "#general-minutes-heading"].includes(
+        window.location.hash,
+      ),
   );
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const [referentLock, setReferentLock] = useState(initialReferentLock);
@@ -1981,6 +1930,23 @@ export function MeetingMinutesSection({
   }, [error, meetingAutosave.conflict]);
 
   useEffect(() => {
+    function openDeepLinkedGeneralMinutes() {
+      if (
+        ["#general-minutes-content", "#general-minutes-heading"].includes(
+          window.location.hash,
+        )
+      ) {
+        setIsGeneralMinutesOpen(true);
+      }
+    }
+
+    openDeepLinkedGeneralMinutes();
+    window.addEventListener("hashchange", openDeepLinkedGeneralMinutes);
+    return () =>
+      window.removeEventListener("hashchange", openDeepLinkedGeneralMinutes);
+  }, []);
+
+  useEffect(() => {
     if (
       initialMeetingMinutes &&
       isNewerServerVersion(
@@ -2037,7 +2003,7 @@ export function MeetingMinutesSection({
         referentLock={referentLock}
       />
       <section
-        className="order-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
+        className="order-2 scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
         aria-labelledby="general-minutes-heading"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
@@ -2058,8 +2024,9 @@ export function MeetingMinutesSection({
             </span>
             <span>
               <span
-                className="block font-semibold text-ink"
+                className="block scroll-mt-24 font-semibold text-ink"
                 id="general-minutes-heading"
+                tabIndex={-1}
               >
                 Generelt mødereferat
               </span>
@@ -2335,7 +2302,11 @@ export function MeetingMinutesSection({
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-2.5">
           <div>
             <p className="page-eyebrow">Dagsorden</p>
-            <h3 className="section-title mt-1" id="agenda-minutes-heading">
+            <h3
+              className="section-title mt-1 scroll-mt-24"
+              id="agenda-minutes-heading"
+              tabIndex={-1}
+            >
               Referat pr. dagsordenspunkt
             </h3>
             <p className="metadata mt-1">
@@ -2425,6 +2396,464 @@ export function MeetingMinutesSection({
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+// Kept as an internal migration reference while the historical meeting-level
+// fields remain readable by exports and approval workflows.
+void LegacyMeetingMinutesSection;
+
+type MeetingMinutesSectionProps = Parameters<
+  typeof LegacyMeetingMinutesSection
+>[0];
+
+function occurrenceIdFromHash(
+  hash: string,
+  occurrences: AgendaOccurrence[],
+) {
+  const match = /^#agenda-point-(.+)$/.exec(hash);
+  if (match && occurrences.some((occurrence) => occurrence.id === match[1])) {
+    return match[1];
+  }
+
+  return occurrences[0]?.id ?? null;
+}
+
+export function MeetingMinutesSection({
+  organizationId,
+  userId,
+  committeeId,
+  meetingId,
+  root,
+  occurrences,
+  initialMeetingMinutes,
+  initialAgendaItemMinutes,
+  privateAgendaItemNotes,
+  referentLock: initialReferentLock,
+  responsiblePeople,
+  previousMeetingMinutes,
+  approvals,
+  meetingAttachments,
+  agendaItemAttachments,
+  canApprove,
+  canEdit,
+  canEditDecisions,
+  canEditTasks,
+  meetingDate,
+  meetingDecisions,
+  meetingTasks,
+  decisionCategorySource,
+  taskCategorySource,
+  decisionHistoryByAgendaItem,
+  approvalRecipientInfo,
+}: MeetingMinutesSectionProps) {
+  const [minutes, setMinutes] = useState(initialMeetingMinutes);
+  const [meetingStatus, setMeetingStatus] = useState<MinutesStatus>(
+    initialMeetingMinutes?.status ?? "draft",
+  );
+  const [isEditingApproved, setIsEditingApproved] = useState(false);
+  const [referentLock, setReferentLock] = useState(initialReferentLock);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [activeOccurrenceId, setActiveOccurrenceId] = useState<string | null>(
+    () =>
+      occurrenceIdFromHash(
+        typeof window === "undefined" ? "" : window.location.hash,
+        occurrences,
+      ),
+  );
+  const activeOccurrenceIdRef = useRef(activeOccurrenceId);
+
+  useEffect(() => {
+    activeOccurrenceIdRef.current = activeOccurrenceId;
+  }, [activeOccurrenceId]);
+
+  useEffect(() => {
+    setReferentLock(initialReferentLock);
+  }, [initialReferentLock]);
+
+  useEffect(() => {
+    setMinutes(initialMeetingMinutes);
+    setMeetingStatus(initialMeetingMinutes?.status ?? "draft");
+    if (initialMeetingMinutes?.status === "approved") {
+      setIsEditingApproved(false);
+    }
+  }, [initialMeetingMinutes]);
+
+  useEffect(() => {
+    const fallbackId = occurrences[0]?.id ?? null;
+    if (
+      activeOccurrenceIdRef.current &&
+      occurrences.some(
+        (occurrence) => occurrence.id === activeOccurrenceIdRef.current,
+      )
+    ) {
+      return;
+    }
+    setActiveOccurrenceId(fallbackId);
+  }, [occurrences]);
+
+  useEffect(() => {
+    function syncSelectionFromHash() {
+      const nextId = occurrenceIdFromHash(window.location.hash, occurrences);
+      setActiveOccurrenceId(nextId);
+      setSelectorOpen(false);
+
+      if (window.location.hash.startsWith("#agenda-point-") && nextId) {
+        window.requestAnimationFrame(() => {
+          document
+            .getElementById(`agenda-point-${nextId}-heading`)
+            ?.focus({ preventScroll: true });
+        });
+      }
+    }
+
+    syncSelectionFromHash();
+    window.addEventListener("hashchange", syncSelectionFromHash);
+    return () => window.removeEventListener("hashchange", syncSelectionFromHash);
+  }, [occurrences]);
+
+  const activeIndex = Math.max(
+    0,
+    occurrences.findIndex(
+      (occurrence) => occurrence.id === activeOccurrenceId,
+    ),
+  );
+  const activeOccurrence = occurrences[activeIndex] ?? null;
+  const activeReferentLock = isActiveReferentLock(referentLock)
+    ? referentLock
+    : null;
+  const isCurrentReferent = Boolean(activeReferentLock?.isCurrentUser);
+  const effectiveCanEdit =
+    canEdit && (meetingStatus !== "approved" || isEditingApproved);
+  const canEditOfficialMinutes = effectiveCanEdit && isCurrentReferent;
+  const officialMinutesLockedMessage = activeReferentLock
+    ? activeReferentLock.isCurrentUser
+      ? null
+      : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
+    : "Tag rollen som referent for at redigere de officielle referatfelter.";
+
+  function selectOccurrence(occurrenceId: string) {
+    setActiveOccurrenceId(occurrenceId);
+    setSelectorOpen(false);
+    if (window.location.hash === `#agenda-point-${occurrenceId}`) {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(`agenda-point-${occurrenceId}-heading`)
+          ?.focus({ preventScroll: true });
+      });
+    }
+  }
+
+  function renderAgendaChoice(
+    occurrence: AgendaOccurrence,
+    index: number,
+    mobile = false,
+  ) {
+    const item = occurrence.agenda_items;
+    if (!item) return null;
+    const itemMinutes = initialAgendaItemMinutes.find(
+      (candidate) => candidate.agenda_item_id === occurrence.agenda_item_id,
+    );
+    const itemStatus = normalizeAgendaItemMinutesStatus(
+      item.item_type,
+      itemMinutes?.status ?? "not_started",
+    );
+    const isActive = occurrence.id === activeOccurrence?.id;
+
+    return (
+      <Link
+        aria-current={isActive ? "location" : undefined}
+        className={clsx(
+          "group block min-h-14 rounded-[var(--radius-control)] border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
+          isActive
+            ? "border-2 border-brand bg-brand-soft shadow-sm"
+            : "border-line bg-surface hover:border-brand/35 hover:bg-subtle",
+          mobile && "min-h-16",
+        )}
+        href={`#agenda-point-${occurrence.id}`}
+        key={occurrence.id}
+        onClick={() => selectOccurrence(occurrence.id)}
+      >
+        <span className="flex items-start gap-3">
+          <span
+            className={clsx(
+              "flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold",
+              isActive
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-subtle text-ink",
+            )}
+          >
+            {index + 1}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[0.68rem] font-semibold uppercase tracking-wide text-muted">
+              {agendaItemTypeLabels[item.item_type].label}
+            </span>
+            <span className="mt-0.5 block break-words text-sm font-semibold leading-5 text-ink">
+              {item.title}
+            </span>
+            <span className="mt-1 block text-xs text-muted">
+              {agendaItemMinutesStatusLabels[itemStatus]}
+            </span>
+          </span>
+        </span>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <span className="sr-only" id="general-minutes-heading" tabIndex={-1}>
+        Dagsordenspunkter
+      </span>
+      <span className="sr-only" id="general-minutes-content" tabIndex={-1}>
+        Dagsordenspunkter
+      </span>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-ink">Mødereferat</span>
+          <StatusBadge tone={meetingStatusTones[meetingStatus]}>
+            {meetingMinutesStatusLabels[meetingStatus]}
+          </StatusBadge>
+        </div>
+        {canEdit && meetingStatus === "approved" ? (
+          <Button
+            onClick={() => setIsEditingApproved((current) => !current)}
+            type="button"
+            variant="secondary"
+          >
+            {isEditingApproved
+              ? "Afslut redigering"
+              : "Rediger godkendte punktreferater"}
+          </Button>
+        ) : null}
+      </div>
+
+      <ReferentRoleControl
+        canEdit={effectiveCanEdit}
+        committeeId={committeeId}
+        meetingId={meetingId}
+        onChange={setReferentLock}
+        organizationId={organizationId}
+        referentLock={referentLock}
+      />
+      {effectiveCanEdit && officialMinutesLockedMessage ? (
+        <p
+          className="rounded-[var(--radius-control)] border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-warning"
+          role="status"
+        >
+          {officialMinutesLockedMessage}
+        </p>
+      ) : null}
+
+      <section aria-labelledby="agenda-minutes-heading">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
+          <div>
+            <p className="page-eyebrow">Mødearbejdsflade</p>
+            <h2
+              className="section-title mt-1 scroll-mt-24"
+              id="agenda-minutes-heading"
+              tabIndex={-1}
+            >
+              Dagsorden og punktreferater
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted">
+              {occurrences.length}{" "}
+              {occurrences.length === 1 ? "punkt" : "punkter"}
+            </span>
+            {effectiveCanEdit && occurrences.length > 1 ? (
+              <AgendaReorderModal
+                committeeId={committeeId}
+                meetingId={meetingId}
+                occurrences={occurrences}
+                organizationId={organizationId}
+              />
+            ) : null}
+          </div>
+        </div>
+
+        {activeOccurrence?.agenda_items ? (
+          <>
+            <div className="mb-3 rounded-[var(--radius-panel)] border border-brand/25 bg-brand-soft/45 p-3 lg:hidden">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand">
+                Punkt {activeIndex + 1} af {occurrences.length}
+              </p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                {
+                  agendaItemTypeLabels[activeOccurrence.agenda_items.item_type]
+                    .label
+                }
+              </p>
+              <p className="mt-1 break-words text-base font-semibold text-ink">
+                {activeOccurrence.agenda_items.title}
+              </p>
+              <Button
+                className="mt-3 w-full"
+                onClick={() => setSelectorOpen(true)}
+                type="button"
+                variant="secondary"
+              >
+                Vælg et andet punkt
+              </Button>
+            </div>
+
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)] lg:items-start">
+              <nav
+                aria-label="Dagsordenspunkter"
+                className="sticky top-20 hidden max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain rounded-[var(--radius-panel)] border border-line bg-subtle/35 p-2 lg:block"
+              >
+                <div className="space-y-2">
+                  {occurrences.map((occurrence, index) =>
+                    renderAgendaChoice(occurrence, index),
+                  )}
+                </div>
+              </nav>
+
+              <div className="min-w-0">
+                {occurrences.map((occurrence, index) => (
+                  <div
+                    aria-hidden={occurrence.id !== activeOccurrence.id}
+                    hidden={occurrence.id !== activeOccurrence.id}
+                    key={occurrence.id}
+                  >
+                    <AgendaMinutesCard
+                      attachments={agendaItemAttachments.filter(
+                        (attachment) =>
+                          attachment.agendaItemId === occurrence.agenda_item_id,
+                      )}
+                      canEdit={canEditOfficialMinutes}
+                      canEditDecisions={canEditDecisions}
+                      canEditTasks={canEditTasks}
+                      committeeId={committeeId}
+                      decisionCategorySource={decisionCategorySource}
+                      decisionHistory={
+                        decisionHistoryByAgendaItem[
+                          occurrence.agenda_item_id
+                        ] ?? { categories: [], decisions: [] }
+                      }
+                      displayNumber={index + 1}
+                      initialMinutes={
+                        initialAgendaItemMinutes.find(
+                          (candidate) =>
+                            candidate.agenda_item_id ===
+                            occurrence.agenda_item_id,
+                        ) ?? null
+                      }
+                      initialPrivateNote={
+                        privateAgendaItemNotes.find(
+                          (candidate) =>
+                            candidate.agenda_item_id ===
+                            occurrence.agenda_item_id,
+                        ) ?? null
+                      }
+                      meetingDate={meetingDate}
+                      meetingDecisions={meetingDecisions}
+                      meetingId={meetingId}
+                      meetingTasks={meetingTasks}
+                      minutesStatus={meetingStatus}
+                      occurrence={occurrence}
+                      organizationId={organizationId}
+                      previousMeetingMinutes={previousMeetingMinutes}
+                      responsiblePeople={responsiblePeople}
+                      root={root}
+                      taskCategorySource={taskCategorySource}
+                      userId={userId}
+                    />
+                  </div>
+                ))}
+
+                <nav
+                  aria-label="Forrige og næste dagsordenspunkt"
+                  className="mt-3 grid grid-cols-2 gap-2 lg:hidden"
+                >
+                  {activeIndex > 0 ? (
+                    <Link
+                      className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"
+                      href={`#agenda-point-${occurrences[activeIndex - 1].id}`}
+                      onClick={() =>
+                        selectOccurrence(occurrences[activeIndex - 1].id)
+                      }
+                    >
+                      ← Forrige
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                  {activeIndex < occurrences.length - 1 ? (
+                    <Link
+                      className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink"
+                      href={`#agenda-point-${occurrences[activeIndex + 1].id}`}
+                      onClick={() =>
+                        selectOccurrence(occurrences[activeIndex + 1].id)
+                      }
+                    >
+                      Næste →
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                </nav>
+              </div>
+            </div>
+          </>
+        ) : (
+          <EmptyState title="Mødet har endnu ingen dagsordenspunkter." />
+        )}
+      </section>
+
+      <Modal
+        description="Vælg det punkt, der skal vises i mødearbejdsfladen."
+        onClose={() => setSelectorOpen(false)}
+        open={selectorOpen}
+        title="Vælg dagsordenspunkt"
+      >
+        <nav aria-label="Vælg dagsordenspunkt" className="space-y-2">
+          {occurrences.map((occurrence, index) =>
+            renderAgendaChoice(occurrence, index, true),
+          )}
+        </nav>
+      </Modal>
+
+      {meetingAttachments.length > 0 || canEditOfficialMinutes ? (
+        <details className="group rounded-[var(--radius-panel)] border border-line bg-surface">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            <span>
+              Mødebilag
+              {meetingAttachments.length > 0
+                ? ` (${meetingAttachments.length})`
+                : ""}
+            </span>
+            <span aria-hidden="true" className="text-muted">
+              +
+            </span>
+          </summary>
+          <div className="border-t border-line p-4">
+            <MinuteAttachments
+              attachments={meetingAttachments}
+              canEdit={canEditOfficialMinutes}
+              committeeId={committeeId}
+              meetingId={meetingId}
+              organizationId={organizationId}
+            />
+          </div>
+        </details>
+      ) : null}
+
+      <MinutesApprovalPanel
+        approvalRecipientInfo={approvalRecipientInfo}
+        approvals={approvals}
+        canApprove={canApprove}
+        canEdit={canEdit}
+        committeeId={committeeId}
+        meetingId={meetingId}
+        minutes={minutes ?? initialMeetingMinutes}
+        organizationId={organizationId}
+        userId={userId}
+      />
     </div>
   );
 }

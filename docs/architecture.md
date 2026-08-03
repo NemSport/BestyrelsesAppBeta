@@ -519,7 +519,9 @@ Job Card, AI, PDF, and task-template endpoints, but renders roles as flatter
 role-profile rows instead of large nested panels. PDF export, AI update, and
 edit actions are secondary actions in `ActionMenu`; onboarding, task templates,
 documents, Annual Wheel context, and decision context are quieter read sections
-within the same authorized read model.
+within the same authorized read model. Task-template creation is presented only
+when the existing meeting capability model grants `editTasks` for the template's
+committee; the task endpoint remains the authoritative write boundary.
 
 Phase 7R.6 extends that secondary-surface rule to members, trash, and legacy
 CRUD pages. Member administration keeps the same membership APIs and protected
@@ -724,6 +726,62 @@ actions stay visible inside each agenda item. Whole-minutes AI extraction is
 the prominent AI action; point-specific analysis remains available under
 secondary actions. These are composition changes only and do not alter
 repositories, mutation routes, task confirmation, or RLS.
+
+Issue 2 changes only the responsive presentation of organization navigation.
+The server layout still supplies the same RLS-visible committee list,
+per-committee capability model, organization identity, and trash-management
+capability. The client derives the optional active committee from the current
+route and presents the same filtered destinations either in the sticky desktop
+sidebar or in a modal mobile drawer. Opening and closing the drawer does not
+change the URL; link navigation continues through Next.js routing, so deep
+links and browser history retain their existing behavior.
+
+Issue 15 adds shared presentation-layer accessibility primitives without a new
+domain or authorization boundary. `useDialogFocus` is consumed by both the
+portal-based modal and the mobile organization drawer, so participant, task,
+decision, membership, confirmation, and navigation overlays share focus
+containment, topmost-dialog Escape handling, scroll locking, and focus return.
+Native `details` disclosures retain their browser semantics and add only
+outside/Escape dismissal. Quick Action remains capability-filtered and uses
+ordinary buttons with Tab navigation instead of an incomplete ARIA menu
+pattern. Form labels, described-by relations, live feedback, table header
+scope, and focus-visible styles remain presentation concerns; services,
+repositories, server checks, and PostgreSQL RLS are unchanged.
+
+Issue 14 adds presentation-only surface primitives. `interactiveSurfaceClassName`
+is reserved for native links that own the complete surface, while
+`staticSurfaceClassName` marks informational containers and rows with nested
+actions. `primarySurfaceLinkClassName` supplies an explicit underlined link,
+direction cue, focus behavior, and touch target where only part of a row
+navigates. Task and decision cards deliberately remain static so their nested
+buttons and action menus cannot trigger parent navigation. The patterns consume
+the existing capability-filtered render tree and do not introduce client-side
+authorization, new routes, service logic, persistence, or RLS changes.
+
+Issue 6 adds a presentation-only meeting section navigator. The server page
+constructs its link list from the same RLS-scoped meeting, participant, task,
+decision, and Issue 16 capability context it already loaded; empty related-work
+sections are omitted. `MeetingSectionNavigation` uses native fragment URLs,
+opens enclosing `details` elements, and focuses stable headings without route
+replacement. The client minutes component synchronizes its controlled general
+minutes and agenda-point disclosures on initial hash and `hashchange`. Because
+the components remain mounted and Issue 17 excludes same-page hash changes from
+the leave guard, local editor and autosave state survives section navigation.
+No repository, service, mutation, database, authorization, or RLS behavior
+changes.
+
+Issue 5 centralizes meeting-list presentation and deterministic list state.
+`meeting-list.ts` validates URL filters, groups cancelled meetings separately,
+sorts upcoming meetings ascending and historical meetings descending, and maps
+meeting status plus Issue 16 capabilities to the next permitted link.
+Organization lists join each already RLS-visible meeting to the per-committee
+capability context produced by `OrganizationService.getOverview`; committee
+lists use `requireCommitteeMember` and the same capability model. The shared
+row renders native title/action links and semantic date/status metadata without
+making its static surface interactive. Filtering is server-rendered from GET
+query parameters and never expands the meetings returned by the existing
+organization- or committee-scoped repository reads. No mutation, persistence,
+authorization, database, or RLS behavior changes.
 
 ## Domain Hierarchy
 
@@ -1141,6 +1199,17 @@ styling applies only to decisions that are neither completed nor cancelled.
 No filter endpoint, database index, migration, or RLS exception is introduced
 at this scale.
 
+Issue 7 strengthens the existing aggregate boundary without introducing a new
+decision entity. New decision inserts require a non-null `agenda_item_id`;
+application validation, service reference checks, and a PostgreSQL `before
+insert` trigger enforce that the agenda item belongs to the same organization
+and committee. The trigger is insert-only so historical rows without an agenda
+relation are preserved. The organization register serializes its presentation
+filters into validated URL parameters and preserves unrelated deep-link state.
+Creation is exposed only to agenda-item editors and starts with an explicit
+agenda-item selection or from the agenda-item workspace itself. Updates that
+omit an already established agenda relation retain the stored relation.
+
 Phase 2A.5 reuses the existing RLS-protected decision creation route and modal
 from the minutes workflow. Current client-side minutes state is converted from
 sanitized rich text to plain text when the user opens the modal, so an
@@ -1382,6 +1451,14 @@ Membership administration follows these invariants:
 - Committee membership writes are restricted to organization owners and
   administrators. Committee chairs and secretaries do not gain membership
   administration rights from their committee-manager role.
+- Issue 9 changes only the responsive member-directory presentation. The
+  members and invitations tables retain one semantic table tree and switch
+  their rows to labelled, non-scrolling card layouts below `md`. The desktop
+  table, per-member capability calculation, owner protections, access editor,
+  destructive action menu, server service, PostgreSQL function, and RLS
+  boundary are unchanged. No search, sorting, or pagination state existed in
+  this directory before the responsive change, so no such state is replaced or
+  discarded.
 - Owners may manually create an authenticated user with a temporary password,
   a non-owner organization role, and zero, one, or multiple committee
   assignments. Each selected committee stores its own committee role.

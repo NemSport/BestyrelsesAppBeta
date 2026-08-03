@@ -12,7 +12,11 @@ import {
   ActionMenu,
   PageHeader,
   PageSection,
+  interactiveSurfaceClassName,
+  primarySurfaceLinkClassName,
+  staticSurfaceClassName,
   StatusBadge,
+  SurfaceLinkCue,
   type StatusTone,
 } from "@/components/ui";
 import {
@@ -238,13 +242,11 @@ export default async function OrganizationPage({
             </Link>
           </div>
           {nextMeeting ? (
-            <div>
-              <Link
-                className="text-lg font-semibold hover:text-brand hover:underline"
-                href={`${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
-              >
-                {nextMeeting.title}
-              </Link>
+            <Link
+              className={interactiveSurfaceClassName("p-4")}
+              href={`${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
+            >
+              <span className="text-lg font-semibold">{nextMeeting.title}</span>
               <p className="mt-1 text-sm text-muted">
                 {formatDateTime(nextMeeting.starts_at)} ·{" "}
                 {nextMeeting.committeeName}
@@ -264,7 +266,8 @@ export default async function OrganizationPage({
                 Her er det naturlige sted til en fremtidig “Hurtigt møde”-
                 handling, uden at den implementeres i denne fase.
               </p>
-            </div>
+              <SurfaceLinkCue label="Åbn møde" />
+            </Link>
           ) : (
             <EmptyState
               compact
@@ -307,13 +310,15 @@ export default async function OrganizationPage({
                   openTaskCount + activeDecisionCount + openFollowUpCount;
                 return (
                   <article
-                    className="grid gap-3 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                    className={staticSurfaceClassName(
+                      "grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center",
+                    )}
                     key={committee.id}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          className="text-base font-semibold hover:text-brand hover:underline"
+                          className={primarySurfaceLinkClassName("text-base")}
                           href={committeeRoot}
                         >
                           {committee.name}

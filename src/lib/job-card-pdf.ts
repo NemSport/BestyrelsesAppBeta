@@ -48,10 +48,24 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
   const tableText = (value: string | null | undefined) =>
     richTextToPlainText(value) || "";
 
-  report.addSection("Rollebeskrivelse");
+  report.addSection("Rollen kort fortalt");
   addRichKeyValue("Formål", input.role.purpose);
+  addRichKeyValue("Ansvar", input.role.responsibilities);
+  addRichKeyValue("Forventninger", input.role.meeting_expectations);
+  addRichKeyValue(
+    "Næste skridt - de første 30 dage",
+    input.role.onboardingGuide?.first_30_days ?? "",
+  );
+  report.addKeyValue(
+    "Ansvarsområder",
+    listOrEmpty(input.role.responsibilityAreas.map((area) => area.name)),
+  );
+
+  report.addSection("Rammer og samarbejde");
   addRichKeyValue("Kort rollebeskrivelse", input.role.description);
   addRichKeyValue("Kompetencer", input.role.competencies);
+  addRichKeyValue("Ikke ansvar for", input.role.exclusions);
+  addRichKeyValue("Samarbejde", input.role.collaboration);
 
   report.addSection("Tilknytning");
   report.addKeyValue(
@@ -68,24 +82,10 @@ export async function generateJobCardPdf(input: JobCardPdfInput) {
   );
   addRichKeyValue("Kontaktpersoner", input.role.contact_people);
 
-  report.addSection("Ansvar og samarbejde");
-  report.addKeyValue(
-    "Ansvarsområder",
-    listOrEmpty(input.role.responsibilityAreas.map((area) => area.name)),
-  );
-  addRichKeyValue("Hvad rollen har ansvar for", input.role.responsibilities);
-  addRichKeyValue("Hvad rollen ikke har ansvar for", input.role.exclusions);
-  addRichKeyValue("Samarbejde", input.role.collaboration);
-  addRichKeyValue("Mødedeltagelse", input.role.meeting_expectations);
-
   report.addSection("Onboarding");
   addRichKeyValue(
     "Onboardingintroduktion",
     input.role.onboardingGuide?.introduction ?? "",
-  );
-  addRichKeyValue(
-    "Første 30 dage",
-    input.role.onboardingGuide?.first_30_days ?? "",
   );
   addRichKeyValue(
     "Praktisk information",

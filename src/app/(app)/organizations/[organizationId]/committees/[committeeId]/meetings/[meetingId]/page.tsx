@@ -1,7 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { DecisionCreateModal } from "@/components/decisions/decision-create-modal";
-import { RelatedDecisions } from "@/components/decisions/related-decisions";
 import { SendMeetingAgendaEmailModal } from "@/components/email/send-meeting-agenda-email-modal";
 import { AddAgendaItemModal } from "@/components/meetings/add-agenda-item-modal";
 import { EditMeetingModal } from "@/components/meetings/edit-meeting-modal";
@@ -10,11 +8,8 @@ import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-he
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
-import { RelatedTasks } from "@/components/tasks/related-tasks";
-import { TaskCreateModal } from "@/components/tasks/task-create-modal";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
-  ActionMenu,
   PageSection,
   StatusBadge,
   buttonClassName,
@@ -501,83 +496,27 @@ export default async function MeetingPage({
 
       <PageSection
         actions={
-          <div className="flex flex-wrap gap-2">
-            {canEditDecisions || canEditTasks ? (
-              <ActionMenu className="order-2">
-                {canEditDecisions ? (
-                  <DecisionCreateModal
-                    agendaItems={meeting.agenda_item_occurrences.flatMap(
-                      (occurrence) =>
-                        occurrence.agenda_items
-                          ? [
-                              {
-                                id: occurrence.agenda_items.id,
-                                title: occurrence.agenda_items.title,
-                              },
-                            ]
-                          : [],
-                    )}
-                    categorySource={decisionContext.categorySource}
-                    committeeId={committeeId}
-                    meetingDate={meeting.starts_at}
-                    meetingId={meetingId}
-                    organizationId={organizationId}
-                    responsiblePeople={decisionContext.responsiblePeople}
-                  />
-                ) : null}
-                {canEditTasks ? (
-                  <TaskCreateModal
-                    agendaItems={meeting.agenda_item_occurrences.flatMap(
-                      (occurrence) =>
-                        occurrence.agenda_items
-                          ? [
-                              {
-                                id: occurrence.agenda_items.id,
-                                title: occurrence.agenda_items.title,
-                              },
-                            ]
-                          : [],
-                    )}
-                    categorySource={taskContext.categorySource}
-                    committeeId={committeeId}
-                    initialMeetingId={meetingId}
-                    instanceId="meeting-task"
-                    meetings={[
-                      {
-                        id: meeting.id,
-                        title: meeting.title,
-                        starts_at: meeting.starts_at,
-                      },
-                    ]}
-                    organizationId={organizationId}
-                    responsiblePeople={taskContext.responsiblePeople}
-                    triggerLabel="Opret opgave"
-                  />
-                ) : null}
-              </ActionMenu>
-            ) : null}
-            {meetingCapabilities.scheduleAgendaItem ? (
-              <AddAgendaItemModal
-                committeeId={committeeId}
-                meetingId={meeting.id}
-                meetings={[
-                  {
-                    id: meeting.id,
-                    title: meeting.title,
-                    starts_at: meeting.starts_at,
-                  },
-                  ...transferredAgendaItems.futureMeetings.map(
-                    ({ id, title, starts_at }) => ({
-                      id,
-                      title,
-                      starts_at,
-                    }),
-                  ),
-                ]}
-                organizationId={organizationId}
-              />
-            ) : null}
-          </div>
+          meetingCapabilities.scheduleAgendaItem ? (
+            <AddAgendaItemModal
+              committeeId={committeeId}
+              meetingId={meeting.id}
+              meetings={[
+                {
+                  id: meeting.id,
+                  title: meeting.title,
+                  starts_at: meeting.starts_at,
+                },
+                ...transferredAgendaItems.futureMeetings.map(
+                  ({ id, title, starts_at }) => ({
+                    id,
+                    title,
+                    starts_at,
+                  }),
+                ),
+              ]}
+              organizationId={organizationId}
+            />
+          ) : null
         }
         className="mt-6"
         description="Arbejd gennem dagsordenen punkt for punkt. Noter, beslutninger og opfølgning samles i referatet."
@@ -589,58 +528,6 @@ export default async function MeetingPage({
           occurrences={meeting.agenda_item_occurrences}
           root={root}
         />
-        {decisionContext.decisions.length > 0 ||
-        taskContext.tasks.length > 0 ? (
-          <details className="group mb-4 rounded-[var(--radius-panel)] border border-line bg-subtle/20">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden sm:px-4">
-              <span>
-                Relateret arbejde
-                <span className="ml-2 font-normal text-muted">
-                  {decisionContext.decisions.length} beslutninger ·{" "}
-                  {taskContext.tasks.length} opgaver
-                </span>
-              </span>
-              <span className="text-brand">
-                <span className="group-open:hidden">Åbn</span>
-                <span className="hidden group-open:inline">Skjul</span>
-              </span>
-            </summary>
-            <div className="grid gap-4 border-t border-line p-3 sm:p-4 lg:grid-cols-2">
-              <section>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Beslutninger</h3>
-                  <a
-                    className="text-xs font-semibold text-brand hover:underline"
-                    href={`/organizations/${organizationId}/decisions`}
-                  >
-                    Åbn register
-                  </a>
-                </div>
-                <RelatedDecisions
-                  compact
-                  decisions={decisionContext.decisions}
-                  organizationId={organizationId}
-                />
-              </section>
-              <section>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Opgaver</h3>
-                  <a
-                    className="text-xs font-semibold text-brand hover:underline"
-                    href={`/organizations/${organizationId}/tasks`}
-                  >
-                    Task Board
-                  </a>
-                </div>
-                <RelatedTasks
-                  compact
-                  organizationId={organizationId}
-                  tasks={taskContext.tasks}
-                />
-              </section>
-            </div>
-          </details>
-        ) : null}
         <MeetingMinutesSection
           agendaItemAttachments={minutes.agendaItemAttachments}
           approvals={minutes.approvals}

@@ -1,7 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import clsx from "clsx";
+
+import { useDismissibleDetails } from "@/hooks/use-dismissible-details";
 
 export function Dropdown({
   label,
@@ -14,8 +16,11 @@ export function Dropdown({
   align?: "left" | "right";
   className?: string;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  useDismissibleDetails(detailsRef);
+
   return (
-    <details className={clsx("group relative", className)}>
+    <details className={clsx("group relative", className)} ref={detailsRef}>
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
         {label}
         <span className="text-xs transition group-open:rotate-180" aria-hidden>
