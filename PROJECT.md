@@ -910,10 +910,9 @@ clearer agenda-item headers so long agendas and minutes are easier to scan.
 PDF branding now carries the organization font choice into the report
 foundation, but PDF readability takes priority over exact webfont matching.
 Because the `pdf-lib` renderer cannot safely use browser CSS font stacks and
-WOFF embedding produced unreadable glyph boxes in PDF readers, generated
-agenda and minutes PDFs use safe built-in PDF fonts. Unsupported brand fonts
-fall back server-side with a small diagnostic log instead of risking broken
-text. The report header and agenda-item backgrounds still use the primary
+earlier WOFF embedding produced unreadable glyph boxes in PDF readers, Issue 12
+uses bundled Noto Sans TTF faces for all report text instead of browser fonts
+or PDF standard fonts. The report header and agenda-item backgrounds still use the primary
 brand color as a light print-friendly tint with a solid brand accent line
 instead of the old default header surface.
 Agenda PDF and agenda email use the shared Danish agenda-item type labels
@@ -1148,6 +1147,19 @@ defensively so exported minutes and Job Cards remain readable on A4. Job Card
 PDF prose fields are rendered through the same sanitized rich-text-to-PDF
 pipeline used by minutes, avoiding raw HTML while preserving the existing PDF
 download routes and authorization flows.
+
+Issue 12 removes the remaining Latin-1 boundary from that foundation. PDF
+reports now embed bundled SIL Open Font License Noto Sans faces with Noto
+Symbols/Emoji fallbacks, normalize source and data text to Unicode NFC, and replace only invalid control
+characters. Flowing prose and table rows continue across pages without silent
+line caps; table headers repeat after every page break. The Annual Wheel matrix
+uses variable-height rows, and its visual overview is followed by a complete
+month-by-month activity list so compact cards never become the only copy of
+exported content. PDF metadata receives the caller's export timestamp, making
+synthetic fixtures byte-deterministic, and download headers include both an
+ASCII fallback and an RFC 5987 UTF-8 filename. Existing authorized service read
+models remain the export data source, private notes remain excluded, and no
+database migration or stored-data rewrite is part of the encoding fix.
 
 Update 5 adds an AI minutes assistant for general meeting minutes and
 agenda-item minutes fields. Authorized minutes editors can ask AI to improve

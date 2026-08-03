@@ -324,7 +324,7 @@ export class AiMeetingOverviewService {
         actionType: "generate_meeting_overview",
         originalText: meetingContext,
         aiSuggestion: JSON.stringify(overview),
-        label: "AI-resumÃ©",
+        label: "AI-resumé",
         model,
         promptVersion: meetingOverviewPromptVersion,
         metadata: {

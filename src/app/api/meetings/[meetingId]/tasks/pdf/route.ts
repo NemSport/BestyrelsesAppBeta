@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { generateMeetingTasklistPdf } from "@/lib/meeting-tasklist-pdf";
+import { pdfContentDisposition } from "@/lib/pdf-response";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -21,8 +22,8 @@ export async function GET(
     const db = await createClient();
     const user = await new AuthService(db).requireUser();
     const authorization = new AuthorizationService(db);
-    const [committeeContext, organizationContext, tasklist] =
-      await Promise.all([
+    const [committeeContext, organizationContext, tasklist] = await Promise.all(
+      [
         authorization.requireCommitteeMember(
           organizationId,
           committeeId,
@@ -34,7 +35,8 @@ export async function GET(
           committeeId,
           meetingId,
         ),
-      ]);
+      ],
+    );
     const branding = await new OrganizationBrandingService(db).getPdfBranding(
       organizationContext.organization.id,
       organizationContext.organization.name,
@@ -50,7 +52,7 @@ export async function GET(
 
     return new NextResponse(Buffer.from(pdf), {
       headers: {
-        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Disposition": pdfContentDisposition(fileName),
         "Content-Type": "application/pdf",
       },
     });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
 import { generateAnnualWheelVisualPdf } from "@/lib/annual-wheel-overview-pdf";
+import { pdfContentDisposition } from "@/lib/pdf-response";
 import { createClient } from "@/lib/supabase/server";
 import { AnnualWheelService } from "@/services/annual-wheel-service";
 import { AuthService } from "@/services/auth-service";
@@ -40,7 +41,9 @@ export async function GET(
 
     return new NextResponse(Buffer.from(pdf), {
       headers: {
-        "Content-Disposition": `attachment; filename="aarshjul-${overview.year}.pdf"`,
+        "Content-Disposition": pdfContentDisposition(
+          `aarshjul-${overview.year}.pdf`,
+        ),
         "Content-Type": "application/pdf",
       },
     });

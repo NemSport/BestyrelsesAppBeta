@@ -337,11 +337,10 @@ exactly once, and normalizes positions so duplicate sort values and numbering
 gaps are avoided.
 PDF branding includes the organization font family, but the `pdf-lib` renderer
 does not consume browser font stacks or CSS variables. The shared report
-foundation therefore resolves validated branding fonts server-side to safe
-built-in PDF families. Exact webfont embedding is intentionally avoided after
-WOFF-based embedding produced unreadable glyph boxes in generated PDFs.
-Unsupported brand fonts fall back with a small server-side diagnostic log
-rather than failing export or risking unreadable text. Primary brand color
+foundation therefore uses the bundled Noto Sans TTF family for predictable
+Unicode coverage. Exact browser-font matching remains intentionally avoided
+after WOFF-based embedding produced unreadable glyph boxes in generated PDFs.
+Primary brand color
 remains the accent color for borders and headings, while the report header and
 larger agenda-item backgrounds use a 20-30% brand-color tint blended toward
 white for print-safe contrast.
@@ -547,6 +546,29 @@ header and metadata text, repeats table headers after page breaks, and caps
 overlong table cells to protect A4 page flow. Job Card prose fields pass
 through the same sanitized rich-text PDF conversion as minutes, so stored HTML
 is rendered as document text rather than printed raw.
+
+Issue 12 replaces the earlier cell cap and built-in-font compromise. The
+server registers `@pdf-lib/fontkit` and embeds the bundled Noto Sans regular,
+bold, italic, and bold-italic TTF assets plus Noto Symbols 2 and monochrome
+Noto Emoji fallbacks from `public/fonts`; this preserves Danish, symbols, and
+emoji through PDF generation and text extraction.
+`safePdfText` performs NFC normalization and control-character cleanup rather
+than reducing input to Latin-1. `pdf-report` paginates prose line by line and
+splits tall table rows into bordered continuation fragments, repeating the
+column header on every new page. The separate landscape Annual Wheel renderer
+uses the same font loader, variable row heights, and a complete paginated list
+after the compact visual wheel. Both renderers set creation and modification
+metadata from the supplied export timestamp for deterministic fixtures.
+
+All seven PDF routes retain their existing authenticated service reads and RLS
+scope; the change does not add repository queries, fields, migrations, or
+private-note access. `pdf-response` centralizes safe ASCII slugs and RFC 5987
+UTF-8 `Content-Disposition` values. Issue 12 regression fixtures cover meeting
+agenda, minutes, meeting tasks, Annual Wheel activity/matrix/visual exports,
+and Job Cards with long Danish data, Unicode symbols, long URLs, many rows, and
+multiple pages. Tests reopen every PDF, extract its text, exercise the two
+layout engines deterministically, scan affected runtime source for mojibake,
+and lock the existing authorization call boundaries.
 
 Update 5 introduces a review-only AI minutes assistant. The client sends the
 current rich-text field value to

@@ -61,8 +61,8 @@ export const organizationBrandingInputSchema = z.object({
   logoUrl: optionalText.pipe(
     z
       .string()
-      .max(500, "Logo-URL mÃ¥ hÃ¸jst vÃ¦re 500 tegn.")
-      .url("Logo-URL skal vÃ¦re en gyldig URL.")
+      .max(500, "Logo-URL må højst være 500 tegn.")
+      .url("Logo-URL skal være en gyldig URL.")
       .refine(
         (value) => value.startsWith("https://") || value.startsWith("http://"),
         {

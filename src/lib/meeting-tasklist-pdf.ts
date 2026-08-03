@@ -5,10 +5,7 @@ import {
   type PdfReportBranding,
 } from "@/lib/pdf-report";
 import { richTextToPlainText } from "@/lib/rich-text";
-import {
-  getTaskDeadlineState,
-  taskStatusLabels,
-} from "@/lib/tasks";
+import { getTaskDeadlineState, taskStatusLabels } from "@/lib/tasks";
 import type { MeetingReviewTask } from "@/services/task-service";
 import type { MeetingWithAgenda } from "@/types/domain";
 
@@ -18,6 +15,7 @@ type PdfInput = {
   organizationName: string;
   tasks: MeetingReviewTask[];
   branding?: PdfReportBranding;
+  generatedAt?: Date;
 };
 
 type TaskRow = {
@@ -64,12 +62,15 @@ export async function generateMeetingTasklistPdf(input: PdfInput) {
   const dueSoonCount = openTasks.filter((task) =>
     ["today", "soon"].includes(getTaskDeadlineState(task)),
   ).length;
-  const waitingCount = openTasks.filter((task) => task.status === "waiting")
-    .length;
+  const waitingCount = openTasks.filter(
+    (task) => task.status === "waiting",
+  ).length;
   const missingResponsibleCount = openTasks.filter(
     (task) => !task.responsible_user_id,
   ).length;
-  const missingDeadlineCount = openTasks.filter((task) => !task.deadline).length;
+  const missingDeadlineCount = openTasks.filter(
+    (task) => !task.deadline,
+  ).length;
 
   const report = await createPdfReport({
     documentType: "Opgaveliste",
@@ -77,14 +78,17 @@ export async function generateMeetingTasklistPdf(input: PdfInput) {
     subtitle: meetingDate,
     organizationName: input.organizationName,
     committeeName: input.committeeName,
-    generatedAt: new Date(),
+    generatedAt: input.generatedAt ?? new Date(),
     branding: input.branding,
     meta: [
       { label: "Organisation", value: input.organizationName },
       { label: "Udvalg", value: input.committeeName },
       { label: "Møde", value: input.meeting.title },
       { label: "Mødedato", value: meetingDate },
-      { label: "Genereret", value: formatDanishDate(new Date(), "long") },
+      {
+        label: "Genereret",
+        value: formatDanishDate(input.generatedAt ?? new Date(), "long"),
+      },
     ],
   });
 

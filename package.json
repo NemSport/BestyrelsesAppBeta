@@ -22,9 +22,11 @@
     "test:issue-7": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-7/*.test.mjs",
     "test:issue-10": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-10/*.test.mjs",
     "test:issue-11": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-11/*.test.mjs",
+    "test:issue-12": "node --import tsx --test tests/issue-12/pdf-regression.test.ts",
     "test:issue-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-5/*.test.mjs"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/ssr": "0.12.0",
     "@supabase/supabase-js": "2.108.1",
     "@tiptap/extension-link": "^3.26.1",
@@ -48,9 +50,11 @@
     "autoprefixer": "^10.4.21",
     "eslint": "^9.27.0",
     "eslint-config-next": "^15.3.2",
+    "pdfjs-dist": "^5.4.54",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

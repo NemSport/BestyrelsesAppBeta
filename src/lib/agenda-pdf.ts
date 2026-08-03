@@ -1,4 +1,7 @@
-﻿import { getAgendaItemTypeLabel, meetingStatusLabels } from "@/lib/localization";
+﻿import {
+  getAgendaItemTypeLabel,
+  meetingStatusLabels,
+} from "@/lib/localization";
 import {
   createPdfReport,
   formatPdfDate,
@@ -14,6 +17,7 @@ type PdfInput = {
   organizationName: string;
   branding?: PdfReportBranding;
   attachments?: PdfReportAttachment[];
+  generatedAt?: Date;
 };
 
 export async function generateMeetingAgendaPdf(input: PdfInput) {
@@ -24,7 +28,7 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     subtitle: meetingDate,
     organizationName: input.organizationName,
     committeeName: input.committeeName,
-    generatedAt: new Date(),
+    generatedAt: input.generatedAt ?? new Date(),
     branding: input.branding,
     meta: [
       { label: "Organisation", value: input.organizationName },

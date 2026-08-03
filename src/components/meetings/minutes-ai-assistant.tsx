@@ -242,7 +242,7 @@ export function MinutesAiAssistant({
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone="info">AI-assisteret</StatusBadge>
               <span className="text-xs text-muted">
-                Forslaget gemmes i AI-historikken, men Ã¦ndrer ikke referatet
+                Forslaget gemmes i AI-historikken, men ændrer ikke referatet
                 uden din accept.
               </span>
             </div>

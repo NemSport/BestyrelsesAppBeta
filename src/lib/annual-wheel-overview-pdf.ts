@@ -1,13 +1,17 @@
 import {
   PDFDocument,
-  StandardFonts,
   rgb,
   type PDFFont,
   type PDFPage,
   type RGB,
 } from "pdf-lib";
 
-import { formatPdfDate, safePdfText, type PdfReportBranding } from "@/lib/pdf-report";
+import {
+  formatPdfDate,
+  safePdfText,
+  type PdfReportBranding,
+} from "@/lib/pdf-report";
+import { embedPdfFonts } from "@/lib/pdf-fonts";
 import type {
   AnnualWheelEventView,
   AnnualWheelOverview,
@@ -108,47 +112,41 @@ async function embedLogo(
   }
 }
 
-function truncate(text: string, font: PDFFont, size: number, width: number) {
-  const safe = safePdfText(text);
-  if (font.widthOfTextAtSize(safe, size) <= width) return safe;
-  let result = safe;
-  while (
-    result.length > 1 &&
-    font.widthOfTextAtSize(`${result}...`, size) > width
-  ) {
-    result = result.slice(0, -1);
-  }
-  return `${result.trimEnd()}...`;
-}
-
-function wrap(
-  text: string,
-  font: PDFFont,
-  size: number,
-  width: number,
-  maxLines: number,
-) {
-  const words = safePdfText(text).split(/\s+/).filter(Boolean);
+function wrap(text: string, font: PDFFont, size: number, width: number) {
   const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) <= width) {
-      line = candidate;
-    } else {
-      if (line) lines.push(line);
-      line = word;
-      if (lines.length === maxLines) break;
+  for (const paragraph of safePdfText(text).split(/\r?\n/)) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      lines.push("");
+      continue;
     }
-  }
-  if (line && lines.length < maxLines) lines.push(line);
-  if (lines.length === maxLines && words.join(" ") !== lines.join(" ")) {
-    lines[maxLines - 1] = truncate(
-      lines[maxLines - 1],
-      font,
-      size,
-      width,
-    );
+    let line = "";
+    for (const word of words) {
+      if (font.widthOfTextAtSize(word, size) > width) {
+        if (line) lines.push(line);
+        line = "";
+        let chunk = "";
+        for (const character of word) {
+          const candidate = `${chunk}${character}`;
+          if (!chunk || font.widthOfTextAtSize(candidate, size) <= width) {
+            chunk = candidate;
+          } else {
+            lines.push(chunk);
+            chunk = character;
+          }
+        }
+        line = chunk;
+        continue;
+      }
+      const candidate = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) <= width) {
+        line = candidate;
+      } else {
+        if (line) lines.push(line);
+        line = word;
+      }
+    }
+    if (line) lines.push(line);
   }
   return lines.length ? lines : [""];
 }
@@ -188,34 +186,11 @@ function filteredOverview(input: AnnualWheelOverviewPdfInput) {
 
 async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
   const document = await PDFDocument.create();
-  if (
-    input.branding?.fontFamily &&
-    !["Georgia", "Merriweather", "Times New Roman", "Courier New"].includes(
-      input.branding.fontFamily,
-    )
-  ) {
-    console.warn(
-      `[annual-wheel-pdf] Brandingfont '${input.branding.fontFamily}' falder tilbage til en sikker PDF-standardfont.`,
-    );
-  }
-  const serif = ["Georgia", "Merriweather", "Times New Roman"].includes(
-    input.branding?.fontFamily ?? "",
-  );
-  const mono = input.branding?.fontFamily === "Courier New";
-  const regular = await document.embedFont(
-    mono
-      ? StandardFonts.Courier
-      : serif
-        ? StandardFonts.TimesRoman
-        : StandardFonts.Helvetica,
-  );
-  const bold = await document.embedFont(
-    mono
-      ? StandardFonts.CourierBold
-      : serif
-        ? StandardFonts.TimesRomanBold
-        : StandardFonts.HelveticaBold,
-  );
+  const { regular, bold, drawText } = await embedPdfFonts(document);
+  document.setCreationDate(input.exportedAt);
+  document.setModificationDate(input.exportedAt);
+  document.setCreator("BestyrelsesApp");
+  document.setProducer("BestyrelsesApp PDF export");
   const logo = await embedLogo(document, input.branding);
   const colors = {
     ink: rgb(0.1, 0.13, 0.14),
@@ -224,16 +199,8 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
     subtle: rgb(0.95, 0.96, 0.95),
     brand: pdfColor(input.branding?.primaryColor, rgb(0.07, 0.28, 0.24)),
     accent: pdfColor(input.branding?.accentColor, rgb(0.32, 0.48, 0.43)),
-    brandSoft: tint(
-      input.branding?.primaryColor,
-      0.2,
-      rgb(0.88, 0.94, 0.91),
-    ),
-    accentSoft: tint(
-      input.branding?.accentColor,
-      0.18,
-      rgb(0.92, 0.95, 0.94),
-    ),
+    brandSoft: tint(input.branding?.primaryColor, 0.2, rgb(0.88, 0.94, 0.91)),
+    accentSoft: tint(input.branding?.accentColor, 0.18, rgb(0.92, 0.95, 0.94)),
   };
 
   const addPage = (title: string, documentType: string) => {
@@ -252,21 +219,21 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
       height: 4,
       color: colors.brand,
     });
-    page.drawText(safePdfText(documentType.toLocaleUpperCase("da-DK")), {
+    drawText(page, safePdfText(documentType.toLocaleUpperCase("da-DK")), {
       x: margin,
       y: landscapeA4[1] - 28,
       font: bold,
       size: 8,
       color: colors.brand,
     });
-    page.drawText(safePdfText(title), {
+    drawText(page, safePdfText(title), {
       x: margin,
       y: landscapeA4[1] - 49,
       font: bold,
       size: 17,
       color: colors.ink,
     });
-    page.drawText(safePdfText(input.organizationName), {
+    drawText(page, safePdfText(input.organizationName), {
       x: margin,
       y: landscapeA4[1] - 64,
       font: regular,
@@ -292,14 +259,14 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
       thickness: 0.5,
       color: colors.line,
     });
-    page.drawText(`Eksporteret ${formatPdfDate(input.exportedAt)}`, {
+    drawText(page, `Eksporteret ${formatPdfDate(input.exportedAt)}`, {
       x: margin,
       y: footerHeight - 9,
       font: regular,
       size: 7.5,
       color: colors.muted,
     });
-    page.drawText(`Side ${pageNumber}`, {
+    drawText(page, `Side ${pageNumber}`, {
       x: landscapeA4[0] - margin - 32,
       y: footerHeight - 9,
       font: regular,
@@ -308,7 +275,7 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
     });
   };
 
-  return { document, regular, bold, colors, addPage, footer };
+  return { document, regular, bold, colors, addPage, footer, drawText };
 }
 
 export async function generateAnnualWheelMatrixPdf(
@@ -333,108 +300,129 @@ export async function generateAnnualWheelMatrixPdf(
     responsible: 85,
     month: (contentWidth - 100 - 150 - 70 - 85) / 12,
   };
-  const rowHeight = 25;
   const tableTop = landscapeA4[1] - headerHeight - 20;
   const tableBottom = footerHeight + 17;
-  const rowsPerPage = Math.max(
-    1,
-    Math.floor((tableTop - tableBottom - 30) / rowHeight),
-  );
-  const pages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+  const columns = [
+    { label: "Udvalg / kategori", width: widths.group },
+    { label: "Aktivitet", width: widths.title },
+    { label: "Status", width: widths.status },
+    { label: "Ansvarlig", width: widths.responsible },
+    ...months.map((label) => ({ label, width: widths.month })),
+  ];
+  const headerRowHeight = 22;
+  const lineHeight = 9;
+  let pageNumber = 0;
+  let page!: PDFPage;
+  let y = tableTop;
 
-  for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
-    const page = pdf.addPage(
+  const newTablePage = () => {
+    if (pageNumber) pdf.footer(page, pageNumber);
+    pageNumber += 1;
+    page = pdf.addPage(
       `Årshjul overblik ${input.overview.year}`,
       "Arbejdsoversigt",
     );
-    let y = tableTop;
-    const columns = [
-      { label: "Udvalg / kategori", width: widths.group },
-      { label: "Aktivitet", width: widths.title },
-      { label: "Status", width: widths.status },
-      { label: "Ansvarlig", width: widths.responsible },
-      ...months.map((label) => ({ label, width: widths.month })),
-    ];
+    y = tableTop;
     let x = margin;
     for (const column of columns) {
       page.drawRectangle({
         x,
-        y: y - 22,
+        y: y - headerRowHeight,
         width: column.width,
-        height: 22,
+        height: headerRowHeight,
         color: pdf.colors.brandSoft,
         borderColor: pdf.colors.line,
         borderWidth: 0.35,
       });
-      page.drawText(
-        truncate(column.label, pdf.bold, 7.2, column.width - 6),
-        {
-          x: x + 3,
-          y: y - 14,
-          font: pdf.bold,
-          size: 7.2,
-          color: pdf.colors.brand,
-        },
-      );
+      pdf.drawText(page, safePdfText(column.label), {
+        x: x + 3,
+        y: y - 14,
+        font: pdf.bold,
+        size: 7.2,
+        color: pdf.colors.brand,
+      });
       x += column.width;
     }
-    y -= 22;
+    y -= headerRowHeight;
+  };
 
-    const pageRows = rows.slice(
-      pageIndex * rowsPerPage,
-      (pageIndex + 1) * rowsPerPage,
+  newTablePage();
+
+  if (!rows.length) {
+    pdf.drawText(page, "Ingen årshjulsaktiviteter i det valgte år.", {
+      x: margin,
+      y: y - 28,
+      font: pdf.regular,
+      size: 10,
+      color: pdf.colors.muted,
+    });
+  }
+
+  for (const [eventIndex, event] of rows.entries()) {
+    const group = [
+      event.committee?.name ?? "Hele organisationen",
+      event.category,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    const cells = [
+      group,
+      event.title,
+      `${eventStatusLabels[event.status]} · ${priorityLabels[event.priority]}`,
+      event.responsible?.full_name ||
+        memberName(input.overview.members, event.responsible_user_id),
+    ];
+    const cellWidths = [
+      widths.group,
+      widths.title,
+      widths.status,
+      widths.responsible,
+    ];
+    const cellLines = cells.map((cell, index) =>
+      wrap(cell, pdf.regular, 6.9, cellWidths[index] - 6),
     );
-    if (!pageRows.length) {
-      page.drawText("Ingen årshjulsaktiviteter i det valgte år.", {
-        x: margin,
-        y: y - 28,
-        font: pdf.regular,
-        size: 10,
-        color: pdf.colors.muted,
-      });
-    }
+    const activeMonths = monthsForEvent(event, input.overview.year);
+    const totalLines = Math.max(...cellLines.map((lines) => lines.length));
+    let lineOffset = 0;
 
-    for (const event of pageRows) {
-      const group = [
-        event.committee?.name ?? "Hele organisationen",
-        event.category,
-      ]
-        .filter(Boolean)
-        .join(" / ");
-      const cells = [
-        group,
-        event.title,
-        `${eventStatusLabels[event.status]} · ${priorityLabels[event.priority]}`,
-        event.responsible?.full_name ||
-          memberName(input.overview.members, event.responsible_user_id),
-      ];
-      x = margin;
-      cells.forEach((cell, index) => {
-        const width = [
-          widths.group,
-          widths.title,
-          widths.status,
-          widths.responsible,
-        ][index];
+    while (lineOffset < totalLines) {
+      const availableLines = Math.floor((y - tableBottom - 10) / lineHeight);
+      if (availableLines < 1) {
+        newTablePage();
+        continue;
+      }
+      const linesInFragment = Math.min(totalLines - lineOffset, availableLines);
+      const rowHeight = Math.max(25, linesInFragment * lineHeight + 10);
+      let x = margin;
+      cellLines.forEach((lines, index) => {
+        const width = cellWidths[index];
+        const fill = eventIndex % 2 ? rgb(1, 1, 1) : pdf.colors.subtle;
         page.drawRectangle({
           x,
           y: y - rowHeight,
           width,
           height: rowHeight,
-          color: pageRows.indexOf(event) % 2 ? rgb(1, 1, 1) : pdf.colors.subtle,
+          color: fill,
           borderColor: pdf.colors.line,
           borderWidth: 0.3,
         });
-        page.drawText(truncate(cell, pdf.regular, 6.9, width - 6), {
-          x: x + 3,
-          y: y - 15,
-          font: pdf.regular,
-          size: 6.9,
-          color: pdf.colors.ink,
-        });
+        let textY = y - 11;
+        for (const line of lines.slice(
+          lineOffset,
+          lineOffset + linesInFragment,
+        )) {
+          pdf.drawText(page, line, {
+            x: x + 3,
+            y: textY,
+            font: pdf.regular,
+            size: 6.9,
+            color: pdf.colors.ink,
+          });
+          textY -= lineHeight;
+        }
         x += width;
       });
-      const activeMonths = monthsForEvent(event, input.overview.year);
+
       for (let month = 0; month < 12; month += 1) {
         page.drawRectangle({
           x,
@@ -452,7 +440,7 @@ export async function generateAnnualWheelMatrixPdf(
         if (activeMonths.has(month)) {
           page.drawRectangle({
             x: x + 5,
-            y: y - 15,
+            y: y - rowHeight / 2 - 2,
             width: Math.max(4, widths.month - 10),
             height: 4,
             color:
@@ -464,9 +452,12 @@ export async function generateAnnualWheelMatrixPdf(
         x += widths.month;
       }
       y -= rowHeight;
+      lineOffset += linesInFragment;
+      if (lineOffset < totalLines) newTablePage();
     }
-    pdf.footer(page, pageIndex + 1);
   }
+
+  pdf.footer(page, pageNumber);
 
   return pdf.document.save();
 }
@@ -495,7 +486,7 @@ export async function generateAnnualWheelVisualPdf(
       height: quarterHeader,
       color: quarter % 2 ? pdf.colors.accentSoft : pdf.colors.brandSoft,
     });
-    page.drawText(`Kvartal ${quarter + 1}`, {
+    pdf.drawText(page, `Kvartal ${quarter + 1}`, {
       x: quarterX + 8,
       y: contentTop - 15,
       font: pdf.bold,
@@ -506,10 +497,7 @@ export async function generateAnnualWheelVisualPdf(
     for (let offset = 0; offset < 3; offset += 1) {
       const month = quarter * 3 + offset;
       const monthY =
-        contentTop -
-        quarterHeader -
-        offset * (monthHeight + gap) -
-        monthHeight;
+        contentTop - quarterHeader - offset * (monthHeight + gap) - monthHeight;
       const eventItems = events
         .filter((event) =>
           monthsForEvent(event, input.overview.year).has(month),
@@ -557,7 +545,7 @@ export async function generateAnnualWheelVisualPdf(
         height: 23,
         color: pdf.colors.subtle,
       });
-      page.drawText(monthNames[month], {
+      pdf.drawText(page, monthNames[month], {
         x: quarterX + 8,
         y: monthY + monthHeight - 15,
         font: pdf.bold,
@@ -565,7 +553,9 @@ export async function generateAnnualWheelVisualPdf(
         color: pdf.colors.ink,
       });
       let itemY = monthY + monthHeight - 37;
-      for (const item of primaryItems.slice(0, maxItems)) {
+      for (const [itemIndex, item] of primaryItems
+        .slice(0, maxItems)
+        .entries()) {
         const dotColor =
           item.kind === "activity" ? pdf.colors.brand : pdf.colors.accent;
         page.drawCircle({
@@ -574,30 +564,30 @@ export async function generateAnnualWheelVisualPdf(
           size: 2.4,
           color: dotColor,
         });
-        const titleLines = wrap(
-          item.title,
-          pdf.regular,
-          7.1,
-          quarterWidth - 25,
-          1,
-        );
-        page.drawText(titleLines[0], {
+        const safeTitle = safePdfText(item.title);
+        const titleLabel =
+          pdf.regular.widthOfTextAtSize(safeTitle, 7.1) <= quarterWidth - 25
+            ? safeTitle
+            : `${itemIndex + 1}. Se fuld titel i aktivitetslisten`;
+        pdf.drawText(page, titleLabel, {
           x: quarterX + 16,
           y: itemY,
           font: pdf.regular,
           size: 7.1,
           color: pdf.colors.ink,
         });
-        page.drawText(
-          truncate(item.detail, pdf.regular, 5.9, quarterWidth - 25),
-          {
-            x: quarterX + 16,
-            y: itemY - 8,
-            font: pdf.regular,
-            size: 5.9,
-            color: pdf.colors.muted,
-          },
-        );
+        const safeDetail = safePdfText(item.detail);
+        const detailLabel =
+          pdf.regular.widthOfTextAtSize(safeDetail, 5.9) <= quarterWidth - 25
+            ? safeDetail
+            : "Detaljer i aktivitetslisten";
+        pdf.drawText(page, detailLabel, {
+          x: quarterX + 16,
+          y: itemY - 8,
+          font: pdf.regular,
+          size: 5.9,
+          color: pdf.colors.muted,
+        });
         itemY -= 21;
       }
       const hidden = Math.max(0, primaryItems.length - maxItems);
@@ -608,18 +598,15 @@ export async function generateAnnualWheelVisualPdf(
         .filter(Boolean)
         .join(" · ");
       if (summary) {
-        page.drawText(
-          truncate(summary, pdf.bold, 6.2, quarterWidth - 16),
-          {
-            x: quarterX + 8,
-            y: monthY + 7,
-            font: pdf.bold,
-            size: 6.2,
-            color: pdf.colors.muted,
-          },
-        );
+        pdf.drawText(page, summary, {
+          x: quarterX + 8,
+          y: monthY + 7,
+          font: pdf.bold,
+          size: 6.2,
+          color: pdf.colors.muted,
+        });
       } else if (!primaryItems.length) {
-        page.drawText("Ingen planlagte aktiviteter", {
+        pdf.drawText(page, "Ingen planlagte aktiviteter", {
           x: quarterX + 8,
           y: monthY + monthHeight / 2 - 8,
           font: pdf.regular,
@@ -636,7 +623,7 @@ export async function generateAnnualWheelVisualPdf(
     size: 2.5,
     color: pdf.colors.brand,
   });
-  page.drawText("Aktivitet", {
+  pdf.drawText(page, "Aktivitet", {
     x: 267,
     y: landscapeA4[1] - 63,
     font: pdf.regular,
@@ -649,13 +636,144 @@ export async function generateAnnualWheelVisualPdf(
     size: 2.5,
     color: pdf.colors.accent,
   });
-  page.drawText("Møde", {
+  pdf.drawText(page, "Møde", {
     x: 329,
     y: landscapeA4[1] - 63,
     font: pdf.regular,
     size: 6.8,
     color: pdf.colors.muted,
   });
+  pdf.drawText(page, "Fuld aktivitetsliste følger på de næste sider.", {
+    x: 365,
+    y: landscapeA4[1] - 63,
+    font: pdf.bold,
+    size: 6.8,
+    color: pdf.colors.muted,
+  });
   pdf.footer(page, 1);
+
+  let pageNumber = 1;
+  let appendixPage!: PDFPage;
+  let appendixY = 0;
+  const appendixTop = landscapeA4[1] - headerHeight - 20;
+  const appendixBottom = footerHeight + 18;
+  const appendixWidth = landscapeA4[0] - margin * 2;
+
+  const newAppendixPage = () => {
+    if (pageNumber > 1) pdf.footer(appendixPage, pageNumber);
+    pageNumber += 1;
+    appendixPage = pdf.addPage(
+      `Aktivitetsliste ${input.overview.year}`,
+      "Komplet årshjul",
+    );
+    appendixY = appendixTop;
+  };
+
+  const ensureAppendixSpace = (height: number) => {
+    if (!appendixPage || appendixY - height < appendixBottom) newAppendixPage();
+  };
+
+  for (let month = 0; month < 12; month += 1) {
+    const monthEvents = events
+      .filter((event) => monthsForEvent(event, input.overview.year).has(month))
+      .map((event) => ({
+        kind: "Aktivitet",
+        title: event.title,
+        detail: [
+          `${event.starts_on} - ${event.ends_on}`,
+          event.committee?.name ?? event.category ?? "Organisation",
+          event.responsible?.full_name ||
+            memberName(input.overview.members, event.responsible_user_id),
+        ].join(" · "),
+      }));
+    const monthCalendarItems = calendarItems
+      .filter((item) => Number(item.date.slice(5, 7)) - 1 === month)
+      .map((item) => ({
+        kind:
+          item.kind === "meeting"
+            ? "Møde"
+            : item.kind === "task"
+              ? "Opgave"
+              : "Beslutning",
+        title: item.title,
+        detail: [
+          item.date,
+          input.overview.committees.find(
+            (committee) => committee.id === item.committeeId,
+          )?.name ?? "Organisation",
+          memberName(input.overview.members, item.responsibleUserId),
+        ].join(" · "),
+      }));
+    const items = [...monthEvents, ...monthCalendarItems];
+    ensureAppendixSpace(34);
+    appendixPage.drawRectangle({
+      x: margin,
+      y: appendixY - 22,
+      width: appendixWidth,
+      height: 22,
+      color: pdf.colors.brandSoft,
+    });
+    pdf.drawText(appendixPage, monthNames[month], {
+      x: margin + 8,
+      y: appendixY - 15,
+      font: pdf.bold,
+      size: 9,
+      color: pdf.colors.brand,
+    });
+    appendixY -= 30;
+
+    if (!items.length) {
+      ensureAppendixSpace(18);
+      pdf.drawText(appendixPage, "Ingen planlagte aktiviteter.", {
+        x: margin + 8,
+        y: appendixY,
+        font: pdf.regular,
+        size: 7.5,
+        color: pdf.colors.muted,
+      });
+      appendixY -= 18;
+      continue;
+    }
+
+    for (const item of items) {
+      const titleLines = wrap(
+        `${item.kind}: ${item.title}`,
+        pdf.bold,
+        8.2,
+        appendixWidth - 16,
+      );
+      const detailLines = wrap(
+        item.detail,
+        pdf.regular,
+        7.1,
+        appendixWidth - 16,
+      );
+      const blockHeight = titleLines.length * 10 + detailLines.length * 9 + 10;
+      ensureAppendixSpace(blockHeight);
+      for (const line of titleLines) {
+        pdf.drawText(appendixPage, line, {
+          x: margin + 8,
+          y: appendixY,
+          font: pdf.bold,
+          size: 8.2,
+          color: pdf.colors.ink,
+        });
+        appendixY -= 10;
+      }
+      for (const line of detailLines) {
+        pdf.drawText(appendixPage, line, {
+          x: margin + 8,
+          y: appendixY,
+          font: pdf.regular,
+          size: 7.1,
+          color: pdf.colors.muted,
+        });
+        appendixY -= 9;
+      }
+      appendixY -= 10;
+    }
+  }
+
+  if (pageNumber > 1) pdf.footer(appendixPage, pageNumber);
   return pdf.document.save();
 }
