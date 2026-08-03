@@ -7,6 +7,7 @@ import { pdfContentDisposition } from "@/lib/pdf-response";
 import { createClient } from "@/lib/supabase/server";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
+import { TransferredAgendaItemService } from "@/services/transferred-agenda-item-service";
 
 export async function GET(
   request: Request,
@@ -29,12 +30,16 @@ export async function GET(
       data.organization.id,
       data.organization.name,
     );
-    const attachmentsForPdf = await service.getPdfAttachments(
-      organizationId,
-      committeeId,
-      meetingId,
-      { includeMeetingAttachments: true },
-    );
+    const [attachmentsForPdf, transferredHistories] = await Promise.all([
+      service.getPdfAttachments(organizationId, committeeId, meetingId, {
+        includeMeetingAttachments: true,
+      }),
+      new TransferredAgendaItemService(db).listPdfHistoryForMeeting(
+        organizationId,
+        committeeId,
+        meetingId,
+      ),
+    ]);
     const pdf = await generateMeetingMinutesPdf({
       meeting: data.meeting,
       committeeName: data.committee.name,
@@ -53,6 +58,7 @@ export async function GET(
       externalAttendees: data.externalAttendees,
       branding,
       attachmentsForPdf,
+      transferredHistories,
     });
     const fileName = `referat-${formatDanishDateKey(data.meeting.starts_at)}.pdf`;
 

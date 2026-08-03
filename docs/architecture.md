@@ -314,8 +314,10 @@ the same `MeetingService` access check as the meeting page. It does not depend
 on approved minutes and only includes public meeting and agenda-item content:
 title, committee, date/time, location, item order, type, objective, and
 description. Internal notes and private fields are intentionally excluded.
-Agenda and minutes PDFs use the shared agenda-item header helper for clearer
-separation between points.
+Agenda and minutes PDFs use the shared multi-page agenda-item card helpers for
+the same header, content insets, section spacing, continuation treatment, and
+border geometry. Minutes add post-meeting content inside that same card instead
+of maintaining an unrelated layout.
 Agenda item occurrence `position` is the persisted sort key, not the public
 point number. When agenda item occurrences are soft-deleted or restored, the
 database normalizes positions for the affected meeting. UI and PDF point
@@ -335,15 +337,16 @@ scoped PostgreSQL batch reorder function, which locks the affected meeting
 occurrences, validates that the submitted list contains every active occurrence
 exactly once, and normalizes positions so duplicate sort values and numbering
 gaps are avoided.
-PDF branding includes the organization font family, but the `pdf-lib` renderer
-does not consume browser font stacks or CSS variables. The shared report
-foundation therefore uses the bundled Noto Sans TTF family for predictable
-Unicode coverage. Exact browser-font matching remains intentionally avoided
-after WOFF-based embedding produced unreadable glyph boxes in generated PDFs.
-Primary brand color
-remains the accent color for borders and headings, while the report header and
-larger agenda-item backgrounds use a 20-30% brand-color tint blended toward
-white for print-safe contrast.
+`src/lib/pdf-theme.ts` resolves logo, primary, secondary, accent, derived text
+colors, and the requested font from the RLS-protected organization branding
+row. It derives print-safe tints and chooses a readable heading foreground when
+a configured color lacks sufficient contrast. Primary color drives document
+identity and point cards; accent color drives nested transferred-history boxes;
+secondary color is retained in the common theme for consistent extension.
+Missing or invalid values use the neutral report theme. The rendered font is
+still bundled Noto Sans as a deterministic Unicode fallback; the requested
+controlled browser font is retained as theme metadata rather than embedded
+from an unsafe webfont source.
 Agenda PDF and agenda email consume `getAgendaItemTypeLabel` so user-facing
 output shows Danish point types and falls back to `Punkt` for unknown values.
 Agenda exports include public agenda-item objective and description when
@@ -560,9 +563,15 @@ uses the same font loader, variable row heights, and a complete paginated list
 after the compact visual wheel. Both renderers set creation and modification
 metadata from the supplied export timestamp for deterministic fixtures.
 
-All seven PDF routes retain their existing authenticated service reads and RLS
-scope; the change does not add repository queries, fields, migrations, or
-private-note access. `pdf-response` centralizes safe ASCII slugs and RFC 5987
+All seven PDF routes retain their authenticated service reads and RLS scope.
+Agenda and minutes additionally ask `TransferredAgendaItemService` for history
+of scheduled incoming points. That service repeats committee membership and
+meeting ownership validation, then reads only the RLS-protected transfer,
+source meeting, source agenda item, and public `agenda_item_minutes` fields
+`notes`, `decision`, and `follow_up`, plus linked public decisions/tasks for the
+same source agenda item; it never selects
+`agenda_item_private_notes`. No schema, authorization, tenant scope, or stored
+data changes are involved. `pdf-response` centralizes safe ASCII slugs and RFC 5987
 UTF-8 `Content-Disposition` values. Issue 12 regression fixtures cover meeting
 agenda, minutes, meeting tasks, Annual Wheel activity/matrix/visual exports,
 and Job Cards with long Danish data, Unicode symbols, long URLs, many rows, and

@@ -10,27 +10,44 @@ import { generateMeetingAgendaPdf } from "../../src/lib/agenda-pdf";
 import { generateAnnualWheelMatrixPdf } from "../../src/lib/annual-wheel-overview-pdf";
 import { pdfContentDisposition, pdfFileSlug } from "../../src/lib/pdf-response";
 import { safePdfText } from "../../src/lib/pdf-report";
+import { contrastRatio, resolvePdfTheme } from "../../src/lib/pdf-theme";
 import {
+  fixtureDate,
   generateIssue12Fixtures,
   longUrl,
   unicodeMarker,
 } from "./pdf-fixtures";
 
 const workspace = process.cwd();
+let issue12Fixtures: ReturnType<typeof generateIssue12Fixtures> | undefined;
+function getIssue12Fixtures() {
+  issue12Fixtures ??= generateIssue12Fixtures();
+  return issue12Fixtures;
+}
 
 async function extractPdf(bytes: Uint8Array) {
-  const loadingTask = getDocument({ data: bytes });
+  const loadingTask = getDocument({ data: new Uint8Array(bytes) });
   const document = await loadingTask.promise;
   const pages: string[] = [];
+  const overflowingText: string[] = [];
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
+    for (const item of content.items) {
+      if (
+        "str" in item &&
+        item.str.trim() &&
+        item.transform[4] + item.width > page.view[2] - 36
+      ) {
+        overflowingText.push(`side ${pageNumber}: ${item.str}`);
+      }
+    }
     pages.push(
       content.items.map((item) => ("str" in item ? item.str : "")).join(" "),
     );
   }
   await document.destroy();
-  return { pages: document.numPages, text: pages.join("\n") };
+  return { pages: document.numPages, text: pages.join("\n"), overflowingText };
 }
 
 test("Unicode text is preserved before PDF layout", () => {
@@ -40,7 +57,7 @@ test("Unicode text is preserved before PDF layout", () => {
 });
 
 test("all Issue 12 PDF fixtures open, span pages, and retain complete text", async () => {
-  const fixtures = await generateIssue12Fixtures();
+  const fixtures = await getIssue12Fixtures();
   assert.deepEqual(Object.keys(fixtures).sort(), [
     "agenda",
     "annual-event",
@@ -59,6 +76,11 @@ test("all Issue 12 PDF fixtures open, span pages, and retain complete text", asy
     );
     const extracted = await extractPdf(bytes);
     assert.ok(extracted.pages > 1, `${name} skal have flere sider`);
+    assert.deepEqual(
+      extracted.overflowingText,
+      [],
+      `${name} har tekst uden for siden`,
+    );
     assert.match(extracted.text, /ÆØÅ æøå/iu, name);
     assert.match(extracted.text, /✓\s*⚠\s*☕\s*🚀/u, name);
     assert.doesNotMatch(extracted.text, /Ã.|Â·|â€|�/u, name);
@@ -101,6 +123,74 @@ test("fixed timestamps produce deterministic PDF bytes", async () => {
     const firstHash = createHash("sha256").update(bytes).digest("hex");
     const secondHash = createHash("sha256").update(second[index]).digest("hex");
     assert.equal(firstHash, secondHash, `layout ${index + 1}`);
+  }
+});
+
+test("meeting documents share theme resolution with accessible text fallbacks", async () => {
+  const firstTheme = resolvePdfTheme({
+    primaryColor: "#f7d117",
+    secondaryColor: "#29335c",
+    accentColor: "#ef476f",
+    fontFamily: "Montserrat",
+  });
+  const secondTheme = resolvePdfTheme({
+    primaryColor: "#16425b",
+    secondaryColor: "#81c3d7",
+    accentColor: "#2f6690",
+    fontFamily: "Merriweather",
+  });
+  const fallbackTheme = resolvePdfTheme();
+
+  assert.notDeepEqual(firstTheme.brand, secondTheme.brand);
+  assert.notDeepEqual(firstTheme.secondary, secondTheme.secondary);
+  assert.equal(firstTheme.requestedFontFamily, "Montserrat");
+  assert.equal(secondTheme.requestedFontFamily, "Merriweather");
+  assert.equal(firstTheme.resolvedFontFamily, "Noto Sans");
+  assert.equal(fallbackTheme.resolvedFontFamily, "Noto Sans");
+  assert.ok(contrastRatio(firstTheme.brandText, firstTheme.brandSoft) >= 4.5);
+  assert.ok(contrastRatio(firstTheme.accentText, firstTheme.accentSoft) >= 4.5);
+
+  const meetingInput = {
+    title: "Tematest ÆØÅ",
+    starts_at: "2026-08-03T10:15:00.000Z",
+    status: "scheduled",
+    agenda_item_occurrences: [],
+  } as never;
+  const first = await generateMeetingAgendaPdf({
+    meeting: meetingInput,
+    committeeName: "Udvalg",
+    organizationName: "Organisation A",
+    branding: { organizationName: "Organisation A", primaryColor: "#f7d117" },
+    generatedAt: fixtureDate,
+  });
+  const second = await generateMeetingAgendaPdf({
+    meeting: meetingInput,
+    committeeName: "Udvalg",
+    organizationName: "Organisation B",
+    branding: { organizationName: "Organisation B", primaryColor: "#16425b" },
+    generatedAt: fixtureDate,
+  });
+  assert.notEqual(
+    createHash("sha256").update(first).digest("hex"),
+    createHash("sha256").update(second).digest("hex"),
+  );
+});
+
+test("agenda and minutes retain complete transferred history inside shared cards", async () => {
+  const fixtures = await getIssue12Fixtures();
+  for (const name of ["agenda", "minutes"] as const) {
+    const extracted = await extractPdf(fixtures[name]);
+    assert.match(extracted.text, /Overført fra tidligere møde/u, name);
+    assert.match(extracted.text, /Tidligere noter\/referat/u, name);
+    assert.match(extracted.text, /Tidligere beslutning/u, name);
+    assert.match(extracted.text, /Tidligere opfølgning/u, name);
+    assert.match(extracted.text, /Tidligere relaterede beslutninger/u, name);
+    assert.match(extracted.text, /Tidligere relaterede opgaver/u, name);
+    assert.match(extracted.text, /\(fortsat\)/u, name);
+    assert.ok(
+      extracted.text.match(/Side \d+/gu)?.length === extracted.pages,
+      `${name} skal have footer og sidetal på alle sider`,
+    );
   }
 });
 
@@ -150,6 +240,7 @@ test("export routes retain their authorized service boundaries", async () => {
         /requireCommitteeMember/,
         /MeetingService\(db\)\.get/,
         /getPdfAttachments/,
+        /listPdfHistoryForMeeting/,
       ],
     ],
     [
@@ -158,6 +249,7 @@ test("export routes retain their authorized service boundaries", async () => {
         /getApprovedPdfData/,
         /getPdfAttachments/,
         /allowReadyForApproval: true/,
+        /listPdfHistoryForMeeting/,
       ],
     ],
     [
@@ -181,4 +273,22 @@ test("export routes retain their authorized service boundaries", async () => {
     assert.match(source, /pdfContentDisposition/);
     for (const pattern of patterns) assert.match(source, pattern, file);
   }
+
+  const transferService = await readFile(
+    path.join(workspace, "src/services/transferred-agenda-item-service.ts"),
+    "utf8",
+  );
+  assert.match(transferService, /requireCommitteeMember/);
+  assert.match(transferService, /organization_id !== organizationId/);
+  assert.match(transferService, /committee_id !== committeeId/);
+
+  const transferRepository = await readFile(
+    path.join(
+      workspace,
+      "src/repositories/transferred-agenda-item-repository.ts",
+    ),
+    "utf8",
+  );
+  assert.match(transferRepository, /select\("id,notes,decision,follow_up"\)/);
+  assert.doesNotMatch(transferRepository, /agenda_item_private_notes/);
 });

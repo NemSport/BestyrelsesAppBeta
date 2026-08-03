@@ -50,6 +50,41 @@ export class TransferredAgendaItemRepository {
     }>;
   }
 
+  async listSourceMinutes(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.db
+      .from("agenda_item_minutes")
+      .select("id,notes,decision,follow_up")
+      .in("id", ids);
+    if (error) throw error;
+    return data as Array<{
+      id: string;
+      notes: string;
+      decision: string;
+      follow_up: string;
+    }>;
+  }
+
+  async listSourceDecisions(agendaItemIds: string[]) {
+    if (agendaItemIds.length === 0) return [];
+    const { data, error } = await this.db
+      .from("decisions")
+      .select("agenda_item_id,title,description,deadline")
+      .in("agenda_item_id", agendaItemIds);
+    if (error) throw error;
+    return data;
+  }
+
+  async listSourceTasks(agendaItemIds: string[]) {
+    if (agendaItemIds.length === 0) return [];
+    const { data, error } = await this.db
+      .from("tasks")
+      .select("agenda_item_id,title,description,deadline")
+      .in("agenda_item_id", agendaItemIds);
+    if (error) throw error;
+    return data;
+  }
+
   async listPendingBySourceMinutes(agendaItemMinutesId: string) {
     const { data, error } = await this.db
       .from("transferred_agenda_items")
