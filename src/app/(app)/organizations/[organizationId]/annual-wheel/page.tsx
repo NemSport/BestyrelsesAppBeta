@@ -18,14 +18,13 @@ export default async function AnnualWheelPage({
   );
 
   return (
-    <>
+    <div className="page-flow">
       <PageHeader
-        className="mb-8"
         description="Planlæg aktiviteter, gentagelser og deadlines, før de bliver akutte."
         eyebrow="Strategisk planlægning"
         title={`Årshjul ${data.year}`}
       />
       <AnnualWheel data={data} organizationId={organizationId} />
-    </>
+    </div>
   );
 }

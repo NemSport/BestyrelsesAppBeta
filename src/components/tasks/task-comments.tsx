@@ -107,7 +107,10 @@ export function TaskComments({
       </div>
 
       {error ? (
-        <p className="alert-danger rounded-[var(--radius-control)] px-3 py-2 text-sm">
+        <p
+          className="alert-danger rounded-[var(--radius-control)] px-3 py-2 text-sm"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
@@ -136,7 +139,9 @@ export function TaskComments({
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted">Henter kommentarer...</p>
+        <p aria-live="polite" className="text-sm text-muted" role="status">
+          Henter kommentarer...
+        </p>
       ) : comments.length ? (
         <ol className="space-y-2">
           {comments.map((comment) => (
@@ -163,6 +168,17 @@ export function TaskComments({
         </ol>
       ) : (
         <EmptyState
+          action={
+            <Button
+              onClick={() =>
+                document.getElementById(`task-comment-${taskId}`)?.focus()
+              }
+              size="sm"
+              variant="secondary"
+            >
+              Skriv første kommentar
+            </Button>
+          }
           compact
           description="Tilføj en kommentar, når der er nyt om opgaven."
           title="Der er endnu ingen kommentarer."

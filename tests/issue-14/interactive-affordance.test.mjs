@@ -57,8 +57,8 @@ test("shared surface patterns distinguish links from static content without colo
 test("true full-card destinations use the interactive surface and a persistent cue", () => {
   assert.match(agendaItems, /interactiveSurfaceClassName\("p-5"\)/);
   assert.match(agendaItems, /SurfaceLinkCue label="Åbn dagsordenspunkt"/);
-  assert.match(dashboard, /interactiveSurfaceClassName\("p-4"\)/);
-  assert.match(dashboard, /SurfaceLinkCue label="Åbn møde"/);
+  assert.match(dashboard, /staticSurfaceClassName/);
+  assert.match(dashboard, /primarySurfaceLinkClassName/);
 });
 
 test("rows with separate actions stay static and expose explicit primary links", () => {

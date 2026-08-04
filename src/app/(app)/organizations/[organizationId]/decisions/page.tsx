@@ -17,9 +17,8 @@ export default async function DecisionsPage({
   ]);
 
   return (
-    <>
+    <div className="page-flow">
       <PageHeader
-        className="mb-8"
         description="Saml organisationens beslutninger, ansvar og deadlines på tværs af udvalg."
         eyebrow="Organisatorisk hukommelse"
         title="Beslutningsregister"
@@ -29,6 +28,6 @@ export default async function DecisionsPage({
         organizationId={organizationId}
         taskData={taskData}
       />
-    </>
+    </div>
   );
 }

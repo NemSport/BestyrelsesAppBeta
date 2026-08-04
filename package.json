@@ -23,7 +23,10 @@
     "test:issue-10": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-10/*.test.mjs",
     "test:issue-11": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-11/*.test.mjs",
     "test:issue-12": "node --import tsx --test tests/issue-12/pdf-regression.test.ts",
-    "test:issue-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-5/*.test.mjs"
+    "test:issue-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-5/*.test.mjs",
+    "test:issue-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-4/*.test.mjs",
+    "test:issue-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-3/*.test.mjs",
+    "test:issue-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-13/*.test.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

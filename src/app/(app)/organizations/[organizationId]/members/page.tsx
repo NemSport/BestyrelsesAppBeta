@@ -14,14 +14,13 @@ export default async function OrganizationMembersPage({
   );
 
   return (
-    <>
+    <div className="page-flow">
       <PageHeader
-        className="mb-8"
         description="Se organisationens medlemmer, deres roller og udvalgstilknytninger."
         eyebrow="Adgang og roller"
         title="Medlemmer"
       />
       <MemberAdministration organizationId={organizationId} {...data} />
-    </>
+    </div>
   );
 }

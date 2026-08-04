@@ -116,6 +116,16 @@ across the committees visible to the current user. This is a presentation read
 model only; committee membership and PostgreSQL Row Level Security still
 determine which underlying records are returned.
 
+Issue 4 makes both overview levels role- and capability-aware without adding
+rights or a separate recommendation model. A viewer is led to upcoming and
+approved reading material, a member to their own open tasks and relevant active
+decisions, a chair to meeting preparation, participants, and minutes approval
+in committees they manage, and an administrator to organization-wide
+operations while retaining committee context. Empty states and calls to action
+use the same server-derived capabilities as their destination workflows. The
+viewer presentation omits write actions and action-detail titles rather than
+merely hiding them in the browser.
+
 ### Committee Workspace
 
 The operational home for a committee's meetings, agenda items, tasks, Annual
@@ -840,6 +850,16 @@ Business workflows and authorization remain in the existing page, service,
 repository, and RLS layers; the UI components contain presentation behavior
 only.
 
+Issue 3 makes this hierarchy explicit across dashboards, meetings, tasks,
+decisions, members, Annual Wheel, and Job Cards. Pages and sections now share
+the same title/action alignment, records use a common title-status-metadata
+order, filter results use one summary/action bar, and metrics keep the same
+semantic order in a visible mobile grid. Secondary metadata is smaller and
+status badges are more restrained while retaining textual labels, contrast,
+and the existing focus-visible outline. The change is presentation-only: no
+capability, URL-state, service, repository, RLS, database, or PDF contract is
+changed.
+
 Phase 1.6-A4 applies this foundation to meetings, agendas, and minutes. A
 meeting uses one document header for title, committee, date, meeting status,
 minutes status, location, attendee count, agenda count, and transfer count.
@@ -1377,3 +1397,13 @@ repositories, tests, and UI copy.
 The legacy organizational term beginning with `B` must not be introduced in
 domain naming. A Kanban-style task interface should be called **Task View** or
 **Task Workflow**, not by terminology that conflicts with the Committee model.
+
+# Issue 13: Actionable Empty-state Guidance
+
+Issue 13 distinguishes genuinely empty data, filter no-results, read-only
+guidance, loading, and errors. Calls to action are selected from existing
+server-derived organization and committee capabilities, so viewers and members
+do not receive permanently forbidden editor actions. Meeting-minutes guidance
+also distinguishes reading from official-minutes editing and referent control.
+This is a presentation and navigation change only; repositories, service
+authorization, Row Level Security, and tenant scope are unchanged.

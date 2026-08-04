@@ -212,25 +212,28 @@ function ReferentRoleControl({
     : null;
   const isCurrentReferent = Boolean(activeLock?.isCurrentUser);
 
-  const sendReferentAction = useCallback(async (action: "claim" | "heartbeat" | "release") => {
-    const result = await readResponse<{
-      lock: MeetingMinutesReferentLockView | null;
-      claimed: boolean;
-      message: string;
-    }>(
-      await fetch(`/api/meetings/${meetingId}/minutes/referent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          committeeId,
-          action,
+  const sendReferentAction = useCallback(
+    async (action: "claim" | "heartbeat" | "release") => {
+      const result = await readResponse<{
+        lock: MeetingMinutesReferentLockView | null;
+        claimed: boolean;
+        message: string;
+      }>(
+        await fetch(`/api/meetings/${meetingId}/minutes/referent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizationId,
+            committeeId,
+            action,
+          }),
         }),
-      }),
-    );
-    onChange(result.lock);
-    return result;
-  }, [committeeId, meetingId, onChange, organizationId]);
+      );
+      onChange(result.lock);
+      return result;
+    },
+    [committeeId, meetingId, onChange, organizationId],
+  );
 
   async function handleAction(action: "claim" | "release") {
     setPendingAction(action);
@@ -312,7 +315,9 @@ function ReferentRoleControl({
               ? activeLock.isCurrentUser
                 ? "Du kan redigere de officielle referatfelter. Andre kan stadig skrive interne noter og oprette opgaver."
                 : `Referatfelter er låst, fordi ${activeLock.memberName} er referent. Du kan stadig skrive interne noter og oprette opgaver.`
-              : "Tag rollen som referent for at skrive i de officielle referatfelter."}
+              : canEdit
+                ? "Tag rollen som referent for at skrive i de officielle referatfelter."
+                : "Du kan læse de officielle referatfelter. En mødeansvarlig kan vælge referent og redigere."}
           </p>
         </div>
         {canEdit ? (
@@ -1747,14 +1752,14 @@ function AgendaMinutesCard({
             </span>
           ) : null}
         </h4>
-          <MinuteAttachments
-            agendaItemId={item.id}
-            attachments={attachments}
-            canEdit={canEdit}
-            committeeId={committeeId}
-            meetingId={meetingId}
-            organizationId={organizationId}
-          />
+        <MinuteAttachments
+          agendaItemId={item.id}
+          attachments={attachments}
+          canEdit={canEdit}
+          committeeId={committeeId}
+          meetingId={meetingId}
+          organizationId={organizationId}
+        />
       </section>
     </article>
   );
@@ -1860,11 +1865,13 @@ function LegacyMeetingMinutesSection({
   const effectiveCanEdit =
     canEdit && (meetingStatus !== "approved" || isEditingApproved);
   const canEditOfficialMinutes = effectiveCanEdit && isCurrentReferent;
-  const officialMinutesLockedMessage = activeReferentLock
-    ? activeReferentLock.isCurrentUser
-      ? null
-      : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
-    : "Tag rollen som referent for at redigere de officielle referatfelter.";
+  const officialMinutesLockedMessage = !canEdit
+    ? "Du kan læse de officielle referatfelter. En mødeansvarlig kan vælge referent og redigere."
+    : activeReferentLock
+      ? activeReferentLock.isCurrentUser
+        ? null
+        : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
+      : "Tag rollen som referent for at redigere de officielle referatfelter.";
 
   const meetingDraft: MeetingMinutesDraft = {
     minutesText,
@@ -2392,7 +2399,15 @@ function LegacyMeetingMinutesSection({
             />
           ))}
           {occurrences.length === 0 ? (
-            <EmptyState title="Mødet har endnu ingen dagsordenspunkter." />
+            <EmptyState
+              description={
+                canEdit
+                  ? "Tilføj et dagsordenspunkt fra mødehandlingerne for at starte referatet."
+                  : "En mødeansvarlig kan tilføje dagsordenspunkter. De vises her, når de er planlagt."
+              }
+              kind={canEdit ? "empty" : "read-only"}
+              title="Mødet har endnu ingen dagsordenspunkter."
+            />
           ) : null}
         </div>
       </section>
@@ -2408,10 +2423,7 @@ type MeetingMinutesSectionProps = Parameters<
   typeof LegacyMeetingMinutesSection
 >[0];
 
-function occurrenceIdFromHash(
-  hash: string,
-  occurrences: AgendaOccurrence[],
-) {
+function occurrenceIdFromHash(hash: string, occurrences: AgendaOccurrence[]) {
   const match = /^#agenda-point-(.+)$/.exec(hash);
   if (match && occurrences.some((occurrence) => occurrence.id === match[1])) {
     return match[1];
@@ -2510,14 +2522,13 @@ export function MeetingMinutesSection({
 
     syncSelectionFromHash();
     window.addEventListener("hashchange", syncSelectionFromHash);
-    return () => window.removeEventListener("hashchange", syncSelectionFromHash);
+    return () =>
+      window.removeEventListener("hashchange", syncSelectionFromHash);
   }, [occurrences]);
 
   const activeIndex = Math.max(
     0,
-    occurrences.findIndex(
-      (occurrence) => occurrence.id === activeOccurrenceId,
-    ),
+    occurrences.findIndex((occurrence) => occurrence.id === activeOccurrenceId),
   );
   const activeOccurrence = occurrences[activeIndex] ?? null;
   const activeReferentLock = isActiveReferentLock(referentLock)
@@ -2527,11 +2538,13 @@ export function MeetingMinutesSection({
   const effectiveCanEdit =
     canEdit && (meetingStatus !== "approved" || isEditingApproved);
   const canEditOfficialMinutes = effectiveCanEdit && isCurrentReferent;
-  const officialMinutesLockedMessage = activeReferentLock
-    ? activeReferentLock.isCurrentUser
-      ? null
-      : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
-    : "Tag rollen som referent for at redigere de officielle referatfelter.";
+  const officialMinutesLockedMessage = !canEdit
+    ? "Du kan læse de officielle referatfelter. En mødeansvarlig kan vælge referent og redigere."
+    : activeReferentLock
+      ? activeReferentLock.isCurrentUser
+        ? null
+        : `Referatfelter er låst, fordi ${activeReferentLock.memberName} er referent.`
+      : "Tag rollen som referent for at redigere de officielle referatfelter.";
 
   function selectOccurrence(occurrenceId: string) {
     setActiveOccurrenceId(occurrenceId);
@@ -2801,7 +2814,15 @@ export function MeetingMinutesSection({
             </div>
           </>
         ) : (
-          <EmptyState title="Mødet har endnu ingen dagsordenspunkter." />
+          <EmptyState
+            description={
+              canEdit
+                ? "Tilføj et dagsordenspunkt fra mødehandlingerne for at starte referatet."
+                : "En mødeansvarlig kan tilføje dagsordenspunkter. De vises her, når de er planlagt."
+            }
+            kind={canEdit ? "empty" : "read-only"}
+            title="Mødet har endnu ingen dagsordenspunkter."
+          />
         )}
       </section>
 

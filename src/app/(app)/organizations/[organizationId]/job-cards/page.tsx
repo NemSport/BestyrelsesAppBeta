@@ -13,14 +13,13 @@ export default async function JobCardsPage({
     organizationId,
   );
   return (
-    <>
+    <div className="page-flow">
       <PageHeader
-        className="mb-8"
         description="Dokumentér roller, ansvar og onboarding, så vigtig viden bliver i organisationen."
         eyebrow="Digital håndbog"
         title="Jobkort og roller"
       />
       <JobCardRegister data={data} organizationId={organizationId} />
-    </>
+    </div>
   );
 }
