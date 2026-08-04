@@ -55,22 +55,18 @@ export function MeetingDocumentHeader({
 
   return (
     <header className="meeting-document-header border-b border-line pb-5">
-      <div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Møde og referat
-          </p>
-          <h1 className="mt-1.5 max-w-4xl break-words text-3xl font-semibold leading-tight tracking-[-0.035em]">
-            {meeting.title}
-          </h1>
-          <p className="mt-1.5 text-sm text-muted">
+      <div className="entity-header">
+        <div className="min-w-0 flex-1">
+          <p className="page-eyebrow text-muted">Møde og referat</p>
+          <h1 className="page-title max-w-4xl break-words">{meeting.title}</h1>
+          <p className="metadata mt-1.5">
             {committeeName} · {formatDateTime(meeting.starts_at, "full")}
           </p>
         </div>
       </div>
 
       {meeting.description ? (
-        <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-muted">
+        <p className="supporting-text mt-3 whitespace-pre-wrap">
           {meeting.description}
         </p>
       ) : null}
@@ -88,7 +84,9 @@ export function MeetingDocumentHeader({
           <dt>Referatstatus</dt>
           <dd>
             <StatusBadge
-              tone={minutesStatus ? minutesStatusTones[minutesStatus] : "neutral"}
+              tone={
+                minutesStatus ? minutesStatusTones[minutesStatus] : "neutral"
+              }
             >
               {minutesStatus
                 ? meetingMinutesStatusLabels[minutesStatus]
@@ -130,7 +128,9 @@ export function MeetingDocumentHeader({
                   {participantSummary.presentInternalCount} interne til stede
                 </StatusBadge>
                 {participantSummary.externalCount > 0 ? (
-                  <StatusBadge>{participantSummary.externalCount} eksterne</StatusBadge>
+                  <StatusBadge>
+                    {participantSummary.externalCount} eksterne
+                  </StatusBadge>
                 ) : null}
                 {participantSummary.action}
               </span>
@@ -144,9 +144,7 @@ export function MeetingDocumentHeader({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
             Mødehandlinger
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {actions}
-          </div>
+          <div className="action-cluster mt-2">{actions}</div>
         </div>
       ) : null}
     </header>

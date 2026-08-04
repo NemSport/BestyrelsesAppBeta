@@ -1,11 +1,10 @@
 import Link from "next/link";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
-import { MeetingAgendaPreview } from "@/components/meetings/meeting-agenda-preview";
+import { CommitteeDashboardPriority } from "@/components/dashboard/committee-dashboard-priority";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
   ActionMenu,
-  ContentPanel,
   EmptyState,
   PageHeader,
   PageSection,
@@ -20,7 +19,9 @@ import {
   meetingMinutesStatusLabels,
   transferredAgendaItemStatusLabels,
 } from "@/lib/localization";
-import { canEditAgendaItems, isOrganizationAdmin } from "@/lib/permissions";
+import { isOrganizationAdmin } from "@/lib/permissions";
+import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
+import { resolveCommitteeDashboardAudience } from "@/lib/dashboard-prioritization";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -63,10 +64,7 @@ function ActionItemsList({
             className="font-semibold text-ink hover:text-brand hover:underline"
             href={`${root}/agenda-items/${item.agendaItemId}`}
           >
-            <AgendaItemDocumentTitle
-              title={item.title}
-              type={item.itemType}
-            />
+            <AgendaItemDocumentTitle title={item.title} type={item.itemType} />
           </Link>
           <p className="mt-1 text-xs text-muted">
             {agendaItemMinutesStatusLabels[item.status]} · {item.meetingTitle}
@@ -147,16 +145,22 @@ export default async function CommitteeDashboardPage({
     )
     .sort(
       (left, right) =>
-        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime(),
+        new Date(left.starts_at).getTime() -
+        new Date(right.starts_at).getTime(),
     );
   const nextMeeting = upcomingMeetings[0] ?? null;
   const otherUpcomingMeetings = upcomingMeetings.slice(1, 6);
-  const canEditItems = canEditAgendaItems(
+  const capabilities = getMeetingCapabilities(
     context.organizationMembership.role,
     context.membership?.role ?? null,
   );
   const canEditCommittee = isOrganizationAdmin(
     context.organizationMembership.role,
+  );
+  const dashboardAudience = resolveCommitteeDashboardAudience(
+    context.organizationMembership.role,
+    context.membership?.role ?? null,
+    capabilities,
   );
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
 
@@ -165,8 +169,11 @@ export default async function CommitteeDashboardPage({
       <PageHeader
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {canEditItems ? (
-              <Link className={buttonClassName()} href={`${root}/agenda-items/new`}>
+            {capabilities.createAgendaItem ? (
+              <Link
+                className={buttonClassName()}
+                href={`${root}/agenda-items/new`}
+              >
                 Nyt dagsordenspunkt
               </Link>
             ) : null}
@@ -194,59 +201,68 @@ export default async function CommitteeDashboardPage({
         title={context.committee.name}
       />
 
-      <div className="grid divide-y divide-line border-y border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <div className="px-1 py-4 sm:px-5">
-          <p className="metadata">Kommende møder</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {upcomingMeetings.length}
-          </p>
-        </div>
-        <div className="px-1 py-4 sm:px-5">
-          <p className="metadata">Punkter der kræver handling</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {overview.openFollowUps.length +
-              overview.decisionsRequired.length +
-              overview.transfers.length}
-          </p>
-        </div>
-        <div className="px-1 py-4 sm:px-5">
-          <p className="metadata">Medlemmer</p>
-          <p className="mt-1 text-2xl font-semibold">
-            {overview.members.length}
-          </p>
-        </div>
-      </div>
+      <CommitteeDashboardPriority
+        capabilities={capabilities}
+        committeeRole={context.membership?.role ?? null}
+        nextMeeting={nextMeeting}
+        organizationId={organizationId}
+        organizationRole={context.organizationMembership.role}
+        overview={overview}
+        root={root}
+      />
 
-      <PageSection
-        description="Det næste planlagte møde og dets aktuelle dagsorden."
-        eyebrow="Overblik"
-        title="Næste møde"
-      >
-        {nextMeeting ? (
-          <ContentPanel className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h3 className="text-xl font-semibold">{nextMeeting.title}</h3>
-                <p className="mt-1 text-sm text-muted">
-                  {formatDateTime(nextMeeting.starts_at)}
-                  {nextMeeting.location ? ` · ${nextMeeting.location}` : ""}
-                </p>
-                <MeetingAgendaPreview
-                  occurrences={nextMeeting.agenda_item_occurrences}
-                />
-              </div>
-              <Link
-                className={buttonClassName({ variant: "secondary" })}
-                href={`${root}/meetings/${nextMeeting.id}`}
-              >
-                Åbn møde
-              </Link>
+      <div className="metric-strip sm:grid-cols-3 xl:grid-cols-3">
+        <div className="metric-item">
+          <p className="metric-label">Kommende møder</p>
+          <p className="metric-value">{upcomingMeetings.length}</p>
+        </div>
+        {dashboardAudience === "viewer" ? (
+          <>
+            <div className="metric-item">
+              <p className="metric-label">Godkendte referater</p>
+              <p className="metric-value">
+                {
+                  overview.recentMinutes.filter(
+                    (minutes) => minutes.status === "approved",
+                  ).length
+                }
+              </p>
             </div>
-          </ContentPanel>
+            <div className="metric-item">
+              <p className="metric-label">Læserolle</p>
+              <p className="mt-1 text-sm font-semibold">
+                Ingen skrivehandlinger
+              </p>
+            </div>
+          </>
+        ) : dashboardAudience === "member" ? (
+          <>
+            <div className="metric-item">
+              <p className="metric-label">Mine åbne opgaver</p>
+              <p className="metric-value">{overview.myOpenTasks.length}</p>
+            </div>
+            <div className="metric-item">
+              <p className="metric-label">Aktive beslutninger</p>
+              <p className="metric-value">{overview.activeDecisions.length}</p>
+            </div>
+          </>
         ) : (
-          <EmptyState title="Der er ingen kommende møder." />
+          <>
+            <div className="metric-item">
+              <p className="metric-label">Punkter der kræver handling</p>
+              <p className="metric-value">
+                {overview.openFollowUps.length +
+                  overview.decisionsRequired.length +
+                  overview.transfers.length}
+              </p>
+            </div>
+            <div className="metric-item">
+              <p className="metric-label">Medlemmer</p>
+              <p className="metric-value">{overview.members.length}</p>
+            </div>
+          </>
         )}
-      </PageSection>
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <PageSection
@@ -325,34 +341,36 @@ export default async function CommitteeDashboardPage({
         </PageSection>
       </div>
 
-      <PageSection
-        description="Aktuelle punkter fra referater og videreførelse."
-        eyebrow="Aktuelt i udvalget"
-        title="Punkter der kræver handling"
-      >
-        <div className="grid gap-7 lg:grid-cols-3">
-          <section>
-            <h3 className="mb-3 font-semibold">Åbne opfølgningspunkter</h3>
-            <ActionItemsList
-              emptyText="Der er ingen åbne opfølgningspunkter."
-              items={overview.openFollowUps}
-              root={root}
-            />
-          </section>
-          <section>
-            <h3 className="mb-3 font-semibold">Kræver beslutning</h3>
-            <ActionItemsList
-              emptyText="Der er ingen punkter, der kræver beslutning."
-              items={overview.decisionsRequired}
-              root={root}
-            />
-          </section>
-          <section>
-            <h3 className="mb-3 font-semibold">Overførte punkter</h3>
-            <TransfersList items={overview.transfers} root={root} />
-          </section>
-        </div>
-      </PageSection>
+      {dashboardAudience !== "viewer" ? (
+        <PageSection
+          description="Aktuelle punkter fra referater og videreførelse."
+          eyebrow="Aktuelt i udvalget"
+          title="Punkter der kræver handling"
+        >
+          <div className="grid gap-7 lg:grid-cols-3">
+            <section>
+              <h3 className="mb-3 font-semibold">Åbne opfølgningspunkter</h3>
+              <ActionItemsList
+                emptyText="Der er ingen åbne opfølgningspunkter."
+                items={overview.openFollowUps}
+                root={root}
+              />
+            </section>
+            <section>
+              <h3 className="mb-3 font-semibold">Kræver beslutning</h3>
+              <ActionItemsList
+                emptyText="Der er ingen punkter, der kræver beslutning."
+                items={overview.decisionsRequired}
+                root={root}
+              />
+            </section>
+            <section>
+              <h3 className="mb-3 font-semibold">Overførte punkter</h3>
+              <TransfersList items={overview.transfers} root={root} />
+            </section>
+          </div>
+        </PageSection>
+      ) : null}
 
       <PageSection
         description="Aktive medlemmer og deres roller i udvalget."

@@ -18,10 +18,7 @@ import {
   groupMeetingList,
   parseMeetingListFilters,
 } from "@/lib/meeting-list";
-import {
-  formatDateTime,
-  meetingMinutesStatusLabels,
-} from "@/lib/localization";
+import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -192,7 +189,16 @@ export default async function OrganizationMeetingsPage({
             </>
           ) : (
             <EmptyState
+              action={
+                <Link
+                  className={buttonClassName({ variant: "secondary" })}
+                  href={meetingsRoot}
+                >
+                  Nulstil filtre
+                </Link>
+              }
               description="Prøv at rydde et filter eller vælge en anden periode, status eller dato."
+              kind="filtered"
               title="Ingen møder matcher filtrene."
             />
           )}
@@ -211,6 +217,14 @@ export default async function OrganizationMeetingsPage({
               />
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({ variant: "secondary" })}
+                    href={`${organizationRoot}/committees`}
+                  >
+                    Åbn et udvalg
+                  </Link>
+                }
                 description="Når der planlægges møder i dine udvalg, vises de her."
                 title="Der er ingen kommende eller igangværende møder."
               />

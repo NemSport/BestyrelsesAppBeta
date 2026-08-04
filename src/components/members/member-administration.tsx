@@ -180,7 +180,7 @@ export function MemberAdministration({
       ) : null}
 
       {canManage ? (
-        <section className="border-l-2 border-brand bg-brand-soft/35 px-4 py-4">
+        <section className="workflow-panel" id="invite-member">
           <h2 className="text-base font-semibold">Inviter medlem</h2>
           <p className="mt-2 text-sm text-muted">
             Invitationen gemmes som afventende. Der sendes endnu ingen e-mail.
@@ -278,7 +278,7 @@ export function MemberAdministration({
 
                   return (
                     <TableRow
-                      className="grid gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
+                      className="entity-record grid gap-3 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
                       key={member.user_id}
                     >
                       <TableCell className="block min-w-0 p-0 md:table-cell md:min-w-56 md:px-5 md:py-4">
@@ -388,7 +388,27 @@ export function MemberAdministration({
             </Table>
           </TableContainer>
         ) : (
-          <EmptyState title="Organisationen har endnu ingen medlemmer." />
+          <EmptyState
+            action={
+              canManage ? (
+                <Button
+                  onClick={() =>
+                    document.getElementById("invitation-email")?.focus()
+                  }
+                  variant="secondary"
+                >
+                  Inviter medlem
+                </Button>
+              ) : undefined
+            }
+            description={
+              canManage
+                ? "Inviter det første medlem ovenfor, og vælg den nødvendige adgang."
+                : "En ejer eller administrator kan invitere organisationens første medlem."
+            }
+            kind={canManage ? "empty" : "read-only"}
+            title="Organisationen har endnu ingen medlemmer."
+          />
         )}
       </PageSection>
 
@@ -413,7 +433,7 @@ export function MemberAdministration({
               <TableBody className="grid gap-3 md:table-row-group">
                 {invitations.map((invitation) => (
                   <TableRow
-                    className="grid gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
+                    className="entity-record grid gap-3 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:p-0"
                     key={invitation.id}
                   >
                     <TableCell className="block min-w-0 p-0 md:table-cell md:px-5 md:py-4">
@@ -444,7 +464,29 @@ export function MemberAdministration({
             </Table>
           </TableContainer>
         ) : (
-          <EmptyState compact title="Der er ingen afventende invitationer." />
+          <EmptyState
+            action={
+              canManage ? (
+                <Button
+                  onClick={() =>
+                    document.getElementById("invitation-email")?.focus()
+                  }
+                  size="sm"
+                  variant="secondary"
+                >
+                  Opret invitation
+                </Button>
+              ) : undefined
+            }
+            compact
+            description={
+              canManage
+                ? "Brug invitationsformularen ovenfor, når en ny person skal have adgang."
+                : "Nye invitationer vises her, når en ejer eller administrator opretter dem."
+            }
+            kind={canManage ? "empty" : "read-only"}
+            title="Der er ingen afventende invitationer."
+          />
         )}
       </PageSection>
     </div>

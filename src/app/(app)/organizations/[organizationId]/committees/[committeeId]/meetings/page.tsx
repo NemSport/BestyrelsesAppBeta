@@ -107,7 +107,16 @@ export default async function MeetingsPage({
               />
             ) : (
               <EmptyState
+                action={
+                  <Link
+                    className={buttonClassName({ variant: "secondary" })}
+                    href={meetingsRoot}
+                  >
+                    Nulstil filtre
+                  </Link>
+                }
                 description="Prøv at rydde et filter eller vælge en anden periode, status eller dato."
+                kind="filtered"
                 title="Ingen møder matcher filtrene."
               />
             )}
@@ -154,9 +163,7 @@ export default async function MeetingsPage({
                   >
                     Afholdte møder
                   </h2>
-                  <p className="text-xs text-muted">
-                    Nyeste mødedato først.
-                  </p>
+                  <p className="text-xs text-muted">Nyeste mødedato først.</p>
                 </div>
                 <span className="text-xs font-semibold text-muted">
                   {grouped.previous.length} møde(r)
@@ -203,11 +210,22 @@ export default async function MeetingsPage({
           </>
         ) : (
           <EmptyState
+            action={
+              capabilities.createMeeting ? (
+                <Link
+                  className={buttonClassName()}
+                  href={`${meetingsRoot}/new`}
+                >
+                  Opret første møde
+                </Link>
+              ) : undefined
+            }
             description={
               capabilities.createMeeting
                 ? "Opret et møde for at samle dagsorden, referat og opfølgning."
                 : "Når en ansvarlig opretter et møde, vises dagsorden, referat og opfølgning her."
             }
+            kind={capabilities.createMeeting ? "empty" : "read-only"}
             title="Der er endnu ikke oprettet nogen møder."
           />
         )}

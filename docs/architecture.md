@@ -542,6 +542,18 @@ chrome, and personal task summaries should use lightweight emphasis instead of
 large dashboard cards. These are presentation rules only and do not alter
 authorization, services, repositories, or data ownership.
 
+Issue 3 adds a small information-hierarchy layer to that composition contract.
+`PageHeader` and `PageSection` own the responsive title/action relationship;
+semantic CSS classes own metric strips, entity headers, metadata grids,
+workflow callouts, filter result bars, and action/status clusters. The
+organization registers use `page-flow` instead of route-specific bottom
+margins, and the custom meeting header consumes the same page typography.
+Task summary metrics render as a visible grid on mobile, while the deliberate
+horizontal interaction model of Task View remains unchanged. Status continues
+to include text, focus-visible remains token-driven, and DOM order does not
+change between viewports. No query, mutation, capability, URL-state, PDF,
+database, or RLS boundary is part of this layer.
+
 Phase 7R.8 extends the same polish principle to PDF exports. The shared
 `pdf-report` foundation remains the only report layout system for existing
 minutes and Job Card downloads, but it now wraps long words and URLs, constrains
@@ -731,6 +743,14 @@ for next meeting, upcoming meetings, recent minutes, action-required points,
 and committee members. No new table, lifecycle, permission, or mutation flow
 is introduced; PostgreSQL RLS remains the final visibility boundary.
 
+Issue 4 extends that read model after the membership check with two parallel,
+existing repository reads: tasks assigned to the current user and active
+decisions in the current committee. Both remain organization-/committee-scoped
+and RLS-protected. A shared dashboard-priority presentation resolves viewer,
+member, chair, or admin from organization role, committee role, and the same
+meeting capabilities used by server workflows. It changes ordering, copy, and
+links only; it does not move mutation authorization into React components.
+
 ### Organization Overview Read Model
 
 Phase 1.6-B2 adds an organization-scoped read model without adding dashboard
@@ -741,6 +761,22 @@ maps these records into compact organization metrics, committee summaries,
 upcoming meetings, recent minutes, and action-required agenda items. Data from
 committees the current user cannot access is excluded by the existing
 PostgreSQL policies.
+
+Issue 4 reuses those records and the existing per-committee capabilities to put
+the next permitted action first. Viewer output includes only readable meeting
+and approved-minutes destinations; member output prioritizes the current
+user's tasks before RLS-visible decisions; chair output prioritizes preparation,
+participants, and approval within managed committees; admin output prioritizes
+cross-committee operational attention. Capability-aware empty states never
+offer a write destination that the corresponding server workflow would reject.
+Loading and error boundaries cover the organization route, and the shared
+priority surface preserves the same content order at mobile widths.
+
+This change deliberately adds no dashboard table, policy, RPC, mutation, or
+cross-tenant query. It also avoids a new recommendation engine. The existing
+organization overview still performs its established per-committee capability
+resolution; reducing those round trips would require a measured repository or
+RPC optimization and is not part of the presentation change.
 
 Phase 3 extends this presentation read model with active decisions, open
 organization tasks, and open tasks assigned to the current user. The data is
@@ -2174,3 +2210,13 @@ and pay for the service.
 
 **Success criterion:** The system supports complex organizations while
 preserving reliable committee memory, accountability, and tenant isolation.
+
+# Issue 13 Presentation-state Boundary
+
+The shared empty-state component models `empty`, `filtered`, `read-only`, and
+`error` as presentation semantics. Route and domain components remain
+responsible for passing existing capability decisions and valid destinations.
+The component never queries data, derives roles, or authorizes mutations.
+Loading remains a distinct route state with `aria-busy`, while errors retain
+alert semantics and retry/navigation actions. No database, repository, service,
+RLS, tenant-scope, or committee-scope changes are introduced.

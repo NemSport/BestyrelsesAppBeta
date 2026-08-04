@@ -712,7 +712,7 @@ export function DecisionRegister({
           </div>
         </details>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+        <div className="register-summary-bar">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span
@@ -721,7 +721,9 @@ export function DecisionRegister({
               >
                 {filteredDecisions.length} af {decisions.length} beslutninger
               </span>
-              {isReadOnly ? <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge> : null}
+              {isReadOnly ? (
+                <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge>
+              ) : null}
               {hasModifiedFilterState ? (
                 <Button onClick={resetFilters} size="sm" variant="secondary">
                   Nulstil alle filtre
@@ -745,7 +747,7 @@ export function DecisionRegister({
               </div>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="action-cluster">
             <label className="flex items-center gap-2 text-sm text-muted">
               <input
                 checked={filters.showArchived}
@@ -798,16 +800,14 @@ export function DecisionRegister({
               }));
             return (
               <article
-                className={staticSurfaceClassName("scroll-mt-24 p-4")}
+                className={staticSurfaceClassName("entity-record")}
                 id={`decision-${decision.id}`}
                 key={decision.id}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="entity-header">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-semibold leading-6">
-                        {decision.title}
-                      </h2>
+                      <h2 className="entity-title">{decision.title}</h2>
                       <StatusBadge tone={decisionStatusTones[decision.status]}>
                         {decisionStatusLabels[decision.status]}
                       </StatusBadge>
@@ -829,7 +829,7 @@ export function DecisionRegister({
                         {decision.description}
                       </p>
                     ) : null}
-                    <dl className="mt-3 grid gap-x-5 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                    <dl className="entity-metadata-grid">
                       <div>
                         <dt className="metadata">Udvalg</dt>
                         <dd>{decision.committee?.name ?? "Ukendt udvalg"}</dd>
@@ -899,7 +899,7 @@ export function DecisionRegister({
                     </div>
                   </div>
                   {canEdit ? (
-                    <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
+                    <div className="action-cluster w-full sm:w-auto sm:shrink-0 sm:justify-end">
                       <TaskCreateModal
                         agendaItems={taskData.agendaItems.filter(
                           (item) => item.committee_id === decision.committee_id,
@@ -986,6 +986,13 @@ export function DecisionRegister({
               <Button onClick={resetFilters} variant="secondary">
                 Nulstil filtre
               </Button>
+            ) : decisions.length ? (
+              <Button
+                onClick={() => updateFilter("showArchived", true)}
+                variant="secondary"
+              >
+                Vis arkiverede beslutninger
+              </Button>
             ) : canCreate ? (
               <Button onClick={openCreate}>Opret fra dagsordenspunkt</Button>
             ) : null
@@ -998,6 +1005,9 @@ export function DecisionRegister({
                 : canCreate
                   ? "Opret den første beslutning fra det dagsordenspunkt, hvor den blev truffet."
                   : "Der er endnu ikke registreret beslutninger i de udvalg, du har adgang til."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters

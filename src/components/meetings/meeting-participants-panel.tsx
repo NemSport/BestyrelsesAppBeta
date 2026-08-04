@@ -311,7 +311,10 @@ export function MeetingParticipantsPanel({
             role="status"
           >
             <p className="font-semibold text-ink">Skrivebeskyttet</p>
-            <p>Du kan se deltagerstatus, men ikke ændre mødedeltagere.</p>
+            <p>
+              Du kan se deltagerstatus. En mødeansvarlig kan opdatere
+              deltagerlisten.
+            </p>
           </div>
         ) : null}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
@@ -376,7 +379,16 @@ export function MeetingParticipantsPanel({
                 );
               })}
               {committeeMembers.length === 0 ? (
-                <EmptyState compact title="Ingen medlemmer i udvalget." />
+                <EmptyState
+                  compact
+                  description={
+                    canEdit
+                      ? "Tilføj medlemmer til udvalget, før intern deltagelse kan registreres."
+                      : "En organisationsadministrator kan tilføje medlemmer til udvalget."
+                  }
+                  kind={canEdit ? "empty" : "read-only"}
+                  title="Ingen medlemmer i udvalget."
+                />
               ) : null}
             </div>
           </section>
@@ -555,7 +567,16 @@ export function MeetingParticipantsPanel({
                 );
               })}
               {external.length === 0 ? (
-                <EmptyState compact title="Ingen eksterne deltagere." />
+                <EmptyState
+                  compact
+                  description={
+                    canEdit
+                      ? "Brug Tilføj ekstern deltager, hvis en gæst skal registreres."
+                      : "Eksterne deltagere vises her, når en mødeansvarlig registrerer dem."
+                  }
+                  kind={canEdit ? "empty" : "read-only"}
+                  title="Ingen eksterne deltagere."
+                />
               ) : null}
             </div>
           </section>

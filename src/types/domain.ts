@@ -201,6 +201,8 @@ export type CommitteeOverview = {
   decisionsRequired: CommitteeOverviewActionItem[];
   transfers: CommitteeOverviewTransfer[];
   members: CommitteeOverviewMember[];
+  myOpenTasks: TaskView[];
+  activeDecisions: DecisionView[];
 };
 
 export type OrganizationOverviewActionItem = {

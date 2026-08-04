@@ -886,11 +886,11 @@ export function TaskRegister({
 
   return (
     <div className="space-y-6">
-      <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         {summaryCards.map((card) => (
           <button
             aria-pressed={card.active}
-            className={`min-w-36 snap-start rounded-[var(--radius-panel)] border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:min-w-0 ${
+            className={`metric-item rounded-[var(--radius-control)] border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
               card.active
                 ? "border-brand bg-mist text-brand"
                 : "border-line bg-surface hover:border-brand/40"
@@ -899,12 +899,8 @@ export function TaskRegister({
             onClick={card.onClick}
             type="button"
           >
-            <span className="block text-xs font-semibold uppercase tracking-wide text-muted">
-              {card.label}
-            </span>
-            <span className="mt-1 block text-2xl font-semibold leading-none">
-              {card.value}
-            </span>
+            <span className="metric-label block">{card.label}</span>
+            <span className="metric-value block">{card.value}</span>
           </button>
         ))}
       </div>
@@ -1039,11 +1035,8 @@ export function TaskRegister({
           </div>
         </details>
 
-        <div
-          aria-live="polite"
-          className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3"
-        >
-          <div className="flex flex-wrap items-center gap-2">
+        <div aria-live="polite" className="register-summary-bar">
+          <div className="action-cluster">
             <strong className="text-sm text-ink">
               {filteredTasks.length} af {tasks.length} opgaver
             </strong>
@@ -1067,7 +1060,7 @@ export function TaskRegister({
               </Button>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="action-cluster">
             {canCreate ? (
               <Button onClick={openCreate}>Opret opgave</Button>
             ) : null}
@@ -1159,6 +1152,22 @@ export function TaskRegister({
         )
       ) : (
         <EmptyState
+          action={
+            hasActiveFilters ? (
+              <Button onClick={resetFilters} variant="secondary">
+                Nulstil filtre
+              </Button>
+            ) : tasks.length ? (
+              <Button
+                onClick={() => updateFilter("showArchived", true)}
+                variant="secondary"
+              >
+                Vis arkiverede opgaver
+              </Button>
+            ) : canCreate ? (
+              <Button onClick={openCreate}>Opret første opgave</Button>
+            ) : undefined
+          }
           description={
             tasks.length && hasActiveFilters
               ? "Ingen opgaver matcher de valgte filtre. Ryd et eller flere filtre for at udvide visningen."
@@ -1167,6 +1176,9 @@ export function TaskRegister({
                 : canCreate
                   ? "Opret den første opgave og gør ansvar og deadline tydelig."
                   : "Der er endnu ikke registreret opgaver i de udvalg, du har adgang til."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters

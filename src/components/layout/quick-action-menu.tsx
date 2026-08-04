@@ -403,6 +403,10 @@ export function QuickActionMenu({
     (committee) => committee.capabilities.scheduleAgendaItem,
   );
 
+  if (!canCreateMeeting && !canCreateQuickMeeting && !canScheduleAgendaItem) {
+    return null;
+  }
+
   return (
     <>
       <div className="relative" ref={menuContainerRef}>

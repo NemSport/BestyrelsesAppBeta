@@ -6,6 +6,7 @@ import {
   EmptyState,
   PageHeader,
   PageSection,
+  buttonClassName,
 } from "@/components/ui";
 import { organizationRoleLabels } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
@@ -42,14 +43,19 @@ export default async function OrganizationsPage() {
           })}
           {memberships.length === 0 ? (
             <EmptyState
+              action={
+                <Link className={buttonClassName()} href="#new-organization">
+                  Opret organisation
+                </Link>
+              }
               className="md:col-span-2"
-              description="Når organisationen er oprettet, kan du tilføje udvalg, møder og medlemmer."
+              description="Udfyld formularen for at oprette et arbejdsrum med udvalg, møder og medlemmer."
               title="Opret din første organisation for at komme i gang."
             />
           ) : null}
         </div>
       </PageSection>
-      <ContentPanel className="h-fit p-6">
+      <ContentPanel className="h-fit scroll-mt-24 p-6" id="new-organization">
         <h2 className="text-lg font-semibold">Ny organisation</h2>
         <p className="mt-2 text-sm text-muted">
           En organisation indeholder ét eller flere udvalg.

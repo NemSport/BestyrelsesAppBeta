@@ -851,8 +851,8 @@ export function AnnualWheel({
     : null;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
+    <div className="content-flow">
+      <div className="section-header border-b border-line pb-4">
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <Link
             className="button-secondary justify-center"
@@ -896,7 +896,7 @@ export function AnnualWheel({
             {data.year + 1} →
           </Link>
         </div>
-        <div className="hidden flex-wrap items-center gap-2 sm:flex">
+        <div className="action-cluster hidden sm:flex sm:justify-end">
           <Link
             className={buttonClassName({
               size: "sm",
@@ -953,7 +953,7 @@ export function AnnualWheel({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
         <Select
           aria-label="Filtrér på udvalg"
           disabled={Boolean(initialCommitteeId)}
@@ -1022,10 +1022,7 @@ export function AnnualWheel({
           ))}
         </Select>
       </div>
-      <div
-        aria-live="polite"
-        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-subtle px-3 py-2 text-sm"
-      >
+      <div aria-live="polite" className="filter-result-bar">
         <p>
           <span className="font-semibold">{visibleItemCount} elementer</span>
           <span className="text-muted">
@@ -1041,7 +1038,7 @@ export function AnnualWheel({
       </div>
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-brand/20 bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-brand-soft px-4 py-4">
+        <div className="section-header bg-brand-soft px-4 py-4">
           <div>
             <p className="page-eyebrow">AI-planlægningsassistent</p>
             <h2 className="mt-1 font-semibold">Find mangler i årets plan</h2>
@@ -1159,12 +1156,17 @@ export function AnnualWheel({
               <Button onClick={resetFilters} variant="secondary">
                 Nulstil filtre
               </Button>
+            ) : canCreate ? (
+              <Button onClick={openCreate}>Opret første aktivitet</Button>
             ) : undefined
           }
           description={
             hasActiveFilters
               ? "Der findes ingen elementer, som matcher de valgte filtre i perioden."
               : "Der er endnu ikke planlagt aktiviteter, møder, opgaver eller beslutningsdeadlines i perioden."
+          }
+          kind={
+            hasActiveFilters ? "filtered" : canCreate ? "empty" : "read-only"
           }
           title={
             hasActiveFilters
@@ -1182,7 +1184,7 @@ export function AnnualWheel({
               splitMonthItems(monthItems);
             return (
               <section
-                className="min-h-44 border-b border-line bg-surface px-3 py-4 sm:px-4"
+                className="entity-record min-h-44 px-3 py-4 sm:px-4"
                 key={month}
               >
                 <div className="flex items-start justify-between gap-3">

@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  Button,
-  EmptyState,
-  Select,
-  StatusBadge,
-} from "@/components/ui";
+import { Button, EmptyState, Select, StatusBadge } from "@/components/ui";
 import {
   getMyOpenTasks,
   getTaskDeadlineState,
@@ -162,7 +157,9 @@ export function MyTasks({
           </div>
           <div className="flex flex-wrap gap-2">
             {overdueCount ? (
-              <StatusBadge tone="danger">{overdueCount} overskredet</StatusBadge>
+              <StatusBadge tone="danger">
+                {overdueCount} overskredet
+              </StatusBadge>
             ) : null}
             {todayCount ? (
               <StatusBadge tone="warning">{todayCount} i dag</StatusBadge>
@@ -195,7 +192,10 @@ export function MyTasks({
       </div>
 
       {error ? (
-        <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
+        <div
+          className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}
@@ -331,11 +331,26 @@ export function MyTasks({
         </div>
       ) : (
         <EmptyState
+          action={
+            showClosed ? (
+              <Link
+                className="button-secondary"
+                href={`/organizations/${organizationId}/tasks`}
+              >
+                Se alle organisationens opgaver
+              </Link>
+            ) : (
+              <Button onClick={() => setShowClosed(true)} variant="secondary">
+                Vis afsluttede opgaver
+              </Button>
+            )
+          }
           description={
             showClosed
               ? "Du har ingen opgaver i organisationen."
               : "Du har ingen åbne opgaver. Gennemførte opgaver kan vises ovenfor."
           }
+          kind={showClosed ? "empty" : "filtered"}
           title="Ingen opgaver at vise"
         />
       )}
