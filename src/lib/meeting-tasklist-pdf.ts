@@ -2,6 +2,7 @@ import { formatDanishDate } from "@/lib/date-format";
 import {
   createPdfReport,
   formatPdfDate,
+  type PdfTableBadgeTone,
   type PdfReportBranding,
 } from "@/lib/pdf-report";
 import { richTextToPlainText } from "@/lib/rich-text";
@@ -26,7 +27,11 @@ type TaskRow = {
   deadline: string;
   source: string;
   note: string;
+  statusBadge: { label: string; tone: PdfTableBadgeTone };
+  deadlineBadge: { label: string; tone: PdfTableBadgeTone } | null;
 };
+
+type PdfTaskStatus = MeetingReviewTask["status"] | "blocked";
 
 function isOpenTask(task: MeetingReviewTask) {
   return task.status !== "completed" && task.status !== "cancelled";
@@ -36,9 +41,41 @@ function shortText(value: string | null | undefined) {
   return richTextToPlainText(value).replace(/\s+/g, " ").trim();
 }
 
-function taskRow(task: MeetingReviewTask): TaskRow {
+export function getTaskStatusPdfBadge(
+  status: PdfTaskStatus,
+): TaskRow["statusBadge"] {
+  const badgeByStatus: Record<PdfTaskStatus, TaskRow["statusBadge"]> = {
+    not_started: { label: taskStatusLabels.not_started, tone: "neutral" },
+    in_progress: { label: taskStatusLabels.in_progress, tone: "progress" },
+    waiting: { label: taskStatusLabels.waiting, tone: "warning" },
+    blocked: { label: "Blokeret", tone: "orange" },
+    completed: { label: "Færdig", tone: "success" },
+    cancelled: { label: taskStatusLabels.cancelled, tone: "neutral" },
+  };
+  return badgeByStatus[status];
+}
+
+export function getTaskDeadlinePdfBadge(
+  task: MeetingReviewTask,
+  today: Date,
+): TaskRow["deadlineBadge"] {
+  const state = getTaskDeadlineState(task, today);
+  if (state === "overdue") {
+    return { label: "Overskredet", tone: "danger" };
+  }
+  if (state === "today" || state === "soon") {
+    return { label: "Forfalder snart", tone: "warning" };
+  }
+  if (state === "none") {
+    return { label: "Ingen deadline", tone: "neutral" };
+  }
+  return null;
+}
+
+function taskRow(task: MeetingReviewTask, generatedAt: Date): TaskRow {
   const latestComment = shortText(task.latestComment?.body);
   const description = shortText(task.description);
+  const status = task.status as PdfTaskStatus;
 
   return {
     checkbox: "[ ]",
@@ -46,21 +83,24 @@ function taskRow(task: MeetingReviewTask): TaskRow {
     responsible:
       task.responsible?.full_name ||
       (task.responsible_user_id ? "Ukendt medlem" : "Mangler"),
-    status: taskStatusLabels[task.status] ?? task.status,
-    deadline: task.deadline ? formatPdfDate(task.deadline) : "Mangler",
+    status: "",
+    statusBadge: getTaskStatusPdfBadge(status),
+    deadline: task.deadline ? formatPdfDate(task.deadline) : "",
+    deadlineBadge: getTaskDeadlinePdfBadge(task, generatedAt),
     source: task.reviewSource,
     note: latestComment || description || "",
   };
 }
 
 export async function generateMeetingTasklistPdf(input: PdfInput) {
+  const generatedAt = input.generatedAt ?? new Date();
   const meetingDate = formatPdfDate(input.meeting.starts_at, true);
   const openTasks = input.tasks.filter(isOpenTask);
   const overdueCount = openTasks.filter(
-    (task) => getTaskDeadlineState(task) === "overdue",
+    (task) => getTaskDeadlineState(task, generatedAt) === "overdue",
   ).length;
   const dueSoonCount = openTasks.filter((task) =>
-    ["today", "soon"].includes(getTaskDeadlineState(task)),
+    ["today", "soon"].includes(getTaskDeadlineState(task, generatedAt)),
   ).length;
   const waitingCount = openTasks.filter(
     (task) => task.status === "waiting",
@@ -78,7 +118,8 @@ export async function generateMeetingTasklistPdf(input: PdfInput) {
     subtitle: meetingDate,
     organizationName: input.organizationName,
     committeeName: input.committeeName,
-    generatedAt: input.generatedAt ?? new Date(),
+    generatedAt,
+    orientation: "landscape",
     branding: input.branding,
     meta: [
       { label: "Organisation", value: input.organizationName },
@@ -87,7 +128,7 @@ export async function generateMeetingTasklistPdf(input: PdfInput) {
       { label: "Mødedato", value: meetingDate },
       {
         label: "Genereret",
-        value: formatDanishDate(input.generatedAt ?? new Date(), "long"),
+        value: formatDanishDate(generatedAt, "long"),
       },
     ],
   });
@@ -113,42 +154,45 @@ export async function generateMeetingTasklistPdf(input: PdfInput) {
     [
       {
         label: "",
-        width: 25,
+        width: 24,
         getValue: (row: TaskRow) => row.checkbox,
       },
       {
         label: "Opgave",
-        width: 125,
+        width: 180,
         getValue: (row: TaskRow) => row.title,
       },
       {
         label: "Ansvarlig",
-        width: 70,
+        width: 80,
         getValue: (row: TaskRow) => row.responsible,
       },
       {
         label: "Status",
-        width: 62,
+        width: 88,
         getValue: (row: TaskRow) => row.status,
+        getBadge: (row: TaskRow) => row.statusBadge,
       },
       {
         label: "Deadline",
-        width: 60,
+        width: 90,
         getValue: (row: TaskRow) => row.deadline,
+        getBadge: (row: TaskRow) => row.deadlineBadge,
       },
       {
         label: "Kilde",
-        width: 78,
+        width: 82,
         getValue: (row: TaskRow) => row.source,
       },
       {
         label: "Seneste note",
-        width: 83,
+        width: 204,
         getValue: (row: TaskRow) => row.note,
       },
     ],
-    input.tasks.map(taskRow),
+    input.tasks.map((task) => taskRow(task, generatedAt)),
     "Ingen aktive opgaver til dette møde",
+    { keepRowsTogether: true, minimumContinuationLines: 4 },
   );
 
   return report.save();

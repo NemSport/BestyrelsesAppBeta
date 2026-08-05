@@ -50,6 +50,7 @@ type PdfReportOptions = {
   generatedAt?: Date;
   meta?: PdfMetaItem[];
   branding?: PdfReportBranding;
+  orientation?: "portrait" | "landscape";
 };
 
 type TextOptions = {
@@ -63,10 +64,29 @@ type TextOptions = {
   runs?: PdfTextRun[];
 };
 
+export type PdfTableBadgeTone =
+  | "neutral"
+  | "progress"
+  | "warning"
+  | "orange"
+  | "success"
+  | "danger";
+
+type PdfTableBadge = {
+  label: string;
+  tone: PdfTableBadgeTone;
+};
+
 type TableColumn<T> = {
   label: string;
   width: number;
   getValue: (row: T) => string;
+  getBadge?: (row: T) => PdfTableBadge | null;
+};
+
+type TableOptions = {
+  keepRowsTogether?: boolean;
+  minimumContinuationLines?: number;
 };
 
 type AgendaItemCardInput = {
@@ -76,7 +96,7 @@ type AgendaItemCardInput = {
   subtitle?: string;
 };
 
-const pageSize: [number, number] = [595.28, 841.89];
+const portraitPageSize: [number, number] = [595.28, 841.89];
 const margin = 46;
 const footerHeight = 34;
 export function safePdfText(value: string) {
@@ -137,6 +157,10 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 }
 
 export async function createPdfReport(options: PdfReportOptions) {
+  const pageSize: [number, number] =
+    options.orientation === "landscape"
+      ? [portraitPageSize[1], portraitPageSize[0]]
+      : portraitPageSize;
   const document = await PDFDocument.create();
   const { regular, bold, italic, boldItalic, drawText } =
     await embedPdfFonts(document);
@@ -905,6 +929,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     columns: TableColumn<T>[],
     rows: T[],
     emptyText: string,
+    tableOptions: TableOptions = {},
   ) => {
     if (!rows.length) {
       addParagraph(emptyText);
@@ -923,7 +948,22 @@ export async function createPdfReport(options: PdfReportOptions) {
     }));
     const headerHeight = 22;
     const lineHeight = 12;
+    const minimumContinuationLines = Math.max(
+      2,
+      tableOptions.minimumContinuationLines ?? 3,
+    );
     let shouldDrawHeader = true;
+    const badgeColors = {
+      neutral: { fill: reportPalette.subtle, text: reportPalette.muted },
+      progress: {
+        fill: rgb(0.87, 0.93, 0.99),
+        text: rgb(0.08, 0.29, 0.56),
+      },
+      warning: { fill: rgb(0.99, 0.95, 0.79), text: rgb(0.47, 0.32, 0) },
+      orange: { fill: rgb(0.99, 0.9, 0.8), text: rgb(0.55, 0.22, 0.02) },
+      success: { fill: rgb(0.88, 0.95, 0.9), text: reportPalette.success },
+      danger: { fill: rgb(0.97, 0.88, 0.88), text: reportPalette.danger },
+    } satisfies Record<PdfTableBadgeTone, { fill: RGB; text: RGB }>;
     const drawTableHeader = () => {
       page.drawRectangle({
         x: flowX(),
@@ -948,24 +988,83 @@ export async function createPdfReport(options: PdfReportOptions) {
     };
 
     for (const row of rows) {
-      const cells = scaledColumns.map((column) =>
-        wrapText(column.getValue(row) || "-", regular, 8.5, column.width - 10),
-      );
-      const lineCount = Math.max(...cells.map((cell) => cell.length));
+      const cells = scaledColumns.map((column) => {
+        const badge = column.getBadge?.(row) ?? null;
+        const value = column.getValue(row);
+        const lines = wrapText(
+          value || (badge ? "" : "-"),
+          regular,
+          8.5,
+          column.width - 10,
+        );
+        return {
+          badge,
+          lines,
+          lineCount: lines.length + (badge ? 2 : 0),
+        };
+      });
+      const lineCount = Math.max(...cells.map((cell) => cell.lineCount));
       let lineOffset = 0;
       while (lineOffset < lineCount) {
+        const fullRowHeight = Math.max(26, lineCount * lineHeight + 12);
+        const freshPageHeight =
+          pageSize[1] -
+          margin -
+          reportHeaderHeight -
+          headerHeight -
+          (footerHeight + margin) -
+          12;
+        const currentHeightAfterHeader =
+          y -
+          (footerHeight + margin) -
+          12 -
+          (shouldDrawHeader ? headerHeight : 0);
+        if (
+          tableOptions.keepRowsTogether &&
+          lineOffset === 0 &&
+          fullRowHeight <= freshPageHeight &&
+          fullRowHeight > currentHeightAfterHeader &&
+          currentHeightAfterHeader < freshPageHeight - 0.5
+        ) {
+          newPage();
+          shouldDrawHeader = true;
+          continue;
+        }
+
         if (shouldDrawHeader) {
           ensureSpace(headerHeight + 26);
           drawTableHeader();
         }
         const availableHeight = y - (footerHeight + margin) - 12;
-        const linesOnPage = Math.max(
+        const availableLines = Math.max(
           1,
-          Math.min(
-            lineCount - lineOffset,
-            Math.floor((availableHeight - 12) / lineHeight),
-          ),
+          Math.floor((availableHeight - 12) / lineHeight),
         );
+        const remainingLines = lineCount - lineOffset;
+        let linesOnPage = Math.max(1, Math.min(remainingLines, availableLines));
+
+        if (
+          tableOptions.keepRowsTogether &&
+          lineOffset === 0 &&
+          remainingLines > availableLines &&
+          availableLines < minimumContinuationLines
+        ) {
+          newPage();
+          shouldDrawHeader = true;
+          continue;
+        }
+
+        const trailingLines = remainingLines - linesOnPage;
+        if (
+          tableOptions.keepRowsTogether &&
+          trailingLines > 0 &&
+          trailingLines < minimumContinuationLines &&
+          linesOnPage - (minimumContinuationLines - trailingLines) >=
+            minimumContinuationLines
+        ) {
+          linesOnPage -= minimumContinuationLines - trailingLines;
+        }
+
         const rowHeight = Math.max(26, linesOnPage * lineHeight + 12);
         if (availableHeight < rowHeight) {
           newPage();
@@ -983,20 +1082,44 @@ export async function createPdfReport(options: PdfReportOptions) {
           borderWidth: 0.35,
         });
         let cellX = flowX();
-        cells.forEach((cellLines, index) => {
-          let cellY = y - 9;
-          for (const line of cellLines.slice(
-            lineOffset,
-            lineOffset + linesOnPage,
-          )) {
-            drawText(page, line, {
-              x: cellX + 6,
-              y: cellY,
-              font: regular,
-              size: 8.5,
-              color: reportPalette.ink,
-            });
-            cellY -= lineHeight;
+        cells.forEach((cell, index) => {
+          for (let offset = 0; offset < linesOnPage; offset += 1) {
+            const virtualLine = lineOffset + offset;
+            const cellY = y - 9 - offset * lineHeight;
+            if (virtualLine < cell.lines.length) {
+              drawText(page, cell.lines[virtualLine], {
+                x: cellX + 6,
+                y: cellY,
+                font: regular,
+                size: 8.5,
+                color: reportPalette.ink,
+              });
+            } else if (cell.badge && virtualLine === cell.lines.length) {
+              const colors = badgeColors[cell.badge.tone];
+              const badgeWidth = Math.min(
+                Math.max(
+                  bold.widthOfTextAtSize(cell.badge.label, 7.2) + 12,
+                  38,
+                ),
+                scaledColumns[index].width - 10,
+              );
+              page.drawRectangle({
+                x: cellX + 5,
+                y: cellY - 4,
+                width: badgeWidth,
+                height: 14,
+                color: colors.fill,
+                borderColor: reportPalette.line,
+                borderWidth: 0.3,
+              });
+              drawText(page, safePdfText(cell.badge.label), {
+                x: cellX + 11,
+                y: cellY,
+                font: bold,
+                size: 7.2,
+                color: colors.text,
+              });
+            }
           }
           cellX += scaledColumns[index].width;
         });
