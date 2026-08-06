@@ -50,6 +50,22 @@ export class TransferredAgendaItemRepository {
     }>;
   }
 
+  async listSourceOccurrences(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.db
+      .from("agenda_item_occurrences")
+      .select("id,meeting_id,agenda_item_id,position")
+      .in("id", ids)
+      .is("deleted_at", null);
+    if (error) throw error;
+    return data as Array<{
+      id: string;
+      meeting_id: string;
+      agenda_item_id: string;
+      position: number;
+    }>;
+  }
+
   async listSourceMinutes(ids: string[]) {
     if (ids.length === 0) return [];
     const { data, error } = await this.db

@@ -2231,3 +2231,22 @@ The component never queries data, derives roles, or authorizes mutations.
 Loading remains a distinct route state with `aria-busy`, while errors retain
 alert semantics and retry/navigation actions. No database, repository, service,
 RLS, tenant-scope, or committee-scope changes are introduced.
+
+## Transferred Agenda Item Task References
+
+`transferred_agenda_items` is the source-to-target relation. Its existing
+`source_meeting_id`, `source_agenda_item_id`,
+`source_agenda_item_occurrence_id`, and `target_agenda_item_id` columns are
+sufficient; no task-copy table or task relation is introduced. The transfer
+read model resolves open source tasks under the current Committee membership
+and task RLS policies, deduplicates them by the original task ID, and removes
+`internal_note` for users without the existing agenda-item editor capability.
+
+The target meeting passes these task references to the normal related-task UI.
+The task dialog reuses the existing task PATCH and comment routes, whose
+services remain responsible for Committee authorization. Mutations preserve
+the original `meeting_id`, `agenda_item_id`, and `decision_id`. The scheduling
+function creates the new agenda item and occurrence without embedding previous
+minutes, decisions, or follow-up fields in the target item's editable
+description; those records remain readable only through the source relation
+and existing history views.

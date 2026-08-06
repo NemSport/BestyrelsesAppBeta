@@ -372,6 +372,21 @@ export type TaskView = Task & {
   responsible: Pick<Profile, "id" | "full_name"> | null;
 };
 
+export type IncomingTransferredAgendaItemView = {
+  id: string;
+  targetAgendaItemId: string | null;
+  sourceStatus: AgendaItemMinutes["status"];
+  transferReason: TransferredAgendaItem["transfer_reason"];
+  targetItemType: AgendaItem["item_type"];
+  sourceMeeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
+  sourceAgendaItem: Pick<AgendaItem, "id" | "title" | "item_type"> | null;
+  sourceOccurrence: Pick<
+    AgendaItemOccurrence,
+    "id" | "meeting_id" | "agenda_item_id" | "position"
+  > | null;
+  sourceTasks: TaskView[];
+};
+
 export type TaskCommentView = TaskComment & {
   author: Pick<Profile, "id" | "full_name"> | null;
 };

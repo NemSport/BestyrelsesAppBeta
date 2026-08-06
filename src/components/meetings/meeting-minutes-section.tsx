@@ -2387,16 +2387,12 @@ void LegacyMeetingMinutesSection;
 
 type MeetingMinutesSectionProps = Parameters<
   typeof LegacyMeetingMinutesSection
-<<<<<<< HEAD
->[0];
-=======
 >[0] & {
   canEditPrivateNotes: boolean;
   incomingTransfers: IncomingTransferredAgendaItemView[];
   meetingTitle: string;
   privateMeetingNote: AgendaItemPrivateNote | null;
 };
->>>>>>> 64f5387 (fix: make meeting notes private per user (v2.hotfix.1))
 
 function occurrenceIdFromHash(hash: string, occurrences: AgendaOccurrence[]) {
   const match = /^#agenda-point-(.+)$/.exec(hash);
@@ -2416,13 +2412,9 @@ export function MeetingMinutesSection({
   occurrences,
   initialMeetingMinutes,
   initialAgendaItemMinutes,
-<<<<<<< HEAD
-=======
   incomingTransfers,
   privateMeetingNote,
->>>>>>> 64f5387 (fix: make meeting notes private per user (v2.hotfix.1))
-  privateAgendaItemNotes,
-  referentLock: initialReferentLock,
+  privateAgendaItemNotes,  referentLock: initialReferentLock,
   responsiblePeople,
   previousMeetingMinutes,
   approvals,

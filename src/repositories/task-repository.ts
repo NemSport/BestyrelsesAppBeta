@@ -67,6 +67,19 @@ export class TaskRepository {
     return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
+  async listByAgendaItems(agendaItemIds: string[]) {
+    if (agendaItemIds.length === 0) return [];
+    const { data, error } = await this.db
+      .from("tasks")
+      .select(this.viewSelect)
+      .in("agenda_item_id", agendaItemIds)
+      .is("archived_at", null)
+      .order("deadline", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
   async listByDecision(decisionId: string) {
     const { data, error } = await this.db
       .from("tasks")

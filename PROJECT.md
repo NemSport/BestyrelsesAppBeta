@@ -1418,3 +1418,20 @@ do not receive permanently forbidden editor actions. Meeting-minutes guidance
 also distinguishes reading from official-minutes editing and referent control.
 This is a presentation and navigation change only; repositories, service
 authorization, Row Level Security, and tenant scope are unchanged.
+
+## Version 2.hotfix.2: Transferred Task References
+
+Scheduling a transferred agenda item creates a new agenda item occurrence and
+keeps the transfer record as the immutable link to its source meeting, source
+occurrence, and source agenda item. Open tasks remain attached to their
+original task, meeting, agenda item, responsible member, deadline, status, and
+comment history; the target meeting only renders references to those task IDs.
+Completed, cancelled, and archived tasks remain available through source
+history but are not presented as active follow-up on the transferred point.
+
+The meeting workspace opens a referenced task in the shared task dialog over
+the active agenda point. Closing the dialog preserves the point selection and
+page position. Read-only members can inspect task details and comments, while
+existing task capabilities and server authorization continue to control edits
+and new comments. Previous minutes, decisions, and follow-up text are history,
+not editable content on newly scheduled target items.

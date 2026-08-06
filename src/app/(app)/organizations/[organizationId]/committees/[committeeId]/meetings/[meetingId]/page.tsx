@@ -533,11 +533,13 @@ export default async function MeetingPage({
           decisionHistoryByAgendaItem={decisionContext.historyByAgendaItem}
           initialAgendaItemMinutes={minutes.agendaItemMinutes}
           initialMeetingMinutes={minutes.meetingMinutes}
+          incomingTransfers={transferredAgendaItems.incomingItems}
           meetingAttachments={minutes.meetingAttachments}
           privateMeetingNote={minutes.privateMeetingNote}
           privateAgendaItemNotes={minutes.privateAgendaItemNotes}
           referentLock={minutes.referentLock}
           meetingId={meetingId}
+          meetingTitle={meeting.title}
           meetingDate={meeting.starts_at}
           meetingDecisions={decisionContext.decisions}
           meetingTasks={taskContext.tasks}
