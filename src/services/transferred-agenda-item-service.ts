@@ -111,6 +111,7 @@ export class TransferredAgendaItemService {
       sourceMeetings,
       sourceAgendaItems,
       sourceOccurrences,
+      sourceMinutes,
       sourceTasks,
       canEditSourceTasks,
     ] = await Promise.all([
@@ -125,6 +126,11 @@ export class TransferredAgendaItemService {
           transfer.source_agenda_item_occurrence_id
             ? [transfer.source_agenda_item_occurrence_id]
             : [],
+        ),
+      ),
+      this.transfers.listSourceMinutes(
+        incomingTransfers.map(
+          (transfer) => transfer.source_agenda_item_minutes_id,
         ),
       ),
       this.tasks.listByAgendaItems(sourceAgendaItemIds),
@@ -144,6 +150,9 @@ export class TransferredAgendaItemService {
     );
     const sourceOccurrencesById = new Map(
       sourceOccurrences.map((occurrence) => [occurrence.id, occurrence]),
+    );
+    const sourceMinutesById = new Map(
+      sourceMinutes.map((minutes) => [minutes.id, minutes]),
     );
     const sourceTasksByAgendaItemId = new Map<string, typeof sourceTasks>();
     for (const task of sourceTasks) {
@@ -179,6 +188,8 @@ export class TransferredAgendaItemService {
               transfer.source_agenda_item_occurrence_id,
             ) ?? null)
           : null,
+        sourceMinutes:
+          sourceMinutesById.get(transfer.source_agenda_item_minutes_id) ?? null,
         sourceTasks:
           sourceTasksByAgendaItemId.get(transfer.source_agenda_item_id) ?? [],
       })),
@@ -207,25 +218,13 @@ export class TransferredAgendaItemService {
     const sourceAgendaItemIds = transfers.map(
       (transfer) => transfer.source_agenda_item_id,
     );
-    const [sourceMinutes, sourceDecisions, sourceTasks] = await Promise.all([
-      this.transfers.listSourceMinutes(
-        transfers.map((transfer) => transfer.source_agenda_item_minutes_id),
-      ),
+    const [sourceDecisions, sourceTasks] = await Promise.all([
       this.transfers.listSourceDecisions(sourceAgendaItemIds),
       this.transfers.listSourceTasks(sourceAgendaItemIds),
     ]);
-    const transferById = new Map(
-      transfers.map((transfer) => [transfer.id, transfer]),
-    );
-    const minutesById = new Map(
-      sourceMinutes.map((minutes) => [minutes.id, minutes]),
-    );
 
     return result.incomingItems.flatMap((item) => {
-      const transfer = transferById.get(item.id);
-      const minutes = transfer
-        ? minutesById.get(transfer.source_agenda_item_minutes_id)
-        : null;
+      const minutes = item.sourceMinutes;
       if (
         !item.targetAgendaItemId ||
         !item.sourceMeeting ||

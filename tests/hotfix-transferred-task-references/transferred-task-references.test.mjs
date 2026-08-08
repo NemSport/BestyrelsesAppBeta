@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import transferredTaskReferences from "../../src/lib/transferred-task-references.ts";
-
-const { isOpenTransferredTask, mergeTransferredTaskReferences } =
-  transferredTaskReferences;
+import {
+  isOpenTransferredTask,
+  mergeTransferredTaskReferences,
+} from "../../src/lib/transferred-task-references.ts";
 
 const workspace = process.cwd();
 const read = (relativePath) =>
@@ -102,7 +102,7 @@ test("scheduler creates a new point but does not copy minutes, decisions, follow
   assert.match(migration, /target_agenda_item_id = created_item\.id/);
 });
 
-test("meeting UI uses an origin link, full-width clickable rows and the shared accessible modal", async () => {
+test("meeting UI opens the transfer origin in the shared accessible modal", async () => {
   const [meeting, relatedTasks, taskModal, modal, focusHook] =
     await Promise.all([
       read("src/components/meetings/meeting-minutes-section.tsx"),
@@ -114,6 +114,16 @@ test("meeting UI uses an origin link, full-width clickable rows and the shared a
 
   assert.match(meeting, /Videreført fra/);
   assert.match(meeting, /sourceOccurrence\.position/);
+  assert.match(meeting, /onClick=\{\(\) => setSourceModalOpen\(true\)\}/);
+  const originTrigger = meeting.slice(
+    meeting.indexOf("{incomingTransfer?.sourceMeeting ? ("),
+    meeting.indexOf("</button>", meeting.indexOf("{incomingTransfer?.sourceMeeting ? (")),
+  );
+  assert.doesNotMatch(originTrigger, /href=/);
+  assert.match(meeting, /open=\{sourceModalOpen\}/);
+  assert.match(meeting, /Åbn oprindeligt møde/);
+  assert.match(meeting, /incomingTransfer\.sourceMinutes/);
+  assert.match(meeting, /incomingTransfer\.sourceTasks\.map/);
   assert.match(meeting, /openInModal/);
   assert.match(meeting, /className="space-y-4"/);
   assert.match(relatedTasks, /<button[\s\S]*setActiveTaskId/);

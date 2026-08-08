@@ -28,6 +28,7 @@ import { PreviousMinutesReference } from "@/components/meetings/previous-minutes
 import {
   ActionBar,
   Button,
+  buttonClassName,
   DocumentPanel,
   EmptyState,
   Input,
@@ -52,11 +53,14 @@ import {
   standardAgendaItemLabels,
 } from "@/lib/localization";
 import { firstRichTextToPlainText } from "@/lib/rich-text";
+import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
+import { mergeTransferredTaskReferences } from "@/lib/transferred-task-references";
 import type { Database } from "@/types/database";
 import type {
   AgendaItemMinutes,
   AgendaItemPrivateNote,
   DecisionView,
+  IncomingTransferredAgendaItemView,
   MeetingMinutes,
   MeetingMinutesReferentLock,
   MeetingWithAgenda,
@@ -702,6 +706,8 @@ function AgendaMinutesCard({
   taskCategorySource,
   decisionHistory,
   minutesStatus,
+  incomingTransfers = [],
+  meetingTitle = "Aktuelt møde",
 }: {
   organizationId: string;
   userId: string;
@@ -728,6 +734,8 @@ function AgendaMinutesCard({
     categories: string[];
     decisions: DecisionView[];
   };
+  incomingTransfers?: IncomingTransferredAgendaItemView[];
+  meetingTitle?: string;
 }) {
   const router = useRouter();
   const item = occurrence.agenda_items!;
@@ -747,6 +755,7 @@ function AgendaMinutesCard({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isEditingMinutes, setIsEditingMinutes] = useState(false);
+  const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const [activeActionPanel, setActiveActionPanel] =
     useState<AgendaActionPanel>(null);
   const moreActionsRef = useRef<HTMLDetailsElement>(null);
@@ -930,7 +939,11 @@ function AgendaMinutesCard({
     (person) => person.id === minutes?.responsible_user_id,
   );
   const isStandardItem = item.standard_key !== null;
-  const isTransferredItem = item.parent_id !== null;
+  const incomingTransfer = incomingTransfers.find(
+    (transfer) => transfer.targetAgendaItemId === item.id,
+  );
+  const isTransferredItem =
+    item.parent_id !== null || Boolean(incomingTransfer);
   const isAnyOtherBusiness = item.standard_key === "any_other_business";
   const requiresAction = agendaItemMinutesNeedsAction(
     itemType,
@@ -940,8 +953,31 @@ function AgendaMinutesCard({
   const relatedDecisions = meetingDecisions.filter(
     (relatedDecision) => relatedDecision.agenda_item_id === item.id,
   );
-  const relatedTasks = meetingTasks.filter(
+  const currentRelatedTasks = meetingTasks.filter(
     (relatedTask) => relatedTask.agenda_item_id === item.id,
+  );
+  const relatedTasks = mergeTransferredTaskReferences(
+    currentRelatedTasks,
+    incomingTransfer?.sourceTasks ?? [],
+  );
+  const transferSourceMeeting = incomingTransfer?.sourceMeeting;
+  const taskOrigins = Object.fromEntries(
+    (incomingTransfer?.sourceTasks ?? []).flatMap((task) =>
+      transferSourceMeeting
+        ? [
+            [
+              task.id,
+              {
+                meeting: {
+                  id: transferSourceMeeting.id,
+                  title: transferSourceMeeting.title,
+                  startsAt: transferSourceMeeting.starts_at,
+                },
+              },
+            ] as const,
+          ]
+        : [],
+    ),
   );
   const followUpText = firstRichTextToPlainText(followUp).trim();
   const hasFollowUpCaptured = Boolean(followUpText || relatedTasks.length > 0);
@@ -1018,6 +1054,18 @@ function AgendaMinutesCard({
           >
             {item.title}
           </h3>
+          {incomingTransfer?.sourceMeeting ? (
+            <button
+              className="mt-2 inline-flex min-h-8 items-center break-words rounded-[var(--radius-control)] border border-progress/25 bg-surface/75 px-2.5 py-1 text-xs font-semibold text-progress hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              onClick={() => setSourceModalOpen(true)}
+              type="button"
+            >
+              Videreført fra {incomingTransfer.sourceMeeting.title}
+              {incomingTransfer.sourceOccurrence
+                ? ` · Punkt ${incomingTransfer.sourceOccurrence.position}`
+                : ""}
+            </button>
+          ) : null}
           {item.objective || item.description ? (
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">
               {item.objective || item.description}
@@ -1030,6 +1078,183 @@ function AgendaMinutesCard({
           </StatusBadge>
         </div>
       </header>
+
+      {incomingTransfer ? (
+        <Modal
+          description={
+            incomingTransfer.sourceMeeting
+              ? `${incomingTransfer.sourceMeeting.title} · ${formatDate(
+                  incomingTransfer.sourceMeeting.starts_at,
+                )}`
+              : undefined
+          }
+          eyebrow="Oprindeligt dagsordenspunkt"
+          footer={
+            incomingTransfer.sourceMeeting ? (
+              <div className="flex justify-end">
+                <Link
+                  className={buttonClassName({ variant: "secondary" })}
+                  href={`${root}/meetings/${incomingTransfer.sourceMeeting.id}${
+                    incomingTransfer.sourceOccurrence
+                      ? `#agenda-point-${incomingTransfer.sourceOccurrence.id}`
+                      : ""
+                  }`}
+                >
+                  Åbn oprindeligt møde
+                </Link>
+              </div>
+            ) : null
+          }
+          maxWidth="3xl"
+          onClose={() => setSourceModalOpen(false)}
+          open={sourceModalOpen}
+          title={incomingTransfer.sourceAgendaItem?.title ?? "Overført punkt"}
+        >
+          <div className="space-y-5">
+            <dl className="grid gap-3 rounded-[var(--radius-control)] border border-line bg-subtle/35 p-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Punkt
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-ink">
+                  {incomingTransfer.sourceOccurrence?.position ?? "Ikke angivet"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Type
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-ink">
+                  {incomingTransfer.sourceAgendaItem
+                    ? `${
+                        agendaItemTypeLabels[
+                          incomingTransfer.sourceAgendaItem.item_type
+                        ].short
+                      } · ${
+                        agendaItemTypeLabels[
+                          incomingTransfer.sourceAgendaItem.item_type
+                        ].label
+                      }`
+                    : "Ikke angivet"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Status ved overførsel
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-ink">
+                  {agendaItemMinutesStatusLabels[incomingTransfer.sourceStatus]}
+                </dd>
+              </div>
+            </dl>
+
+            {incomingTransfer.sourceAgendaItem?.description ||
+            incomingTransfer.sourceAgendaItem?.objective ? (
+              <section
+                aria-labelledby={`source-description-${incomingTransfer.id}`}
+              >
+                <h3
+                  className="text-sm font-semibold text-ink"
+                  id={`source-description-${incomingTransfer.id}`}
+                >
+                  Beskrivelse / sagsfremstilling
+                </h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink">
+                  {incomingTransfer.sourceAgendaItem.description ||
+                    incomingTransfer.sourceAgendaItem.objective}
+                </p>
+              </section>
+            ) : null}
+
+            {incomingTransfer.sourceMinutes &&
+            firstRichTextToPlainText(
+              incomingTransfer.sourceMinutes.notes,
+              incomingTransfer.sourceMinutes.decision,
+              incomingTransfer.sourceMinutes.follow_up,
+            ).trim() ? (
+              <section
+                aria-labelledby={`source-minutes-${incomingTransfer.id}`}
+                className="space-y-4 border-t border-line pt-5"
+              >
+                <h3
+                  className="text-sm font-semibold text-ink"
+                  id={`source-minutes-${incomingTransfer.id}`}
+                >
+                  Eksisterende referat
+                </h3>
+                {incomingTransfer.sourceMinutes.notes ? (
+                  <div>
+                    <p className="minutes-document-label">Noter</p>
+                    <RichTextContent
+                      className="mt-2 text-sm leading-7"
+                      value={incomingTransfer.sourceMinutes.notes}
+                    />
+                  </div>
+                ) : null}
+                {incomingTransfer.sourceMinutes.decision ? (
+                  <div className="minutes-decision">
+                    <p className="minutes-document-label text-success">
+                      Beslutning
+                    </p>
+                    <RichTextContent
+                      className="mt-2 text-sm leading-7"
+                      value={incomingTransfer.sourceMinutes.decision}
+                    />
+                  </div>
+                ) : null}
+                {incomingTransfer.sourceMinutes.follow_up ? (
+                  <div className="minutes-follow-up">
+                    <p className="minutes-document-label text-warning">
+                      Opfølgning
+                    </p>
+                    <RichTextContent
+                      className="mt-2 text-sm leading-7"
+                      value={incomingTransfer.sourceMinutes.follow_up}
+                    />
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {incomingTransfer.sourceTasks.length > 0 ? (
+              <section
+                aria-labelledby={`source-tasks-${incomingTransfer.id}`}
+                className="border-t border-line pt-5"
+              >
+                <h3
+                  className="text-sm font-semibold text-ink"
+                  id={`source-tasks-${incomingTransfer.id}`}
+                >
+                  Tilknyttede opgaver
+                </h3>
+                <div className="mt-2 divide-y divide-line border-y border-line">
+                  {incomingTransfer.sourceTasks.map((task) => (
+                    <article
+                      className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between"
+                      key={task.id}
+                    >
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-ink">
+                          {task.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          {task.responsible?.full_name || "Ingen ansvarlig"}
+                          {task.deadline
+                            ? ` · Deadline ${formatDate(task.deadline)}`
+                            : " · Ingen deadline"}
+                        </p>
+                      </div>
+                      <StatusBadge tone={taskStatusTones[task.status]}>
+                        {taskStatusLabels[task.status]}
+                      </StatusBadge>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
 
       {item.standard_key === "previous_minutes_approval" ? (
         <PreviousMinutesReference
@@ -1694,7 +1919,7 @@ function AgendaMinutesCard({
           aria-label="Beslutninger og opgaver for punktet"
           className="border-t border-line bg-surface px-4 py-4 sm:px-5"
         >
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4">
             {relatedDecisions.length > 0 ? (
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -1713,8 +1938,17 @@ function AgendaMinutesCard({
                   Relaterede opgaver
                 </p>
                 <RelatedTasks
+                  canEdit={canEditTasks}
                   compact
+                  openInModal
                   organizationId={organizationId}
+                  origins={taskOrigins}
+                  relatedMeeting={{
+                    id: meetingId,
+                    title: meetingTitle,
+                    startsAt: meetingDate,
+                  }}
+                  responsiblePeople={responsiblePeople}
                   tasks={relatedTasks}
                 />
               </div>
@@ -2345,9 +2579,9 @@ function LegacyMeetingMinutesSection({
                 ) ?? null
               }
               key={occurrence.id}
-              meetingId={meetingId}
               meetingDate={meetingDate}
               meetingDecisions={meetingDecisions}
+              meetingId={meetingId}
               meetingTasks={meetingTasks}
               minutesStatus={meetingStatus}
               occurrence={occurrence}
@@ -2414,7 +2648,8 @@ export function MeetingMinutesSection({
   initialAgendaItemMinutes,
   incomingTransfers,
   privateMeetingNote,
-  privateAgendaItemNotes,  referentLock: initialReferentLock,
+  privateAgendaItemNotes,
+  referentLock: initialReferentLock,
   responsiblePeople,
   previousMeetingMinutes,
   approvals,
@@ -2426,6 +2661,7 @@ export function MeetingMinutesSection({
   canEditDecisions,
   canEditTasks,
   meetingDate,
+  meetingTitle,
   meetingDecisions,
   meetingTasks,
   decisionCategorySource,
@@ -2760,9 +2996,11 @@ export function MeetingMinutesSection({
                             occurrence.agenda_item_id,
                         ) ?? null
                       }
+                      incomingTransfers={incomingTransfers}
                       meetingDate={meetingDate}
                       meetingDecisions={meetingDecisions}
                       meetingId={meetingId}
+                      meetingTitle={meetingTitle}
                       meetingTasks={meetingTasks}
                       minutesStatus={meetingStatus}
                       occurrence={occurrence}

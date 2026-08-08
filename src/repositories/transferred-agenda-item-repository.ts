@@ -40,12 +40,14 @@ export class TransferredAgendaItemRepository {
     if (ids.length === 0) return [];
     const { data, error } = await this.db
       .from("agenda_items")
-      .select("id,title,item_type")
+      .select("id,title,description,objective,item_type")
       .in("id", ids);
     if (error) throw error;
     return data as Array<{
       id: string;
       title: string;
+      description: string;
+      objective: string;
       item_type: Database["public"]["Enums"]["agenda_item_type"];
     }>;
   }

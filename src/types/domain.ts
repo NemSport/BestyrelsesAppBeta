@@ -379,10 +379,17 @@ export type IncomingTransferredAgendaItemView = {
   transferReason: TransferredAgendaItem["transfer_reason"];
   targetItemType: AgendaItem["item_type"];
   sourceMeeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
-  sourceAgendaItem: Pick<AgendaItem, "id" | "title" | "item_type"> | null;
+  sourceAgendaItem: Pick<
+    AgendaItem,
+    "id" | "title" | "description" | "objective" | "item_type"
+  > | null;
   sourceOccurrence: Pick<
     AgendaItemOccurrence,
     "id" | "meeting_id" | "agenda_item_id" | "position"
+  > | null;
+  sourceMinutes: Pick<
+    AgendaItemMinutes,
+    "id" | "notes" | "decision" | "follow_up"
   > | null;
   sourceTasks: TaskView[];
 };
