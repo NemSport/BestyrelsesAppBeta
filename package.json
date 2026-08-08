@@ -27,7 +27,8 @@
     "test:issue-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-4/*.test.mjs",
     "test:issue-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-3/*.test.mjs",
     "test:issue-13": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/issue-13/*.test.mjs",
-    "test:task-pdf": "node --import tsx --test tests/task-pdf/meeting-tasklist-pdf.test.ts"
+    "test:task-pdf": "node --import tsx --test tests/task-pdf/meeting-tasklist-pdf.test.ts",
+    "test:private-meeting-notes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/hotfix-private-meeting-notes/*.test.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

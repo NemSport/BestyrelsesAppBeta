@@ -196,6 +196,17 @@ Available statuses depend on whether the agenda item is information,
 discussion, decision, or follow-up. Responsible person and deadline remain
 optional until the selected status or follow-up text creates an action.
 
+Version 2.hotfix.1 makes internal meeting notes personal for every user who can
+view the meeting. Meeting-level notes are stored in the existing private-note
+table with `agenda_item_id = null` and a unique `(meeting_id, user_id)` key;
+agenda-item private notes keep their existing per-item key. Reads and writes
+always use the authenticated user id, and Row Level Security prevents chairs,
+referents, organization administrators, and owners from reading another
+person's notes. The migration copies legacy content before removing the old
+shared `meeting_minutes.internal_note` column. Private notes are excluded from
+minutes, agendas, exports, tasks, decisions, approval material, and shared AI
+workflows.
+
 Organization owners and administrators plus committee chairs and secretaries
 may edit minutes. Committee members may read relevant minutes. Committee
 viewers may only read minutes after the general meeting minutes are approved.

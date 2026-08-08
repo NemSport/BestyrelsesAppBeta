@@ -11,6 +11,7 @@ import {
   agendaItemMinutesInputSchema,
   markNoResponseSchema,
   meetingMinutesInputSchema,
+  meetingPrivateNoteInputSchema,
   meetingMinutesReferentActionSchema,
   minutesApprovalResponseSchema,
   sendMinutesForApprovalSchema,
@@ -203,7 +204,6 @@ export class MeetingMinutesService {
         meeting_id: input.meetingId,
         minutes_text: "",
         decisions: "",
-        internal_note: null,
         status: "draft",
         created_by: input.userId,
         updated_by: input.userId,
@@ -256,22 +256,25 @@ export class MeetingMinutesService {
 
   async get(organizationId: string, committeeId: string, meetingId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(
+    await this.authorization.requireMeetingCapability(
       organizationId,
       committeeId,
       user.id,
+      "viewMeeting",
     );
     await this.requireMeeting(organizationId, committeeId, meetingId);
 
     const [
       meetingMinutes,
       agendaItemMinutes,
+      privateMeetingNote,
       privateAgendaItemNotes,
       members,
       referentLock,
     ] = await Promise.all([
       this.minutes.findMeetingMinutes(meetingId),
       this.minutes.listAgendaItemMinutes(meetingId),
+      this.minutes.findPrivateMeetingNote(meetingId, user.id),
       this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
       this.members.listMembers(organizationId),
       this.minutes.findReferentLock(meetingId),
@@ -313,6 +316,7 @@ export class MeetingMinutesService {
       meetingMinutes,
       referentLock: this.toReferentLockView(referentLock, user.id),
       agendaItemMinutes,
+      privateMeetingNote,
       privateAgendaItemNotes,
       responsiblePeople: members
         .filter((member) => member.status === "active")
@@ -434,9 +438,6 @@ export class MeetingMinutesService {
     const values = {
       minutes_text: sanitizeRichText(parsed.minutesText),
       decisions: sanitizeRichText(parsed.decisions),
-      internal_note: parsed.internalNote
-        ? sanitizeRichText(parsed.internalNote)
-        : null,
       status: parsed.status,
       updated_by: user.id,
     };
@@ -648,10 +649,11 @@ export class MeetingMinutesService {
   async savePrivateAgendaItemNote(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemPrivateNoteInputSchema.parse(input);
-    await this.authorization.requireCommitteeMember(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "viewMeeting",
     );
     const meeting = await this.requireMeeting(
       parsed.organizationId,
@@ -687,6 +689,52 @@ export class MeetingMinutesService {
     if (!savedNote) {
       throw new AppError(
         "Din interne note er ændret i en anden fane. Den lokale tekst er ikke overskrevet.",
+        409,
+        "PRIVATE_NOTE_VERSION_CONFLICT",
+      );
+    }
+
+    return savedNote;
+  }
+
+  async savePrivateMeetingNote(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = meetingPrivateNoteInputSchema.parse(input);
+    await this.authorization.requireMeetingCapability(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+      "viewMeeting",
+    );
+    await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+
+    const existing = await this.minutes.findPrivateMeetingNote(
+      parsed.meetingId,
+      user.id,
+    );
+    const values = { content: sanitizeRichText(parsed.content) };
+    const savedNote = existing
+      ? await this.minutes.updatePrivateAgendaItemNote(
+          existing.id,
+          values,
+          parsed.expectedUpdatedAt ?? undefined,
+        )
+      : await this.minutes.createPrivateAgendaItemNote({
+          organization_id: parsed.organizationId,
+          committee_id: parsed.committeeId,
+          meeting_id: parsed.meetingId,
+          agenda_item_id: null,
+          user_id: user.id,
+          ...values,
+        });
+
+    if (!savedNote) {
+      throw new AppError(
+        "Dine interne mødenoter er ændret i en anden fane. Den lokale tekst er ikke overskrevet.",
         409,
         "PRIVATE_NOTE_VERSION_CONFLICT",
       );

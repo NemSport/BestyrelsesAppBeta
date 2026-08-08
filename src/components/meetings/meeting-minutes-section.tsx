@@ -89,7 +89,6 @@ type AgendaPrivateNoteDraft = {
 type MeetingMinutesDraft = {
   minutesText: string;
   decisions: string;
-  internalNote: string;
   status: MinutesStatus;
 };
 
@@ -383,7 +382,7 @@ function mentionsContinuationToNextMeeting(...values: string[]) {
   return /\bforts?aette(?:r)? til naeste moede\b/.test(text);
 }
 
-function AgendaPrivateNoteEditor({
+function PrivateNoteEditor({
   organizationId,
   userId,
   committeeId,
@@ -395,7 +394,7 @@ function AgendaPrivateNoteEditor({
   userId: string;
   committeeId: string;
   meetingId: string;
-  agendaItemId: string;
+  agendaItemId: string | null;
   initialPrivateNote: AgendaItemPrivateNote | null;
 }) {
   const [privateNote, setPrivateNote] = useState(initialPrivateNote);
@@ -413,7 +412,9 @@ function AgendaPrivateNoteEditor({
       message: string;
     }>(
       await fetch(
-        `/api/meetings/${meetingId}/agenda-items/${agendaItemId}/private-note`,
+        agendaItemId
+          ? `/api/meetings/${meetingId}/agenda-items/${agendaItemId}/private-note`
+          : `/api/meetings/${meetingId}/private-note`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -429,7 +430,7 @@ function AgendaPrivateNoteEditor({
   }
 
   const autosave = useOfflineAutosave({
-    storageKey: `agenda-private-note:v1:${userId}:${organizationId}:${committeeId}:${meetingId}:agenda:${agendaItemId}`,
+    storageKey: `private-note:v2:${userId}:${organizationId}:${committeeId}:${meetingId}:${agendaItemId ? `agenda:${agendaItemId}` : "meeting"}`,
     data: privateNoteDraft,
     serverUpdatedAt: privateNote?.updated_at ?? null,
     enabled: true,
@@ -460,8 +461,8 @@ function AgendaPrivateNoteEditor({
       <div>
         <p className="text-sm font-semibold">Intern note</p>
         <p className="mt-1 text-xs text-muted">
-          Kun du kan se denne note. Den bliver ikke en del af referatet, PDF
-          eller mails.
+          Kun du kan se disse noter. De bliver ikke en del af referatet,
+          dagsordenen, PDF-eksporter eller fælles AI-opsummeringer.
         </p>
       </div>
       <LocalDraftConflict
@@ -480,7 +481,7 @@ function AgendaPrivateNoteEditor({
         </p>
       ) : null}
       <RichTextEditor
-        id={`private-note-${agendaItemId}`}
+        id={`private-note-${agendaItemId ?? "meeting"}`}
         minHeightClass="min-h-24"
         onChange={setContent}
         value={content}
@@ -1120,7 +1121,7 @@ function AgendaMinutesCard({
               >
                 Åbn dagsordenspunkt
               </Link>
-              <AgendaPrivateNoteEditor
+              <PrivateNoteEditor
                 agendaItemId={item.id}
                 committeeId={committeeId}
                 initialPrivateNote={initialPrivateNote}
@@ -1341,7 +1342,7 @@ function AgendaMinutesCard({
             ) : null}
             {activeActionPanel === "privateNote" ? (
               <div className="border-t border-line pt-3">
-                <AgendaPrivateNoteEditor
+                <PrivateNoteEditor
                   agendaItemId={item.id}
                   committeeId={committeeId}
                   initialPrivateNote={initialPrivateNote}
@@ -1836,9 +1837,6 @@ function LegacyMeetingMinutesSection({
   const [decisions, setDecisions] = useState(
     initialMeetingMinutes?.decisions ?? "",
   );
-  const [internalNote, setInternalNote] = useState(
-    initialMeetingMinutes?.internal_note ?? "",
-  );
   const [meetingStatus, setMeetingStatus] = useState<MinutesStatus>(
     initialMeetingMinutes?.status ?? "draft",
   );
@@ -1876,7 +1874,6 @@ function LegacyMeetingMinutesSection({
   const meetingDraft: MeetingMinutesDraft = {
     minutesText,
     decisions,
-    internalNote,
     status: meetingStatus,
   };
 
@@ -1897,7 +1894,6 @@ function LegacyMeetingMinutesSection({
           expectedUpdatedAt,
           minutesText: draft.minutesText,
           decisions: draft.decisions,
-          internalNote: draft.internalNote || null,
           status: draft.status,
         }),
       }),
@@ -1913,7 +1909,6 @@ function LegacyMeetingMinutesSection({
     restore: (draft) => {
       setMinutesText(draft.minutesText);
       setDecisions(draft.decisions);
-      setInternalNote(draft.internalNote);
       setMeetingStatus(draft.status);
     },
     onSaved: (result) => {
@@ -2133,35 +2128,6 @@ function LegacyMeetingMinutesSection({
                   value={decisions}
                 />
               </div>
-              <details className="group rounded-[var(--radius-control)] border border-line bg-subtle/30">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                  <span>Intern note</span>
-                  <span className="text-xs font-semibold text-brand">
-                    <span className="group-open:hidden">Åbn</span>
-                    <span className="hidden group-open:inline">Skjul</span>
-                  </span>
-                </summary>
-                <div className="border-t border-line p-3">
-                  <RichTextEditor
-                    id="meeting-internal-note"
-                    minHeightClass="min-h-14"
-                    onChange={setInternalNote}
-                    value={internalNote}
-                  />
-                  <MinutesAiAssistant
-                    committeeId={committeeId}
-                    field="internal_note"
-                    meetingId={meetingId}
-                    onApply={setInternalNote}
-                    organizationId={organizationId}
-                    source="meeting_minutes"
-                    value={internalNote}
-                  />
-                  <p className="mt-1 text-xs text-muted">
-                    Kun til interne bemærkninger i referatprocessen.
-                  </p>
-                </div>
-              </details>
               <ActionBar>
                 <p className="text-xs text-slate-500">
                   Ændringer gemmes automatisk, mens du skriver.
@@ -2421,7 +2387,16 @@ void LegacyMeetingMinutesSection;
 
 type MeetingMinutesSectionProps = Parameters<
   typeof LegacyMeetingMinutesSection
+<<<<<<< HEAD
 >[0];
+=======
+>[0] & {
+  canEditPrivateNotes: boolean;
+  incomingTransfers: IncomingTransferredAgendaItemView[];
+  meetingTitle: string;
+  privateMeetingNote: AgendaItemPrivateNote | null;
+};
+>>>>>>> 64f5387 (fix: make meeting notes private per user (v2.hotfix.1))
 
 function occurrenceIdFromHash(hash: string, occurrences: AgendaOccurrence[]) {
   const match = /^#agenda-point-(.+)$/.exec(hash);
@@ -2441,6 +2416,11 @@ export function MeetingMinutesSection({
   occurrences,
   initialMeetingMinutes,
   initialAgendaItemMinutes,
+<<<<<<< HEAD
+=======
+  incomingTransfers,
+  privateMeetingNote,
+>>>>>>> 64f5387 (fix: make meeting notes private per user (v2.hotfix.1))
   privateAgendaItemNotes,
   referentLock: initialReferentLock,
   responsiblePeople,
@@ -2450,6 +2430,7 @@ export function MeetingMinutesSection({
   agendaItemAttachments,
   canApprove,
   canEdit,
+  canEditPrivateNotes,
   canEditDecisions,
   canEditTasks,
   meetingDate,
@@ -2659,6 +2640,30 @@ export function MeetingMinutesSection({
         >
           {officialMinutesLockedMessage}
         </p>
+      ) : null}
+
+      {canEditPrivateNotes ? (
+        <section
+          aria-labelledby="private-meeting-note-heading"
+          className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-sm"
+        >
+          <h2
+            className="text-base font-semibold text-ink"
+            id="private-meeting-note-heading"
+          >
+            Interne mødenoter
+          </h2>
+          <div className="mt-3">
+            <PrivateNoteEditor
+              agendaItemId={null}
+              committeeId={committeeId}
+              initialPrivateNote={privateMeetingNote}
+              meetingId={meetingId}
+              organizationId={organizationId}
+              userId={userId}
+            />
+          </div>
+        </section>
       ) : null}
 
       <section aria-labelledby="agenda-minutes-heading">

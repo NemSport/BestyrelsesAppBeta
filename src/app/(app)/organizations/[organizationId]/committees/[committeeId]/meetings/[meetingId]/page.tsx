@@ -525,6 +525,7 @@ export default async function MeetingPage({
           approvalRecipientInfo={approvalRecipientInfo}
           canApprove={minutes.canApprove}
           canEdit={meetingCapabilities.editOfficialMinutes}
+          canEditPrivateNotes={meetingCapabilities.viewMeeting}
           canEditDecisions={canEditDecisions}
           canEditTasks={canEditTasks}
           committeeId={committeeId}
@@ -533,6 +534,7 @@ export default async function MeetingPage({
           initialAgendaItemMinutes={minutes.agendaItemMinutes}
           initialMeetingMinutes={minutes.meetingMinutes}
           meetingAttachments={minutes.meetingAttachments}
+          privateMeetingNote={minutes.privateMeetingNote}
           privateAgendaItemNotes={minutes.privateAgendaItemNotes}
           referentLock={minutes.referentLock}
           meetingId={meetingId}

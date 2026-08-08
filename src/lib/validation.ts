@@ -330,12 +330,6 @@ export const meetingMinutesInputSchema = z.object({
   expectedUpdatedAt: optionalUpdatedAtSchema,
   minutesText: optionalMinutesText("Referattekst", 100000),
   decisions: optionalMinutesText("Beslutninger", 50000),
-  internalNote: z
-    .string()
-    .trim()
-    .max(20000, "Intern note må højst være 20.000 tegn")
-    .nullable()
-    .optional(),
   status: z.enum(["draft", "ready_for_approval", "approved"], {
     required_error: "Status skal vælges",
     invalid_type_error: "Status er ugyldig",
@@ -400,6 +394,14 @@ export const agendaItemPrivateNoteInputSchema = z.object({
   agendaItemId: uuidSchema,
   expectedUpdatedAt: optionalUpdatedAtSchema,
   content: optionalMinutesText("Intern note", 50000),
+});
+
+export const meetingPrivateNoteInputSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  expectedUpdatedAt: optionalUpdatedAtSchema,
+  content: optionalMinutesText("Interne mødenoter", 50000),
 });
 
 export const meetingMinutesReferentActionSchema = z.object({

@@ -17,7 +17,6 @@ export const aiMinutesAssistantSourceSchema = z.enum([
 export const aiMinutesAssistantFieldSchema = z.enum([
   "minutes_text",
   "decisions",
-  "internal_note",
   "notes",
   "decision",
   "follow_up",
@@ -39,7 +38,7 @@ export const aiMinutesAssistantRequestSchema = z
     text: z.string().max(100000),
   })
   .superRefine(({ agendaItemId, field, source }, context) => {
-    const meetingFields = ["minutes_text", "decisions", "internal_note"];
+    const meetingFields = ["minutes_text", "decisions"];
     const agendaFields = ["notes", "decision", "follow_up"];
     if (source === "agenda_item_minutes" && !agendaItemId) {
       context.addIssue({

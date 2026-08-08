@@ -571,7 +571,6 @@ export type Database = {
           meeting_id: string;
           minutes_text: string;
           decisions: string;
-          internal_note: string | null;
           status: Database["public"]["Enums"]["meeting_minutes_status"];
           approval_deadline: string | null;
           created_by: string;
@@ -586,7 +585,6 @@ export type Database = {
           meeting_id: string;
           minutes_text?: string;
           decisions?: string;
-          internal_note?: string | null;
           status?: Database["public"]["Enums"]["meeting_minutes_status"];
           approval_deadline?: string | null;
           created_by: string;
@@ -595,7 +593,6 @@ export type Database = {
         Update: {
           minutes_text?: string;
           decisions?: string;
-          internal_note?: string | null;
           status?: Database["public"]["Enums"]["meeting_minutes_status"];
           approval_deadline?: string | null;
           updated_by?: string;
@@ -686,7 +683,7 @@ export type Database = {
           organization_id: string;
           committee_id: string;
           meeting_id: string;
-          agenda_item_id: string;
+          agenda_item_id: string | null;
           user_id: string;
           content: string;
           created_at: string;
@@ -697,7 +694,7 @@ export type Database = {
           organization_id: string;
           committee_id: string;
           meeting_id: string;
-          agenda_item_id: string;
+          agenda_item_id?: string | null;
           user_id: string;
           content?: string;
         };

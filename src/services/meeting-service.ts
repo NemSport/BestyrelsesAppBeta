@@ -203,7 +203,6 @@ export class MeetingService {
       meeting_id: meeting.id,
       minutes_text: sanitizeRichText(parsed.minutesText),
       decisions: "",
-      internal_note: null,
       status: "draft",
       created_by: user.id,
       updated_by: user.id,

@@ -2005,6 +2005,17 @@ Meeting minutes use:
 - `POST /api/transferred-agenda-items/[transferId]`
 - `PATCH /api/transferred-agenda-items/[transferId]`
 
+Personal meeting notes use `PUT /api/meetings/[meetingId]/private-note`.
+The route authenticates the request, requires the existing `viewMeeting`
+capability, derives `user_id` from the authenticated session, and upserts only
+that user's row. The existing `agenda_item_private_notes` table stores both
+scopes: `agenda_item_id is null` denotes the one meeting-level note identified
+by `(meeting_id, user_id)`, while a non-null agenda item retains the existing
+`(meeting_id, agenda_item_id, user_id)` identity. Legacy shared content is
+copied to the last editor's private row before the obsolete shared column is
+removed. RLS repeats the note-owner check for select, insert, update, and
+delete. Shared minutes and AI services never load the private-note table.
+
 The meeting-level endpoint creates or updates the single general minutes
 record, including status changes. The agenda-item endpoint creates or updates
 the structured minutes for that item occurrence and synchronizes any matching
