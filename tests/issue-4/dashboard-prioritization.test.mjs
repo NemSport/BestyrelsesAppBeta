@@ -21,6 +21,7 @@ const committeePage = source(
 const organizationPriority = source(
   "../../src/components/dashboard/organization-dashboard-priority.tsx",
 );
+const globalStyles = source("../../src/app/globals.css");
 const committeePriority = source(
   "../../src/components/dashboard/committee-dashboard-priority.tsx",
 );
@@ -96,11 +97,11 @@ test("viewer presentation contains read destinations and no write CTA", () => {
   assert.match(organizationPriority, /Seneste godkendte referat/);
   assert.match(organizationPriority, /Læs referat/);
   assert.match(committeePriority, /data-dashboard-audience/);
-  assert.match(committeePage, /Ingen skrivehandlinger|læseadgang/i);
-  assert.match(committeePage, /dashboardAudience !== "viewer"/);
+  assert.match(committeePage, /capabilities\.createMeeting \|\| capabilities\.editTasks/);
+  assert.match(committeePage, /canManageCommittee \?/);
   assert.match(
     quickActionMenu,
-    /!canCreateMeeting[\s\S]*!canCreateQuickMeeting[\s\S]*!canScheduleAgendaItem[\s\S]*return null/,
+    /!canCreateMeeting[\s\S]*!canCreateQuickMeeting[\s\S]*!canCreateTask[\s\S]*!canScheduleAgendaItem[\s\S]*return null/,
   );
   assert.doesNotMatch(
     organizationPage,
@@ -120,7 +121,8 @@ test("member, chair, and admin CTAs are capability-aware and navigable", () => {
   assert.match(organizationPriority, /meeting-participants-heading/);
   assert.match(organizationPriority, /minutes-approval/);
   assert.match(organizationPriority, /audience === "admin"/);
-  assert.match(committeePage, /capabilities\.createAgendaItem/);
+  assert.match(committeePage, /capabilities\.editTasks/);
+  assert.match(committeePage, /capabilities\.createMeeting/);
   assert.match(committeePriority, /capabilities\.createMeeting/);
   assert.match(committeePriority, /capabilities\.manageParticipants/);
   assert.match(committeePriority, /nextMeeting \|\| approvalMinutes/);
@@ -158,4 +160,60 @@ test("priority, empty, loading, and error states remain responsive and actionabl
   assert.match(errorState, /role="alert"/);
   assert.match(errorState, /reset/);
   assert.match(errorState, /Prøv igen/);
+});
+
+test("Version 3.1.2 keeps the approved data structure in a compact visual cockpit", () => {
+  assert.match(organizationPriority, /Næste møde/);
+  assert.match(organizationPriority, /Mine opgaver/);
+  assert.match(organizationPriority, /Beslutninger/);
+  assert.match(organizationPriority, /Mødeforberedelse/);
+  assert.match(organizationPriority, /Kræver handling nu/);
+  assert.match(organizationPriority, /DashboardGlyph name="calendar"/);
+  assert.match(organizationPriority, /DashboardGlyph name="tasks"/);
+  assert.match(organizationPriority, /DashboardGlyph name="decisions"/);
+  assert.match(organizationPriority, /DashboardGlyph name="preparation"/);
+  assert.match(organizationPriority, /DashboardCardCue/);
+  assert.match(organizationPriority, /variant="card"/);
+  assert.match(organizationPriority, /DashboardGlyph compact/);
+  assert.match(organizationPriority, /<AppIcon/);
+  assert.doesNotMatch(organizationPriority, /▦|✓|◇|≡|•/);
+  assert.match(organizationPriority, /Se dagsorden/);
+  assert.match(organizationPage, /Seneste referater/);
+  assert.match(
+    organizationPage,
+    /Senest opdaterede referater, du har adgang til\./,
+  );
+  assert.doesNotMatch(organizationPage, /Fortsæt hvor du slap/);
+  assert.match(organizationPage, /recentActivity\.map/);
+  assert.match(organizationPage, /\.slice\(0, 4\)/);
+  assert.match(organizationPage, /committeeHighlights\.length \?/);
+  assert.match(
+    organizationPage,
+    /overview\.committees\.length > committeeHighlights\.length/,
+  );
+  assert.match(organizationPage, /Du har ikke adgang til nogen udvalg endnu\./);
+  assert.match(organizationPage, /divide-y divide-line/);
+  assert.match(organizationPage, /sm:grid-cols-2/);
+  assert.match(organizationPriority, /committeeSection/);
+  assert.match(organizationPriority, /recentMinutesSection/);
+  assert.match(organizationPriority, /contents xl:block xl:space-y-/);
+  assert.match(organizationPriority, /className="order-1"/);
+  assert.match(organizationPriority, /order-2 p-/);
+  assert.match(organizationPriority, /className="order-3"/);
+  assert.match(organizationPriority, /className="order-4"/);
+  assert.match(organizationPriority, /flex flex-wrap items-center gap-1\.5/);
+  assert.match(organizationPriority, /\.slice\(0, 6\)/);
+  assert.match(organizationPage, /divide-y divide-line/);
+});
+
+test("Version 3.1.2c widens only the large desktop dashboard", () => {
+  assert.match(organizationPage, /data-organization-dashboard/);
+  assert.match(
+    globalStyles,
+    /@media \(min-width: 1536px\)[\s\S]*\.org-layout-content:has\(> \[data-organization-dashboard\]\)[\s\S]*max-width: 96rem/,
+  );
+  assert.match(
+    organizationPriority,
+    /xl:grid-cols-\[minmax\(0,1\.9fr\)_minmax\(20rem,1fr\)\]/,
+  );
 });

@@ -34,12 +34,18 @@ export function AgendaItemEditForm({
           label: "Formål med beslutning eller drøftelse",
           type: "textarea",
           defaultValue: item.objective,
+          aiSuggestion: {
+            endpoint: `/api/committees/${committeeId}/agenda-items/draft-assistant`,
+          },
         },
         {
           name: "description",
           label: "Baggrund",
           type: "textarea",
           defaultValue: item.description,
+          aiSuggestion: {
+            endpoint: `/api/committees/${committeeId}/agenda-items/draft-assistant`,
+          },
         },
         {
           name: "itemType",

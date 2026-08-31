@@ -77,13 +77,17 @@ test("write CTAs remain guarded by existing capabilities", () => {
   );
   assert.match(
     committeeMeetings,
-    /capabilities\.createMeeting \? \([\s\S]*Opret første møde/,
+    /capabilities\.createMeeting[\s\S]*href=\{`\$\{meetingsRoot\}\/new`\}[\s\S]*Opret møde/,
   );
   assert.doesNotMatch(emptyState, /organizationRole|committeeRole|owner|admin/);
 });
 
 test("minutes and participant guidance follows concrete edit capability", () => {
-  assert.match(minutes, /canEdit\s*\? "Tag rollen som referent/);
+  assert.match(minutes, /const officialMinutesLockedMessage = !canEdit/);
+  assert.match(
+    minutes,
+    /: "Tag rollen som referent for at redigere de officielle referatfelter\."/,
+  );
   assert.match(
     minutes,
     /Du kan læse de officielle referatfelter\. En mødeansvarlig kan vælge referent og redigere\./,

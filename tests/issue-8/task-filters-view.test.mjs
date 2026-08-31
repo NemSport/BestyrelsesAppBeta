@@ -8,21 +8,45 @@ import {
   taskRegisterSearchParams,
 } from "../../src/lib/task-register-state.ts";
 import { getMeetingCapabilities } from "../../src/lib/meeting-capabilities.ts";
+import {
+  filterTasks,
+  getTaskDeadlineState,
+  taskBoardStatuses,
+  taskStatusOptions,
+} from "../../src/lib/tasks.ts";
 
 async function source(path) {
   return readFile(new URL(path, import.meta.url), "utf8");
 }
 
-const [register, taskService, taskRepository, taskPolicy, route] =
-  await Promise.all([
-    source("../../src/components/tasks/task-register.tsx"),
-    source("../../src/services/task-service.ts"),
-    source("../../src/repositories/task-repository.ts"),
-    source("../../supabase/migrations/202606140001_task_foundation.sql"),
-    source("../../src/app/api/organizations/[organizationId]/tasks/route.ts"),
-  ]);
+const [
+  register,
+  detail,
+  modal,
+  actionMenu,
+  taskPage,
+  globalStyles,
+  taskService,
+  taskRepository,
+  taskPolicy,
+  route,
+] = await Promise.all([
+  source("../../src/components/tasks/task-register.tsx"),
+  source("../../src/components/tasks/task-register-detail.tsx"),
+  source("../../src/components/ui/modal.tsx"),
+  source("../../src/components/ui/action-menu.tsx"),
+  source("../../src/app/(app)/organizations/[organizationId]/tasks/page.tsx"),
+  source("../../src/app/globals.css"),
+  source("../../src/services/task-service.ts"),
+  source("../../src/repositories/task-repository.ts"),
+  source("../../supabase/migrations/202606140001_task_foundation.sql"),
+  source("../../src/app/api/organizations/[organizationId]/tasks/route.ts"),
+]);
 
 test("URL state validates filters and view mode", () => {
+  const defaultState = parseTaskRegisterState(new URLSearchParams());
+  assert.equal(defaultState.filters.mineOnly, true);
+
   const parsed = parseTaskRegisterState(
     new URLSearchParams(
       "view=task&q=budget&status=waiting&committee=c1&responsible=u1&category=Drift&deadline=soon&mine=1&archived=1",
@@ -44,9 +68,15 @@ test("URL state validates filters and view mode", () => {
   const invalid = parseTaskRegisterState(
     new URLSearchParams("view=board&status=unknown&deadline=later"),
   );
-  assert.equal(invalid.view, "list");
+  assert.equal(invalid.view, "task");
   assert.equal(invalid.filters.status, "");
   assert.equal(invalid.filters.deadline, "");
+
+  const allList = parseTaskRegisterState(
+    new URLSearchParams("view=list&scope=all"),
+  );
+  assert.equal(allList.view, "list");
+  assert.equal(allList.filters.mineOnly, false);
 });
 
 test("serialization omits defaults and preserves unrelated deep-link state", () => {
@@ -60,28 +90,75 @@ test("serialization omits defaults and preserves unrelated deep-link state", () 
     { filters, view: "task" },
   );
 
-  assert.equal(
-    params.toString(),
-    "editTask=task-1&view=task&committee=committee-1&mine=1",
-  );
+  assert.equal(params.toString(), "editTask=task-1&committee=committee-1");
 
   const reset = taskRegisterSearchParams(params, {
     filters: emptyTaskFilters(),
     view: "task",
   });
-  assert.equal(reset.toString(), "editTask=task-1&view=task");
+  assert.equal(reset.toString(), "editTask=task-1");
+
+  const allList = taskRegisterSearchParams(reset, {
+    filters: { ...emptyTaskFilters(), mineOnly: false },
+    view: "list",
+  });
+  assert.equal(allList.toString(), "editTask=task-1&view=list&scope=all");
 });
 
-test("list and Task View share one filtered collection and URL contract", () => {
+test("Mine and Alle scope only filter the already accessible task collection", () => {
+  const accessibleTasks = [
+    {
+      id: "mine",
+      archived_at: null,
+      status: "not_started",
+      responsible_user_id: "user-1",
+      committee_id: "committee-1",
+      category: null,
+      deadline: null,
+      title: "Min opgave",
+      description: "",
+    },
+    {
+      id: "colleague",
+      archived_at: null,
+      status: "in_progress",
+      responsible_user_id: "user-2",
+      committee_id: "committee-1",
+      category: null,
+      deadline: null,
+      title: "Kollegas opgave",
+      description: "",
+    },
+  ];
+
+  assert.deepEqual(
+    filterTasks(accessibleTasks, emptyTaskFilters(), "user-1").map(
+      (task) => task.id,
+    ),
+    ["mine"],
+  );
+  assert.deepEqual(
+    filterTasks(
+      accessibleTasks,
+      { ...emptyTaskFilters(), mineOnly: false },
+      "user-1",
+    ).map((task) => task.id),
+    ["mine", "colleague"],
+  );
+});
+
+test("Board and list share one filtered collection and URL contract", () => {
   assert.match(register, /const filteredTasks = useMemo/);
   assert.match(register, /viewMode === "task"/);
-  assert.match(register, /columnTasks = filteredTasks\.filter/);
+  assert.match(register, /const activeBoardTasks = filteredTasks\.filter/);
+  assert.match(register, /columnTasks = activeBoardTasks\.filter/);
   assert.match(register, /filteredTasks\.map\(\(task\) => taskRow\(task\)\)/);
   assert.match(register, /router\.replace/);
   assert.match(register, /scroll: false/);
   assert.match(register, /parseTaskRegisterState/);
   assert.match(register, /taskRegisterSearchParams/);
-  assert.match(register, />\s*Task View\s*</);
+  assert.match(register, />\s*Board\s*</);
+  assert.match(register, />\s*Liste\s*</);
   assert.doesNotMatch(register, />\s*Kanban\s*</);
 });
 
@@ -89,7 +166,8 @@ test("primary and advanced filters expose results, active state, and reset", () 
   assert.match(register, /htmlFor="task-search"/);
   assert.match(register, /htmlFor="task-status-filter"/);
   assert.match(register, /htmlFor="task-committee-filter"/);
-  assert.match(register, /Avancerede filtre/);
+  assert.match(register, /htmlFor="task-deadline-filter"/);
+  assert.match(register, /Flere filtre/);
   assert.match(register, /activeFilterLabels\.map/);
   assert.match(register, /aria-label=\{`Fjern filter:/);
   assert.match(register, /Ryd alle filtre/);
@@ -98,6 +176,23 @@ test("primary and advanced filters expose results, active state, and reset", () 
     register,
     /filteredTasks\.length\} af \{tasks\.length\} opgaver/,
   );
+});
+
+test("final polish keeps tasks locally full-width with one compact toolbar", () => {
+  assert.match(taskPage, /data-task-register-page/);
+  assert.match(
+    globalStyles,
+    /\.org-layout-content:has\(> \[data-task-register-page\]\)[\s\S]*max-width: none/,
+  );
+  assert.match(register, /xl:grid-cols-\[minmax\(13rem,1\.35fr\)_repeat/);
+  assert.match(register, /aria-expanded=\{showMoreFilters\}/);
+  assert.match(register, /<AppIcon name="filter" size=\{14\}/);
+  assert.match(register, /xl:flex-row xl:items-center/);
+  assert.match(register, /lg:grid-cols-3/);
+  assert.match(register, /showChevron=\{false\}/);
+  assert.match(register, /triggerClassName="!size-8/);
+  assert.match(actionMenu, /triggerClassName/);
+  assert.match(actionMenu, /showChevron \? \(/);
 });
 
 test("viewer is read-only while editor roles keep task actions", () => {
@@ -111,11 +206,100 @@ test("viewer is read-only while editor roles keep task actions", () => {
   assert.equal(chair.editTasks, true);
   assert.equal(admin.editTasks, true);
   assert.match(register, /if \(!canEdit\) return null/);
+  assert.match(register, /\{canCreate \? \(/);
+  assert.match(register, /<Button onClick=\{openCreate\} size="sm">/);
+  assert.doesNotMatch(register, /disabled=\{!canCreate\}/);
+});
+
+test("Version 3.4 board contains three active columns and a collapsed completed area", () => {
+  assert.deepEqual(taskBoardStatuses, [
+    "not_started",
+    "in_progress",
+    "waiting",
+  ]);
+  assert.equal(taskBoardStatuses.includes("completed"), false);
+  assert.equal(taskBoardStatuses.includes("cancelled"), false);
+  assert.match(register, /lg:grid-cols-3/);
+  assert.match(register, /aria-label="Vælg statuskolonne"/);
+  assert.match(register, /mobileBoardStatus === status/);
+  assert.doesNotMatch(
+    register,
+    /aria-label="Task Board"[\s\S]{0,200}overflow-x-auto/,
+  );
   assert.match(
     register,
-    /\{canCreate \? \(\s*<Button onClick=\{openCreate\}>Opret opgave<\/Button>/,
+    /const completedTasks = filteredTasks\.filter\(\s*\(task\) => task\.status === "completed"/,
   );
-  assert.doesNotMatch(register, /disabled=\{!canCreate\}/);
+  assert.match(register, /<details className="group rounded/);
+  assert.match(register, /gennemførte opgaver/);
+  assert.match(register, /Annullerede opgaver kan ses i listevisningen/);
+
+  const boardRenderer = register.match(
+    /aria-label="Task Board"[\s\S]*?\{completedTasks\.length > 0 \? \(/,
+  )?.[0];
+  assert.ok(boardRenderer);
+  assert.match(boardRenderer, /taskBoardStatuses\.map/);
+  assert.doesNotMatch(boardRenderer, /taskStatusOptions\.map/);
+});
+
+test("deadline urgency remains separate from terminal task status", () => {
+  const today = new Date(2026, 7, 9);
+  assert.equal(
+    getTaskDeadlineState(
+      { deadline: "2026-08-08", status: "not_started" },
+      today,
+    ),
+    "overdue",
+  );
+  assert.equal(
+    getTaskDeadlineState({ deadline: "2026-08-16", status: "waiting" }, today),
+    "soon",
+  );
+  assert.equal(
+    getTaskDeadlineState(
+      { deadline: "2026-08-08", status: "completed" },
+      today,
+    ),
+    "closed",
+  );
+  assert.equal(
+    getTaskDeadlineState(
+      { deadline: "2026-08-08", status: "cancelled" },
+      today,
+    ),
+    "closed",
+  );
+});
+
+test("task details use the shared accessible modal as a right-side sheet", () => {
+  assert.match(register, /openDetail\(task\)/);
+  assert.match(register, /<TaskRegisterDetail/);
+  assert.match(detail, /placement="right"/);
+  assert.match(detail, /<TaskComments/);
+  assert.match(detail, /meetingHref \|\| agendaHref \|\| task\.decision/);
+  assert.match(detail, /onStatusChange\("completed"\)/);
+  assert.match(modal, /useDialogFocus/);
+  assert.match(modal, /placement === "right"/);
+});
+
+test("consolidated V2 retains the former personal-task actions and context", () => {
+  assert.match(register, /taskStatusOptions\.map/);
+  assert.match(register, /void changeStatus\(task, option\.value\)/);
+  assert.match(register, /openEdit\(task\)/);
+  assert.match(detail, /onStatusChange\("completed"\)/);
+  assert.match(detail, /meetingHref/);
+  assert.match(detail, /agendaHref/);
+  assert.match(detail, /task\.decision/);
+  assert.match(register, /const completedTasks = filteredTasks\.filter/);
+  assert.equal(
+    taskStatusOptions.some((option) => option.value === "completed"),
+    true,
+  );
+  assert.equal(
+    taskStatusOptions.some((option) => option.value === "cancelled"),
+    true,
+  );
+  assert.match(register, /Annullerede opgaver kan ses i listevisningen/);
 });
 
 test("task form follows pending, validation, success, and dirty-state patterns", () => {

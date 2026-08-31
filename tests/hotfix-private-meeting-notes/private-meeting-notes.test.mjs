@@ -84,9 +84,10 @@ test("migration preserves legacy notes and enforces owner-only RLS for all opera
 });
 
 test("private notes stay out of shared minutes, AI, and PDF generators", async () => {
-  const [service, assistant, libFiles] = await Promise.all([
+  const [service, assistant, assistantComponent, libFiles] = await Promise.all([
     read("src/services/meeting-minutes-service.ts"),
     read("src/lib/ai-minutes-assistant.ts"),
+    read("src/components/meetings/minutes-ai-assistant.tsx"),
     readdir(path.join(workspace, "src/lib")),
   ]);
   const pdfSources = await Promise.all(
@@ -102,6 +103,8 @@ test("private notes stay out of shared minutes, AI, and PDF generators", async (
   assert.doesNotMatch(saveMinutesMethod, /parsed\.internalNote/);
   assert.doesNotMatch(service, /internal_note/);
   assert.doesNotMatch(assistant, /internal_note/);
+  assert.doesNotMatch(assistantComponent, /privateNote|private_note/i);
+  assert.match(assistantComponent, /text:\s*value/);
   for (const source of pdfSources) {
     assert.doesNotMatch(source, /privateMeetingNote|agenda_item_private_notes/);
   }

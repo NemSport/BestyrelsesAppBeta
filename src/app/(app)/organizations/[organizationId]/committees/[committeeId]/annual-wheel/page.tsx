@@ -8,7 +8,7 @@ export default async function CommitteeAnnualWheelPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string; committeeId: string }>;
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; create?: string }>;
 }) {
   const { organizationId, committeeId } = await params;
   const query = await searchParams;
@@ -18,16 +18,16 @@ export default async function CommitteeAnnualWheelPage({
   );
 
   return (
-    <div>
+    <div className="page-flow" data-annual-wheel-page>
       <PageHeader
-        className="mb-8"
-        description="Udvalgets aktiviteter, møder og deadlines samlet gennem året."
+        description="Planlæg aktiviteter, gentagelser og deadlines, før de bliver akutte."
         eyebrow="Strategisk planlægning"
         title={`Årshjul ${data.year}`}
       />
       <AnnualWheel
         data={data}
         initialCommitteeId={committeeId}
+        openCreateOnLoad={query.create === "1"}
         organizationId={organizationId}
       />
     </div>

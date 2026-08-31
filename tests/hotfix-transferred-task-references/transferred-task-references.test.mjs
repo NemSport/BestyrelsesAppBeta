@@ -117,7 +117,10 @@ test("meeting UI opens the transfer origin in the shared accessible modal", asyn
   assert.match(meeting, /onClick=\{\(\) => setSourceModalOpen\(true\)\}/);
   const originTrigger = meeting.slice(
     meeting.indexOf("{incomingTransfer?.sourceMeeting ? ("),
-    meeting.indexOf("</button>", meeting.indexOf("{incomingTransfer?.sourceMeeting ? (")),
+    meeting.indexOf(
+      "</button>",
+      meeting.indexOf("{incomingTransfer?.sourceMeeting ? ("),
+    ),
   );
   assert.doesNotMatch(originTrigger, /href=/);
   assert.match(meeting, /open=\{sourceModalOpen\}/);
@@ -125,7 +128,8 @@ test("meeting UI opens the transfer origin in the shared accessible modal", asyn
   assert.match(meeting, /incomingTransfer\.sourceMinutes/);
   assert.match(meeting, /incomingTransfer\.sourceTasks\.map/);
   assert.match(meeting, /openInModal/);
-  assert.match(meeting, /className="space-y-4"/);
+  assert.match(meeting, /Kontekst for aktivt dagsordenspunkt/);
+  assert.match(meeting, /origins=\{taskOrigins\}/);
   assert.match(relatedTasks, /<button[\s\S]*setActiveTaskId/);
   assert.doesNotMatch(
     relatedTasks.slice(

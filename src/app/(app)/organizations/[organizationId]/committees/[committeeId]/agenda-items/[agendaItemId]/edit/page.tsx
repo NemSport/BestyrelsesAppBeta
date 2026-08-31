@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AgendaItemEditForm } from "@/components/agenda-items/agenda-item-edit-form";
-import { PageHeader } from "@/components/ui";
+import { Breadcrumbs, PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AgendaItemService } from "@/services/agenda-item-service";
 import { AuthService } from "@/services/auth-service";
@@ -31,6 +31,22 @@ export default async function EditAgendaItemPage({
 
   return (
     <div className="max-w-3xl">
+      <Breadcrumbs
+        className="mb-3"
+        items={[
+          { label: allowed.committee.name, href: root },
+          { label: "Dagsordenspunkter", href: `${root}/agenda-items` },
+          {
+            label: item.title,
+            href: `${root}/agenda-items/${agendaItemId}`,
+          },
+          { label: "Rediger" },
+        ]}
+        mobileBack={{
+          label: "dagsordenspunktet",
+          href: `${root}/agenda-items/${agendaItemId}`,
+        }}
+      />
       <PageHeader
         className="mb-6"
         description="Opdater emnet uden at miste dets mødehistorik."

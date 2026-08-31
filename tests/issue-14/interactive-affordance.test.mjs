@@ -15,6 +15,7 @@ const [
   committees,
   dashboard,
   tasks,
+  taskDetail,
   decisions,
   table,
   buttons,
@@ -36,6 +37,7 @@ const [
   ),
   source("../../src/app/(app)/organizations/[organizationId]/page.tsx"),
   source("../../src/components/tasks/task-register.tsx"),
+  source("../../src/components/tasks/task-register-detail.tsx"),
   source("../../src/components/decisions/decision-register.tsx"),
   source("../../src/components/ui/table.tsx"),
   source("../../src/components/ui/button.tsx"),
@@ -57,29 +59,36 @@ test("shared surface patterns distinguish links from static content without colo
 test("true full-card destinations use the interactive surface and a persistent cue", () => {
   assert.match(agendaItems, /interactiveSurfaceClassName\("p-5"\)/);
   assert.match(agendaItems, /SurfaceLinkCue label="Åbn dagsordenspunkt"/);
+  assert.match(committees, /interactiveSurfaceClassName/);
+  assert.match(
+    committees,
+    /aria-label=\{`Åbn arbejdsrummet \$\{item\.committee\.name\}`\}/,
+  );
   assert.match(dashboard, /staticSurfaceClassName/);
-  assert.match(dashboard, /primarySurfaceLinkClassName/);
+  assert.match(dashboard, /focus-visible:ring-brand/);
+  assert.match(dashboard, /aria-hidden="true"/);
 });
 
 test("rows with separate actions stay static and expose explicit primary links", () => {
-  for (const module of [meetingList, committees, dashboard]) {
-    assert.match(module, /staticSurfaceClassName/);
-    assert.match(module, /primarySurfaceLinkClassName/);
-  }
+  assert.match(meetingList, /staticSurfaceClassName/);
+  assert.match(meetingList, /primarySurfaceLinkClassName/);
+  assert.match(dashboard, /group grid min-h-11/);
   assert.match(organizationMeetings, /<MeetingList/);
   assert.match(committeeMeetings, /<MeetingList/);
   assert.doesNotMatch(meetingList, /<article[^>]+onClick=/);
   assert.doesNotMatch(committees, /<article[^>]+onClick=/);
+  assert.doesNotMatch(committees, /<Link[\s\S]*?<button/);
   assert.doesNotMatch(table, /hover:bg-subtle/);
 });
 
 test("nested register actions remain outside parent navigation and read-only is explicit", () => {
   for (const register of [tasks, decisions]) {
     assert.match(register, /staticSurfaceClassName/);
-    assert.match(register, />Skrivebeskyttet</);
     assert.doesNotMatch(register, /<article[^>]+onClick=/);
   }
-  assert.match(tasks, /<ActionMenu label="Handlinger">/);
+  assert.match(taskDetail, />Skrivebeskyttet</);
+  assert.match(decisions, />Skrivebeskyttet</);
+  assert.match(tasks, /<ActionMenu[\s\S]*ariaLabel=\{`Handlinger for/);
   assert.match(tasks, /if \(!canEdit\) return null/);
   assert.match(decisions, /\{canEdit \? \(/);
 });

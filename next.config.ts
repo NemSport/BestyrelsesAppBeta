@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep live development chunks isolated from production builds. Mixing
+  // these artifacts can leave webpack's
+  // client module table out of sync with an already rendered server response.
+  distDir:
+    process.env.NODE_ENV === "development"
+      ? ".next-dev"
+      : ".next",
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {

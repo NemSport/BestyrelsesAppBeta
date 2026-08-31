@@ -25,6 +25,7 @@ export async function POST(
       committeeId: String(formData.get("committeeId") ?? ""),
       meetingId: (await params).meetingId,
       agendaItemId: String(formData.get("agendaItemId") ?? "") || null,
+      parentMinutesId: String(formData.get("parentMinutesId") ?? "") || null,
       file,
     });
 

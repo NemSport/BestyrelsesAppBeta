@@ -16,7 +16,7 @@ export function PageHeader({
 }) {
   return (
     <header className={clsx("page-header", className)}>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 sm:basis-80">
         {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
         <h1 className="page-title">{title}</h1>
         {description ? <p className="page-lead">{description}</p> : null}

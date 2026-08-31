@@ -14,6 +14,7 @@ import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
 import { taskStatusLabels } from "@/lib/tasks";
 import {
   addTransferredAgendaItemHistory,
+  removeDuplicatePdfSectionLabel,
   type PdfTransferredAgendaItemHistory,
 } from "@/lib/meeting-document-pdf";
 import type {
@@ -161,6 +162,12 @@ function pointFollowUpRows(
 export async function generateMeetingMinutesPdf(input: PdfInput) {
   const meetingDate = formatPdfDate(input.meeting.starts_at, true);
   const finalApprovalDate = approvedDate(input.approvals);
+  const minutesStatusLabel =
+    input.meetingMinutes.status === "approved"
+      ? "Godkendt"
+      : input.meetingMinutes.status === "ready_for_approval"
+        ? "Klar til godkendelse"
+        : "Kladde";
   const report = await createPdfReport({
     documentType: "Mødereferat",
     title: input.meeting.title,
@@ -169,20 +176,14 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     committeeName: input.committeeName,
     generatedAt: input.generatedAt ?? new Date(),
     branding: input.branding,
+    agendaItemCardOutline: false,
+    metaLayout: "compact",
     meta: [
       { label: "Organisation", value: input.branding?.organizationName ?? "" },
       { label: "Udvalg", value: input.committeeName },
       { label: "Mødedato", value: meetingDate },
-      {
-        label: "Referatstatus",
-        value:
-          input.meetingMinutes.status === "approved"
-            ? "Godkendt"
-            : input.meetingMinutes.status === "ready_for_approval"
-              ? "Klar til godkendelse"
-              : "Kladde",
-      },
-      { label: "Godkendelse", value: approvalSummary(input.approvals) },
+      { label: "Referatstatus", value: minutesStatusLabel },
+      { label: "Godkendelsesstatus", value: approvalSummary(input.approvals) },
     ],
   });
 
@@ -225,17 +226,25 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     }
   }
 
-  report.addSection("Generelt referat");
-  report.addSubsection("Referattekst");
-  report.addProse(
+  const generalMinutes = removeDuplicatePdfSectionLabel(
+    "Referat",
     richTextToPdfBlocks(input.meetingMinutes.minutes_text),
-    "Der er ingen referattekst.",
   );
-  report.addSubsection("Beslutninger");
-  report.addProse(
+  const generalDecisions = removeDuplicatePdfSectionLabel(
+    "Beslutninger",
     richTextToPdfBlocks(input.meetingMinutes.decisions),
-    "Der er ingen samlede beslutninger.",
   );
+  if (generalMinutes.length || generalDecisions.length) {
+    report.addSection("Generelt referat");
+    if (generalMinutes.length) {
+      report.addSubsection("Referat");
+      report.addProse(generalMinutes);
+    }
+    if (generalDecisions.length) {
+      report.addSubsection("Beslutninger");
+      report.addProse(generalDecisions);
+    }
+  }
 
   report.addSection("Dagsorden og punktreferater");
   const minutesByAgendaItem = new Map(
@@ -270,15 +279,49 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const minutes = minutesByAgendaItem.get(item.id);
-
+    const objective = removeDuplicatePdfSectionLabel(
+      "Formål",
+      richTextToPdfBlocks(item.objective),
+    );
+    const background = removeDuplicatePdfSectionLabel(
+      "Baggrund",
+      richTextToPdfBlocks(item.description),
+    );
+    const notes = removeDuplicatePdfSectionLabel(
+      "Referat",
+      richTextToPdfBlocks(minutes?.notes ?? ""),
+    );
+    const pointDecisions = minutes
+      ? pointDecisionRows(
+          minutes,
+          decisionsByAgendaItem.get(item.id) ?? [],
+          input.responsiblePeople,
+        )
+      : [];
+    const pointFollowUps = minutes
+      ? pointFollowUpRows(
+          minutes,
+          tasksByAgendaItem.get(item.id) ?? [],
+          input.responsiblePeople,
+        )
+      : [];
+    const history = input.transferredHistories?.find(
+      (candidate) => candidate.targetAgendaItemId === item.id,
+    );
     report.beginAgendaItemCard({
       number: occurrenceIndex + 1,
       typeLabel: agendaItemTypeLabels[item.item_type].short,
       title: item.title,
       subtitle: agendaItemTypeLabels[item.item_type].label,
+      keepWithNext: Boolean(
+        objective.length ||
+        background.length ||
+        history ||
+        minutes ||
+        pointDecisions.length ||
+        pointFollowUps.length,
+      ),
     });
-    const objective = richTextToPdfBlocks(item.objective);
-    const background = richTextToPdfBlocks(item.description);
     if (objective.length) {
       report.addSubsection("Formål");
       report.addProse(objective);
@@ -287,12 +330,8 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
       report.addSubsection("Baggrund");
       report.addProse(background);
     }
-    const history = input.transferredHistories?.find(
-      (candidate) => candidate.targetAgendaItemId === item.id,
-    );
     if (history) addTransferredAgendaItemHistory(report, history);
     if (!minutes) {
-      report.addParagraph("Der er ikke gemt et punktreferat.");
       report.endAgendaItemCard();
       continue;
     }
@@ -313,23 +352,12 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
       { label: "Deadline", value: minutes.deadline ?? "" },
     ]);
 
-    const notes = richTextToPdfBlocks(minutes.notes);
-    const pointDecisions = pointDecisionRows(
-      minutes,
-      decisionsByAgendaItem.get(item.id) ?? [],
-      input.responsiblePeople,
-    );
-    const pointFollowUps = pointFollowUpRows(
-      minutes,
-      tasksByAgendaItem.get(item.id) ?? [],
-      input.responsiblePeople,
-    );
     if (notes.length) {
       report.addSubsection("Referat");
       report.addProse(notes);
     }
     if (pointDecisions.length) {
-      report.addSubsection("Beslutninger");
+      report.addSubsection("Beslutning");
       report.addTable(
         [
           {
@@ -363,7 +391,7 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
       );
     }
     if (pointFollowUps.length) {
-      report.addSubsection("Opfølgninger");
+      report.addSubsection("Opfølgning");
       report.addTable(
         [
           {
@@ -408,29 +436,31 @@ export async function generateMeetingMinutesPdf(input: PdfInput) {
     report.addParagraph("Der er ikke registreret godkendelser.");
   }
 
-  report.addSection("Vedhæftninger");
-  report.addTable(
-    [
-      {
-        label: "Filnavn",
-        width: 220,
-        getValue: (attachment: MinuteAttachmentView) => attachment.fileName,
-      },
-      {
-        label: "Filtype",
-        width: 120,
-        getValue: (attachment: MinuteAttachmentView) => attachment.mimeType,
-      },
-      {
-        label: "Uploadet af",
-        width: 160,
-        getValue: (attachment: MinuteAttachmentView) =>
-          attachment.uploadedByName,
-      },
-    ],
-    input.attachments,
-    "Ingen vedhæftninger.",
-  );
+  if (input.attachments.length) {
+    report.addSection("Vedhæftninger");
+    report.addTable(
+      [
+        {
+          label: "Filnavn",
+          width: 220,
+          getValue: (attachment: MinuteAttachmentView) => attachment.fileName,
+        },
+        {
+          label: "Filtype",
+          width: 120,
+          getValue: (attachment: MinuteAttachmentView) => attachment.mimeType,
+        },
+        {
+          label: "Uploadet af",
+          width: 160,
+          getValue: (attachment: MinuteAttachmentView) =>
+            attachment.uploadedByName,
+        },
+      ],
+      input.attachments,
+      "",
+    );
+  }
 
   await report.addAttachments(input.attachmentsForPdf ?? []);
 

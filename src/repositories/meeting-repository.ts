@@ -14,7 +14,7 @@ export class MeetingRepository {
     const { data, error } = await this.db
       .from("meetings")
       .select(
-        "*, agenda_item_occurrences(position, deleted_at, agenda_items(id, title, item_type, deleted_at))",
+        "*, agenda_item_occurrences(id, position, deleted_at, agenda_items(id, title, item_type, deleted_at))",
       )
       .eq("committee_id", committeeId)
       .is("deleted_at", null)
@@ -32,7 +32,7 @@ export class MeetingRepository {
     const { data, error } = await this.db
       .from("meetings")
       .select(
-        "*, agenda_item_occurrences(position, deleted_at, agenda_items(id, title, item_type, deleted_at))",
+        "*, agenda_item_occurrences(id, position, deleted_at, agenda_items(id, title, item_type, deleted_at))",
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
@@ -109,6 +109,43 @@ export class MeetingRepository {
       .gt("starts_at", startsAfter)
       .order("starts_at", { ascending: true })
       .order("created_at", { ascending: true });
+    if (error) throw error;
+    return data as Meeting[];
+  }
+
+  async listWorkspaceMeetings(
+    organizationId: string,
+    committeeId: string,
+    now: string,
+  ) {
+    const { data, error } = await this.db
+      .from("meetings")
+      .select(
+        "*, agenda_item_occurrences(id, position, deleted_at, agenda_items(id, title, item_type, deleted_at))",
+      )
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .gte("starts_at", now)
+      .order("starts_at", { ascending: true })
+      .limit(6);
+    if (error) throw error;
+    return this.activePreviews(data as unknown as MeetingWithAgendaPreview[]);
+  }
+
+  async listRecentWorkspaceMeetings(
+    organizationId: string,
+    committeeId: string,
+  ) {
+    const { data, error } = await this.db
+      .from("meetings")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(5);
     if (error) throw error;
     return data as Meeting[];
   }

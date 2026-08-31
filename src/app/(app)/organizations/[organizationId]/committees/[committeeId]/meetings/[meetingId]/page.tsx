@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
-import { SendMeetingAgendaEmailModal } from "@/components/email/send-meeting-agenda-email-modal";
+import { AppIcon } from "@/components/icons/app-icon";
+import { SendMeetingMaterialsModal } from "@/components/email/send-meeting-materials-modal";
 import { AddAgendaItemModal } from "@/components/meetings/add-agenda-item-modal";
 import { EditMeetingModal } from "@/components/meetings/edit-meeting-modal";
 import { MeetingAiOverview } from "@/components/meetings/meeting-ai-overview";
@@ -9,7 +11,7 @@ import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-sec
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
-import { PageSection, StatusBadge, buttonClassName } from "@/components/ui";
+import { Dropdown, StatusBadge } from "@/components/ui";
 import {
   agendaItemMinutesStatusLabels,
   agendaItemTransferReasonLabels,
@@ -17,15 +19,20 @@ import {
   formatDate,
   formatDateTime,
 } from "@/lib/localization";
-import { agendaItemMinutesNeedsAction } from "@/lib/agenda-item-minutes";
+import {
+  resolveMeetingParticipantRecipients,
+  resolveSelectedMeetingMaterialRecipients,
+} from "@/lib/meeting-material-dispatch";
 import { getMeetingCapabilities } from "@/lib/permissions";
-import { firstRichTextToPlainText } from "@/lib/rich-text";
 import { createClient } from "@/lib/supabase/server";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
+import { AgendaItemService } from "@/services/agenda-item-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { DecisionService } from "@/services/decision-service";
+import { DocumentService } from "@/services/document-service";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
+import { MeetingMaterialDispatchService } from "@/services/meeting-material-dispatch-service";
 import { MeetingService } from "@/services/meeting-service";
 import { TaskService } from "@/services/task-service";
 import { TransferredAgendaItemService } from "@/services/transferred-agenda-item-service";
@@ -33,39 +40,6 @@ import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-d
 import type { MeetingWithAgenda } from "@/types/domain";
 
 type AgendaOccurrence = MeetingWithAgenda["agenda_item_occurrences"][number];
-
-function isOpenTask(status: string, archivedAt?: string | null) {
-  return !archivedAt && !["completed", "cancelled"].includes(status);
-}
-
-function isActiveDecision(decision: {
-  status: string;
-  archived_at?: string | null;
-  cancelled_at?: string | null;
-}) {
-  return (
-    !decision.archived_at &&
-    !decision.cancelled_at &&
-    !["completed", "cancelled"].includes(decision.status)
-  );
-}
-
-function hasAgendaMinutesText(
-  minutes: {
-    notes?: string | null;
-    decision?: string | null;
-    follow_up?: string | null;
-  } | null,
-) {
-  if (!minutes) return false;
-  return Boolean(
-    firstRichTextToPlainText(
-      minutes.notes ?? "",
-      minutes.decision ?? "",
-      minutes.follow_up ?? "",
-    ).trim(),
-  );
-}
 
 function MeetingWorkOverview({
   agendaItemCount,
@@ -238,6 +212,9 @@ function IncomingTransferredItems({
   );
 }
 
+void MeetingWorkOverview;
+void IncomingTransferredItems;
+
 export default async function MeetingPage({
   params,
 }: {
@@ -270,6 +247,9 @@ export default async function MeetingPage({
     decisionContext,
     taskContext,
     memberDirectory,
+    agendaItemHistoryMetadata,
+    documentContext,
+    dispatchHistory,
   ] = await Promise.all([
     minutesService.get(organizationId, committeeId, meetingId),
     minutesService.getPreviousMeetingReference(
@@ -294,6 +274,28 @@ export default async function MeetingPage({
       meetingId,
     ),
     new OrganizationMemberRepository(db).listMembers(organizationId),
+    new AgendaItemService(db)
+      .getAgendaItemHistoryMetadataBatch({
+        organizationId,
+        committeeId,
+        agendaItemIds: meeting.agenda_item_occurrences.map(
+          (occurrence) => occurrence.agenda_item_id,
+        ),
+      })
+      .catch(() => []),
+    new DocumentService(db).getMeetingDocumentContext({
+      organizationId,
+      committeeId,
+      meetingId,
+      agendaItemIds: meeting.agenda_item_occurrences.map(
+        (occurrence) => occurrence.agenda_item_id,
+      ),
+    }),
+    new MeetingMaterialDispatchService(db).listHistory(
+      organizationId,
+      committeeId,
+      meetingId,
+    ),
   ]);
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const organizationRole = context.organizationMembership.role;
@@ -333,6 +335,31 @@ export default async function MeetingPage({
       name: member.full_name || member.email,
       email: member.email,
     }));
+  const participantRecipientResolution = resolveMeetingParticipantRecipients({
+    committeeId,
+    members: memberDirectory,
+    internalParticipants: participants.internalParticipants,
+    externalParticipants: participants.externalAttendees,
+  });
+  const participantUserIds = new Set(
+    participantRecipientResolution.recipients.flatMap((recipient) =>
+      recipient.userId ? [recipient.userId] : [],
+    ),
+  );
+  const selectedRecipientResolution = resolveSelectedMeetingMaterialRecipients({
+    members: memberDirectory,
+    selectedUserIds: memberDirectory
+      .filter((member) => member.status === "active")
+      .map((member) => member.user_id),
+  });
+  const organizationRecipientOptions = selectedRecipientResolution.recipients.map(
+    (recipient) => ({
+      userId: recipient.userId!,
+      name: recipient.name,
+      email: recipient.email,
+      isMeetingParticipant: participantUserIds.has(recipient.userId!),
+    }),
+  );
   const approvalRecipientInfo = {
     mode:
       registeredInternalParticipantCount > 0
@@ -346,97 +373,107 @@ export default async function MeetingPage({
     registeredInternalCount: registeredInternalParticipantCount,
     externalCount: participants.externalAttendees.length,
   };
-  const agendaMinutesByItemId = new Map(
-    minutes.agendaItemMinutes.map((agendaMinutes) => [
-      agendaMinutes.agenda_item_id,
-      agendaMinutes,
-    ]),
+  const participantChipNames = [
+    ...participants.internalParticipants
+      .filter((participant) => participant.attendance_status !== "declined")
+      .flatMap((participant) => {
+        const member = memberDirectory.find(
+          (candidate) => candidate.user_id === participant.user_id,
+        );
+        return member ? [member.full_name || member.email] : [];
+      }),
+    ...participants.externalAttendees.map((participant) => participant.name),
+  ];
+  const declinedParticipantUserIds = new Set(
+    participants.internalParticipants
+      .filter((participant) => participant.attendance_status === "declined")
+      .map((participant) => participant.user_id),
   );
-  const incomingTransferCount = meeting.agenda_item_occurrences.filter(
-    (occurrence) =>
-      occurrence.agenda_items?.parent_id ||
-      transferredAgendaItems.incomingItems.some(
-        (transfer) => transfer.targetAgendaItemId === occurrence.agenda_item_id,
-      ),
-  ).length;
-  const missingMinutesCount = meeting.agenda_item_occurrences.filter(
-    (occurrence) =>
-      !hasAgendaMinutesText(
-        agendaMinutesByItemId.get(occurrence.agenda_item_id) ?? null,
-      ),
-  ).length;
-  const actionPointCount = meeting.agenda_item_occurrences.filter(
-    (occurrence) => {
-      const item = occurrence.agenda_items;
-      const agendaMinutes = agendaMinutesByItemId.get(
-        occurrence.agenda_item_id,
-      );
-      if (!item || !agendaMinutes) return false;
-      const hasDecisionOrFollowUp = Boolean(
-        firstRichTextToPlainText(
-          agendaMinutes.decision ?? "",
-          agendaMinutes.follow_up ?? "",
-        ).trim(),
-      );
-      return (
-        hasDecisionOrFollowUp ||
-        agendaItemMinutesNeedsAction(
-          item.item_type,
-          agendaMinutes.status,
-          agendaMinutes.follow_up ?? "",
-        )
-      );
-    },
-  ).length;
-  const openDecisionCount =
-    decisionContext.decisions.filter(isActiveDecision).length;
-  const openTaskCount = taskContext.tasks.filter((task) =>
-    isOpenTask(task.status, task.archived_at),
-  ).length;
-
+  const participantHeaderNames =
+    participantChipNames.length > 0
+      ? participantChipNames
+      : emailRecipients
+          .filter(
+            (recipient) => !declinedParticipantUserIds.has(recipient.userId),
+          )
+          .map((recipient) => recipient.name);
   return (
-    <div>
+    <div data-meeting-workspace>
       <MeetingDocumentHeader
         actions={
           <>
-            <MeetingAiOverview
-              committeeId={committeeId}
-              meetingId={meetingId}
-              organizationId={organizationId}
-            />
-            <a
-              className={buttonClassName({ variant: "secondary" })}
-              href={`/api/meetings/${meetingId}/agenda/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
+            {meetingCapabilities.sendAgendaEmail ? (
+              <SendMeetingMaterialsModal
+                committeeId={committeeId}
+                initialHistory={dispatchHistory}
+                meetingDateLabel={formatDateTime(meeting.starts_at, "full")}
+                meetingId={meetingId}
+                meetingTitle={meeting.title}
+                minutesAvailable={Boolean(
+                  minutes.meetingMinutes &&
+                    ["ready_for_approval", "approved"].includes(
+                      minutes.meetingMinutes.status,
+                    ),
+                )}
+                organizationId={organizationId}
+                participantSummary={{
+                  recipientCount:
+                    participantRecipientResolution.recipients.length,
+                  totalParticipantCount:
+                    participantRecipientResolution.totalParticipantCount,
+                  participantsWithEmailCount:
+                    participantRecipientResolution.participantsWithEmailCount,
+                  unavailableParticipants:
+                    participantRecipientResolution.unavailableParticipants,
+                  usedCommitteeFallback:
+                    participantRecipientResolution.usedCommitteeFallback,
+                }}
+                recipients={organizationRecipientOptions}
+                relatedDocuments={[
+                  ...documentContext.meetingDocuments,
+                  ...documentContext.agendaItemDocuments,
+                ]}
+              />
+            ) : null}
+            <Dropdown label="Eksportér" panelId="meeting-export-actions">
+              <div className="grid gap-1">
+                <a
+                  className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-ink hover:bg-subtle"
+                  href={`/api/meetings/${meetingId}/agenda/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
+                >
+                  Download dagsorden
+                </a>
+                <a
+                  className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-ink hover:bg-subtle"
+                  href={`/api/meetings/${meetingId}/tasks/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
+                >
+                  Download opgaveliste PDF
+                </a>
+              </div>
+            </Dropdown>
+            <Dropdown
+              className="meeting-actions-dropdown"
+              label={
+                <>
+                  <AppIcon name="more" size={17} />
+                  <span>Flere</span>
+                </>
+              }
+              panelId="meeting-secondary-actions"
             >
-              Download dagsorden
-            </a>
-            <a
-              className={buttonClassName({ variant: "secondary" })}
-              href={`/api/meetings/${meetingId}/tasks/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
-            >
-              Download opgaveliste PDF
-            </a>
-            {meetingCapabilities.updateMeeting ||
-            meetingCapabilities.sendAgendaEmail ||
-            meetingCapabilities.deleteMeeting ? (
-              <>
+              <div className="grid gap-1">
+                <div className="[&>button]:w-full [&>button]:justify-start [&>button]:border-0 [&>button]:px-3 [&>button]:shadow-none">
+                  <MeetingAiOverview
+                    committeeId={committeeId}
+                    meetingId={meetingId}
+                    organizationId={organizationId}
+                  />
+                </div>
                 {meetingCapabilities.updateMeeting ? (
                   <EditMeetingModal
                     committeeId={committeeId}
                     meeting={meeting}
                     organizationId={organizationId}
-                  />
-                ) : null}
-                {meetingCapabilities.sendAgendaEmail ? (
-                  <SendMeetingAgendaEmailModal
-                    agendaItemCount={meeting.agenda_item_occurrences.length}
-                    committeeId={committeeId}
-                    meetingDateLabel={formatDateTime(meeting.starts_at, "full")}
-                    meetingId={meetingId}
-                    meetingTitle={meeting.title}
-                    organizationId={organizationId}
-                    recipients={emailRecipients}
-                    triggerStyle="button"
                   />
                 ) : null}
                 {meetingCapabilities.deleteMeeting ? (
@@ -449,11 +486,20 @@ export default async function MeetingPage({
                     variant="secondary"
                   />
                 ) : null}
-              </>
-            ) : null}
+              </div>
+            </Dropdown>
           </>
         }
         agendaItemCount={meeting.agenda_item_occurrences.length}
+        backLink={
+          <Link
+            className="inline-flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            href={`${root}/meetings`}
+          >
+            <AppIcon name="arrowLeft" size={14} />
+            Tilbage til møder
+          </Link>
+        }
         committeeName={context.committee.name}
         meeting={meeting}
         minutesStatus={minutes.meetingMinutes?.status ?? null}
@@ -462,6 +508,7 @@ export default async function MeetingPage({
             <MeetingParticipantsPanel
               canEdit={meetingCapabilities.manageParticipants}
               committeeId={committeeId}
+              compact
               externalAttendees={participants.externalAttendees}
               internalParticipants={participants.internalParticipants}
               meetingId={meetingId}
@@ -472,59 +519,45 @@ export default async function MeetingPage({
           externalCount: participants.externalAttendees.length,
           presentInternalCount: presentInternalParticipantCount,
           registeredCount: registeredParticipantCount,
+          names: participantHeaderNames,
         }}
         transferredItemCount={activeTransfers}
       />
 
-      <MeetingWorkOverview
-        actionPointCount={actionPointCount}
-        agendaItemCount={meeting.agenda_item_occurrences.length}
-        incomingTransferCount={incomingTransferCount}
-        missingMinutesCount={missingMinutesCount}
-        openDecisionCount={openDecisionCount}
-        openTaskCount={openTaskCount}
-      />
-
-      <PageSection
-        actions={
-          meetingCapabilities.scheduleAgendaItem ? (
-            <AddAgendaItemModal
-              committeeId={committeeId}
-              meetingId={meeting.id}
-              meetings={[
-                {
-                  id: meeting.id,
-                  title: meeting.title,
-                  starts_at: meeting.starts_at,
-                },
-                ...transferredAgendaItems.futureMeetings.map(
-                  ({ id, title, starts_at }) => ({
-                    id,
-                    title,
-                    starts_at,
-                  }),
-                ),
-              ]}
-              organizationId={organizationId}
-            />
-          ) : null
-        }
-        className="mt-6"
-        description="Arbejd gennem dagsordenen punkt for punkt. Noter, beslutninger og opfølgning samles i referatet."
-        eyebrow="Mødedokument"
-        title="Dagsorden og referat"
-      >
-        <IncomingTransferredItems
-          incomingTransfers={transferredAgendaItems.incomingItems}
-          occurrences={meeting.agenda_item_occurrences}
-          root={root}
-        />
+      <section aria-label="Referat workspace" className="mt-1">
         <MeetingMinutesSection
+          agendaAction={
+            meetingCapabilities.scheduleAgendaItem ? (
+              <AddAgendaItemModal
+                committeeId={committeeId}
+                meetingId={meeting.id}
+                meetings={[
+                  {
+                    id: meeting.id,
+                    title: meeting.title,
+                    starts_at: meeting.starts_at,
+                  },
+                  ...transferredAgendaItems.futureMeetings.map(
+                    ({ id, title, starts_at }) => ({
+                      id,
+                      title,
+                      starts_at,
+                    }),
+                  ),
+                ]}
+                organizationId={organizationId}
+              />
+            ) : null
+          }
           agendaItemAttachments={minutes.agendaItemAttachments}
+          agendaItemHistoryMetadata={agendaItemHistoryMetadata}
+          documentContext={documentContext}
           approvals={minutes.approvals}
           approvalRecipientInfo={approvalRecipientInfo}
           canApprove={minutes.canApprove}
           canEdit={meetingCapabilities.editOfficialMinutes}
+          canUploadAttachments={meetingCapabilities.uploadMinutesAttachments}
+          canEditAgendaItems={meetingCapabilities.updateAgendaItem}
           canEditPrivateNotes={meetingCapabilities.viewMeeting}
           canEditDecisions={canEditDecisions}
           canEditTasks={canEditTasks}
@@ -547,17 +580,19 @@ export default async function MeetingPage({
           organizationId={organizationId}
           previousMeetingMinutes={previousMeetingMinutes}
           responsiblePeople={minutes.responsiblePeople}
+          reviewSupplement={
+            <TransferredAgendaItemsSection
+              canEdit={meetingCapabilities.manageTransferredAgendaItems}
+              futureMeetings={transferredAgendaItems.futureMeetings}
+              items={transferredAgendaItems.items}
+              root={root}
+            />
+          }
           taskCategorySource={taskContext.categorySource}
           root={root}
           userId={user.id}
         />
-        <TransferredAgendaItemsSection
-          canEdit={meetingCapabilities.manageTransferredAgendaItems}
-          futureMeetings={transferredAgendaItems.futureMeetings}
-          items={transferredAgendaItems.items}
-          root={root}
-        />
-      </PageSection>
+      </section>
     </div>
   );
 }

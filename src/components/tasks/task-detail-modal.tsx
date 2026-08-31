@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { TaskComments } from "@/components/tasks/task-comments";
@@ -17,7 +18,12 @@ import {
   taskStatusTones,
   type TaskStatus,
 } from "@/lib/tasks";
-import type { TaskView } from "@/types/domain";
+import { reconcileTaskStakeholderContract } from "@/lib/task-stakeholder-context";
+import type {
+  TaskStakeholderContractOption,
+  TaskStakeholderOption,
+  TaskView,
+} from "@/types/domain";
 
 type TaskModalDraft = {
   title: string;
@@ -26,6 +32,8 @@ type TaskModalDraft = {
   responsibleUserId: string;
   deadline: string;
   internalNote: string;
+  stakeholderId: string;
+  stakeholderContractId: string;
 };
 
 export type RelatedTaskMeeting = {
@@ -42,6 +50,8 @@ function draftFromTask(task: TaskView): TaskModalDraft {
     responsibleUserId: task.responsible_user_id ?? "",
     deadline: task.deadline ?? "",
     internalNote: task.internal_note ?? "",
+    stakeholderId: task.stakeholder_id ?? "",
+    stakeholderContractId: task.stakeholder_contract_id ?? "",
   };
 }
 
@@ -60,6 +70,8 @@ export function TaskDetailModal({
   originMeeting,
   relatedMeeting,
   responsiblePeople,
+  stakeholderContracts = [],
+  stakeholders = [],
   task,
 }: {
   canEdit: boolean;
@@ -70,6 +82,8 @@ export function TaskDetailModal({
   originMeeting?: RelatedTaskMeeting;
   relatedMeeting?: RelatedTaskMeeting;
   responsiblePeople: Array<{ id: string; name: string }>;
+  stakeholderContracts?: TaskStakeholderContractOption[];
+  stakeholders?: TaskStakeholderOption[];
   task: TaskView;
 }) {
   const [draft, setDraft] = useState(() => draftFromTask(task));
@@ -87,7 +101,21 @@ export function TaskDetailModal({
     key: Key,
     value: TaskModalDraft[Key],
   ) {
-    setDraft((current) => ({ ...current, [key]: value }));
+    setDraft((current) => {
+      if (key === "stakeholderId") {
+        const stakeholderId = String(value);
+        return {
+          ...current,
+          stakeholderId,
+          stakeholderContractId: reconcileTaskStakeholderContract(
+            stakeholderId,
+            current.stakeholderContractId,
+            stakeholderContracts,
+          ),
+        };
+      }
+      return { ...current, [key]: value };
+    });
     setError(null);
     setMessage(null);
   }
@@ -108,6 +136,8 @@ export function TaskDetailModal({
           meetingId: task.meeting_id,
           agendaItemId: task.agenda_item_id,
           decisionId: task.decision_id,
+          stakeholderId: draft.stakeholderId || null,
+          stakeholderContractId: draft.stakeholderContractId || null,
           title: draft.title,
           description: draft.description,
           status: draft.status,
@@ -127,6 +157,12 @@ export function TaskDetailModal({
       const responsible = responsiblePeople.find(
         (person) => person.id === draft.responsibleUserId,
       );
+      const stakeholder = stakeholders.find(
+        (item) => item.id === draft.stakeholderId,
+      );
+      const stakeholderContract = stakeholderContracts.find(
+        (item) => item.id === draft.stakeholderContractId,
+      );
       onUpdated({
         ...task,
         ...result,
@@ -138,6 +174,17 @@ export function TaskDetailModal({
           ? { id: responsible.id, full_name: responsible.name }
           : null,
         deadline: draft.deadline || null,
+        stakeholder_id: draft.stakeholderId || null,
+        stakeholder_contract_id: draft.stakeholderContractId || null,
+        stakeholder: stakeholder
+          ? {
+              ...stakeholder,
+              stakeholder_type: task.stakeholder?.stakeholder_type ?? "other",
+            }
+          : null,
+        stakeholderContract: stakeholderContract
+          ? { id: stakeholderContract.id, title: stakeholderContract.title }
+          : null,
       });
       setMessage("Opgaven er opdateret.");
     } catch (caughtError) {
@@ -168,6 +215,9 @@ export function TaskDetailModal({
       : null,
   ].filter((meeting): meeting is RelatedTaskMeeting & { label: string } =>
     Boolean(meeting),
+  );
+  const visibleContracts = stakeholderContracts.filter(
+    (contract) => contract.stakeholder_id === draft.stakeholderId,
   );
 
   return (
@@ -319,6 +369,56 @@ export function TaskDetailModal({
               />
             </div>
           </div>
+          {canEdit && stakeholders.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  className="label"
+                  htmlFor={`related-task-stakeholder-${task.id}`}
+                >
+                  Interessent
+                </label>
+                <Select
+                  id={`related-task-stakeholder-${task.id}`}
+                  onChange={(event) =>
+                    updateDraft("stakeholderId", event.target.value)
+                  }
+                  value={draft.stakeholderId}
+                >
+                  <option value="">Ingen interessent</option>
+                  {stakeholders.map((stakeholder) => (
+                    <option key={stakeholder.id} value={stakeholder.id}>
+                      {stakeholder.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              {draft.stakeholderId ? (
+                <div>
+                  <label
+                    className="label"
+                    htmlFor={`related-task-contract-${task.id}`}
+                  >
+                    Kontrakt
+                  </label>
+                  <Select
+                    id={`related-task-contract-${task.id}`}
+                    onChange={(event) =>
+                      updateDraft("stakeholderContractId", event.target.value)
+                    }
+                    value={draft.stakeholderContractId}
+                  >
+                    <option value="">Ingen kontrakt</option>
+                    {visibleContracts.map((contract) => (
+                      <option key={contract.id} value={contract.id}>
+                        {contract.title}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {canEdit ? (
             <div>
               <label className="label" htmlFor={`related-task-note-${task.id}`}>
@@ -359,6 +459,31 @@ export function TaskDetailModal({
               </dt>
               <dd className="mt-1 break-words text-ink">
                 {task.decision?.title || "Ingen beslutning"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Interessent
+              </dt>
+              <dd className="mt-1 break-words text-ink">
+                {task.stakeholder ? (
+                  <Link
+                    className="text-brand hover:underline"
+                    href={`/organizations/${organizationId}/stakeholders/${task.stakeholder.id}`}
+                  >
+                    {task.stakeholder.name}
+                  </Link>
+                ) : (
+                  "Ingen interessent"
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Kontrakt
+              </dt>
+              <dd className="mt-1 break-words text-ink">
+                {task.stakeholderContract?.title || "Ingen kontrakt"}
               </dd>
             </div>
             {meetings.map((meeting) => (

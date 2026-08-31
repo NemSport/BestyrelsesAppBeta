@@ -19,26 +19,28 @@ const [
   organizationPage,
   committeePage,
   meetingList,
+  agendaPreview,
   filters,
+  overviewContext,
   repository,
 ] = await Promise.all([
-  source("../../src/app/(app)/organizations/[organizationId]/meetings/page.tsx"),
+  source(
+    "../../src/app/(app)/organizations/[organizationId]/meetings/page.tsx",
+  ),
   source(
     "../../src/app/(app)/organizations/[organizationId]/committees/[committeeId]/meetings/page.tsx",
   ),
   source("../../src/components/meetings/meeting-list.tsx"),
+  source("../../src/components/meetings/meeting-agenda-preview.tsx"),
   source("../../src/components/meetings/meeting-list-filters.tsx"),
+  source("../../src/components/meetings/meeting-overview-context.tsx"),
   source("../../src/repositories/meeting-repository.ts"),
 ]);
 
-function meeting({
-  id,
-  startsAt,
-  status = "scheduled",
-  createdAt = startsAt,
-}) {
+function meeting({ id, startsAt, status = "scheduled", createdAt = startsAt }) {
   return {
     id,
+    committee_id: "committee-1",
     starts_at: startsAt,
     created_at: createdAt,
     status,
@@ -114,6 +116,7 @@ test("URL filters are validated and combine status, period, and exact date", () 
     status: "scheduled",
   });
   assert.deepEqual(valid, {
+    committeeId: "",
     date: "2026-07-25",
     period: "upcoming",
     status: "scheduled",
@@ -124,7 +127,7 @@ test("URL filters are validated and combine status, period, and exact date", () 
       period: "other",
       status: "private",
     }),
-    { date: "", period: "", status: "" },
+    { committeeId: "", date: "", period: "", status: "" },
   );
 
   const filtered = filterMeetingList(
@@ -144,6 +147,22 @@ test("URL filters are validated and combine status, period, and exact date", () 
     filtered.map(({ id }) => id),
     ["match"],
   );
+
+  const committeeFiltered = filterMeetingList(
+    [
+      meeting({ id: "visible", startsAt: "2026-07-25T10:00:00Z" }),
+      {
+        ...meeting({ id: "other", startsAt: "2026-07-25T10:00:00Z" }),
+        committee_id: "committee-2",
+      },
+    ],
+    { ...valid, committeeId: "committee-1" },
+    now,
+  );
+  assert.deepEqual(
+    committeeFiltered.map(({ id }) => id),
+    ["visible"],
+  );
 });
 
 test("next action follows Issue 16 capabilities for every role", () => {
@@ -152,11 +171,32 @@ test("next action follows Issue 16 capabilities for every role", () => {
   const chair = getMeetingCapabilities("member", "chair");
   const admin = getMeetingCapabilities("admin", null);
 
-  assert.equal(getMeetingListAction("scheduled", viewer).label, "Åbn møde");
-  assert.equal(getMeetingListAction("scheduled", member).label, "Åbn møde");
-  assert.equal(getMeetingListAction("scheduled", chair).label, "Redigér møde");
-  assert.equal(getMeetingListAction("scheduled", admin).label, "Redigér møde");
-  assert.equal(getMeetingListAction("in_progress", chair).label, "Før referat");
+  assert.equal(
+    getMeetingListAction("scheduled", viewer).label,
+    "Åbn dagsorden",
+  );
+  assert.equal(
+    getMeetingListAction("scheduled", member).label,
+    "Åbn dagsorden",
+  );
+  assert.equal(getMeetingListAction("scheduled", chair).label, "Åbn dagsorden");
+  assert.equal(getMeetingListAction("scheduled", admin).label, "Åbn dagsorden");
+  assert.equal(
+    getMeetingListAction("in_progress", chair).label,
+    "Fortsæt møde",
+  );
+  assert.equal(
+    getMeetingListAction("completed", chair, "draft").label,
+    "Færdiggør referat",
+  );
+  assert.equal(
+    getMeetingListAction("completed", viewer, "draft").label,
+    "Se referat",
+  );
+  assert.equal(
+    getMeetingListAction("completed", chair, "ready_for_approval").label,
+    "Se referat",
+  );
   assert.equal(getMeetingListAction("completed", viewer).label, "Se referat");
 });
 
@@ -164,23 +204,71 @@ test("rows expose native deep links, text status, and mobile-safe metadata", () 
   assert.match(meetingList, /<article/);
   assert.match(meetingList, /<Link[\s\S]*href=\{meetingHref\}/);
   assert.match(meetingList, /<time dateTime=\{meeting\.starts_at\}>/);
-  assert.match(meetingList, /meetingStatusLabels\[meeting\.status\]/);
-  assert.match(meetingList, /Næste trin/);
+  assert.match(meetingList, /meetingOverviewStatus\(meeting\)/);
+  assert.match(meetingList, /Dagsorden klar/);
+  assert.match(meetingList, /Referat mangler/);
+  assert.match(meetingList, /Afventer godkendelse/);
+  assert.match(meetingList, /Afsluttet/);
   assert.match(meetingList, /aria-label=\{`\$\{action\.label\}:/);
   assert.match(meetingList, /break-words/);
   assert.doesNotMatch(meetingList, /overflow-x-auto/);
-  assert.doesNotMatch(meetingList, /onClick=/);
+  assert.match(meetingList, /<Dropdown/);
+  assert.doesNotMatch(meetingList, /overflow-x-auto/);
 });
 
 test("filter state and empty results remain distinguishable", () => {
   assert.match(filters, /method="get"/);
-  assert.match(filters, /name="period"/);
+  assert.match(filters, /aria-label="Mødeperiode"/);
+  assert.match(filters, /\["upcoming", "Kommende"\]/);
+  assert.match(filters, /\["previous", "Afholdte"\]/);
+  assert.match(filters, /name="committee"/);
   assert.match(filters, /name="status"/);
   assert.match(filters, /name="date"/);
   assert.match(filters, /Ryd filtre/);
   assert.match(organizationPage, /Ingen møder matcher filtrene/);
   assert.match(committeePage, /Ingen møder matcher filtrene/);
-  assert.match(committeePage, /Der er endnu ikke oprettet nogen møder/);
+  assert.match(committeePage, /Ingen kommende møder/);
+});
+
+test("agenda preview is accessible, linked, and limited to four rows", () => {
+  assert.match(agendaPreview, /meetingAgendaPreviewLimit = 4/);
+  assert.match(agendaPreview, /aria-expanded=\{expanded\}/);
+  assert.match(agendaPreview, /aria-controls=\{panelId\}/);
+  assert.match(
+    agendaPreview,
+    /agendaItems\.slice\(0, meetingAgendaPreviewLimit\)/,
+  );
+  assert.match(agendaPreview, /\+ \{hiddenCount\} flere punkter/);
+  assert.match(
+    agendaPreview,
+    /agendaItems\.length - meetingAgendaPreviewLimit/,
+  );
+  assert.match(agendaPreview, /\{item\.displayNumber\}\./);
+  assert.match(agendaPreview, /type=\{item\.item_type\}/);
+  assert.match(
+    agendaPreview,
+    /href=\{`\$\{meetingHref\}#agenda-point-\$\{item\.occurrenceId\}`\}/,
+  );
+});
+
+test("organization overview uses the existing shell and a secondary context column", () => {
+  assert.match(organizationPage, /title="Mødeoversigt"/);
+  assert.match(organizationPage, /data-meeting-overview/);
+  assert.match(organizationPage, /79fr.*21fr/);
+  assert.match(organizationPage, /<MeetingOverviewContext/);
+  assert.match(overviewContext, /Næste møde/);
+  assert.match(overviewContext, /Kræver handling/);
+  assert.match(overviewContext, /Hurtig adgang/);
+  assert.doesNotMatch(organizationPage, /AppShell|OrganizationNav|Topbar/);
+});
+
+test("create meeting remains capability-gated", () => {
+  assert.match(
+    organizationPage,
+    /overview\.committees\.find\([\s\S]*capabilities\.createMeeting/,
+  );
+  assert.match(organizationPage, /\{meetingCommittee \? \(/);
+  assert.match(committeePage, /capabilities\.createMeeting \? \(/);
 });
 
 test("organization and committee queries preserve authorization scope", () => {

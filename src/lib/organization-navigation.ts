@@ -6,11 +6,13 @@ export type OrganizationNavItem = {
 
 export const organizationNavItems: readonly OrganizationNavItem[] = [
   { label: "Overblik", suffix: "" },
+  { label: "Handlinger", suffix: "/actions" },
   { label: "Udvalg", suffix: "/committees" },
   { label: "Møder", suffix: "/meetings" },
   { label: "Beslutninger", suffix: "/decisions" },
+  { label: "Dokumenter", suffix: "/documents" },
+  { label: "Interessenter & Relationer", suffix: "/stakeholders" },
   { label: "Opgaver", match: "exact", suffix: "/tasks" },
-  { label: "Mine opgaver", suffix: "/tasks/my" },
   { label: "Årshjul", suffix: "/annual-wheel" },
   { label: "Jobkort", suffix: "/job-cards" },
   { label: "Medlemmer", suffix: "/members" },

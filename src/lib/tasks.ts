@@ -28,8 +28,6 @@ export const taskBoardStatuses: TaskStatus[] = [
   "not_started",
   "in_progress",
   "waiting",
-  "completed",
-  "cancelled",
 ];
 
 export type TaskFilters = {

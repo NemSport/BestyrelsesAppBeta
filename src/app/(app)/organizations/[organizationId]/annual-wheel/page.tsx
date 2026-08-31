@@ -18,7 +18,7 @@ export default async function AnnualWheelPage({
   );
 
   return (
-    <div className="page-flow">
+    <div className="page-flow" data-annual-wheel-page>
       <PageHeader
         description="Planlæg aktiviteter, gentagelser og deadlines, før de bliver akutte."
         eyebrow="Strategisk planlægning"

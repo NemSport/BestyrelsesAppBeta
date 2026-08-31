@@ -8,6 +8,17 @@ const logoBucket = "organization-logos";
 export class OrganizationBrandingRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async listByOrganizations(organizationIds: string[]) {
+    if (organizationIds.length === 0) return [];
+
+    const { data, error } = await this.db
+      .from("organization_branding")
+      .select("*")
+      .in("organization_id", organizationIds);
+    if (error) throw error;
+    return data as OrganizationBranding[];
+  }
+
   async findByOrganization(organizationId: string) {
     const { data, error } = await this.db
       .from("organization_branding")

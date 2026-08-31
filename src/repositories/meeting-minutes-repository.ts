@@ -28,6 +28,17 @@ export class MeetingMinutesRepository {
     return data as MeetingMinutes | null;
   }
 
+  async findMeetingMinutesById(id: string, meetingId: string) {
+    const { data, error } = await this.db
+      .from("meeting_minutes")
+      .select("*")
+      .eq("id", id)
+      .eq("meeting_id", meetingId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as MeetingMinutes | null;
+  }
+
   async listAgendaItemMinutes(meetingId: string) {
     const { data, error } = await this.db
       .from("agenda_item_minutes")
@@ -97,6 +108,22 @@ export class MeetingMinutesRepository {
     const { data, error } = await this.db
       .from("agenda_item_minutes")
       .select("*")
+      .eq("meeting_id", meetingId)
+      .eq("agenda_item_id", agendaItemId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as AgendaItemMinutes | null;
+  }
+
+  async findAgendaItemMinutesById(
+    id: string,
+    meetingId: string,
+    agendaItemId: string,
+  ) {
+    const { data, error } = await this.db
+      .from("agenda_item_minutes")
+      .select("*")
+      .eq("id", id)
       .eq("meeting_id", meetingId)
       .eq("agenda_item_id", agendaItemId)
       .maybeSingle();

@@ -16,7 +16,7 @@ import { OrganizationBrandingService } from "@/services/organization-branding-se
 import type { Database } from "@/types/database";
 import type { OrganizationMemberDirectoryEntry } from "@/types/domain";
 
-type EmailPayload = {
+export type EmailPayload = {
   from: string;
   to: string[];
   subject: string;
@@ -194,6 +194,10 @@ export class EmailService {
         },
       ],
     });
+  }
+
+  async sendPrepared(payload: EmailPayload) {
+    return this.deliver(payload);
   }
 
   private resolveCommitteeRecipients({

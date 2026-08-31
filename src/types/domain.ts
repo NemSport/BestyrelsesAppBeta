@@ -28,6 +28,7 @@ export type TransferredAgendaItem = TableRow<"transferred_agenda_items">;
 export type Decision = TableRow<"decisions">;
 export type Task = TableRow<"tasks">;
 export type TaskComment = TableRow<"task_comments">;
+export type ActionPersonalState = TableRow<"action_user_states">;
 export type AnnualWheelEvent = TableRow<"annual_wheel_events">;
 export type AnnualWheelKeyPerson = TableRow<"annual_wheel_key_people">;
 export type AnnualWheelTaskTemplate = TableRow<"annual_wheel_task_templates">;
@@ -122,6 +123,12 @@ export type OrganizationSummary = Organization & {
   committees: Committee[];
 };
 
+export type OrganizationWorkspaceEntry = Pick<Organization, "id" | "name"> & {
+  role: OrganizationMember["role"];
+  committeeCount: number;
+  logoUrl: string | null;
+};
+
 export type OrganizationMemberDirectoryEntry = {
   user_id: string;
   full_name: string | null;
@@ -143,6 +150,63 @@ export type AgendaItemWithOccurrences = AgendaItem & {
   >;
 };
 
+export type AgendaItemHistoryEntry = {
+  id: string;
+  occurrenceId: string | null;
+  threadId: string;
+  meetingId: string | null;
+  meetingTitle: string | null;
+  meetingDate: string | null;
+  meetingStatus: Meeting["status"] | null;
+  agendaItemNumber: number | null;
+  title: string;
+  type: AgendaItem["item_type"];
+  background: string;
+  objective: string;
+  outcomeSummary: string;
+  status:
+    | AgendaItem["lifecycle_status"]
+    | AgendaItemOccurrence["meeting_status"];
+  minutes: {
+    notes: string;
+    decision: string;
+    followUp: string;
+    status: AgendaItemMinutes["status"];
+  } | null;
+  decisions: Array<{
+    id: string;
+    title: string;
+    description: string;
+    status: Decision["status"];
+    decisionDate: string;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: Task["status"];
+    deadline: string | null;
+    responsibleName: string | null;
+  }>;
+  openTaskCount: number;
+  transfer: {
+    reason: TransferredAgendaItem["transfer_reason"];
+    status: TransferredAgendaItem["status"];
+  } | null;
+  createdAt: string;
+};
+
+export type AgendaItemHistoryLinkCandidate = {
+  agendaItemId: string;
+  threadId: string;
+  title: string;
+  itemType: AgendaItem["item_type"];
+  agendaItemNumber: number | null;
+  meetingId: string;
+  meetingTitle: string;
+  meetingDate: string;
+  historyCount: number;
+};
+
 export type MeetingWithAgenda = Meeting & {
   agenda_item_occurrences: Array<
     AgendaItemOccurrence & {
@@ -153,7 +217,7 @@ export type MeetingWithAgenda = Meeting & {
 
 export type MeetingWithAgendaPreview = Meeting & {
   agenda_item_occurrences: Array<
-    Pick<AgendaItemOccurrence, "position"> & {
+    Pick<AgendaItemOccurrence, "id" | "position"> & {
       agenda_items: Pick<AgendaItem, "id" | "title" | "item_type"> | null;
     }
   >;
@@ -205,6 +269,45 @@ export type CommitteeOverview = {
   activeDecisions: DecisionView[];
 };
 
+export type CommitteeWorkspaceActivity = {
+  id: string;
+  kind: "meeting" | "task" | "decision" | "document" | "activity";
+  title: string;
+  detail: string;
+  occurredAt: string;
+  href: string;
+};
+
+export type CommitteeWorkspace = {
+  committee: Committee;
+  members: CommitteeOverviewMember[];
+  nextMeeting: MeetingWithAgendaPreview | null;
+  activeTasks: TaskView[];
+  upcomingActivities: AnnualWheelEventView[];
+  recentDocuments: Array<{
+    id: string;
+    name: string;
+    updatedAt: string;
+    fileName: string | null;
+    mimeType: string | null;
+    uploaderName: string;
+  }>;
+  recentActivity: CommitteeWorkspaceActivity[];
+};
+
+export type CommitteeDirectoryEntry = {
+  committee: Committee;
+  members: CommitteeOverviewMember[];
+  activeTaskCount: number;
+  overdueTaskCount: number;
+  upcomingMeetingCount: number;
+  nextMeeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
+  nextActivity: Pick<
+    AnnualWheelEvent,
+    "id" | "title" | "starts_on" | "ends_on"
+  > | null;
+};
+
 export type OrganizationOverviewActionItem = {
   id: string;
   kind: "follow_up" | "decision" | "transfer";
@@ -229,6 +332,77 @@ export type PendingMinutesApprovalReminder = {
   status: MeetingMinuteApproval["status"];
   approvalDeadline: string | null;
   updatedAt: string;
+};
+
+export type ApprovalActionSource = {
+  approvalId: string;
+  organizationId: string;
+  userId: string;
+  approvalStatus: MeetingMinuteApproval["status"];
+  meetingMinutesId: string;
+  minutesStatus: MeetingMinutes["status"];
+  approvalDeadline: string | null;
+  meetingId: string;
+  meetingTitle: string;
+  meetingStartsAt: string;
+  committeeId: string;
+  committeeName: string;
+  updatedAt: string;
+};
+
+export type ActionItem = {
+  key: string;
+  type:
+    | "task_overdue"
+    | "task_due_soon"
+    | "task_reminder"
+    | "stakeholder_follow_up"
+    | "stakeholder_contract_notice"
+    | "stakeholder_contract_renewal"
+    | "stakeholder_contract_end"
+    | "stakeholder_pipeline_follow_up"
+    | "minutes_approval"
+    | "annual_wheel_overdue"
+    | "annual_wheel_due";
+  category: "requires_action" | "deadline" | "follow_up" | "information";
+  priority: "critical" | "soon" | "follow_up" | "information";
+  audience: "personal" | "organization";
+  title: string;
+  description: string;
+  context: string;
+  href: string;
+  sourceType:
+    | "task"
+    | "meeting_minutes"
+    | "annual_wheel_event"
+    | "stakeholder"
+    | "stakeholder_contract"
+    | "stakeholder_pipeline";
+  sourceId: string;
+  responsibleUserId: string | null;
+  deadline: string | null;
+  daysUntil: number | null;
+  occurredAt: string;
+  state: "inbox" | "claimed" | "snoozed" | "dismissed" | "resolved";
+  snoozedUntil: string | null;
+  dismissalReason: string | null;
+  reminderAt?: string | null;
+  followUpAt?: string | null;
+  stakeholderId?: string;
+  meetingId?: string;
+  committeeId?: string;
+  task?: TaskView;
+};
+
+export type ActionCenterData = {
+  userId: string;
+  inbox: ActionItem[];
+  mine: ActionItem[];
+  completed: ActionItem[];
+  activeCount: number;
+  delegationMembers: OrganizationMemberDirectoryEntry[];
+  editableCommitteeIds: string[];
+  nextRefreshAt: string | null;
 };
 
 export type OrganizationOverview = {
@@ -369,8 +543,20 @@ export type TaskView = Task & {
   meeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
   agendaItem: Pick<AgendaItem, "id" | "title" | "item_type"> | null;
   decision: Pick<Decision, "id" | "title"> | null;
+  stakeholder?: { id: string; name: string; stakeholder_type: string } | null;
+  stakeholderContract?: { id: string; title: string } | null;
   responsible: Pick<Profile, "id" | "full_name"> | null;
 };
+
+export type TaskStakeholderOption = Pick<
+  TableRow<"stakeholders">,
+  "id" | "name"
+>;
+
+export type TaskStakeholderContractOption = Pick<
+  TableRow<"stakeholder_contracts">,
+  "id" | "stakeholder_id" | "title"
+>;
 
 export type IncomingTransferredAgendaItemView = {
   id: string;
@@ -406,6 +592,8 @@ export type TaskRegisterData = {
   agendaItems: AgendaItem[];
   decisions: DecisionView[];
   members: OrganizationMemberDirectoryEntry[];
+  stakeholders: TaskStakeholderOption[];
+  stakeholderContracts: TaskStakeholderContractOption[];
   editableCommitteeIds: string[];
 };
 

@@ -12,6 +12,155 @@ export type Database = {
   };
   public: {
     Tables: {
+      action_user_states: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          action_key: string;
+          action_type: string;
+          source_type: string;
+          source_id: string;
+          status: "claimed" | "snoozed" | "dismissed";
+          snoozed_until: string | null;
+          dismissal_reason: string | null;
+          first_seen_at: string;
+          last_seen_at: string;
+          resolved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          action_key: string;
+          action_type: string;
+          source_type: string;
+          source_id: string;
+          status: "claimed" | "snoozed" | "dismissed";
+          snoozed_until?: string | null;
+          dismissal_reason?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+          resolved_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: "claimed" | "snoozed" | "dismissed";
+          snoozed_until?: string | null;
+          dismissal_reason?: string | null;
+          last_seen_at?: string;
+          resolved_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      meeting_material_dispatches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          sender_id: string;
+          subject: string;
+          message: string;
+          content_types: string[];
+          task_list_mode: string | null;
+          recipient_count: number;
+          recipient_snapshot: Json;
+          document_snapshot: Json;
+          delivery_status: string;
+          delivery_mode: string;
+          sent_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          committee_id: string;
+          meeting_id: string;
+          sender_id: string;
+          subject: string;
+          message?: string;
+          content_types: string[];
+          task_list_mode?: string | null;
+          recipient_count: number;
+          recipient_snapshot: Json;
+          document_snapshot?: Json;
+          delivery_status: string;
+          delivery_mode: string;
+          sent_at?: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      stakeholders: {
+        Row: { id: string; organization_id: string; name: string; stakeholder_type: Database["public"]["Enums"]["stakeholder_type"]; relationship_status: Database["public"]["Enums"]["stakeholder_relationship_status"]; internal_owner_user_id: string | null; website: string | null; phone: string | null; email: string | null; cvr_number: string | null; address_line: string | null; postal_code: string | null; city: string | null; country: string | null; notes: string | null; next_follow_up_at: string | null; next_follow_up_note: string | null; archived_at: string | null; created_by: string; updated_by: string; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; name: string; stakeholder_type: Database["public"]["Enums"]["stakeholder_type"]; relationship_status?: Database["public"]["Enums"]["stakeholder_relationship_status"]; internal_owner_user_id?: string | null; website?: string | null; phone?: string | null; email?: string | null; cvr_number?: string | null; address_line?: string | null; postal_code?: string | null; city?: string | null; country?: string | null; notes?: string | null; next_follow_up_at?: string | null; next_follow_up_note?: string | null; archived_at?: string | null; created_by: string; updated_by: string };
+        Update: { name?: string; stakeholder_type?: Database["public"]["Enums"]["stakeholder_type"]; relationship_status?: Database["public"]["Enums"]["stakeholder_relationship_status"]; internal_owner_user_id?: string | null; website?: string | null; phone?: string | null; email?: string | null; cvr_number?: string | null; address_line?: string | null; postal_code?: string | null; city?: string | null; country?: string | null; notes?: string | null; next_follow_up_at?: string | null; next_follow_up_note?: string | null; archived_at?: string | null; updated_by?: string };
+        Relationships: [];
+      };
+      stakeholder_contacts: {
+        Row: { id: string; organization_id: string; stakeholder_id: string; name: string; job_title: string | null; email: string | null; phone: string | null; is_primary: boolean; notes: string | null; archived_at: string | null; created_by: string; updated_by: string; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; stakeholder_id: string; name: string; job_title?: string | null; email?: string | null; phone?: string | null; is_primary?: boolean; notes?: string | null; archived_at?: string | null; created_by: string; updated_by: string };
+        Update: { name?: string; job_title?: string | null; email?: string | null; phone?: string | null; is_primary?: boolean; notes?: string | null; archived_at?: string | null; updated_by?: string };
+        Relationships: [];
+      };
+      stakeholder_contracts: {
+        Row: { id: string; organization_id: string; stakeholder_id: string; title: string; status: Database["public"]["Enums"]["stakeholder_contract_status"]; contract_value: number | null; annual_value: number | null; currency: string; start_date: string; end_date: string | null; notice_deadline: string | null; renewal_deadline: string | null; auto_renew: boolean; notes: string | null; archived_at: string | null; created_by: string; updated_by: string; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; stakeholder_id: string; title: string; status?: Database["public"]["Enums"]["stakeholder_contract_status"]; contract_value?: number | null; annual_value?: number | null; currency?: string; start_date: string; end_date?: string | null; notice_deadline?: string | null; renewal_deadline?: string | null; auto_renew?: boolean; notes?: string | null; archived_at?: string | null; created_by: string; updated_by: string };
+        Update: { title?: string; status?: Database["public"]["Enums"]["stakeholder_contract_status"]; contract_value?: number | null; annual_value?: number | null; currency?: string; start_date?: string; end_date?: string | null; notice_deadline?: string | null; renewal_deadline?: string | null; auto_renew?: boolean; notes?: string | null; archived_at?: string | null; updated_by?: string };
+        Relationships: [];
+      };
+      stakeholder_contract_deliverables: {
+        Row: { id: string; organization_id: string; contract_id: string; deliverable_type: string; title: string; description: string | null; quantity_details: string | null; fulfillment_status: string; archived_at: string | null; created_by: string; updated_by: string; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; contract_id: string; deliverable_type: string; title: string; description?: string | null; quantity_details?: string | null; fulfillment_status?: string; archived_at?: string | null; created_by: string; updated_by: string };
+        Update: { deliverable_type?: string; title?: string; description?: string | null; quantity_details?: string | null; fulfillment_status?: string; archived_at?: string | null; updated_by?: string };
+        Relationships: [];
+      };
+      stakeholder_activities: {
+        Row: { id: string; organization_id: string; stakeholder_id: string; activity_type: Database["public"]["Enums"]["stakeholder_activity_type"]; activity_source: string; title: string; description: string | null; occurred_at: string; created_by: string; contact_id: string | null; contract_id: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; stakeholder_id: string; activity_type: Database["public"]["Enums"]["stakeholder_activity_type"]; activity_source?: string; title: string; description?: string | null; occurred_at?: string; created_by: string; contact_id?: string | null; contract_id?: string | null };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      stakeholder_pipeline_entries: {
+        Row: { id: string; organization_id: string; stakeholder_id: string; pipeline_type: string; stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; internal_owner_user_id: string | null; estimated_value: number | null; currency: string; next_follow_up_at: string | null; next_follow_up_note: string | null; last_contact_at: string | null; lost_reason: string | null; closed_at: string | null; created_by: string; updated_by: string; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; stakeholder_id: string; pipeline_type?: string; stage?: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; internal_owner_user_id?: string | null; estimated_value?: number | null; currency?: string; next_follow_up_at?: string | null; next_follow_up_note?: string | null; last_contact_at?: string | null; lost_reason?: string | null; closed_at?: string | null; created_by: string; updated_by: string };
+        Update: { internal_owner_user_id?: string | null; estimated_value?: number | null; currency?: string; next_follow_up_at?: string | null; next_follow_up_note?: string | null; last_contact_at?: string | null; lost_reason?: string | null; updated_by?: string };
+        Relationships: [];
+      };
+      stakeholder_pipeline_events: {
+        Row: { id: string; organization_id: string; pipeline_entry_id: string; from_stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"] | null; to_stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; changed_by: string; changed_at: string };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      document_categories: {
+        Row: { id: string; organization_id: string; name: string; description: string | null; is_active: boolean; is_system: boolean; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; name: string; description?: string | null; is_active?: boolean; is_system?: boolean; created_by?: string | null; updated_by?: string | null };
+        Update: { name?: string; description?: string | null; is_active?: boolean; updated_by?: string | null };
+        Relationships: [];
+      };
+      documents: {
+        Row: { id: string; organization_id: string; primary_committee_id: string | null; category_id: string | null; name: string; description: string | null; current_version_number: number; uploaded_by: string; created_by: string; updated_by: string; legacy_source_type: string | null; legacy_source_id: string | null; deleted_at: string | null; deleted_by: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; organization_id: string; primary_committee_id?: string | null; category_id?: string | null; name: string; description?: string | null; current_version_number?: number; uploaded_by: string; created_by: string; updated_by: string };
+        Update: { primary_committee_id?: string | null; category_id?: string | null; name?: string; description?: string | null; current_version_number?: number; updated_by?: string; deleted_at?: string | null; deleted_by?: string | null };
+        Relationships: [];
+      };
+      document_versions: {
+        Row: { id: string; organization_id: string; document_id: string; version_number: number; storage_bucket: string; storage_path: string; file_name: string; mime_type: string; file_size: number; uploaded_by: string; created_at: string };
+        Insert: { id?: string; organization_id: string; document_id: string; version_number: number; storage_bucket: string; storage_path: string; file_name: string; mime_type: string; file_size: number; uploaded_by: string; created_at?: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      document_relations: {
+        Row: { id: string; organization_id: string; document_id: string; relation_type: Database["public"]["Enums"]["document_relation_type"]; committee_id: string | null; meeting_id: string | null; agenda_item_id: string | null; task_id: string | null; annual_wheel_event_id: string | null; stakeholder_id: string | null; stakeholder_contract_id: string | null; created_by: string; created_at: string };
+        Insert: { id?: string; organization_id: string; document_id: string; relation_type: Database["public"]["Enums"]["document_relation_type"]; committee_id?: string | null; meeting_id?: string | null; agenda_item_id?: string | null; task_id?: string | null; annual_wheel_event_id?: string | null; stakeholder_id?: string | null; stakeholder_contract_id?: string | null; created_by: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -454,6 +603,7 @@ export type Database = {
           id: string;
           organization_id: string;
           committee_id: string;
+          agenda_item_thread_id: string;
           parent_id: string | null;
           title: string;
           description: string;
@@ -478,6 +628,7 @@ export type Database = {
           id?: string;
           organization_id: string;
           committee_id: string;
+          agenda_item_thread_id?: string;
           parent_id?: string | null;
           title: string;
           description?: string;
@@ -497,6 +648,7 @@ export type Database = {
           created_by: string;
         };
         Update: {
+          agenda_item_thread_id?: string;
           parent_id?: string | null;
           title?: string;
           description?: string;
@@ -930,6 +1082,8 @@ export type Database = {
           meeting_id: string | null;
           agenda_item_id: string | null;
           decision_id: string | null;
+          stakeholder_id: string | null;
+          stakeholder_contract_id: string | null;
           role_profile_id: string | null;
           task_template_id: string | null;
           annual_wheel_event_id: string | null;
@@ -959,6 +1113,8 @@ export type Database = {
           meeting_id?: string | null;
           agenda_item_id?: string | null;
           decision_id?: string | null;
+          stakeholder_id?: string | null;
+          stakeholder_contract_id?: string | null;
           role_profile_id?: string | null;
           task_template_id?: string | null;
           annual_wheel_event_id?: string | null;
@@ -984,6 +1140,8 @@ export type Database = {
           meeting_id?: string | null;
           agenda_item_id?: string | null;
           decision_id?: string | null;
+          stakeholder_id?: string | null;
+          stakeholder_contract_id?: string | null;
           role_profile_id?: string | null;
           task_template_id?: string | null;
           annual_wheel_event_id?: string | null;
@@ -1427,6 +1585,26 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      update_stakeholder_pipeline_stage: {
+        Args: { target_organization_id: string; target_pipeline_entry_id: string; target_stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; target_lost_reason?: string | null };
+        Returns: Database["public"]["Tables"]["stakeholder_pipeline_entries"]["Row"];
+      };
+      add_document_version: {
+        Args: { target_document_id: string; target_storage_bucket: string; target_storage_path: string; target_file_name: string; target_mime_type: string; target_file_size: number };
+        Returns: Database["public"]["Tables"]["document_versions"]["Row"];
+      };
+      attach_existing_document: {
+        Args: {
+          target_document_id: string;
+          target_relation_type: Database["public"]["Enums"]["document_relation_type"];
+          target_relation_id?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["document_relations"]["Row"];
+      };
+      detach_existing_document: {
+        Args: { target_relation_id: string };
+        Returns: string;
+      };
       create_organization_with_owner: {
         Args: { organization_name: string; organization_slug: string };
         Returns: Database["public"]["Tables"]["organizations"]["Row"];
@@ -1450,6 +1628,16 @@ export type Database = {
           agenda_status: Database["public"]["Enums"]["agenda_item_status"];
           agenda_target_date?: string | null;
           target_meeting_id?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["agenda_items"]["Row"];
+      };
+      link_agenda_item_to_history: {
+        Args: {
+          target_organization_id: string;
+          target_committee_id: string;
+          source_agenda_item_id: string;
+          target_agenda_item_id: string;
+          expected_source_thread_id: string;
         };
         Returns: Database["public"]["Tables"]["agenda_items"]["Row"];
       };
@@ -1660,6 +1848,12 @@ export type Database = {
       };
     };
     Enums: {
+      document_relation_type: "organization" | "committee" | "meeting" | "agenda_item" | "task" | "annual_wheel_event" | "stakeholder" | "stakeholder_contract";
+      stakeholder_type: "sponsor" | "supplier" | "partner" | "other";
+      stakeholder_relationship_status: "lead" | "active" | "inactive" | "ended";
+      stakeholder_contract_status: "draft" | "active" | "expired" | "terminated";
+      stakeholder_activity_type: "note" | "phone_call" | "email" | "meeting" | "follow_up" | "contract_event" | "pipeline_change";
+      stakeholder_pipeline_stage: "lead" | "contacted" | "dialogue" | "proposal_sent" | "won" | "lost";
       ai_activity_status: "generated" | "applied" | "dismissed" | "failed";
       organization_role: "owner" | "admin" | "member" | "viewer";
       membership_status: "active" | "suspended";

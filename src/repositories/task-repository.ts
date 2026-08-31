@@ -7,7 +7,7 @@ export class TaskRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
   private readonly viewSelect =
-    "*, committee:committees(id, name, deleted_at), meeting:meetings(id, title, starts_at, deleted_at), agendaItem:agenda_items(id, title, item_type, deleted_at), decision:decisions(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
+    "*, committee:committees(id, name, deleted_at), meeting:meetings(id, title, starts_at, deleted_at), agendaItem:agenda_items(id, title, item_type, deleted_at), decision:decisions(id, title), stakeholder:stakeholders(id, name, stakeholder_type), stakeholderContract:stakeholder_contracts(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
 
   async listByOrganization(organizationId: string) {
     const { data, error } = await this.db
@@ -39,6 +39,34 @@ export class TaskRepository {
       .eq("committee_id", committeeId)
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
+    if (error) throw error;
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
+  async listWorkspaceOpen(organizationId: string, committeeId: string) {
+    const { data, error } = await this.db
+      .from("tasks")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .is("archived_at", null)
+      .not("status", "in", "(completed,cancelled)")
+      .order("deadline", { ascending: true, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .limit(12);
+    if (error) throw error;
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
+  async listWorkspaceRecent(organizationId: string, committeeId: string) {
+    const { data, error } = await this.db
+      .from("tasks")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .is("archived_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(5);
     if (error) throw error;
     return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
@@ -85,6 +113,19 @@ export class TaskRepository {
       .from("tasks")
       .select(this.viewSelect)
       .eq("decision_id", decisionId)
+      .is("archived_at", null)
+      .order("deadline", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
+  async listByStakeholder(organizationId: string, stakeholderId: string) {
+    const { data, error } = await this.db
+      .from("tasks")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .eq("stakeholder_id", stakeholderId)
       .is("archived_at", null)
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });

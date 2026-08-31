@@ -44,6 +44,18 @@ export class DecisionRepository {
     return this.activeRelations(data as unknown as DecisionViewWithTrash[]);
   }
 
+  async listWorkspaceRecent(organizationId: string, committeeId: string) {
+    const { data, error } = await this.db
+      .from("decisions")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .order("updated_at", { ascending: false })
+      .limit(5);
+    if (error) throw error;
+    return this.activeRelations(data as unknown as DecisionViewWithTrash[]);
+  }
+
   async findById(decisionId: string) {
     const { data, error } = await this.db
       .from("decisions")

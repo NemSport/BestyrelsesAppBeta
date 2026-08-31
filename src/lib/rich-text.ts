@@ -27,6 +27,7 @@ export type RichTextPdfBlock = {
   runs?: RichTextPdfRun[];
   ordered?: boolean;
   index?: number;
+  depth?: number;
 };
 
 function escapeHtml(value: string) {
@@ -172,9 +173,14 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
   if (!sanitized) return [] satisfies RichTextPdfBlock[];
 
   const blocks: RichTextPdfBlock[] = [];
-  const listStack: Array<"ul" | "ol"> = [];
-  const listCounters: number[] = [];
+  const listStack: Array<{ type: "ul" | "ol"; counter: number }> = [];
   let active: RichTextPdfBlock["type"] | null = null;
+  let activeListMeta:
+    | Pick<RichTextPdfBlock, "ordered" | "index" | "depth">
+    | null = null;
+  let listItemMeta:
+    | Pick<RichTextPdfBlock, "ordered" | "index" | "depth">
+    | null = null;
   let buffer = "";
   let runs: RichTextPdfRun[] = [];
   let boldDepth = 0;
@@ -197,15 +203,11 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
       return;
     }
     if (active === "listItem") {
-      const ordered = listStack[listStack.length - 1] === "ol";
-      const counterIndex = Math.max(listCounters.length - 1, 0);
-      if (ordered) listCounters[counterIndex] += 1;
       blocks.push({
         type: "listItem",
         text,
         runs: normalizedRuns,
-        ordered,
-        index: ordered ? listCounters[counterIndex] : undefined,
+        ...activeListMeta,
       });
     } else {
       blocks.push({
@@ -216,6 +218,11 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
     }
     buffer = "";
     runs = [];
+  };
+
+  const beginListItemContent = () => {
+    active = "listItem";
+    activeListMeta = listItemMeta;
   };
 
   for (const token of sanitized.match(/<[^>]*>|[^<]+/g) ?? []) {
@@ -257,29 +264,58 @@ export function richTextToPdfBlocks(value: string | null | undefined) {
       continue;
     }
 
-    if (!closing && (tag === "p" || tag === "h2" || tag === "blockquote" || tag === "li")) {
+    if (!closing && tag === "li") {
       pushBuffer();
-      active =
-        tag === "h2" ? "heading" : tag === "blockquote" ? "quote" : tag === "li" ? "listItem" : "paragraph";
+      const list = listStack[listStack.length - 1];
+      if (list?.type === "ol") list.counter += 1;
+      listItemMeta = {
+        ordered: list?.type === "ol",
+        index: list?.type === "ol" ? list.counter : undefined,
+        depth: Math.max(0, listStack.length - 1),
+      };
+      beginListItemContent();
       continue;
     }
 
-    if (closing && (tag === "p" || tag === "h2" || tag === "blockquote" || tag === "li")) {
+    if (closing && tag === "li") {
       pushBuffer();
       active = null;
+      activeListMeta = null;
+      listItemMeta = null;
+      continue;
+    }
+
+    if (!closing && (tag === "p" || tag === "h2" || tag === "blockquote")) {
+      if (buffer) pushBuffer();
+      if (listItemMeta && tag === "p") {
+        beginListItemContent();
+      } else {
+        active = tag === "h2" ? "heading" : tag === "blockquote" ? "quote" : "paragraph";
+        activeListMeta = null;
+      }
+      continue;
+    }
+
+    if (closing && (tag === "p" || tag === "h2" || tag === "blockquote")) {
+      pushBuffer();
+      active = null;
+      activeListMeta = null;
       continue;
     }
 
     if (!closing && (tag === "ul" || tag === "ol")) {
-      listStack.push(tag);
-      listCounters.push(0);
+      pushBuffer();
+      listStack.push({ type: tag, counter: 0 });
+      active = null;
+      activeListMeta = null;
       continue;
     }
 
     if (closing && (tag === "ul" || tag === "ol")) {
       pushBuffer();
       listStack.pop();
-      listCounters.pop();
+      active = null;
+      activeListMeta = null;
     }
   }
 

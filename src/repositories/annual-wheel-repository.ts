@@ -27,12 +27,73 @@ export class AnnualWheelRepository {
     return this.withWorkItems(organizationId, events);
   }
 
+  async listWorkspaceUpcoming(
+    organizationId: string,
+    committeeId: string,
+    from: string,
+  ) {
+    const { data, error } = await this.db
+      .from("annual_wheel_events")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .is("deleted_at", null)
+      .not("status", "in", "(completed,cancelled)")
+      .gte("ends_on", from)
+      .order("starts_on", { ascending: true })
+      .limit(6);
+    if (error) throw error;
+    return this.activeRelations(
+      data as unknown as AnnualWheelEventViewWithTrash[],
+    );
+  }
+
+  async listActionCandidates(organizationId: string, throughDate: string) {
+    const { data, error } = await this.db
+      .from("annual_wheel_events")
+      .select(this.viewSelect)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .not("status", "in", "(completed,cancelled)")
+      .lte("starts_on", throughDate)
+      .order("ends_on", { ascending: true });
+    if (error) throw error;
+    return this.activeRelations(
+      data as unknown as AnnualWheelEventViewWithTrash[],
+    );
+  }
+
+  async listCommitteeDirectoryUpcoming(organizationId: string, from: string) {
+    const { data, error } = await this.db
+      .from("annual_wheel_events")
+      .select("id,title,committee_id,starts_on,ends_on")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .not("status", "in", "(completed,cancelled)")
+      .gte("starts_on", from)
+      .order("starts_on", { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
   async findById(eventId: string) {
     const { data, error } = await this.db
       .from("annual_wheel_events")
       .select("*")
       .eq("id", eventId)
       .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async findFutureOccurrences(seriesId: string, occurrenceIndex: number) {
+    const { data, error } = await this.db
+      .from("annual_wheel_events")
+      .select("*")
+      .eq("series_id", seriesId)
+      .gt("occurrence_index", occurrenceIndex)
+      .is("deleted_at", null)
+      .order("occurrence_index");
     if (error) throw error;
     return data;
   }

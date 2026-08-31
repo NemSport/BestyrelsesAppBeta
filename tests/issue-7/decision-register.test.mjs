@@ -34,7 +34,7 @@ const [
     "../../supabase/migrations/202606130002_decision_register_foundation.sql",
   ),
   source(
-    "../../supabase/migrations/202607240001_require_decision_agenda_context.sql",
+    "../../supabase/migrations/202607240004_require_decision_agenda_context.sql",
   ),
   source("../../src/lib/validation.ts"),
 ]);

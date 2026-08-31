@@ -116,6 +116,39 @@ across the committees visible to the current user. This is a presentation read
 model only; committee membership and PostgreSQL Row Level Security still
 determine which underlying records are returned.
 
+Dashboard UX V3.1 turns the organization page into a personal working start
+page. It shows the next accessible meeting, permission-relevant task and
+decision counts, concrete prioritized actions, a compact upcoming schedule,
+one Committee navigation section, and recently updated accessible minutes.
+The latter is an explicit "continue" fallback because the MVP does not track
+personal navigation history. All values remain derived from the existing
+organization overview read model; no dashboard state or activity-tracking
+table is introduced.
+
+Version 3.1.1 polishes that approved structure with slightly more compact
+status cards, a stronger title-first hierarchy in "Requires action now", and
+the precise "Recent minutes" label for the existing minutes-based section.
+It introduces no new data model, navigation history, or activity tracking.
+
+Version 3.1.2, Dashboard One-Viewport UX, keeps the same data and workflows but
+uses desktop width more deliberately. Compact status cards add consistent
+visual cues, action and meeting rows become denser single-destination links,
+Committee summaries form one low horizontal row, and recent minutes become a
+compact strip. The update is presentation-only and changes no permissions,
+queries, priority ordering, or domain records.
+
+The final 3.1.2 layout adjustment uses two independently stacked desktop
+columns: actions above recent minutes on the left, and upcoming meetings above
+a compact vertical Committee list on the right. Responsive ordering still
+presents actions, meetings, Committees, and recent minutes in that sequence on
+tablet and mobile.
+
+Version 3.1.2b is the final one-viewport compression pass. It reduces only
+desktop spacing, panel padding, and row rhythm; Committees now share one
+vertical list container and recent-minute items use one compact semantic link.
+Six dashboard actions, four Committee summaries, all existing content, touch
+targets, and responsive ordering remain intact.
+
 Issue 4 makes both overview levels role- and capability-aware without adding
 rights or a separate recommendation model. A viewer is led to upcoming and
 approved reading material, a member to their own open tasks and relevant active
@@ -301,6 +334,36 @@ Phase 1 `lifecycle_status` column remains only as a non-destructive database
 compatibility field for existing records and scheduling functions; it is not
 editable or displayed in the UI.
 
+Version 3.6.1 adds an explicit `agenda_item_thread_id` to the durable agenda
+item. Every ordinary item starts a new thread automatically, while a
+transferred item inherits its parent's thread through the existing
+`parent_id` relation. Existing items are backfilled as separate threads unless
+an existing parent or scheduled `transferred_agenda_items` row proves the
+relationship. Titles, descriptions, numbering, and meeting dates never infer
+history. The server-side history helper loads all RLS-visible treatments in
+the thread oldest-first without changing decision, task, minutes, or private
+note ownership.
+
+Version 3.6.2 exposes that explicit thread as a compact, read-only history
+sheet from the agenda-item detail and the active meeting-workspace point. The
+control is omitted when RLS returns fewer than two treatments. Treatments keep
+their historical title, type, number, meeting, and date, mark the current and
+future occurrences, and deep-link through the existing meeting occurrence
+hash. Short decision titles and an open-task count are loaded in bulk for the
+visible thread; no minutes, attachments, private notes, or hidden thread rows
+are fetched for the timeline.
+
+Version 3.6.3 lets an existing agenda-item editor explicitly attach one
+standalone agenda item to a previous same-committee history. A compact picker
+searches only RLS-visible agenda items, groups results by thread, favors the
+latest treatment no later than the current meeting, and requires confirmation.
+The controlled PostgreSQL function rechecks authentication, the existing
+agenda-item edit capability, organization and committee scope, the expected
+source thread, and a singleton-source invariant under row locks. It changes
+only `agenda_item_thread_id`; parent/transfer records and all minutes,
+decisions, tasks, and private notes retain their original agenda-item ids.
+Existing multi-item histories cannot be merged or split through this flow.
+
 ### Notes
 
 Human or AI-generated records attached to an agenda item. Notes may be scoped
@@ -380,8 +443,9 @@ single-source actions remain available.
 
 Phase 3 consolidates organization-level navigation and attention. A sticky,
 responsive organization navigation exposes Overview, Meetings, Decisions,
-Task View, My Tasks, and Members with active-route treatment while preserving
-all existing URLs. The organization overview adds compact RLS-scoped excerpts
+Opgaver, and Members with active-route treatment. The former My Tasks URL is
+preserved as a redirect into Opgaver's personal scope. The organization
+overview adds compact RLS-scoped excerpts
 of the current user's open tasks, organization-wide open tasks, and active
 decisions alongside the existing meeting and committee overview. On meeting
 pages, related work is progressively disclosed, the whole-minutes AI action is
@@ -491,6 +555,14 @@ nearest deadline with undated work last. The view highlights overdue, due
 today, and waiting work, supports the existing authorized status and
 completion mutations, links to meeting, agenda item, and decision context, and
 opens the shared task editor in Task View when the user has edit permission.
+
+Version 3.4 consolidates this personal view into the organization task
+register. **Opgaver** is the single primary navigation destination, where
+**Mine opgaver** and **Alle opgaver** are presentation scopes over the same
+RLS-visible task collection. The legacy `/tasks/my` URL redirects to
+`/tasks`, whose default scope is **Mine opgaver**, so existing bookmarks remain
+valid without retaining a second task interface or permission path. The
+redirect includes the existing `mine=1` scope parameter explicitly.
 
 Phase 2B.5 adds a compact, append-only task comment thread for practical
 follow-up. Comments inherit the task's organization and committee scope,
@@ -612,6 +684,16 @@ to the activity/template/year and avoids duplicate activation for the same
 period. When all activated tasks for an activity/year are completed, the task
 service marks the activity as completed server-side unless the activity is
 cancelled.
+When fixed templates are added later, the update workflow copies them only to
+later occurrences in the same series that still have zero active templates.
+Matching targets are left untouched, while partial, divergent, cross-scope,
+and historical occurrences require manual review. Activated tasks are never
+part of this propagation. Authorized users can also open an existing activity
+as a create-mode duplicate; the draft copies activity content and inactive
+templates without event, series, occurrence, template, or activated-task ids.
+The approved August 2026 legacy repair is an explicit, idempotent one-off SQL
+backfill limited to four audited future occurrences; it copies only inactive
+template fields from two locked sources and never creates ordinary tasks.
 Annual Wheel activities can also store activity-specific key people in
 `annual_wheel_key_people`: optional organization member reference, displayed
 name, function, phone, and email. Linked users must be active members of the
@@ -1066,8 +1148,9 @@ one-off Tailwind layouts.
 Phase 7.2 redesigns the authenticated app shell and organization navigation on
 top of that foundation. The global topbar now gives the app a calmer frame with
 clear access back to organizations, while the organization navigation exposes
-Overview, Meetings, Decisions, Tasks, My Tasks, Annual Wheel, Job Cards,
-Members, and Trash in a compact responsive module rail. The active module and
+Overview, Meetings, Decisions, Tasks, Annual Wheel, Job Cards, Members, and
+Trash in a compact responsive module rail. Personal and organization-wide task
+scope is selected inside Tasks. The active module and
 organization context are visible without changing routes, data contracts,
 permissions, or feature workflows.
 
@@ -1164,6 +1247,13 @@ same RLS-visible overview data.
 The V1.1 UI bugfix keeps meetings and Annual Wheel activities visible in the
 month detail view, folds tasks and deadlines by default, and ensures completed
 tasks show as completed instead of overdue.
+
+Version 3.5 presents the same Annual Wheel overview data as three purpose-built
+work views. Quarter is the default working view, Year summarizes all twelve
+months with existing counts, and Month exposes the complete selected-month
+timeline. A compact month navigator, attention summary, shared action menu, and
+quieter AI surface reuse the Version 3 design system; create/edit flows, PDF
+exports, filters, services, queries, capabilities, and RLS remain unchanged.
 
 Phase 7R.5 brings Job Cards and onboarding into the same admin workspace
 language. The Job Card register now uses flatter role-profile rows, keeps only
@@ -1333,6 +1423,31 @@ delivery must not depend on a logo being reachable.
 - Route membership changes through protected PostgreSQL functions that enforce
   owner invariants independently of the application UI.
 - Keep documents and attachments secondary to agenda-item workflows.
+
+## Version 3.7: Documents V2
+
+Documents are now first-class organization records rather than independent
+copies attached to each feature. `documents` holds stable metadata,
+`document_versions` holds immutable file versions, `document_categories`
+provides organization-managed classification, and `document_relations` links
+one document to any number of organizations, committees, meetings, agenda
+items, tasks, or Annual Wheel activities. Agenda Item remains the primary
+domain context; documents support that work and do not replace it.
+
+New files use the private `organization-documents` bucket with paths shaped as
+`organizationId/documents/documentId/version-fileName`. Downloads use short
+signed URLs after application authorization and Storage RLS. Ordinary
+committee members may upload within readable committee context. Only the
+uploader or an organization administrator may mutate a central document, and
+only administrators manage categories.
+
+Migration `202608140001_documents_v2.sql` mirrors legacy meeting- and
+agenda-minutes attachments non-destructively. The existing attachment ID
+becomes the document ID, the existing Storage object remains as version 1, and
+its meeting or agenda-item relation is retained. Compatibility triggers mirror
+future legacy uploads. Removing an attachment removes its context relation,
+not the central document or Storage object. Private notes are never migrated.
+
 - Require human confirmation before AI output becomes an authoritative
   decision or task.
 - Prefer simple PostgreSQL-backed asynchronous jobs before introducing a
@@ -1435,3 +1550,187 @@ page position. Read-only members can inspect task details and comments, while
 existing task capabilities and server authorization continue to control edits
 and new comments. Previous minutes, decisions, and follow-up text are history,
 not editable content on newly scheduled target items.
+
+## Version 3.8: Global Search V1
+
+The authenticated app shell exposes a compact organization search palette from
+the topbar and through Cmd+K or Ctrl+K. Search remains classical text search:
+it queries the existing meeting, agenda-item, approved-minutes, decision, task,
+document, and Annual Wheel records close to the database, ranks title matches
+before body matches, and returns at most five results per non-empty category.
+No semantic retrieval, embeddings, AI generation, or duplicate search table is
+part of V1.
+
+Every request authenticates the current user, requires active membership in
+the organization from the URL, applies that organization ID to every query,
+and relies on existing Committee- and document-aware RLS for the narrower
+visibility boundary. Only approved general minutes and point minutes belonging
+to an approved general record are searchable. `agenda_item_private_notes` is
+not queried, selected, transformed, or returned by this flow.
+
+## Version 3.10: Udvalgsarbejdsrum V2
+
+Den kanoniske udvalgsside er nu udvalgets aktive arbejdsrum og ikke en
+committee-filtreret kopi af det personlige dashboard. Den samler næste møde,
+udvalgets prioriterede åbne opgaver, kommende årshjulsaktiviteter, seneste
+dokumenter, medlemmer og en aggregeret read-only aktivitetshistorik fra de
+eksisterende autoritative records.
+
+Arbejdsrummets handlinger genbruger Møder V2, Opgaver V2, Kalender & Årshjul
+V2 og Dokumenter V2 med `organizationId` og `committeeId` forudvalgt. Der er
+ikke indført last-visited tracking, dokument-pins, voting, ny audit/event-log
+eller nye tabeller. Den primære “Seneste aktivitet”-sektion er derfor baseret
+på de senest synlige records og lover ikke en præcis “siden dit sidste
+besøg”-grænse. En redundant “Seneste ændringer”-opsummering vises ikke.
+
+### Version 3.10: Udvalgsoversigt
+
+Organisationens Udvalg-side viser de RLS-synlige udvalg som responsive
+arbejdsrumskort. Hvert kort samler aktive opgaver, kommende møder, næste
+relevante møde eller årshjulsaktivitet og aktive Committee Members fra en
+organisationsscopet, batch-baseret read-model. Hele kortet linker semantisk til
+det eksisterende Committee Workspace; oprettelsesretten og den kanoniske route
+er uændret.
+
+“Kræver handling” bruges kun, når en synlig, aktiv opgave har en overskredet
+deadline. Oversigten introducerer ingen health score, aktivitetslog, ny
+capability eller persisteret status.
+
+## Version 3.11: Handlinger og notifikationer V1
+
+Det globale område `/organizations/[organizationId]/actions` er en
+handlingsorienteret indbakke, ikke et klassisk læst/slettet
+notifikationscenter. `ActionService` udleder aktive handlinger fra autoritative,
+RLS-synlige records og leverer den samme prioriterede liste til handlingscenter,
+navigationens badge og dashboardets “Kræver handling nu”.
+
+V1 udleder præcist disse forhold:
+
+- åbne opgaver tildelt den aktuelle bruger med overskredet deadline;
+- åbne opgaver tildelt den aktuelle bruger med deadline inden for syv dage;
+- åbne opgaver tildelt den aktuelle bruger, når deres eksisterende
+  `reminder_at` er nået;
+- referater der konkret afventer den aktuelle brugers godkendelse;
+- aktive årshjulsaktiviteter tildelt den aktuelle bruger, når de er
+  overskredet, starter eller slutter inden for syv dage.
+
+For samme opgave prioriteres overskredet deadline over deadline inden for syv
+dage og derefter nået reminder, så brugeren altid ser højst én task-handling.
+En fremtidig opgave uden deadline-trigger vises ikke alene, fordi den findes;
+dens reminder aktiverer først handlingen på det valgte absolutte tidspunkt.
+Tildelingshændelser kan ikke udledes sikkert af det nuværende task-record og er
+derfor bevidst ikke en selvstændig V1-trigger. Beslutninger uden en entydig
+opfølgningsregel, dokumentændringer og generelle informationsbeskeder er også
+udeladt for at undgå falske handlinger.
+
+`action_user_states` gemmer kun brugerens personlige disposition for en stabil
+action-identitet: taget ansvar, snooze-tidspunkt eller “ikke relevant” med
+valgfri årsag. Titler, deadlines, mødenavne og øvrige source-data kopieres
+ikke. En task-reminders identitet indeholder det konkrete `reminder_at`, så et
+ændret tidspunkt kan skabe en ny handling efter en tidligere dismissal. En
+completed/cancelled task, flyttet gyldig deadline, fjernet/flyttet reminder, ændret ansvarlig
+eller afsluttet godkendelsesrunde fjerner automatisk den afledte aktive
+handling. Snooze ændrer aldrig source-data og udløber tilbage til indbakken,
+hvis årsagen stadig findes. Dismissal er personlig.
+
+Task completion, deadlineflytning og delegation bruger det eksisterende
+task-PATCH/service/RLS-flow. Referatgodkendelse bruger det eksisterende
+approval-flow. Action-state-mutationer revaliderer den aktuelle derived action,
+og PostgreSQL RLS kræver både `user_id = auth.uid()` og aktivt medlemskab af
+den samme Organization. Afsluttet viser personligt fravalgte handlinger og
+handlinger, som brugeren tog ansvar for, før source-forholdet blev løst eller
+ændret.
+
+Organization-workspacet refresher handlingerne ved focus, når fanen igen bliver
+synlig, og ved det tidligste fremtidige `reminder_at`. Dermed opdateres center,
+navigationens badge og dashboard uden polling eller en parallel notification-
+tabel. Reminderens modtager følger altid taskens aktuelle
+`responsible_user_id`; snooze og dismissal er fortsat personlige overlays.
+
+## Version 3.12: Interessenter & Relationer V1
+
+Organisationens eksterne relationer samles på
+`/organizations/[organizationId]/stakeholders`. En interessent er den
+kanoniske organization-ejede part; sponsor, leverandør, samarbejdspartner og
+anden er metadata på samme domæne. Profilen samler stamdata, eksterne
+kontaktpersoner, kontrakthistorik, strukturerede aftaleleverancer, aktiviteter,
+eksisterende dokumenter og Committee-opgaver samt sponsor-pipeline. Agenda Item
+forbliver produktets centrale Committee-aggregate; modulet indfører ikke et
+alternativt Committee-hierarki.
+
+Kontraktbeløb lagres som decimaler, kalenderfrister som date-only værdier, og
+90 dage er den centrale grænse for “udløber snart”. Sponsor-pipelinen har
+faserne Lead, Kontaktet, Dialog, Tilbud sendt, Aftale og Tabt. Faseskift sker i
+en atomisk databasefunktion, som både opdaterer kortet og registrerer historik
+og en læsbar systemaktivitet. Et vundet kort opfinder ikke en kontrakt.
+
+Dokumenter forbliver autoritative i Documents V2 gennem nye stakeholder- og
+contract-relationstyper. Opgaver forbliver autoritative i Tasks V2 og beholder
+deres Committee-scope, men kan pege på en interessent og kontrakt. De vigtigste
+personlige kontrakt- og opfølgningsforhold udledes af samme `ActionService` som
+dashboard, badge og handlingscenter; kontraktens opsigelsesfrist prioriteres
+over fornyelse og slutdato, så samme kontrakt ikke spammer brugeren.
+
+Alle aktive Organization-medlemmer kan læse. Owner, admin og member kan
+arbejde med stamdata, kontakter, kontrakter, aktiviteter og pipeline; kun owner
+og admin kan ændre en interessents arkivstatus, og viewer er read-only.
+Services håndhæver de centrale capabilities, mens RLS, composite tenant-FK'er
+og scope-triggers uafhængigt beskytter `organization_id`. Global søgning bruger
+de eksisterende bounded og RLS-beskyttede queries og sender kontakt- og
+kontraktmatches til den kanoniske interessentprofil.
+
+## Version 3.13: Organisationsvælger & Workspace Entry V2
+
+`/organizations` er brugerens kompakte workspace-selector. Hver aktiv
+Organization vises som ét semantisk full-card-link med navn, brugerens
+Organization-rolle, antal RLS-synlige aktive Committees og logo eller
+initialer. Metadata hentes i bounded batch-queries; entry-flowet ændrer ikke
+Organization-membership eller Committee-synlighed.
+
+Organization-oprettelse bruger fortsat det eksisterende
+`POST /api/organizations`-flow og den atomiske owner-oprettelse, men formularen
+vises i den fælles accessible modal i stedet for permanent på siden. Den
+globale topbar bruger samme Organization-navne og rollelabels og linker tilbage
+til den samlede selector. Der indføres ingen nye tabeller, migrationer,
+permissions eller routes.
+
+## Featurepakke efter Version 3: mødemateriale og forberedelse
+
+Mødearbejdsrummet har én primær `Udsend`-handling til dagsorden,
+opgaveliste, udsendeligt referat og udvalgte Documents V2-bilag. Generelle
+opgavelister bruger det eksisterende møde-review-scope. Personlige lister
+genereres separat for hver modtager ved at filtrere de samme canonical Tasks
+V2-records på `responsible_user_id`; der oprettes aldrig task-kopier.
+
+Mødedeltagere og deres emails resolver gennem én fælles read-model i både UI
+og serverflow: interne `meeting_attendees.user_id` matches mod den batch-hentede
+Organization Member-directory, mens eksterne deltagere bruger deres egen
+email. Hvis mødet slet ikke har registrerede deltagere, genbruges den
+eksisterende fallback til aktive Committee Members, og UI'et markerer dette
+eksplicit. Antal med email, totalt antal og ikke-udsendelsesbare navne kommer
+fra samme resolver som den endelige udsendelse.
+
+`meeting_material_dispatches` er en immutable revisionshistorik med afsender,
+tidspunkt, indholdstyper, opgavelistetype, leveringsstatus og små JSON-metadata-
+snapshots af modtagere og de konkrete dokumentversioner. Tabellen indeholder
+ingen filbytes eller kopier af dokumenter. Udsendelse kræver den eksisterende
+meeting-manager capability, og historikken kan læses af RLS-synlige Committee
+Members.
+
+Documents V2 kan nu knytte et allerede læsbart dokument til et nyt møde-,
+agenda-, task-, årshjuls- eller stakeholder-kontekst gennem den kontrollerede
+`attach_existing_document`-funktion. Funktionen gentager tenant- og
+skriverettigheder i PostgreSQL. Kun `document_relations` ændres; dokument,
+Storage-objekt og versionshistorik bevares.
+
+Agenda Item-oprettelse og -redigering tilbyder eksplicitte AI-forslag til
+formål og baggrund. Forslaget vises som en separat, redigerbar kladde og bliver
+først kopieret til feltet ved `Brug forslag`; det gemmes aldrig automatisk.
+AI-kaldet går gennem en mockbar provider-grænse, kræver Agenda Item-editor-
+capability og sender kun brugerens aktuelle punktkladde i samme Organization-
+og Committee-kontekst.
+
+Den fælles PDF-proserenderer bevarer paragraphs, line breaks, bold, italic,
+unordered og ordered lists samt TipTap-listedybde. Derfor bruger dagsorden,
+referat, formål, baggrund og øvrige eksisterende rich-text PDF-felter samme
+wrapping- og sideskiftlogik.

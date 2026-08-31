@@ -4,6 +4,7 @@ import { useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { AppIcon } from "@/components/icons/app-icon";
 import {
   Button,
   Input,
@@ -52,10 +53,7 @@ const confidenceTones = {
 } as const;
 
 function normalizePersonName(value: string) {
-  return value
-    .trim()
-    .toLocaleLowerCase("da-DK")
-    .replace(/\s+/g, " ");
+  return value.trim().toLocaleLowerCase("da-DK").replace(/\s+/g, " ");
 }
 
 function normalizeTaskTitle(value: string) {
@@ -89,7 +87,9 @@ function findDuplicateWarning(
   if (existing) {
     return `En lignende opgave findes allerede i denne kontekst: “${existing.title}”.`;
   }
-  if (sessionTitles.some((candidate) => titlesAreVerySimilar(title, candidate))) {
+  if (
+    sessionTitles.some((candidate) => titlesAreVerySimilar(title, candidate))
+  ) {
     return "Et lignende forslag findes allerede i denne gennemgang.";
   }
   return null;
@@ -109,8 +109,7 @@ function findSuggestedResponsible(
   const possibleMatches = responsiblePeople.filter((person) => {
     const candidate = normalizePersonName(person.name);
     return (
-      candidate.startsWith(`${needle} `) ||
-      needle.startsWith(`${candidate} `)
+      candidate.startsWith(`${needle} `) || needle.startsWith(`${candidate} `)
     );
   });
   return possibleMatches.length === 1 ? possibleMatches[0].id : "";
@@ -137,6 +136,7 @@ export function AiTaskReviewModal({
   existingTasks,
   minutesStatus,
   triggerLabel = "Foreslå opgaver fra referat",
+  compactTrigger = false,
 }: {
   organizationId: string;
   committeeId: string;
@@ -150,6 +150,7 @@ export function AiTaskReviewModal({
   existingTasks: TaskView[];
   minutesStatus: MinutesStatus;
   triggerLabel?: string;
+  compactTrigger?: boolean;
 }) {
   const router = useRouter();
   const instanceId = useId().replace(/:/g, "");
@@ -220,21 +221,21 @@ export function AiTaskReviewModal({
           );
           sessionTitles.push(suggestion.title);
           return {
-          ...suggestion,
-          id: `${instanceId}-${index}`,
-          approved: !duplicateWarning,
-          responsibleUserId:
-            suggestion.suggestedResponsibleUserId ||
-            findSuggestedResponsible(
-              suggestion.suggestedResponsibleName,
-              responsiblePeople,
-            ),
-          deadline: suggestion.suggestedDeadline ?? "",
-          category: "",
-          decisionId: suggestion.suggestedDecisionId ?? "",
-          creationStatus: "idle",
-          creationError: null,
-          duplicateWarning,
+            ...suggestion,
+            id: `${instanceId}-${index}`,
+            approved: !duplicateWarning,
+            responsibleUserId:
+              suggestion.suggestedResponsibleUserId ||
+              findSuggestedResponsible(
+                suggestion.suggestedResponsibleName,
+                responsiblePeople,
+              ),
+            deadline: suggestion.suggestedDeadline ?? "",
+            category: "",
+            decisionId: suggestion.suggestedDecisionId ?? "",
+            creationStatus: "idle",
+            creationError: null,
+            duplicateWarning,
           };
         }),
       );
@@ -261,10 +262,7 @@ export function AiTaskReviewModal({
     void analyzeMinutes();
   }
 
-  function updateSuggestion(
-    id: string,
-    patch: Partial<ReviewSuggestion>,
-  ) {
+  function updateSuggestion(id: string, patch: Partial<ReviewSuggestion>) {
     setSuggestions((current) =>
       current.map((suggestion) =>
         suggestion.id === id
@@ -380,6 +378,11 @@ export function AiTaskReviewModal({
     <>
       <div className="flex flex-col items-end gap-1">
         <Button
+          className={
+            compactTrigger
+              ? "min-h-9 w-full justify-start gap-2 border-brand/20 px-2.5 py-1.5 text-left text-xs shadow-sm hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+              : undefined
+          }
           disabled={minutesStatus === "draft"}
           onClick={showModal}
           size="sm"
@@ -390,6 +393,9 @@ export function AiTaskReviewModal({
           }
           variant="secondary"
         >
+          {compactTrigger ? (
+            <AppIcon className="shrink-0 text-brand" name="ai" size={14} />
+          ) : null}
           {triggerLabel}
         </Button>
         {minutesStatus === "draft" ? (
@@ -599,7 +605,9 @@ function SuggestionEditor({
                 Punkt: {suggestion.sourceTitle || "Ukendt punkt"}
               </Link>
             ) : (
-              <span className="text-xs text-muted">Kilde: Generelt referat</span>
+              <span className="text-xs text-muted">
+                Kilde: Generelt referat
+              </span>
             )}
           </div>
         </div>
@@ -665,9 +673,7 @@ function SuggestionEditor({
             >
               {confidenceLabels[suggestion.responsibleConfidence]}
             </StatusBadge>
-            <p className="text-xs text-muted">
-              {suggestion.responsibleReason}
-            </p>
+            <p className="text-xs text-muted">{suggestion.responsibleReason}</p>
           </div>
         </div>
         <div>

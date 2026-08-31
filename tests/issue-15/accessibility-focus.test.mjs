@@ -48,9 +48,9 @@ test("global disclosures and quick actions have keyboard dismissal", () => {
   assert.match(detailsFocus, /event\.key === "Escape"/);
   assert.match(detailsFocus, /details\?\.addEventListener\("keydown"/);
   assert.match(detailsFocus, /summary"\)\?\.focus/);
-  assert.match(quickActions, /aria-controls="quick-action-options"/);
-  assert.match(quickActions, /closeOnEscape/);
-  assert.match(quickActions, /closeOnOutsidePointer/);
+  assert.match(quickActions, /<Dropdown/);
+  assert.match(quickActions, /panelId="quick-action-options"/);
+  assert.match(detailsFocus, /useDismissibleDetails/);
   assert.doesNotMatch(quickActions, /role="menu(item)?"/);
 });
 

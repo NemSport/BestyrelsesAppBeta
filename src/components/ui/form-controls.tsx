@@ -1,5 +1,5 @@
 import type {
-  InputHTMLAttributes,
+  ComponentPropsWithRef,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
@@ -8,7 +8,7 @@ import clsx from "clsx";
 export function Input({
   className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
+}: ComponentPropsWithRef<"input">) {
   return <input className={clsx("field", className)} {...props} />;
 }
 

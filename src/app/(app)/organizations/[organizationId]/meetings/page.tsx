@@ -1,99 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AppIcon } from "@/components/icons/app-icon";
 import { MeetingList } from "@/components/meetings/meeting-list";
 import { MeetingListFilters } from "@/components/meetings/meeting-list-filters";
-import {
-  EmptyState,
-  PageHeader,
-  PageSection,
-  StatusBadge,
-  buttonClassName,
-  primarySurfaceLinkClassName,
-  staticSurfaceClassName,
-  type StatusTone,
-} from "@/components/ui";
+import { MeetingOverviewContext } from "@/components/meetings/meeting-overview-context";
+import { EmptyState, PageHeader, buttonClassName } from "@/components/ui";
 import {
   filterMeetingList,
   groupMeetingList,
   parseMeetingListFilters,
+  sortMeetingList,
 } from "@/lib/meeting-list";
-import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { OrganizationService } from "@/services/organization-service";
-
-type OrganizationOverview = Awaited<
-  ReturnType<OrganizationService["getOverview"]>
->;
-type RecentMinutes = OrganizationOverview["recentMinutes"][number];
-
-const minutesStatusTones = {
-  draft: "neutral",
-  ready_for_approval: "warning",
-  approved: "success",
-} as const satisfies Record<string, StatusTone>;
-
-function RecentMinutesRow({
-  minutes,
-  organizationRoot,
-}: {
-  minutes: RecentMinutes;
-  organizationRoot: string;
-}) {
-  const meetingHref = `${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}#general-minutes-heading`;
-
-  return (
-    <article
-      className={staticSurfaceClassName(
-        "border-l-4 border-l-accent/55 px-3 py-3 sm:px-4",
-      )}
-    >
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="min-w-0">
-          <StatusBadge tone={minutesStatusTones[minutes.status]}>
-            {meetingMinutesStatusLabels[minutes.status]}
-          </StatusBadge>
-          <h3 className="mt-2">
-            <Link
-              className={primarySurfaceLinkClassName(
-                "break-words text-base leading-snug",
-              )}
-              href={meetingHref}
-            >
-              {minutes.meetingTitle}
-            </Link>
-          </h3>
-          <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-2">
-            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-1">
-              <dt className="font-semibold text-ink/70">Dato og tid</dt>
-              <dd>
-                <time dateTime={minutes.meetingStartsAt}>
-                  {formatDateTime(minutes.meetingStartsAt)}
-                </time>
-              </dd>
-            </div>
-            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-1">
-              <dt className="font-semibold text-ink/70">Udvalg</dt>
-              <dd className="break-words">{minutes.committeeName}</dd>
-            </div>
-          </dl>
-        </div>
-        <div className="flex min-w-36 flex-col items-start gap-1 md:items-end">
-          <span className="text-xs font-semibold text-muted">Næste trin</span>
-          <Link
-            aria-label={`Se referat: ${minutes.meetingTitle}`}
-            className={buttonClassName({ size: "sm", variant: "secondary" })}
-            href={meetingHref}
-          >
-            Se referat
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
 
 export default async function OrganizationMeetingsPage({
   params,
@@ -101,15 +23,20 @@ export default async function OrganizationMeetingsPage({
 }: {
   params: Promise<{ organizationId: string }>;
   searchParams?: Promise<{
+    committee?: string;
     date?: string;
     period?: string;
     status?: string;
   }>;
 }) {
   const { organizationId } = await params;
-  const filters = parseMeetingListFilters((await searchParams) ?? {});
+  const requestedFilters = parseMeetingListFilters((await searchParams) ?? {});
+  const filters = {
+    ...requestedFilters,
+    period: requestedFilters.period === "previous" ? "previous" : "upcoming",
+  } as const;
   const filtersActive = Boolean(
-    filters.date || filters.period || filters.status,
+    filters.committeeId || filters.date || filters.status,
   );
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
@@ -130,33 +57,78 @@ export default async function OrganizationMeetingsPage({
       capabilities,
     ]),
   );
+  const minutesStatusByMeeting = new Map(
+    overview.recentMinutes.map((minutes) => [
+      minutes.meetingId,
+      minutes.status,
+    ]),
+  );
   const meetingEntries = meetings.flatMap((meeting) => {
     const capabilities = capabilitiesByCommittee.get(meeting.committee_id);
-    return capabilities ? [{ ...meeting, capabilities }] : [];
+    return capabilities
+      ? [
+          {
+            ...meeting,
+            capabilities,
+            minutesStatus: minutesStatusByMeeting.get(meeting.id) ?? null,
+          },
+        ]
+      : [];
   });
+  const visibleCommitteeIds = new Set(
+    overview.committees.map(({ committee }) => committee.id),
+  );
+  const safeFilters = {
+    ...filters,
+    committeeId: visibleCommitteeIds.has(filters.committeeId)
+      ? filters.committeeId
+      : "",
+  };
   const now = Date.now();
   const grouped = groupMeetingList(meetingEntries, now);
   const filteredGrouped = groupMeetingList(
-    filterMeetingList(meetingEntries, filters, now),
+    filterMeetingList(meetingEntries, { ...safeFilters, period: "" }, now),
     now,
   );
-  const filteredMeetings = [
-    ...filteredGrouped.upcoming,
-    ...filteredGrouped.previous,
-    ...filteredGrouped.cancelled,
-  ];
-  const recentMinutes = [...overview.recentMinutes].sort(
-    (left, right) =>
-      new Date(right.meetingStartsAt).getTime() -
-      new Date(left.meetingStartsAt).getTime(),
+  const selectedMeetings =
+    safeFilters.period === "previous"
+      ? sortMeetingList(
+          [...filteredGrouped.previous, ...filteredGrouped.cancelled],
+          "previous",
+        )
+      : filteredGrouped.upcoming;
+  const meetingCommittee = overview.committees.find(
+    ({ capabilities }) => capabilities.createMeeting,
   );
   const organizationRoot = `/organizations/${organizationId}`;
   const meetingsRoot = `${organizationRoot}/meetings`;
+  const selectedLabel =
+    safeFilters.period === "previous" ? "Afholdte møder" : "Kommende møder";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4" data-meeting-overview>
       <PageHeader
-        description="Et samlet overblik over møder og referater på tværs af de udvalg, du har adgang til."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              className={buttonClassName({ size: "sm", variant: "secondary" })}
+              href="#meeting-filters"
+            >
+              <AppIcon name="filter" size={15} />
+              Filter
+            </Link>
+            {meetingCommittee ? (
+              <Link
+                className={buttonClassName({ size: "sm" })}
+                href={`${organizationRoot}/committees/${meetingCommittee.committee.id}/meetings/new`}
+              >
+                <AppIcon name="meetingAdd" size={15} />
+                Nyt møde
+              </Link>
+            ) : null}
+          </div>
+        }
+        description="Få overblik over kommende og afholdte møder."
         eyebrow={
           <Link
             className="text-muted transition hover:text-brand"
@@ -165,126 +137,95 @@ export default async function OrganizationMeetingsPage({
             ← Overblik
           </Link>
         }
-        title={`Møder i ${context.organization.name}`}
+        title="Mødeoversigt"
       />
 
-      <MeetingListFilters filters={filters} resetHref={meetingsRoot} />
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,79fr)_minmax(15rem,21fr)] xl:items-start">
+        <div className="min-w-0 space-y-2">
+          <MeetingListFilters
+            committees={overview.committees.map(({ committee }) => ({
+              id: committee.id,
+              name: committee.name,
+            }))}
+            filters={safeFilters}
+            resetHref={meetingsRoot}
+          />
 
-      {filtersActive ? (
-        <PageSection
-          description="Kommende resultater vises først, derefter de nyeste afholdte og aflyste."
-          title="Filtrerede møder"
-        >
-          {filteredMeetings.length > 0 ? (
-            <>
-              <p className="mb-2 text-xs font-semibold text-muted">
-                {filteredMeetings.length}{" "}
-                {filteredMeetings.length === 1 ? "møde" : "møder"}
-              </p>
-              <MeetingList
-                meetings={filteredMeetings}
-                now={now}
-                organizationId={organizationId}
-              />
-            </>
-          ) : (
-            <EmptyState
-              action={
-                <Link
-                  className={buttonClassName({ variant: "secondary" })}
-                  href={meetingsRoot}
+          <section aria-labelledby="meeting-list-heading">
+            <div className="mb-1.5 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2
+                  className="text-sm font-semibold text-ink"
+                  id="meeting-list-heading"
                 >
-                  Nulstil filtre
-                </Link>
-              }
-              description="Prøv at rydde et filter eller vælge en anden periode, status eller dato."
-              kind="filtered"
-              title="Ingen møder matcher filtrene."
-            />
-          )}
-        </PageSection>
-      ) : (
-        <>
-          <PageSection
-            description="Næste møde først; igangværende møder placeres her."
-            title="Kommende og igangværende"
-          >
-            {grouped.upcoming.length > 0 ? (
+                  {selectedLabel}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  {safeFilters.period === "previous"
+                    ? "Nyeste møde først."
+                    : "Nærmeste møde først."}
+                </p>
+              </div>
+              <span className="text-xs font-medium tabular-nums text-muted">
+                {selectedMeetings.length}{" "}
+                {selectedMeetings.length === 1 ? "møde" : "møder"}
+              </span>
+            </div>
+
+            {selectedMeetings.length > 0 ? (
               <MeetingList
-                meetings={grouped.upcoming}
+                meetings={selectedMeetings}
                 now={now}
                 organizationId={organizationId}
               />
             ) : (
               <EmptyState
                 action={
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={`${organizationRoot}/committees`}
-                  >
-                    Åbn et udvalg
-                  </Link>
+                  filtersActive ? (
+                    <Link
+                      className={buttonClassName({ variant: "secondary" })}
+                      href={`${meetingsRoot}?period=${safeFilters.period}`}
+                    >
+                      Nulstil filtre
+                    </Link>
+                  ) : meetingCommittee && safeFilters.period === "upcoming" ? (
+                    <Link
+                      className={buttonClassName()}
+                      href={`${organizationRoot}/committees/${meetingCommittee.committee.id}/meetings/new`}
+                    >
+                      Opret møde
+                    </Link>
+                  ) : undefined
                 }
-                description="Når der planlægges møder i dine udvalg, vises de her."
-                title="Der er ingen kommende eller igangværende møder."
+                description={
+                  filtersActive
+                    ? "Prøv at nulstille filtrene eller vælge en anden dato eller status."
+                    : safeFilters.period === "previous"
+                      ? "Afholdte og aflyste møder vises her som historik."
+                      : "Der er ingen planlagte møder lige nu."
+                }
+                kind={filtersActive ? "filtered" : "empty"}
+                title={
+                  filtersActive
+                    ? "Ingen møder matcher filtrene"
+                    : safeFilters.period === "previous"
+                      ? "Ingen afholdte møder endnu"
+                      : "Ingen kommende møder"
+                }
               />
             )}
-          </PageSection>
+          </section>
+        </div>
 
-          <PageSection
-            description="Afholdte møder sorteret med nyeste mødedato først."
-            title="Afholdte møder"
-          >
-            {grouped.previous.length > 0 ? (
-              <MeetingList
-                meetings={grouped.previous}
-                now={now}
-                organizationId={organizationId}
-              />
-            ) : (
-              <EmptyState
-                description="Afholdte møder vises her, når mødedatoen er passeret."
-                title="Der er ingen afholdte møder."
-              />
-            )}
-          </PageSection>
-
-          {grouped.cancelled.length > 0 ? (
-            <PageSection
-              description="Aflyste møder sorteret med nyeste mødedato først."
-              title="Aflyste møder"
-            >
-              <MeetingList
-                meetings={grouped.cancelled}
-                now={now}
-                organizationId={organizationId}
-              />
-            </PageSection>
-          ) : null}
-        </>
-      )}
-
-      <PageSection
-        description="Seneste referater med status; linket åbner referatafsnittet direkte."
-        title="Seneste referater"
-      >
-        {recentMinutes.length > 0 ? (
-          <div className="divide-y divide-line overflow-hidden border border-line bg-surface/60">
-            {recentMinutes.map((minutes) => (
-              <RecentMinutesRow
-                key={minutes.id}
-                minutes={minutes}
-                organizationRoot={organizationRoot}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            description="Når møder får referater, får du et samlet overblik her."
-            title="Der er ingen nyere referater."
-          />
-        )}
-      </PageSection>
+        <MeetingOverviewContext
+          followUpCount={overview.metrics.openFollowUpCount}
+          myOpenTaskCount={overview.metrics.myOpenTaskCount}
+          nextMeeting={grouped.upcoming[0] ?? null}
+          organizationId={organizationId}
+          pendingApprovalCount={overview.pendingMinutesApprovals.length}
+          recentMinutes={overview.recentMinutes[0] ?? null}
+        />
+      </div>
     </div>
   );
 }

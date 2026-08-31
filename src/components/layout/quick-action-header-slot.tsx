@@ -28,6 +28,34 @@ export function QuickActionHeaderSlot({
     setTarget(document.getElementById("app-header-quick-action"));
   }, []);
 
+  useEffect(() => {
+    const themeRoot = document.querySelector<HTMLElement>(".app-frame");
+    if (!themeRoot || !style) return;
+
+    const previousValues = new Map<string, string>();
+    const appliedValues = new Map<string, string>();
+    for (const [property, value] of Object.entries(style)) {
+      if (value === undefined || value === null) continue;
+      const nextValue = String(value);
+      previousValues.set(property, themeRoot.style.getPropertyValue(property));
+      appliedValues.set(property, nextValue);
+      themeRoot.style.setProperty(property, nextValue);
+    }
+
+    return () => {
+      for (const [property, value] of previousValues) {
+        if (
+          themeRoot.style.getPropertyValue(property) !==
+          appliedValues.get(property)
+        ) {
+          continue;
+        }
+        if (value) themeRoot.style.setProperty(property, value);
+        else themeRoot.style.removeProperty(property);
+      }
+    };
+  }, [style]);
+
   if (!target) return null;
 
   return createPortal(
