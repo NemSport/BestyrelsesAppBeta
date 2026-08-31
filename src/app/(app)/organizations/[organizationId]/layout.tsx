@@ -8,6 +8,7 @@ import { AuthorizationService } from "@/services/authorization-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import { CommitteeService } from "@/services/committee-service";
 import { getMeetingCapabilities } from "@/lib/permissions";
+import { ActionService } from "@/services/action-service";
 
 export default async function OrganizationLayout({
   children,
@@ -24,9 +25,10 @@ export default async function OrganizationLayout({
     .catch(() => null);
 
   if (!context) notFound();
-  const [committees, branding] = await Promise.all([
+  const [committees, branding, actionCenter] = await Promise.all([
     new CommitteeService(db).list(organizationId),
     new OrganizationBrandingService(db).getSafeBranding(organizationId),
+    new ActionService(db).getCenter(organizationId),
   ]);
   const committeeOptions = await Promise.all(
     committees.map(async (committee) => {
@@ -46,6 +48,8 @@ export default async function OrganizationLayout({
 
   return (
     <OrganizationWorkspace
+      activeActionCount={actionCenter.activeCount}
+      nextActionRefreshAt={actionCenter.nextRefreshAt}
       branding={branding}
       canManageTrash={canManageOrganizationTrash(context.membership.role)}
       committees={committeeOptions}

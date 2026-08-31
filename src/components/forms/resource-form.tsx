@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 
 import {
   ActionBar,
@@ -32,6 +32,16 @@ export type ResourceFormField = {
   options?: Array<{ label: string; value: string }>;
   visibleWhen?: { field: string; equals: string };
   helpText?: string;
+  aiSuggestion?: {
+    endpoint: string;
+    label?: string;
+  };
+};
+
+type FieldSuggestionState = {
+  loading: boolean;
+  suggestion: string;
+  error: string | null;
 };
 
 export function ResourceForm({
@@ -42,6 +52,7 @@ export function ResourceForm({
   successPath,
   onSuccess,
   secondaryAction,
+  initialFocusRef,
   method = "POST",
 }: {
   endpoint: string;
@@ -54,6 +65,7 @@ export function ResourceForm({
     label: string;
     onClick: () => void;
   };
+  initialFocusRef?: RefObject<HTMLInputElement | null>;
   method?: "POST" | "PATCH";
 }) {
   const router = useRouter();
@@ -66,6 +78,9 @@ export function ResourceForm({
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(
     initialValuesRef.current,
   );
+  const [fieldSuggestions, setFieldSuggestions] = useState<
+    Record<string, FieldSuggestionState>
+  >({});
   const mutation = useMutationFeedback();
   const dirty =
     JSON.stringify(fieldValues) !== JSON.stringify(initialValuesRef.current);
@@ -75,6 +90,58 @@ export function ResourceForm({
   function showFieldErrors(errors: Record<string, string>) {
     setFieldErrors(errors);
     focusInvalidField(firstFieldError(errors, fieldOrder));
+  }
+
+  async function requestSuggestion(field: ResourceFormField) {
+    if (!field.aiSuggestion) return;
+    setFieldSuggestions((current) => ({
+      ...current,
+      [field.name]: {
+        loading: true,
+        suggestion: current[field.name]?.suggestion ?? "",
+        error: null,
+      },
+    }));
+    try {
+      const response = await fetch(field.aiSuggestion.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...hidden,
+          targetField: field.name,
+          values: fieldValues,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        suggestion?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.suggestion) {
+        throw new Error(
+          result.error || "AI-forslaget kunne ikke genereres. Prøv igen.",
+        );
+      }
+      setFieldSuggestions((current) => ({
+        ...current,
+        [field.name]: {
+          loading: false,
+          suggestion: result.suggestion!,
+          error: null,
+        },
+      }));
+    } catch (caught) {
+      setFieldSuggestions((current) => ({
+        ...current,
+        [field.name]: {
+          loading: false,
+          suggestion: current[field.name]?.suggestion ?? "",
+          error:
+            caught instanceof Error
+              ? caught.message
+              : "AI-forslaget kunne ikke genereres. Prøv igen.",
+        },
+      }));
+    }
   }
 
   async function submit(formData: FormData) {
@@ -170,6 +237,7 @@ export function ResourceForm({
         const describedBy =
           [helpId, errorId].filter(Boolean).join(" ") || undefined;
         const labelId = `${field.name}-label`;
+        const suggestion = fieldSuggestions[field.name];
         const sharedProps = {
           "aria-describedby": describedBy,
           "aria-invalid": Boolean(fieldErrors[field.name]),
@@ -263,6 +331,7 @@ export function ResourceForm({
                   }))
                 }
                 required={field.required}
+                ref={field === fields[0] ? initialFocusRef : undefined}
                 type={field.type || "text"}
                 value={fieldValues[field.name]}
               />
@@ -274,6 +343,97 @@ export function ResourceForm({
               >
                 {fieldErrors[field.name]}
               </p>
+            ) : null}
+            {field.aiSuggestion ? (
+              <div className="mt-2">
+                {!suggestion?.suggestion ? (
+                  <Button
+                    disabled={suggestion?.loading || mutation.pending}
+                    onClick={() => void requestSuggestion(field)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {suggestion?.loading
+                      ? "Genererer forslag…"
+                      : field.aiSuggestion.label ?? "Foreslå med AI"}
+                  </Button>
+                ) : (
+                  <div className="rounded-[var(--radius-control)] border border-brand/20 bg-brand-soft/35 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand">
+                      AI-forslag · ikke gemt
+                    </p>
+                    <Textarea
+                      aria-label={`Rediger AI-forslag til ${field.label}`}
+                      className="mt-2 bg-surface"
+                      onChange={(event) =>
+                        setFieldSuggestions((current) => ({
+                          ...current,
+                          [field.name]: {
+                            loading: false,
+                            suggestion: event.target.value,
+                            error: null,
+                          },
+                        }))
+                      }
+                      value={suggestion.suggestion}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => {
+                          setFieldValues((current) => ({
+                            ...current,
+                            [field.name]: suggestion.suggestion,
+                          }));
+                          setFieldSuggestions((current) => ({
+                            ...current,
+                            [field.name]: {
+                              loading: false,
+                              suggestion: "",
+                              error: null,
+                            },
+                          }));
+                        }}
+                        size="sm"
+                        type="button"
+                      >
+                        Brug forslag
+                      </Button>
+                      <Button
+                        disabled={suggestion.loading}
+                        onClick={() => void requestSuggestion(field)}
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                      >
+                        Generer nyt
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          setFieldSuggestions((current) => ({
+                            ...current,
+                            [field.name]: {
+                              loading: false,
+                              suggestion: "",
+                              error: null,
+                            },
+                          }))
+                        }
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        Ignorer
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {suggestion?.error ? (
+                  <p className="mt-1 text-sm text-danger" role="alert">
+                    {suggestion.error} Din eksisterende tekst er uændret.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
         );

@@ -14,7 +14,7 @@ export const emptyTaskFilters = (): TaskFilters => ({
   responsibleUserId: "",
   category: "",
   deadline: "",
-  mineOnly: false,
+  mineOnly: true,
   showArchived: false,
 });
 
@@ -40,7 +40,7 @@ export function parseTaskRegisterState(
   const rawDeadline = searchParams.get("deadline") ?? "";
 
   return {
-    view: searchParams.get("view") === "task" ? "task" : "list",
+    view: searchParams.get("view") === "list" ? "list" : "task",
     filters: {
       search: searchParams.get("q") ?? "",
       status: validStatuses.has(rawStatus as TaskStatus) ? rawStatus : "",
@@ -50,7 +50,8 @@ export function parseTaskRegisterState(
       deadline: validDeadlines.has(rawDeadline as TaskFilters["deadline"])
         ? (rawDeadline as TaskFilters["deadline"])
         : "",
-      mineOnly: searchParams.get("mine") === "1",
+      mineOnly:
+        searchParams.get("mine") === "1" || searchParams.get("scope") !== "all",
       showArchived: searchParams.get("archived") === "1",
     },
   };
@@ -70,12 +71,13 @@ export function taskRegisterSearchParams(
     "category",
     "deadline",
     "mine",
+    "scope",
     "archived",
   ]) {
     next.delete(key);
   }
 
-  if (state.view === "task") next.set("view", "task");
+  if (state.view === "list") next.set("view", "list");
   if (state.filters.search.trim()) next.set("q", state.filters.search.trim());
   if (state.filters.status) next.set("status", state.filters.status);
   if (state.filters.committeeId) {
@@ -86,7 +88,7 @@ export function taskRegisterSearchParams(
   }
   if (state.filters.category) next.set("category", state.filters.category);
   if (state.filters.deadline) next.set("deadline", state.filters.deadline);
-  if (state.filters.mineOnly) next.set("mine", "1");
+  if (!state.filters.mineOnly) next.set("scope", "all");
   if (state.filters.showArchived) next.set("archived", "1");
 
   return next;

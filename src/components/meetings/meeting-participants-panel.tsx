@@ -95,6 +95,7 @@ export function MeetingParticipantsPanel({
   internalParticipants,
   externalAttendees,
   canEdit,
+  compact = false,
 }: {
   organizationId: string;
   committeeId: string;
@@ -103,6 +104,7 @@ export function MeetingParticipantsPanel({
   internalParticipants: MeetingAttendee[];
   externalAttendees: MeetingExternalAttendee[];
   canEdit: boolean;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const committeeMembers = useMemo(
@@ -264,9 +266,19 @@ export function MeetingParticipantsPanel({
 
   return (
     <>
-      <Button onClick={openModal} size="sm" type="button" variant="ghost">
-        {"\u00c5bn"}
-      </Button>
+      {compact ? (
+        <button
+          className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-semibold text-brand hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          onClick={openModal}
+          type="button"
+        >
+          Åbn
+        </button>
+      ) : (
+        <Button onClick={openModal} size="sm" type="button" variant="ghost">
+          Åbn
+        </Button>
+      )}
       <Modal
         description={
           canEdit

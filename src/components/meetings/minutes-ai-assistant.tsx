@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 
+import { AppIcon } from "@/components/icons/app-icon";
 import { RichTextContent } from "@/components/forms/rich-text-content";
 import { Button, Modal, StatusBadge } from "@/components/ui";
 import {
@@ -35,6 +36,7 @@ type AiMinutesAssistantResult = {
 
 export function MinutesAiAssistant({
   agendaItemId,
+  action,
   committeeId,
   disabled = false,
   field,
@@ -43,9 +45,11 @@ export function MinutesAiAssistant({
   organizationId,
   prominent = false,
   source,
+  triggerLabel = "AI-Hjælp",
   value,
 }: {
   agendaItemId?: string | null;
+  action?: AiMinutesAssistantAction;
   committeeId: string;
   disabled?: boolean;
   field: AiMinutesAssistantField;
@@ -54,6 +58,7 @@ export function MinutesAiAssistant({
   organizationId: string;
   prominent?: boolean;
   source: AiMinutesAssistantSource;
+  triggerLabel?: string;
   value: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -168,41 +173,61 @@ export function MinutesAiAssistant({
     <div
       className={clsx(
         "flex flex-wrap items-center gap-2",
-        !prominent && "mt-1.5",
+        !prominent && !action && "mt-1.5",
       )}
     >
-      <details className="group relative">
-        <summary
-          className={clsx(
-            "inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border font-semibold transition [&::-webkit-details-marker]:hidden",
-            prominent
-              ? "min-h-9 border-brand bg-brand px-3 py-2 text-sm text-white shadow-sm hover:bg-brand-hover"
-              : "min-h-8 border-line bg-surface px-2.5 py-1.5 text-xs text-muted hover:border-accent/55 hover:bg-mist/65 hover:text-ink",
-          )}
+      {action ? (
+        <button
+          className="inline-flex min-h-9 w-full items-center justify-start gap-2 rounded-[var(--radius-control)] border border-brand/20 bg-surface px-2.5 py-1.5 text-left text-xs font-semibold text-ink shadow-sm transition hover:border-brand/40 hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={disabled || loadingAction !== null}
+          onClick={() => void requestSuggestion(action)}
+          type="button"
         >
-          AI-Hjælp
-          <span
-            aria-hidden="true"
+          <AppIcon
             className={clsx(
-              "ml-0.5 h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent transition group-open:rotate-180",
-              prominent ? "border-t-white" : "border-t-muted",
+              "shrink-0 text-brand",
+              loadingAction === action && "animate-spin",
             )}
+            name={loadingAction === action ? "progress" : "ai"}
+            size={14}
           />
-        </summary>
-        <div className="absolute left-0 z-30 mt-1.5 w-64 max-w-[calc(100vw-2rem)] border border-line bg-surface p-1.5 shadow-dialog">
-          {actions.map(([action, label]) => (
-            <button
-              className="block w-full px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={disabled || loadingAction !== null}
-              key={action}
-              onClick={() => void requestSuggestion(action)}
-              type="button"
-            >
-              {loadingAction === action ? "AI arbejder..." : label}
-            </button>
-          ))}
-        </div>
-      </details>
+          {loadingAction === action ? "AI arbejder…" : triggerLabel}
+        </button>
+      ) : (
+        <details className="group relative">
+          <summary
+            className={clsx(
+              "inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border font-semibold transition [&::-webkit-details-marker]:hidden",
+              prominent
+                ? "min-h-9 border-brand bg-brand px-3 py-2 text-sm text-white shadow-sm hover:bg-brand-hover"
+                : "min-h-9 justify-start border-brand/20 bg-surface px-2.5 py-1.5 text-xs text-ink shadow-sm hover:border-brand/40 hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+            )}
+          >
+            <AppIcon name="ai" size={13} />
+            {triggerLabel}
+            <span
+              aria-hidden="true"
+              className={clsx(
+                "ml-0.5 h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent transition group-open:rotate-180",
+                prominent ? "border-t-white" : "border-t-muted",
+              )}
+            />
+          </summary>
+          <div className="absolute left-0 z-30 mt-1.5 w-64 max-w-[calc(100vw-2rem)] border border-line bg-surface p-1.5 shadow-dialog">
+            {actions.map(([menuAction, label]) => (
+              <button
+                className="block w-full px-2.5 py-2 text-left text-xs font-medium text-ink transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-55"
+                disabled={disabled || loadingAction !== null}
+                key={menuAction}
+                onClick={() => void requestSuggestion(menuAction)}
+                type="button"
+              >
+                {loadingAction === menuAction ? "AI arbejder..." : label}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
       {error ? (
         <p className="text-xs font-medium text-danger" role="alert">
           {error}

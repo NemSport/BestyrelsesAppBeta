@@ -51,21 +51,30 @@ test("shared page and section hierarchy owns titles, descriptions, and actions",
   assert.match(css, /\.page-title\s*\{/);
   assert.match(css, /\.section-title\s*\{/);
   assert.match(css, /\.supporting-text\s*\{/);
-  assert.ok(registerPages.every((page) => /className="page-flow"/.test(page)));
+  assert.ok(
+    registerPages.every((page) =>
+      /className="page-flow(?:\s[^\"]*)?"/.test(page),
+    ),
+  );
 });
 
 test("representative routes share calm surface and metadata patterns", () => {
   assert.match(dashboardPriority, /section-header/);
-  assert.match(meetingHeader, /page-title/);
-  assert.match(meetingHeader, /supporting-text/);
+  assert.match(meetingHeader, /<header className="meeting-document-header">/);
+  assert.match(meetingHeader, /<h1[^>]*>[\s\S]*\{meeting\.title\}[\s\S]*<\/h1>/);
+  assert.match(meetingHeader, /text-muted/);
   assert.match(meetingPage, /metric-strip/);
-  assert.match(committeePage, /metric-strip/);
-  assert.match(taskRegister, /register-summary-bar/);
+  assert.match(committeePage, /aria-labelledby="attention-title"/);
+  assert.match(committeePage, /\{overdueTasks\.length\}/);
+  assert.match(committeePage, /\{dueSoonTasks\.length\}/);
+  assert.match(taskRegister, /aria-live="polite"/);
+  assert.match(taskRegister, /\{filteredTasks\.length\} af \{tasks\.length\} opgaver/);
   assert.match(decisionRegister, /entity-header/);
   assert.match(decisionRegister, /entity-metadata-grid/);
   assert.match(memberAdministration, /workflow-panel/);
   assert.match(memberAdministration, /entity-record/);
-  assert.match(annualWheel, /filter-result-bar/);
+  assert.match(annualWheel, /aria-live="polite"/);
+  assert.match(annualWheel, /hasActiveFilters[\s\S]*Nulstil filtre/);
   assert.match(jobCards, /module-filter-surface/);
   assert.match(jobCards, /entity-record/);
 });
@@ -75,15 +84,16 @@ test("mobile keeps semantic order without hiding summary metrics", () => {
   assert.match(css, /\.metric-strip[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(
     taskRegister,
-    /grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5/,
+    /className="grid gap-2 sm:grid-cols-3"/,
   );
+  assert.match(taskRegister, /\{summaryCards\.map/);
   assert.doesNotMatch(
     taskRegister,
     /-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid/,
   );
   assert.match(
     annualWheel,
-    /grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4/,
+    /grid flex-1 grid-cols-1 gap-2 sm:max-w-2xl sm:grid-cols-3/,
   );
   assert.match(jobCards, /grid grid-cols-2 gap-3/);
 });

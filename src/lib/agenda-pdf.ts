@@ -10,7 +10,8 @@ import {
 } from "@/lib/pdf-report";
 import { richTextToPdfBlocks } from "@/lib/rich-text";
 import {
-  addTransferredAgendaItemHistory,
+  addTransferredAgendaItemSummary,
+  removeDuplicatePdfSectionLabel,
   type PdfTransferredAgendaItemHistory,
 } from "@/lib/meeting-document-pdf";
 import type { MeetingWithAgenda } from "@/types/domain";
@@ -25,6 +26,8 @@ type PdfInput = {
   transferredHistories?: PdfTransferredAgendaItemHistory[];
 };
 
+export { removeDuplicatePdfSectionLabel as removeDuplicateSectionLabel } from "@/lib/meeting-document-pdf";
+
 export async function generateMeetingAgendaPdf(input: PdfInput) {
   const meetingDate = formatPdfDate(input.meeting.starts_at, true);
   const report = await createPdfReport({
@@ -35,6 +38,7 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     committeeName: input.committeeName,
     generatedAt: input.generatedAt ?? new Date(),
     branding: input.branding,
+    agendaItemCardOutline: false,
     meta: [
       { label: "Organisation", value: input.organizationName },
       { label: "Udvalg", value: input.committeeName },
@@ -62,15 +66,21 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     const item = occurrence.agenda_items;
     if (!item) continue;
     const typeLabel = getAgendaItemTypeLabel(item.item_type);
+    const objectiveBlocks = removeDuplicatePdfSectionLabel(
+      "Formål",
+      richTextToPdfBlocks(item.objective),
+    );
+    const descriptionBlocks = removeDuplicatePdfSectionLabel(
+      "Baggrund",
+      richTextToPdfBlocks(item.description),
+    );
     report.beginAgendaItemCard({
       number: occurrenceIndex + 1,
       typeLabel: typeLabel.short,
       title: item.title,
       subtitle: typeLabel.label,
+      keepWithNext: Boolean(objectiveBlocks.length || descriptionBlocks.length),
     });
-
-    const objectiveBlocks = richTextToPdfBlocks(item.objective);
-    const descriptionBlocks = richTextToPdfBlocks(item.description);
 
     if (objectiveBlocks.length) {
       report.addSubsection("Formål");
@@ -83,7 +93,7 @@ export async function generateMeetingAgendaPdf(input: PdfInput) {
     const history = input.transferredHistories?.find(
       (candidate) => candidate.targetAgendaItemId === item.id,
     );
-    if (history) addTransferredAgendaItemHistory(report, history);
+    if (history) addTransferredAgendaItemSummary(report, history);
     report.endAgendaItemCard();
   }
 

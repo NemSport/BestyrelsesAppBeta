@@ -1,8 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { hasContiguousAgendaPositions } from "@/lib/agenda-reorder";
 import { AppError, NotFoundError } from "@/lib/errors";
 import {
   agendaItemInputSchema,
+  agendaItemHistoryCandidateSearchSchema,
+  agendaItemHistoryMetadataBatchSchema,
+  agendaItemHistoryLinkSchema,
   agendaItemOccurrenceBatchReorderSchema,
   agendaItemOccurrenceReorderSchema,
   agendaItemOccurrenceTrashActionSchema,
@@ -56,6 +60,141 @@ export class AgendaItemService {
       throw new NotFoundError("Dagsordenspunktet");
     }
     return agendaItem;
+  }
+
+  async getAgendaItemHistory(
+    organizationId: string,
+    committeeId: string,
+    agendaItemId: string,
+  ) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
+
+    const history = await this.agendaItems.getAgendaItemHistory({
+      organizationId,
+      committeeId,
+      agendaItemId,
+    });
+    if (!history) throw new NotFoundError("Dagsordenspunktet");
+    return history;
+  }
+
+  async getAgendaItemHistoryMetadataBatch(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemHistoryMetadataBatchSchema.parse(input);
+    await this.authorization.requireCommitteeMember(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+    );
+    return this.agendaItems.getAgendaItemHistoryMetadataBatch(parsed);
+  }
+
+  async searchHistoryLinkCandidates(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemHistoryCandidateSearchSchema.parse(input);
+    await this.authorization.requireMeetingCapability(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+      "updateAgendaItem",
+    );
+    const source = await this.agendaItems.findWithHistory(parsed.agendaItemId);
+    if (
+      !source ||
+      source.organization_id !== parsed.organizationId ||
+      source.committee_id !== parsed.committeeId
+    ) {
+      throw new NotFoundError("Dagsordenspunktet");
+    }
+
+    const currentThreadMemberCount =
+      await this.agendaItems.countActiveThreadMembers({
+        organizationId: parsed.organizationId,
+        committeeId: parsed.committeeId,
+        threadId: source.agenda_item_thread_id,
+      });
+    const meetingDates = source.agenda_item_occurrences.flatMap((occurrence) =>
+      occurrence.meetings?.starts_at ? [occurrence.meetings.starts_at] : [],
+    );
+    const beforeOrAt = meetingDates.sort().at(-1) ?? new Date().toISOString();
+    const candidates =
+      currentThreadMemberCount > 1
+        ? []
+        : await this.agendaItems.searchHistoryLinkCandidates({
+            organizationId: parsed.organizationId,
+            committeeId: parsed.committeeId,
+            sourceAgendaItemId: source.id,
+            sourceThreadId: source.agenda_item_thread_id,
+            query: parsed.query,
+            beforeOrAt,
+          });
+
+    return {
+      currentThreadId: source.agenda_item_thread_id,
+      currentThreadMemberCount,
+      canLink: currentThreadMemberCount <= 1,
+      candidates,
+    };
+  }
+
+  async linkToHistory(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = agendaItemHistoryLinkSchema.parse(input);
+    await this.authorization.requireMeetingCapability(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+      "updateAgendaItem",
+    );
+
+    try {
+      return await this.agendaItems.linkToHistory(parsed);
+    } catch (error) {
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : "";
+      if (message.includes("AGENDA_HISTORY_SOURCE_HAS_HISTORY")) {
+        throw new AppError(
+          "Dette dagsordenspunkt har allerede en historik. SammenkÃ¦dning af to eksisterende historikker understÃ¸ttes ikke endnu.",
+          409,
+          "AGENDA_HISTORY_MERGE_NOT_SUPPORTED",
+        );
+      }
+      if (message.includes("AGENDA_HISTORY_CONCURRENT_CHANGE")) {
+        throw new AppError(
+          "Historikken blev Ã¦ndret imens du arbejdede. GenÃ¥bn dialogen og prÃ¸v igen.",
+          409,
+          "AGENDA_HISTORY_CONCURRENT_CHANGE",
+        );
+      }
+      if (message.includes("AGENDA_HISTORY_SELF_LINK")) {
+        throw new AppError(
+          "Et dagsordenspunkt kan ikke knyttes til sig selv.",
+          422,
+          "AGENDA_HISTORY_SELF_LINK",
+        );
+      }
+      if (
+        message.includes("AGENDA_HISTORY_SCOPE_MISMATCH") ||
+        message.includes("AGENDA_ITEM_EDITOR_REQUIRED")
+      ) {
+        throw new AppError(
+          "Du har ikke adgang til at knytte disse dagsordenspunkter sammen.",
+          403,
+          "AUTHORIZATION_FAILED",
+        );
+      }
+      if (message.includes("AGENDA_HISTORY_ITEM_NOT_FOUND")) {
+        throw new NotFoundError("Dagsordenspunktet");
+      }
+      throw error;
+    }
   }
 
   async create(input: unknown) {
@@ -292,6 +431,15 @@ export class AgendaItemService {
         "Rækkefølgen skal indeholde alle aktive dagsordenspunkter præcis én gang.",
         422,
         "INVALID_AGENDA_ORDER",
+      );
+    }
+
+    const activeOccurrences = meeting.agenda_item_occurrences.filter(
+      (occurrence) => !occurrence.deleted_at,
+    );
+    if (!hasContiguousAgendaPositions(activeOccurrences)) {
+      await this.agendaItems.normalizeMeetingOccurrencePositions(
+        parsed.meetingId,
       );
     }
 

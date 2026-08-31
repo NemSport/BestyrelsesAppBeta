@@ -30,6 +30,7 @@ export type PdfProseBlock = {
   runs?: PdfTextRun[];
   ordered?: boolean;
   index?: number;
+  depth?: number;
 };
 
 export type PdfReportAttachment = {
@@ -51,6 +52,8 @@ type PdfReportOptions = {
   meta?: PdfMetaItem[];
   branding?: PdfReportBranding;
   orientation?: "portrait" | "landscape";
+  agendaItemCardOutline?: boolean;
+  metaLayout?: "cards" | "compact";
 };
 
 type TextOptions = {
@@ -94,6 +97,7 @@ type AgendaItemCardInput = {
   typeLabel: string;
   title: string;
   subtitle?: string;
+  keepWithNext?: boolean;
 };
 
 const portraitPageSize: [number, number] = [595.28, 841.89];
@@ -333,17 +337,24 @@ export async function createPdfReport(options: PdfReportOptions) {
         y: y - 22,
         width: contentWidth,
         height: 22,
-        color: reportPalette.brandSoft,
+        color: reportPalette.subtle,
+      });
+      page.drawRectangle({
+        x: margin,
+        y: y - 22,
+        width: 2,
+        height: 22,
+        color: reportPalette.line,
       });
       drawText(
         page,
-        `${activeCard.number}. ${safePdfText(activeCard.title)} (fortsat)`,
+        `${activeCard.number}. ${safePdfText(activeCard.title)} · fortsat`,
         {
           x: margin + 12,
           y: y - 15,
-          font: bold,
+          font: regular,
           size: 8.5,
-          color: reportPalette.brandText,
+          color: reportPalette.muted,
         },
       );
       y -= 30;
@@ -572,7 +583,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       y -= options.gapAfter ?? 0;
     };
 
-    for (const block of blocks) {
+    for (const [blockIndex, block] of blocks.entries()) {
       if (block.type === "heading") {
         addSubsection(block.text);
         continue;
@@ -581,10 +592,11 @@ export async function createPdfReport(options: PdfReportOptions) {
       if (block.type === "listItem") {
         addProseLine(block.text, {
           bullet: block.ordered ? `${block.index ?? 1}.` : "-",
-          indent: 12,
+          indent: 12 + Math.max(0, block.depth ?? 0) * 16,
           gapAfter: 5,
           runs: block.runs,
         });
+        if (blocks[blockIndex + 1]?.type !== "listItem") y -= 4;
         continue;
       }
 
@@ -658,7 +670,7 @@ export async function createPdfReport(options: PdfReportOptions) {
   };
 
   const addSubsection = (title: string) => {
-    ensureSpace(24);
+    ensureSpace(42);
     drawText(page, safePdfText(title), {
       x: flowX(),
       y,
@@ -679,7 +691,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     const inlineSubtitleLines = subtitleLines.length <= 4 ? subtitleLines : [];
     const boxHeight =
       22 + titleLines.length * 13 + inlineSubtitleLines.length * 11;
-    ensureSpace(boxHeight + 12);
+    ensureSpace(boxHeight + 12 + (input.keepWithNext ? 48 : 0));
     y -= 2;
     page.drawRectangle({
       x: margin,
@@ -687,8 +699,9 @@ export async function createPdfReport(options: PdfReportOptions) {
       width: contentWidth,
       height: boxHeight,
       color: reportPalette.brandSoft,
-      borderColor: reportPalette.line,
-      borderWidth: 0.45,
+      ...(options.agendaItemCardOutline === false
+        ? {}
+        : { borderColor: reportPalette.line, borderWidth: 0.45 }),
     });
     page.drawRectangle({
       x: margin,
@@ -764,13 +777,15 @@ export async function createPdfReport(options: PdfReportOptions) {
     if (!activeCard) return;
     if (activeInformationBox) endInformationBox();
     y -= 4;
-    drawBoxBorders(
-      activeCard.startPageIndex,
-      activeCard.startY,
-      y,
-      0,
-      reportPalette.line,
-    );
+    if (options.agendaItemCardOutline !== false) {
+      drawBoxBorders(
+        activeCard.startPageIndex,
+        activeCard.startY,
+        y,
+        0,
+        reportPalette.line,
+      );
+    }
     activeCard = null;
     y -= 12;
   };
@@ -830,6 +845,57 @@ export async function createPdfReport(options: PdfReportOptions) {
   const addMetaGrid = (items: PdfMetaItem[]) => {
     const visible = items.filter((item) => item.value);
     if (!visible.length) return;
+    if (options.metaLayout === "compact") {
+      const columnWidth = flowWidth() / 2 - 8;
+      for (let index = 0; index < visible.length; index += 2) {
+        const row = visible.slice(index, index + 2);
+        const prepared = row.map((item) => ({
+          item,
+          valueLines: wrapText(item.value, regular, 8.8, columnWidth),
+        }));
+        const rowHeight = Math.max(
+          27,
+          Math.max(...prepared.map((item) => item.valueLines.length)) * 10.5 +
+            13,
+        );
+        ensureSpace(rowHeight + 3);
+        prepared.forEach((item, column) => {
+          const x = flowX() + column * (columnWidth + 16);
+          drawText(
+            page,
+            safePdfText(item.item.label.toLocaleUpperCase("da-DK")),
+            {
+              x,
+              y,
+              font: bold,
+              size: 6.8,
+              color: reportPalette.muted,
+            },
+          );
+          let valueY = y - 12;
+          for (const line of item.valueLines) {
+            drawText(page, line, {
+              x,
+              y: valueY,
+              font: regular,
+              size: 8.8,
+              color: reportPalette.ink,
+            });
+            valueY -= 10.5;
+          }
+        });
+        y -= rowHeight;
+      }
+      y -= 3;
+      page.drawLine({
+        start: { x: flowX(), y },
+        end: { x: flowX() + flowWidth(), y },
+        thickness: 0.4,
+        color: reportPalette.line,
+      });
+      y -= 9;
+      return;
+    }
     const availableWidth = flowWidth();
     const columnWidth = availableWidth / 2 - 8;
     for (let index = 0; index < visible.length; index += 2) {

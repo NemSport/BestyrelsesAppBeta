@@ -11,6 +11,7 @@ import {
   agendaItemMinutesInputSchema,
   markNoResponseSchema,
   meetingMinutesInputSchema,
+  meetingPrivateNoteInputSchema,
   meetingMinutesReferentActionSchema,
   minutesApprovalResponseSchema,
   sendMinutesForApprovalSchema,
@@ -203,7 +204,6 @@ export class MeetingMinutesService {
         meeting_id: input.meetingId,
         minutes_text: "",
         decisions: "",
-        internal_note: null,
         status: "draft",
         created_by: input.userId,
         updated_by: input.userId,
@@ -256,36 +256,43 @@ export class MeetingMinutesService {
 
   async get(organizationId: string, committeeId: string, meetingId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(
+    await this.authorization.requireMeetingCapability(
       organizationId,
       committeeId,
       user.id,
+      "viewMeeting",
     );
     await this.requireMeeting(organizationId, committeeId, meetingId);
 
     const [
       meetingMinutes,
       agendaItemMinutes,
+      privateMeetingNote,
       privateAgendaItemNotes,
       members,
       referentLock,
     ] = await Promise.all([
       this.minutes.findMeetingMinutes(meetingId),
       this.minutes.listAgendaItemMinutes(meetingId),
+      this.minutes.findPrivateMeetingNote(meetingId, user.id),
       this.minutes.listPrivateAgendaItemNotes(meetingId, user.id),
       this.members.listMembers(organizationId),
       this.minutes.findReferentLock(meetingId),
     ]);
 
     const [approvals, meetingAttachments, agendaItemAttachments, canApprove] =
-      meetingMinutes
-        ? await Promise.all([
-            this.governance.listApprovals(meetingMinutes.id),
-            this.governance.listMeetingAttachments(meetingMinutes.id),
-            this.governance.listAgendaItemAttachments(meetingId),
-            this.governance.canApprove(meetingMinutes.id),
-          ])
-        : [[], [], [], false];
+      await Promise.all([
+        meetingMinutes
+          ? this.governance.listApprovals(meetingMinutes.id)
+          : Promise.resolve([]),
+        meetingMinutes
+          ? this.governance.listMeetingAttachments(meetingMinutes.id)
+          : Promise.resolve([]),
+        this.governance.listAgendaItemAttachments(meetingId),
+        meetingMinutes
+          ? this.governance.canApprove(meetingMinutes.id)
+          : Promise.resolve(false),
+      ]);
     const membersById = new Map(
       members.map((member) => [member.user_id, member]),
     );
@@ -313,6 +320,7 @@ export class MeetingMinutesService {
       meetingMinutes,
       referentLock: this.toReferentLockView(referentLock, user.id),
       agendaItemMinutes,
+      privateMeetingNote,
       privateAgendaItemNotes,
       responsiblePeople: members
         .filter((member) => member.status === "active")
@@ -434,9 +442,6 @@ export class MeetingMinutesService {
     const values = {
       minutes_text: sanitizeRichText(parsed.minutesText),
       decisions: sanitizeRichText(parsed.decisions),
-      internal_note: parsed.internalNote
-        ? sanitizeRichText(parsed.internalNote)
-        : null,
       status: parsed.status,
       updated_by: user.id,
     };
@@ -648,10 +653,11 @@ export class MeetingMinutesService {
   async savePrivateAgendaItemNote(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = agendaItemPrivateNoteInputSchema.parse(input);
-    await this.authorization.requireCommitteeMember(
+    await this.authorization.requireMeetingCapability(
       parsed.organizationId,
       parsed.committeeId,
       user.id,
+      "viewMeeting",
     );
     const meeting = await this.requireMeeting(
       parsed.organizationId,
@@ -687,6 +693,52 @@ export class MeetingMinutesService {
     if (!savedNote) {
       throw new AppError(
         "Din interne note er ændret i en anden fane. Den lokale tekst er ikke overskrevet.",
+        409,
+        "PRIVATE_NOTE_VERSION_CONFLICT",
+      );
+    }
+
+    return savedNote;
+  }
+
+  async savePrivateMeetingNote(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = meetingPrivateNoteInputSchema.parse(input);
+    await this.authorization.requireMeetingCapability(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+      "viewMeeting",
+    );
+    await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+
+    const existing = await this.minutes.findPrivateMeetingNote(
+      parsed.meetingId,
+      user.id,
+    );
+    const values = { content: sanitizeRichText(parsed.content) };
+    const savedNote = existing
+      ? await this.minutes.updatePrivateAgendaItemNote(
+          existing.id,
+          values,
+          parsed.expectedUpdatedAt ?? undefined,
+        )
+      : await this.minutes.createPrivateAgendaItemNote({
+          organization_id: parsed.organizationId,
+          committee_id: parsed.committeeId,
+          meeting_id: parsed.meetingId,
+          agenda_item_id: null,
+          user_id: user.id,
+          ...values,
+        });
+
+    if (!savedNote) {
+      throw new AppError(
+        "Dine interne mødenoter er ændret i en anden fane. Den lokale tekst er ikke overskrevet.",
         409,
         "PRIVATE_NOTE_VERSION_CONFLICT",
       );
@@ -867,16 +919,16 @@ export class MeetingMinutesService {
     committeeId: string;
     meetingId: string;
     agendaItemId?: string | null;
+    parentMinutesId?: string | null;
     file: File;
   }) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireMeetingCapability(
+    await this.authorization.requireCommitteeMember(
       input.organizationId,
       input.committeeId,
       user.id,
-      "manageMinutesAttachments",
     );
-    await this.requireMeeting(
+    const meeting = await this.requireMeeting(
       input.organizationId,
       input.committeeId,
       input.meetingId,
@@ -906,15 +958,117 @@ export class MeetingMinutesService {
       );
     }
 
-    const meetingMinutes = await this.minutes.findMeetingMinutes(
-      input.meetingId,
-    );
-    if (!meetingMinutes) {
+    let parentMinutes = input.agendaItemId
+      ? input.parentMinutesId
+        ? await this.minutes.findAgendaItemMinutesById(
+            input.parentMinutesId,
+            input.meetingId,
+            input.agendaItemId,
+          )
+        : await this.minutes.findAgendaItemMinutes(
+            input.meetingId,
+            input.agendaItemId,
+          )
+      : input.parentMinutesId
+        ? await this.minutes.findMeetingMinutesById(
+            input.parentMinutesId,
+            input.meetingId,
+          )
+        : await this.minutes.findMeetingMinutes(input.meetingId);
+
+    if (!parentMinutes) {
+      try {
+        if (input.agendaItemId) {
+          const occurrence = this.requireOccurrence(
+            meeting,
+            input.agendaItemId,
+            null,
+          );
+          parentMinutes = await this.minutes.createAgendaItemMinutes({
+            organization_id: input.organizationId,
+            committee_id: input.committeeId,
+            meeting_id: input.meetingId,
+            agenda_item_id: input.agendaItemId,
+            agenda_item_occurrence_id: occurrence.id,
+            notes: "",
+            decision: "",
+            follow_up: "",
+            responsible_user_id: null,
+            deadline: null,
+            status: "not_started",
+            created_by: user.id,
+            updated_by: user.id,
+          });
+        } else {
+          parentMinutes = await this.minutes.createMeetingMinutes({
+            organization_id: input.organizationId,
+            committee_id: input.committeeId,
+            meeting_id: input.meetingId,
+            minutes_text: "",
+            decisions: "",
+            status: "draft",
+            created_by: user.id,
+            updated_by: user.id,
+          });
+        }
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23505"
+        ) {
+          parentMinutes = input.agendaItemId
+            ? await this.minutes.findAgendaItemMinutes(
+                input.meetingId,
+                input.agendaItemId,
+              )
+            : await this.minutes.findMeetingMinutes(input.meetingId);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (!parentMinutes) {
       throw new AppError(
-        "Gem mødereferatet, før du vedhæfter filer.",
+        "Referatet kunne ikke klargøres til filupload.",
         422,
-        "MINUTES_REQUIRED",
+        "ATTACHMENT_PARENT_REQUIRED",
       );
+    }
+
+    // The existing private Storage read policy resolves access through
+    // meeting_minutes, also for agenda-scoped paths. Keep the attachment
+    // relation agenda-scoped, but establish that minimal access parent before
+    // uploading when an agenda item is the canonical attachment parent.
+    if (
+      input.agendaItemId &&
+      !(await this.minutes.findMeetingMinutes(input.meetingId))
+    ) {
+      try {
+        await this.minutes.createMeetingMinutes({
+          organization_id: input.organizationId,
+          committee_id: input.committeeId,
+          meeting_id: input.meetingId,
+          minutes_text: "",
+          decisions: "",
+          status: "draft",
+          created_by: user.id,
+          updated_by: user.id,
+        });
+      } catch (error) {
+        if (
+          !(
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === "23505"
+          )
+        ) {
+          throw error;
+        }
+      }
     }
 
     const safeName =
@@ -923,7 +1077,7 @@ export class MeetingMinutesService {
     const attachmentId = crypto.randomUUID();
     const scope = input.agendaItemId
       ? `agenda/${input.agendaItemId}`
-      : `meeting/${meetingMinutes.id}`;
+      : `meeting/${parentMinutes.id}`;
     const storagePath = `${input.organizationId}/${input.committeeId}/${input.meetingId}/${scope}/${attachmentId}-${safeName}`;
 
     let uploaded = false;
@@ -931,24 +1085,13 @@ export class MeetingMinutesService {
       await this.governance.upload(storagePath, input.file);
       uploaded = true;
       if (input.agendaItemId) {
-        const agendaMinutes = await this.minutes.findAgendaItemMinutes(
-          input.meetingId,
-          input.agendaItemId,
-        );
-        if (!agendaMinutes) {
-          throw new AppError(
-            "Gem punktreferatet, før du vedhæfter filer.",
-            422,
-            "AGENDA_MINUTES_REQUIRED",
-          );
-        }
         return await this.governance.createAgendaItemAttachment({
           id: attachmentId,
           organization_id: input.organizationId,
           committee_id: input.committeeId,
           meeting_id: input.meetingId,
           agenda_item_id: input.agendaItemId,
-          agenda_item_minutes_id: agendaMinutes.id,
+          agenda_item_minutes_id: parentMinutes.id,
           storage_path: storagePath,
           file_name: input.file.name,
           mime_type: input.file.type || "application/octet-stream",
@@ -964,7 +1107,7 @@ export class MeetingMinutesService {
         organization_id: input.organizationId,
         committee_id: input.committeeId,
         meeting_id: input.meetingId,
-        meeting_minutes_id: meetingMinutes.id,
+        meeting_minutes_id: parentMinutes.id,
         storage_path: storagePath,
         file_name: input.file.name,
         mime_type: input.file.type || "application/octet-stream",
@@ -984,13 +1127,18 @@ export class MeetingMinutesService {
     await this.auth.requireUser();
     const attachment = await this.governance.findAttachment(attachmentId);
     if (!attachment) throw new NotFoundError("Vedhæftningen");
-    return {
-      url: await this.governance.createDownloadUrl(
-        attachment.storage_path,
-        download ? attachment.file_name : null,
-      ),
-      fileName: attachment.file_name,
-    };
+    const currentVersion = await this.governance.findCentralCurrentVersion(attachmentId);
+    if (currentVersion) {
+      return {
+        url: await this.governance.createDocumentVersionUrl(
+          currentVersion.storage_bucket,
+          currentVersion.storage_path,
+          download ? currentVersion.file_name : null,
+        ),
+        fileName: currentVersion.file_name,
+      };
+    }
+    return { url: await this.governance.createDownloadUrl(attachment.storage_path, download ? attachment.file_name : null), fileName: attachment.file_name };
   }
 
   async removeAttachment(attachmentId: string) {
@@ -1022,22 +1170,8 @@ export class MeetingMinutesService {
       await this.governance.deleteMeetingAttachment(attachment.id);
     }
 
-    await this.governance
-      .removeUpload(attachment.storage_path)
-      .catch((error) => {
-        console.warn(
-          "[meeting-minutes] Bilag blev fjernet fra databasen, men storage-filen kunne ikke slettes.",
-          {
-            meetingId: attachment.meeting_id,
-            agendaItemId:
-              "agenda_item_id" in attachment ? attachment.agenda_item_id : null,
-            attachmentId: attachment.id,
-            fileName: attachment.file_name,
-            mimeType: attachment.mime_type,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        );
-      });
+    // Removing a legacy attachment now unlinks its meeting context. The
+    // central document and immutable storage object remain in the archive.
 
     return { id: attachment.id, fileName: attachment.file_name };
   }
@@ -1110,17 +1244,26 @@ export class MeetingMinutesService {
       );
     });
 
+    const currentVersions = await this.governance.listCentralCurrentVersions(
+      ordered.map((entry) => entry.attachment.id),
+    );
+
     const result: PdfReportAttachment[] = [];
     for (const entry of ordered) {
       const attachment = entry.attachment as RawMinuteAttachment;
+      const currentVersion = currentVersions.get(attachment.id);
+      const fileName = currentVersion?.file_name ?? attachment.file_name;
+      const mimeType = currentVersion?.mime_type ?? attachment.mime_type;
       const embedType = attachmentEmbedType(
-        attachment.file_name,
-        attachment.mime_type,
+        fileName,
+        mimeType,
       );
       let bytes: Uint8Array | null = null;
       if (embedType !== "unsupported") {
         try {
-          bytes = await this.governance.download(attachment.storage_path);
+          bytes = currentVersion
+            ? await this.governance.downloadDocumentVersion(currentVersion.storage_bucket, currentVersion.storage_path)
+            : await this.governance.download(attachment.storage_path);
         } catch (error) {
           console.warn("[meeting-minutes] Bilag kunne ikke hentes til PDF.", {
             meetingId,
@@ -1136,8 +1279,8 @@ export class MeetingMinutesService {
       result.push({
         appendixNumber: result.length + 1,
         pointLabel: entry.pointLabel,
-        fileName: attachment.file_name,
-        mimeType: attachment.mime_type,
+        fileName,
+        mimeType,
         bytes,
         embedType,
       });

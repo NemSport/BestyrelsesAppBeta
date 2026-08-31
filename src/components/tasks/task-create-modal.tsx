@@ -27,19 +27,25 @@ import {
   taskStatusOptions,
   type TaskStatus,
 } from "@/lib/tasks";
+import { reconcileTaskStakeholderContract } from "@/lib/task-stakeholder-context";
 import type {
   AgendaItem,
   DecisionView,
   Meeting,
+  TaskStakeholderContractOption,
+  TaskStakeholderOption,
   TaskView,
 } from "@/types/domain";
 
 export function TaskCreateModal({
   organizationId,
   committeeId,
+  committeeOptions = [],
   meetings = [],
   agendaItems = [],
   decisions = [],
+  stakeholders = [],
+  stakeholderContracts = [],
   responsiblePeople,
   categorySource,
   triggerLabel = "Opret opgave",
@@ -47,6 +53,8 @@ export function TaskCreateModal({
   initialMeetingId = "",
   initialAgendaItemId = "",
   initialDecisionId = "",
+  initialStakeholderId = "",
+  initialStakeholderContractId = "",
   initialTitle = "",
   initialDescription = "",
   initialResponsibleUserId = "",
@@ -57,16 +65,25 @@ export function TaskCreateModal({
 }: {
   organizationId: string;
   committeeId: string;
+  committeeOptions?: Array<{ id: string; name: string }>;
   meetings?: Array<Pick<Meeting, "id" | "title" | "starts_at">>;
   agendaItems?: Array<Pick<AgendaItem, "id" | "title">>;
   decisions?: Array<Pick<DecisionView, "id" | "title">>;
-  responsiblePeople: Array<{ id: string; name: string }>;
+  responsiblePeople: Array<{
+    id: string;
+    name: string;
+    committeeIds?: string[];
+  }>;
+  stakeholders?: TaskStakeholderOption[];
+  stakeholderContracts?: TaskStakeholderContractOption[];
   categorySource: TaskView[];
   triggerLabel?: string;
   trigger?: (open: () => void) => ReactNode;
   initialMeetingId?: string;
   initialAgendaItemId?: string;
   initialDecisionId?: string;
+  initialStakeholderId?: string;
+  initialStakeholderContractId?: string;
   initialTitle?: string;
   initialDescription?: string;
   initialResponsibleUserId?: string;
@@ -76,6 +93,7 @@ export function TaskCreateModal({
   instanceId?: string;
 }) {
   const router = useRouter();
+  const defaultCommitteeId = committeeId || committeeOptions[0]?.id || "";
   const formId =
     instanceId || initialDecisionId || initialAgendaItemId || initialMeetingId;
   const [open, setOpen] = useState(false);
@@ -92,6 +110,12 @@ export function TaskCreateModal({
   const [meetingId, setMeetingId] = useState(initialMeetingId);
   const [agendaItemId, setAgendaItemId] = useState(initialAgendaItemId);
   const [decisionId, setDecisionId] = useState(initialDecisionId);
+  const [selectedCommitteeId, setSelectedCommitteeId] =
+    useState(defaultCommitteeId);
+  const [stakeholderId, setStakeholderId] = useState(initialStakeholderId);
+  const [stakeholderContractId, setStakeholderContractId] = useState(
+    initialStakeholderContractId,
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const mutation = useMutationFeedback();
   const dirty =
@@ -105,12 +129,24 @@ export function TaskCreateModal({
     internalNote !== "" ||
     meetingId !== initialMeetingId ||
     agendaItemId !== initialAgendaItemId ||
-    decisionId !== initialDecisionId;
+    decisionId !== initialDecisionId ||
+    selectedCommitteeId !== defaultCommitteeId ||
+    stakeholderId !== initialStakeholderId ||
+    stakeholderContractId !== initialStakeholderContractId;
   const confirmDiscard = useUnsavedChanges(open && dirty && !mutation.pending);
 
   const categorySuggestions = useMemo(
-    () => getTaskCategorySuggestions(categorySource, committeeId, category),
-    [category, categorySource, committeeId],
+    () =>
+      getTaskCategorySuggestions(categorySource, selectedCommitteeId, category),
+    [category, categorySource, selectedCommitteeId],
+  );
+
+  const visibleResponsiblePeople = responsiblePeople.filter(
+    (person) =>
+      !person.committeeIds || person.committeeIds.includes(selectedCommitteeId),
+  );
+  const visibleContracts = stakeholderContracts.filter(
+    (contract) => contract.stakeholder_id === stakeholderId,
   );
 
   function showModal() {
@@ -125,6 +161,9 @@ export function TaskCreateModal({
     setMeetingId(initialMeetingId);
     setAgendaItemId(initialAgendaItemId);
     setDecisionId(initialDecisionId);
+    setSelectedCommitteeId(defaultCommitteeId);
+    setStakeholderId(initialStakeholderId);
+    setStakeholderContractId(initialStakeholderContractId);
     setFieldErrors({});
     mutation.reset();
     setOpen(true);
@@ -146,10 +185,12 @@ export function TaskCreateModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             organizationId,
-            committeeId,
+            committeeId: selectedCommitteeId,
             meetingId: meetingId || null,
             agendaItemId: agendaItemId || null,
             decisionId: decisionId || null,
+            stakeholderId: stakeholderId || null,
+            stakeholderContractId: stakeholderContractId || null,
             title,
             description,
             status,
@@ -177,6 +218,9 @@ export function TaskCreateModal({
       const field = firstFieldError(nextFieldErrors, [
         "title",
         "description",
+        "committeeId",
+        "stakeholderId",
+        "stakeholderContractId",
         "deadline",
         "reminderAt",
         "category",
@@ -249,23 +293,81 @@ export function TaskCreateModal({
               />
             </div>
             <div>
-              <label className="label" htmlFor={`task-status-${formId}`}>
-                Status
-              </label>
-              <Select
-                id={`task-status-${formId}`}
-                onChange={(event) =>
-                  setStatus(event.target.value as TaskStatus)
-                }
-                value={status}
-              >
-                {taskStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+              {committeeOptions.length ? (
+                <>
+                  <label className="label" htmlFor={`task-committee-${formId}`}>
+                    Udvalg
+                  </label>
+                  <Select
+                    aria-describedby={
+                      fieldErrors.committeeId
+                        ? `task-committee-${formId}-error`
+                        : undefined
+                    }
+                    aria-invalid={Boolean(fieldErrors.committeeId)}
+                    id={`task-committee-${formId}`}
+                    onChange={(event) => {
+                      setSelectedCommitteeId(event.target.value);
+                      setResponsibleUserId("");
+                      setMeetingId("");
+                      setAgendaItemId("");
+                      setDecisionId("");
+                    }}
+                    value={selectedCommitteeId}
+                  >
+                    <option value="">Vælg udvalg</option>
+                    {committeeOptions.map((committee) => (
+                      <option key={committee.id} value={committee.id}>
+                        {committee.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <FieldError
+                    id={`task-committee-${formId}-error`}
+                    message={fieldErrors.committeeId}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="label" htmlFor={`task-status-${formId}`}>
+                    Status
+                  </label>
+                  <Select
+                    id={`task-status-${formId}`}
+                    onChange={(event) =>
+                      setStatus(event.target.value as TaskStatus)
+                    }
+                    value={status}
+                  >
+                    {taskStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </>
+              )}
             </div>
+            {committeeOptions.length ? (
+              <div>
+                <label className="label" htmlFor={`task-status-${formId}`}>
+                  Status
+                </label>
+                <Select
+                  id={`task-status-${formId}`}
+                  onChange={(event) =>
+                    setStatus(event.target.value as TaskStatus)
+                  }
+                  value={status}
+                >
+                  {taskStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
             <div>
               <label className="label" htmlFor={`task-responsible-${formId}`}>
                 Ansvarlig
@@ -276,7 +378,7 @@ export function TaskCreateModal({
                 value={responsibleUserId}
               >
                 <option value="">Ingen ansvarlig</option>
-                {responsiblePeople.map((person) => (
+                {visibleResponsiblePeople.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.name}
                   </option>
@@ -356,8 +458,7 @@ export function TaskCreateModal({
                 message={fieldErrors.reminderAt}
               />
               <p className="mt-1 text-xs text-muted">
-                Gemmes til senere email/notifikation. Der sendes ikke automatisk
-                noget endnu.
+                Vises som en handling på det valgte tidspunkt.
               </p>
             </div>
             {meetings.length ? (
@@ -415,6 +516,79 @@ export function TaskCreateModal({
                     </option>
                   ))}
                 </Select>
+              </div>
+            ) : null}
+            {stakeholders.length ? (
+              <div>
+                <label className="label" htmlFor={`task-stakeholder-${formId}`}>
+                  Interessent
+                </label>
+                <Select
+                  aria-describedby={
+                    fieldErrors.stakeholderId
+                      ? `task-stakeholder-${formId}-error`
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.stakeholderId)}
+                  id={`task-stakeholder-${formId}`}
+                  onChange={(event) => {
+                    const nextStakeholderId = event.target.value;
+                    setStakeholderId(nextStakeholderId);
+                    setStakeholderContractId(
+                      reconcileTaskStakeholderContract(
+                        nextStakeholderId,
+                        stakeholderContractId,
+                        stakeholderContracts,
+                      ),
+                    );
+                  }}
+                  value={stakeholderId}
+                >
+                  <option value="">Ingen interessent</option>
+                  {stakeholders.map((stakeholder) => (
+                    <option key={stakeholder.id} value={stakeholder.id}>
+                      {stakeholder.name}
+                    </option>
+                  ))}
+                </Select>
+                <FieldError
+                  id={`task-stakeholder-${formId}-error`}
+                  message={fieldErrors.stakeholderId}
+                />
+              </div>
+            ) : null}
+            {stakeholderId ? (
+              <div>
+                <label
+                  className="label"
+                  htmlFor={`task-stakeholder-contract-${formId}`}
+                >
+                  Kontrakt
+                </label>
+                <Select
+                  aria-describedby={
+                    fieldErrors.stakeholderContractId
+                      ? `task-stakeholder-contract-${formId}-error`
+                      : undefined
+                  }
+                  aria-invalid={Boolean(fieldErrors.stakeholderContractId)}
+                  id={`task-stakeholder-contract-${formId}`}
+                  onChange={(event) =>
+                    setStakeholderContractId(event.target.value)
+                  }
+                  value={stakeholderContractId}
+                >
+                  <option value="">Ingen kontrakt</option>
+                  {visibleContracts.map((contract) => (
+                    <option key={contract.id} value={contract.id}>
+                      {contract.title}
+                    </option>
+                  ))}
+                </Select>
+                <FieldError
+                  id={`task-stakeholder-contract-${formId}-error`}
+                  message={fieldErrors.stakeholderContractId}
+                />
               </div>
             ) : null}
             <div className="sm:col-span-2">

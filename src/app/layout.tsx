@@ -6,10 +6,11 @@ import { ServiceWorkerRegistration } from "@/components/offline/service-worker-r
 export const metadata: Metadata = {
   applicationName: "BestyrelsesApp",
   title: {
-    default: "Udvalgshukommelsen",
-    template: "%s | Udvalgshukommelsen",
+    default: "BestyrelsesApp",
+    template: "%s | BestyrelsesApp",
   },
-  description: "Hjælper udvalg med at huske beslutninger og føre handlinger ud i livet.",
+  description:
+    "Hjælper udvalg med at huske beslutninger og føre handlinger ud i livet.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

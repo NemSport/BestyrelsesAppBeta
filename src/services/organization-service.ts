@@ -15,13 +15,19 @@ import { DecisionRepository } from "@/repositories/decision-repository";
 import { TaskRepository } from "@/repositories/task-repository";
 import { sortTasksByDeadline } from "@/lib/tasks";
 import { getMeetingCapabilities } from "@/lib/permissions";
+import { resolveOrganizationBranding } from "@/lib/organization-branding";
+import { OrganizationBrandingRepository } from "@/repositories/organization-branding-repository";
 import type { Database } from "@/types/database";
-import type { OrganizationOverview } from "@/types/domain";
+import type {
+  OrganizationOverview,
+  OrganizationWorkspaceEntry,
+} from "@/types/domain";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 
 export class OrganizationService {
   private readonly organizations: OrganizationRepository;
+  private readonly organizationBranding: OrganizationBrandingRepository;
   private readonly committees: CommitteeRepository;
   private readonly meetings: MeetingRepository;
   private readonly meetingMinutesGovernance: MeetingMinutesGovernanceRepository;
@@ -33,6 +39,7 @@ export class OrganizationService {
 
   constructor(db: SupabaseClient<Database>) {
     this.organizations = new OrganizationRepository(db);
+    this.organizationBranding = new OrganizationBrandingRepository(db);
     this.committees = new CommitteeRepository(db);
     this.meetings = new MeetingRepository(db);
     this.meetingMinutesGovernance = new MeetingMinutesGovernanceRepository(db);
@@ -46,6 +53,38 @@ export class OrganizationService {
   async listForCurrentUser() {
     const user = await this.auth.requireUser();
     return this.organizations.listForCurrentUser(user.id);
+  }
+
+  async listWorkspaceEntries(): Promise<OrganizationWorkspaceEntry[]> {
+    const user = await this.auth.requireUser();
+    const memberships = await this.organizations.listForCurrentUser(user.id);
+    const organizationIds = memberships.flatMap((membership) =>
+      membership.organizations ? [membership.organizations.id] : [],
+    );
+    const [committeeCounts, brandingRows] = await Promise.all([
+      this.committees.countActiveByOrganizations(organizationIds),
+      this.organizationBranding.listByOrganizations(organizationIds),
+    ]);
+    const brandingByOrganization = new Map(
+      brandingRows.map((branding) => [branding.organization_id, branding]),
+    );
+
+    return memberships.flatMap((membership) => {
+      const organization = membership.organizations;
+      if (!organization) return [];
+
+      return [
+        {
+          id: organization.id,
+          name: organization.name,
+          role: membership.role,
+          committeeCount: committeeCounts.get(organization.id) ?? 0,
+          logoUrl: resolveOrganizationBranding(
+            brandingByOrganization.get(organization.id) ?? null,
+          ).logoUrl,
+        },
+      ];
+    });
   }
 
   async create(input: unknown) {

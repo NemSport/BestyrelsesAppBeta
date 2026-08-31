@@ -19,6 +19,7 @@ export type MeetingCapabilities = {
   editOfficialMinutes: boolean;
   manageMinutesApproval: boolean;
   manageMinutesAttachments: boolean;
+  uploadMinutesAttachments: boolean;
   manageTransferredAgendaItems: boolean;
   sendAgendaEmail: boolean;
   editTasks: boolean;
@@ -62,6 +63,7 @@ export function getMeetingCapabilities(
     editOfficialMinutes: manager,
     manageMinutesApproval: manager,
     manageMinutesAttachments: manager,
+    uploadMinutesAttachments: editor,
     manageTransferredAgendaItems: manager,
     sendAgendaEmail: manager,
     editTasks: editor,

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  annualWheelTemplateSyncDecision,
+  buildAnnualWheelTemplateCopies,
   buildAnnualWheelOccurrences,
   buildRRule,
 } from "@/lib/annual-wheel";
@@ -257,10 +259,7 @@ export class AnnualWheelService {
       status: parsed.status,
       recurrence: parsed.recurrence,
       recurrence_interval: parsed.recurrenceInterval,
-      recurrence_rule: buildRRule(
-        parsed.recurrence,
-        parsed.recurrenceInterval,
-      ),
+      recurrence_rule: buildRRule(parsed.recurrence, parsed.recurrenceInterval),
       is_exception: current.recurrence !== "none",
       updated_by: user.id,
     });
@@ -271,6 +270,10 @@ export class AnnualWheelService {
       user.id,
       true,
     );
+    const templateSync = await this.syncTaskTemplatesToFutureOccurrences(
+      current,
+      user.id,
+    );
     await this.saveKeyPeople(
       parsed.eventId,
       parsed.organizationId,
@@ -278,7 +281,7 @@ export class AnnualWheelService {
       user.id,
       true,
     );
-    return updated;
+    return { ...updated, templateSync };
   }
 
   async activateTasks(input: unknown) {
@@ -288,7 +291,11 @@ export class AnnualWheelService {
       parsed.organizationId,
       parsed.eventId,
     );
-    await this.requireEditor(parsed.organizationId, event.committee_id, user.id);
+    await this.requireEditor(
+      parsed.organizationId,
+      event.committee_id,
+      user.id,
+    );
     if (!event.committee_id) {
       throw new AppError(
         "Aktiviteten skal være tilknyttet et udvalg, før faste opgaver kan aktiveres som tasks.",
@@ -423,6 +430,60 @@ export class AnnualWheelService {
       : this.events.createTaskTemplates(input);
   }
 
+  private async syncTaskTemplatesToFutureOccurrences(
+    sourceEvent: NonNullable<
+      Awaited<ReturnType<AnnualWheelRepository["findById"]>>
+    >,
+    userId: string,
+  ) {
+    const [sourceTemplates, futureOccurrences] = await Promise.all([
+      this.events.findTaskTemplates(sourceEvent.id),
+      this.events.findFutureOccurrences(
+        sourceEvent.series_id,
+        sourceEvent.occurrence_index,
+      ),
+    ]);
+    if (!sourceTemplates.length || !futureOccurrences.length) {
+      return { copiedEventIds: [], manualReviewEventIds: [] };
+    }
+
+    const copiedEventIds: string[] = [];
+    const manualReviewEventIds: string[] = [];
+    for (const targetEvent of futureOccurrences) {
+      if (
+        targetEvent.organization_id !== sourceEvent.organization_id ||
+        targetEvent.committee_id !== sourceEvent.committee_id
+      ) {
+        manualReviewEventIds.push(targetEvent.id);
+        continue;
+      }
+
+      const targetTemplates = await this.events.findTaskTemplates(
+        targetEvent.id,
+      );
+      const decision = annualWheelTemplateSyncDecision(
+        sourceTemplates,
+        targetTemplates,
+      );
+      if (decision === "manual_review") {
+        manualReviewEventIds.push(targetEvent.id);
+        continue;
+      }
+      if (decision === "unchanged") continue;
+
+      await this.events.createTaskTemplates(
+        buildAnnualWheelTemplateCopies(sourceTemplates, {
+          organizationId: sourceEvent.organization_id,
+          eventId: targetEvent.id,
+          userId,
+        }),
+      );
+      copiedEventIds.push(targetEvent.id);
+    }
+
+    return { copiedEventIds, manualReviewEventIds };
+  }
+
   private async saveKeyPeople(
     eventId: string,
     organizationId: string,
@@ -455,7 +516,9 @@ export class AnnualWheelService {
 
   private templateDeadline(
     event: Awaited<ReturnType<AnnualWheelRepository["findById"]>>,
-    template: Awaited<ReturnType<AnnualWheelRepository["findTaskTemplates"]>>[number],
+    template: Awaited<
+      ReturnType<AnnualWheelRepository["findTaskTemplates"]>
+    >[number],
   ) {
     if (!event || template.deadline_offset_days === null) return null;
     const anchor =

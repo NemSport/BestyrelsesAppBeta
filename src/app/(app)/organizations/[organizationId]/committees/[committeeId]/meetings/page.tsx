@@ -7,6 +7,7 @@ import {
   filterMeetingList,
   groupMeetingList,
   parseMeetingListFilters,
+  sortMeetingList,
 } from "@/lib/meeting-list";
 import { getMeetingCapabilities } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
@@ -26,10 +27,13 @@ export default async function MeetingsPage({
   }>;
 }) {
   const { organizationId, committeeId } = await params;
-  const filters = parseMeetingListFilters((await searchParams) ?? {});
-  const filtersActive = Boolean(
-    filters.date || filters.period || filters.status,
-  );
+  const requestedFilters = parseMeetingListFilters((await searchParams) ?? {});
+  const filters = {
+    ...requestedFilters,
+    committeeId: "",
+    period: requestedFilters.period === "previous" ? "previous" : "upcoming",
+  } as const;
+  const filtersActive = Boolean(filters.date || filters.status);
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
   const context = await new AuthorizationService(db).requireCommitteeMember(
@@ -49,16 +53,17 @@ export default async function MeetingsPage({
     committeeName: context.committee.name,
   }));
   const now = Date.now();
-  const grouped = groupMeetingList(meetings, now);
   const filteredGrouped = groupMeetingList(
-    filterMeetingList(meetings, filters, now),
+    filterMeetingList(meetings, { ...filters, period: "" }, now),
     now,
   );
-  const filteredMeetings = [
-    ...filteredGrouped.upcoming,
-    ...filteredGrouped.previous,
-    ...filteredGrouped.cancelled,
-  ];
+  const selectedMeetings =
+    filters.period === "previous"
+      ? sortMeetingList(
+          [...filteredGrouped.previous, ...filteredGrouped.cancelled],
+          "previous",
+        )
+      : filteredGrouped.upcoming;
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
   const meetingsRoot = `${root}/meetings`;
 
@@ -75,160 +80,85 @@ export default async function MeetingsPage({
       eyebrow="Møder"
       title={`${context.committee.name} · Mødeplan`}
     >
-      <div className="space-y-6">
+      <div className="space-y-3">
         <MeetingListFilters filters={filters} resetHref={meetingsRoot} />
 
-        {filtersActive ? (
-          <section aria-labelledby="filtered-meetings-heading">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2
-                  className="text-sm font-semibold text-ink"
-                  id="filtered-meetings-heading"
-                >
-                  Filtrerede møder
-                </h2>
-                <p className="text-xs text-muted">
-                  Resultaterne vises med kommende først og derefter de nyeste
-                  afholdte og aflyste.
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-muted">
-                {filteredMeetings.length}{" "}
-                {filteredMeetings.length === 1 ? "møde" : "møder"}
-              </span>
+        <section aria-labelledby="committee-meeting-list-heading">
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2
+                className="text-sm font-semibold text-ink"
+                id="committee-meeting-list-heading"
+              >
+                {filters.period === "previous"
+                  ? "Afholdte møder"
+                  : "Kommende møder"}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                {filters.period === "previous"
+                  ? "Nyeste møde først."
+                  : "Nærmeste møde først."}
+              </p>
             </div>
-            {filteredMeetings.length > 0 ? (
-              <MeetingList
-                meetings={filteredMeetings}
-                now={now}
-                organizationId={organizationId}
-                showCommittee={false}
-              />
-            ) : (
-              <EmptyState
-                action={
+            <span className="text-xs font-medium tabular-nums text-muted">
+              {selectedMeetings.length}{" "}
+              {selectedMeetings.length === 1 ? "møde" : "møder"}
+            </span>
+          </div>
+
+          {selectedMeetings.length > 0 ? (
+            <MeetingList
+              meetings={selectedMeetings}
+              now={now}
+              organizationId={organizationId}
+              showCommittee={false}
+            />
+          ) : (
+            <EmptyState
+              action={
+                filtersActive ? (
                   <Link
                     className={buttonClassName({ variant: "secondary" })}
-                    href={meetingsRoot}
+                    href={`${meetingsRoot}?period=${filters.period}`}
                   >
                     Nulstil filtre
                   </Link>
-                }
-                description="Prøv at rydde et filter eller vælge en anden periode, status eller dato."
-                kind="filtered"
-                title="Ingen møder matcher filtrene."
-              />
-            )}
-          </section>
-        ) : meetings.length > 0 ? (
-          <>
-            <section aria-labelledby="upcoming-meetings-heading">
-              <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2
-                    className="text-sm font-semibold text-ink"
-                    id="upcoming-meetings-heading"
+                ) : capabilities.createMeeting &&
+                  filters.period === "upcoming" ? (
+                  <Link
+                    className={buttonClassName()}
+                    href={`${meetingsRoot}/new`}
                   >
-                    Kommende og igangværende
-                  </h2>
-                  <p className="text-xs text-muted">
-                    Næste møde først; igangværende møder placeres her.
-                  </p>
-                </div>
-                <span className="text-xs font-semibold text-muted">
-                  {grouped.upcoming.length} møde(r)
-                </span>
-              </div>
-              {grouped.upcoming.length > 0 ? (
-                <MeetingList
-                  meetings={grouped.upcoming}
-                  now={now}
-                  organizationId={organizationId}
-                  showCommittee={false}
-                />
-              ) : (
-                <p className="border border-line bg-surface px-3 py-3 text-sm text-muted">
-                  Der er ingen kommende eller igangværende møder.
-                </p>
-              )}
-            </section>
-
-            <section aria-labelledby="previous-meetings-heading">
-              <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2
-                    className="text-sm font-semibold text-ink"
-                    id="previous-meetings-heading"
-                  >
-                    Afholdte møder
-                  </h2>
-                  <p className="text-xs text-muted">Nyeste mødedato først.</p>
-                </div>
-                <span className="text-xs font-semibold text-muted">
-                  {grouped.previous.length} møde(r)
-                </span>
-              </div>
-              {grouped.previous.length > 0 ? (
-                <MeetingList
-                  meetings={grouped.previous}
-                  now={now}
-                  organizationId={organizationId}
-                  showCommittee={false}
-                />
-              ) : (
-                <p className="border border-line bg-surface px-3 py-3 text-sm text-muted">
-                  Der er ingen afholdte møder.
-                </p>
-              )}
-            </section>
-
-            {grouped.cancelled.length > 0 ? (
-              <details className="group border-y border-line">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                  <span>
-                    Aflyste møder
-                    <span className="ml-2 font-normal text-muted">
-                      {grouped.cancelled.length} møde(r)
-                    </span>
-                  </span>
-                  <span className="text-xs text-brand">
-                    <span className="group-open:hidden">Vis</span>
-                    <span className="hidden group-open:inline">Skjul</span>
-                  </span>
-                </summary>
-                <div className="pb-4">
-                  <MeetingList
-                    meetings={grouped.cancelled}
-                    now={now}
-                    organizationId={organizationId}
-                    showCommittee={false}
-                  />
-                </div>
-              </details>
-            ) : null}
-          </>
-        ) : (
-          <EmptyState
-            action={
-              capabilities.createMeeting ? (
-                <Link
-                  className={buttonClassName()}
-                  href={`${meetingsRoot}/new`}
-                >
-                  Opret første møde
-                </Link>
-              ) : undefined
-            }
-            description={
-              capabilities.createMeeting
-                ? "Opret et møde for at samle dagsorden, referat og opfølgning."
-                : "Når en ansvarlig opretter et møde, vises dagsorden, referat og opfølgning her."
-            }
-            kind={capabilities.createMeeting ? "empty" : "read-only"}
-            title="Der er endnu ikke oprettet nogen møder."
-          />
-        )}
+                    Opret møde
+                  </Link>
+                ) : undefined
+              }
+              description={
+                filtersActive
+                  ? "Prøv at nulstille filtrene eller vælge en anden dato eller status."
+                  : filters.period === "previous"
+                    ? "Afholdte og aflyste møder vises her som historik."
+                    : capabilities.createMeeting
+                      ? "Opret et møde for at samle dagsorden, referat og opfølgning."
+                      : "Når en ansvarlig opretter et møde, vises det her."
+              }
+              kind={
+                filtersActive
+                  ? "filtered"
+                  : capabilities.createMeeting
+                    ? "empty"
+                    : "read-only"
+              }
+              title={
+                filtersActive
+                  ? "Ingen møder matcher filtrene"
+                  : filters.period === "previous"
+                    ? "Ingen afholdte møder endnu"
+                    : "Ingen kommende møder"
+              }
+            />
+          )}
+        </section>
       </div>
     </PageSection>
   );

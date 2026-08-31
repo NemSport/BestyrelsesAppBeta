@@ -288,6 +288,30 @@ export const agendaItemUpdateSchema = agendaItemContentSchema.extend({
   agendaItemId: uuidSchema,
 });
 
+export const agendaItemHistoryLinkSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  agendaItemId: uuidSchema,
+  targetAgendaItemId: uuidSchema,
+  expectedSourceThreadId: uuidSchema,
+});
+
+export const agendaItemHistoryCandidateSearchSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  agendaItemId: uuidSchema,
+  query: z.string().trim().max(100).default(""),
+});
+
+export const agendaItemHistoryMetadataBatchSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  agendaItemIds: z
+    .array(uuidSchema)
+    .max(100, "Der kan højst hentes historikmetadata for 100 punkter")
+    .transform((ids) => [...new Set(ids)]),
+});
+
 export const agendaItemRemoveSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
@@ -330,12 +354,6 @@ export const meetingMinutesInputSchema = z.object({
   expectedUpdatedAt: optionalUpdatedAtSchema,
   minutesText: optionalMinutesText("Referattekst", 100000),
   decisions: optionalMinutesText("Beslutninger", 50000),
-  internalNote: z
-    .string()
-    .trim()
-    .max(20000, "Intern note må højst være 20.000 tegn")
-    .nullable()
-    .optional(),
   status: z.enum(["draft", "ready_for_approval", "approved"], {
     required_error: "Status skal vælges",
     invalid_type_error: "Status er ugyldig",
@@ -400,6 +418,14 @@ export const agendaItemPrivateNoteInputSchema = z.object({
   agendaItemId: uuidSchema,
   expectedUpdatedAt: optionalUpdatedAtSchema,
   content: optionalMinutesText("Intern note", 50000),
+});
+
+export const meetingPrivateNoteInputSchema = z.object({
+  organizationId: uuidSchema,
+  committeeId: uuidSchema,
+  meetingId: uuidSchema,
+  expectedUpdatedAt: optionalUpdatedAtSchema,
+  content: optionalMinutesText("Interne mødenoter", 50000),
 });
 
 export const meetingMinutesReferentActionSchema = z.object({
@@ -566,6 +592,8 @@ export const taskInputSchema = z.object({
   meetingId: uuidSchema.nullable().optional(),
   agendaItemId: uuidSchema.nullable().optional(),
   decisionId: uuidSchema.nullable().optional(),
+  stakeholderId: uuidSchema.nullable().optional(),
+  stakeholderContractId: uuidSchema.nullable().optional(),
   title: requiredName("Titel", 240),
   description: z
     .string()
@@ -594,6 +622,127 @@ export const taskUpdateSchema = taskInputSchema.extend({
   taskId: uuidSchema,
 });
 
+const stakeholderOptionalText = (label: string, max: number) =>
+  z.string({ invalid_type_error: `${label} er ugyldig` }).trim()
+    .max(max, `${label} må højst være ${max} tegn`).nullable().optional();
+
+const stakeholderFieldsSchema = z.object({
+  organizationId: uuidSchema,
+  name: requiredName("Navn", 180),
+  stakeholderType: z.enum(["sponsor", "supplier", "partner", "other"]),
+  relationshipStatus: z.enum(["lead", "active", "inactive", "ended"]),
+  internalOwnerUserId: uuidSchema.nullable().optional(),
+  website: stakeholderOptionalText("Website", 300),
+  phone: stakeholderOptionalText("Telefon", 80),
+  email: z.string().trim().email("Email er ugyldig").max(254).nullable().optional(),
+  cvrNumber: stakeholderOptionalText("CVR", 32),
+  addressLine: stakeholderOptionalText("Adresse", 240),
+  postalCode: stakeholderOptionalText("Postnummer", 24),
+  city: stakeholderOptionalText("By", 120),
+  country: stakeholderOptionalText("Land", 80),
+  notes: stakeholderOptionalText("Noter", 10000),
+  nextFollowUpAt: z.string().datetime("Opfølgningstidspunktet er ugyldigt").nullable().optional(),
+  nextFollowUpNote: stakeholderOptionalText("Næste handling", 500),
+});
+
+export const stakeholderInputSchema = stakeholderFieldsSchema.extend({
+  addToPipeline: z.boolean().default(false),
+  pipelineStage: z.enum(["lead", "contacted", "dialogue", "proposal_sent", "won", "lost"]).default("lead"),
+});
+
+export const stakeholderUpdateSchema = stakeholderFieldsSchema.extend({
+  stakeholderId: uuidSchema,
+});
+
+export const stakeholderArchiveSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+});
+
+export const stakeholderContactInputSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  name: requiredName("Navn", 160),
+  jobTitle: stakeholderOptionalText("Titel", 160),
+  email: z.string().trim().email("Email er ugyldig").max(254).nullable().optional(),
+  phone: stakeholderOptionalText("Telefon", 80),
+  isPrimary: z.boolean().default(false),
+  notes: stakeholderOptionalText("Noter", 2000),
+});
+
+export const stakeholderContactArchiveSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  contactId: uuidSchema,
+});
+
+export const stakeholderContactUpdateSchema = stakeholderContactInputSchema.extend({
+  contactId: uuidSchema,
+});
+
+export const stakeholderContractInputSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  title: requiredName("Titel", 180),
+  status: z.enum(["draft", "active", "expired", "terminated"]).default("draft"),
+  contractValue: z.number().nonnegative("Kontraktværdien må ikke være negativ").nullable().optional(),
+  annualValue: z.number().nonnegative("Årsværdien må ikke være negativ").nullable().optional(),
+  currency: z.string().trim().length(3, "Valutakoden skal være tre tegn").transform((value) => value.toUpperCase()).default("DKK"),
+  startDate: z.string().date("Startdato er ugyldig"),
+  endDate: z.string().date("Slutdato er ugyldig").nullable().optional(),
+  noticeDeadline: z.string().date("Opsigelsesfristen er ugyldig").nullable().optional(),
+  renewalDeadline: z.string().date("Fornyelsesfristen er ugyldig").nullable().optional(),
+  autoRenew: z.boolean().default(false),
+  notes: stakeholderOptionalText("Noter", 10000),
+}).superRefine((value, context) => {
+  for (const [field, label] of [["endDate", "Slutdato"], ["noticeDeadline", "Opsigelsesfrist"], ["renewalDeadline", "Fornyelsesfrist"]] as const) {
+    const date = value[field];
+    if (date && date < value.startDate) context.addIssue({ code: z.ZodIssueCode.custom, message: `${label} må ikke ligge før startdato`, path: [field] });
+    if (date && field !== "endDate" && value.endDate && date > value.endDate) context.addIssue({ code: z.ZodIssueCode.custom, message: `${label} må ikke ligge efter slutdato`, path: [field] });
+  }
+});
+
+export const stakeholderDeliverableInputSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  contractId: uuidSchema,
+  deliverableType: requiredName("Type", 80),
+  title: requiredName("Titel", 180),
+  description: stakeholderOptionalText("Beskrivelse", 2000),
+  quantityDetails: stakeholderOptionalText("Omfang", 500),
+  fulfillmentStatus: z.enum(["planned", "in_progress", "fulfilled", "not_applicable"]).default("planned"),
+});
+
+export const stakeholderActivityInputSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  activityType: z.enum(["note", "phone_call", "email", "meeting", "follow_up", "contract_event"]),
+  title: requiredName("Titel", 180),
+  description: stakeholderOptionalText("Beskrivelse", 5000),
+  occurredAt: z.string().datetime("Tidspunktet er ugyldigt"),
+  contactId: uuidSchema.nullable().optional(),
+  contractId: uuidSchema.nullable().optional(),
+});
+
+export const stakeholderPipelineInputSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  stage: z.enum(["lead", "contacted", "dialogue", "proposal_sent", "won", "lost"]).default("lead"),
+  internalOwnerUserId: uuidSchema.nullable().optional(),
+  estimatedValue: z.number().nonnegative("Værdien må ikke være negativ").nullable().optional(),
+  currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).default("DKK"),
+  nextFollowUpAt: z.string().datetime("Opfølgningstidspunktet er ugyldigt").nullable().optional(),
+  nextFollowUpNote: stakeholderOptionalText("Næste opfølgning", 500),
+});
+
+export const stakeholderPipelineUpdateSchema = stakeholderPipelineInputSchema.partial().extend({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  pipelineEntryId: uuidSchema,
+  stage: z.enum(["lead", "contacted", "dialogue", "proposal_sent", "won", "lost"]).optional(),
+  lostReason: stakeholderOptionalText("Årsag", 1000),
+});
+
 export const taskActionSchema = z.object({
   organizationId: uuidSchema,
   taskId: uuidSchema,
@@ -602,6 +751,39 @@ export const taskActionSchema = z.object({
     invalid_type_error: "Handlingen er ugyldig",
   }),
 });
+
+export const personalActionStateSchema = z
+  .object({
+    organizationId: uuidSchema,
+    actionKey: z.string().trim().min(3).max(300),
+    actionType: z.enum([
+      "task_overdue",
+      "task_due_soon",
+      "task_reminder",
+      "stakeholder_follow_up",
+      "stakeholder_contract_notice",
+      "stakeholder_contract_renewal",
+      "stakeholder_contract_end",
+      "stakeholder_pipeline_follow_up",
+      "minutes_approval",
+      "annual_wheel_overdue",
+      "annual_wheel_due",
+    ]),
+    sourceType: z.enum(["task", "meeting_minutes", "annual_wheel_event", "stakeholder", "stakeholder_contract", "stakeholder_pipeline"]),
+    sourceId: uuidSchema,
+    operation: z.enum(["claim", "snooze", "dismiss"]),
+    snoozedUntil: z.string().datetime().nullable().optional(),
+    dismissalReason: z.string().trim().max(240).nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.operation === "snooze" && !value.snoozedUntil) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Vælg hvornår handlingen skal vises igen.",
+        path: ["snoozedUntil"],
+      });
+    }
+  });
 
 export const taskCommentInputSchema = z.object({
   organizationId: uuidSchema,

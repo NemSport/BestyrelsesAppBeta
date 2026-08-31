@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { AppIcon, organizationNavIconNames } from "@/components/icons/app-icon";
 import { useDialogFocus } from "@/hooks/use-dialog-focus";
 import {
   getActiveCommitteeId,
@@ -17,12 +18,14 @@ export function OrganizationNav({
   committees = [],
   organizationId,
   organizationName,
+  activeActionCount = 0,
 }: {
   logoUrl?: string | null;
   canManageTrash?: boolean;
   committees?: Array<{ id: string; name: string }>;
   organizationId: string;
   organizationName?: string;
+  activeActionCount?: number;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -37,9 +40,12 @@ export function OrganizationNav({
       ),
     [canManageTrash],
   );
-  const activeItem =
-    items.find((item) => isOrganizationNavItemActive(pathname, root, item)) ??
-    items[0];
+  const activeItem = items.find((item) =>
+    isOrganizationNavItemActive(pathname, root, item),
+  );
+  const activeLabel =
+    activeItem?.label ??
+    (pathname === `${root}/edit` ? "Indstillinger" : "Organisation");
   const activeCommitteeId = getActiveCommitteeId(pathname, root);
   const activeCommittee = committees.find(
     (committee) => committee.id === activeCommitteeId,
@@ -78,7 +84,18 @@ export function OrganizationNav({
             key={item.label}
             onClick={onNavigate}
           >
+            <span className="org-nav-icon">
+              <AppIcon name={organizationNavIconNames[item.suffix]} />
+            </span>
             <span>{item.label}</span>
+            {item.suffix === "/actions" && activeActionCount > 0 ? (
+              <span
+                aria-label={`${activeActionCount} aktive handlinger`}
+                className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-[0.65rem] font-bold text-ink"
+              >
+                {activeActionCount > 99 ? "99+" : activeActionCount}
+              </span>
+            ) : null}
           </Link>
         );
       })}
@@ -94,7 +111,7 @@ export function OrganizationNav({
           </p>
           <p className="org-mobile-location truncate">
             {activeCommittee ? `${activeCommittee.name} · ` : ""}
-            {activeItem.label}
+            {activeLabel}
           </p>
         </div>
         <button
@@ -107,7 +124,7 @@ export function OrganizationNav({
           type="button"
         >
           Menu
-          <span aria-hidden>☰</span>
+          <AppIcon name="menu" size={17} />
         </button>
       </div>
 
@@ -123,7 +140,7 @@ export function OrganizationNav({
             {organizationName ?? "Organisation"}
           </p>
           <p className="org-sidebar-current mt-1.5 text-[0.72rem] font-medium">
-            Aktuel side: <span>{activeItem.label}</span>
+            Aktuel side: <span>{activeLabel}</span>
           </p>
         </div>
         {navLinks()}
@@ -157,7 +174,7 @@ export function OrganizationNav({
                 </h2>
                 <p className="org-sidebar-current mt-1 text-sm">
                   {activeCommittee ? `${activeCommittee.name} · ` : ""}
-                  <span>{activeItem.label}</span>
+                  <span>{activeLabel}</span>
                 </p>
               </div>
               <button

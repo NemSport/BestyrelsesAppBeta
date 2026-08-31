@@ -40,13 +40,31 @@ export class TransferredAgendaItemRepository {
     if (ids.length === 0) return [];
     const { data, error } = await this.db
       .from("agenda_items")
-      .select("id,title,item_type")
+      .select("id,title,description,objective,item_type")
       .in("id", ids);
     if (error) throw error;
     return data as Array<{
       id: string;
       title: string;
+      description: string;
+      objective: string;
       item_type: Database["public"]["Enums"]["agenda_item_type"];
+    }>;
+  }
+
+  async listSourceOccurrences(ids: string[]) {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.db
+      .from("agenda_item_occurrences")
+      .select("id,meeting_id,agenda_item_id,position")
+      .in("id", ids)
+      .is("deleted_at", null);
+    if (error) throw error;
+    return data as Array<{
+      id: string;
+      meeting_id: string;
+      agenda_item_id: string;
+      position: number;
     }>;
   }
 

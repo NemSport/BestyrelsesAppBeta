@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -11,7 +12,15 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 
 import { AgendaItemCreateForm } from "@/components/agenda-items/agenda-item-create-form";
-import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
+import { AppIcon } from "@/components/icons/app-icon";
+import {
+  Button,
+  Dropdown,
+  Input,
+  Modal,
+  Select,
+  Textarea,
+} from "@/components/ui";
 import {
   focusInvalidField,
   useUnsavedChanges,
@@ -101,8 +110,6 @@ export function QuickActionMenu({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const menuContainerRef = useRef<HTMLDivElement>(null);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const submissionLockRef = useRef(false);
   const meetingDirty =
     meetingOpen &&
@@ -123,33 +130,6 @@ export function QuickActionMenu({
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setMenuOpen(false);
-      menuTriggerRef.current?.focus();
-    }
-
-    function closeOnOutsidePointer(event: PointerEvent) {
-      if (
-        event.target instanceof Node &&
-        !menuContainerRef.current?.contains(event.target)
-      ) {
-        setMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-    };
-  }, [menuOpen]);
 
   function closeMeetingModal() {
     if (saving || !confirmMeetingDiscard()) return;
@@ -399,43 +379,60 @@ export function QuickActionMenu({
   );
   const canCreateMeeting = meetingCommittees.length > 0;
   const canCreateQuickMeeting = quickMeetingCommittees.length > 0;
+  const canCreateTask = committees.some(
+    (committee) => committee.capabilities.editTasks,
+  );
   const canScheduleAgendaItem = committees.some(
     (committee) => committee.capabilities.scheduleAgendaItem,
   );
 
-  if (!canCreateMeeting && !canCreateQuickMeeting && !canScheduleAgendaItem) {
+  if (
+    !canCreateMeeting &&
+    !canCreateQuickMeeting &&
+    !canCreateTask &&
+    !canScheduleAgendaItem
+  ) {
     return null;
   }
 
   return (
     <>
-      <div className="relative" ref={menuContainerRef}>
-        <Button
-          aria-controls="quick-action-options"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((current) => !current)}
-          ref={menuTriggerRef}
-          size="sm"
-        >
-          + Opret
-        </Button>
-        {menuOpen ? (
-          <div
-            className="absolute right-0 z-30 mt-2 w-72 rounded-[var(--radius-control)] border border-line bg-surface p-2 shadow-dialog"
-            id="quick-action-options"
+      <div className="flex items-center gap-1.5">
+        {canCreateMeeting ? (
+          <button
+            aria-label="Nyt møde"
+            className="app-header-action"
+            onClick={openMeetingModal}
+            type="button"
           >
-            {canCreateMeeting ? (
-              <button
-                className="quick-action-item"
-                onClick={openMeetingModal}
-                type="button"
-              >
-                <span className="font-semibold text-ink">Nyt møde</span>
-                <span className="text-xs text-muted">
-                  Vælg udvalg, titel og dato.
-                </span>
-              </button>
-            ) : null}
+            <AppIcon name="meetingAdd" size={16} />
+            <span className="app-header-action-label">Nyt møde</span>
+          </button>
+        ) : null}
+        {canCreateTask ? (
+          <Link
+            aria-label="Ny opgave"
+            className="app-header-action"
+            href={`/organizations/${organizationId}/tasks?create=1`}
+          >
+            <AppIcon name="taskAdd" size={16} />
+            <span className="app-header-action-label">Ny opgave</span>
+          </Link>
+        ) : null}
+        {canCreateQuickMeeting || canScheduleAgendaItem ? (
+          <Dropdown
+            className="app-header-dropdown app-header-overflow-dropdown"
+            hideChevron
+            label={
+              <>
+                <AppIcon name="more" size={17} />
+                <span className="sr-only">Flere opretmuligheder</span>
+              </>
+            }
+            onOpenChange={setMenuOpen}
+            open={menuOpen}
+            panelId="quick-action-options"
+          >
             {canCreateQuickMeeting ? (
               <button
                 className="quick-action-item"
@@ -448,28 +445,6 @@ export function QuickActionMenu({
                 </span>
               </button>
             ) : null}
-            <button
-              className="quick-action-item disabled"
-              disabled
-              title="Opgaver oprettes fra opgave- eller mødekonteksten, hvor ansvarlige og relationer er tilgængelige."
-              type="button"
-            >
-              <span className="font-semibold text-ink">Ny opgave</span>
-              <span className="text-xs text-muted">
-                Åbn Task View eller et møde først.
-              </span>
-            </button>
-            <button
-              className="quick-action-item disabled"
-              disabled
-              title="Beslutninger oprettes fra beslutningsregisteret eller en mødekontekst med dato og punktrelationer."
-              type="button"
-            >
-              <span className="font-semibold text-ink">Ny beslutning</span>
-              <span className="text-xs text-muted">
-                Åbn beslutninger eller et møde først.
-              </span>
-            </button>
             {canScheduleAgendaItem ? (
               <button
                 className="quick-action-item"
@@ -496,7 +471,7 @@ export function QuickActionMenu({
                 </span>
               </button>
             ) : null}
-          </div>
+          </Dropdown>
         ) : null}
       </div>
 

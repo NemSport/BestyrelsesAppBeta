@@ -28,6 +28,17 @@ export class MeetingMinutesRepository {
     return data as MeetingMinutes | null;
   }
 
+  async findMeetingMinutesById(id: string, meetingId: string) {
+    const { data, error } = await this.db
+      .from("meeting_minutes")
+      .select("*")
+      .eq("id", id)
+      .eq("meeting_id", meetingId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as MeetingMinutes | null;
+  }
+
   async listAgendaItemMinutes(meetingId: string) {
     const { data, error } = await this.db
       .from("agenda_item_minutes")
@@ -44,6 +55,7 @@ export class MeetingMinutesRepository {
       .select("*")
       .eq("meeting_id", meetingId)
       .eq("user_id", userId)
+      .not("agenda_item_id", "is", null)
       .order("updated_at", { ascending: false });
     if (error) throw error;
     return data as AgendaItemPrivateNote[];
@@ -103,6 +115,22 @@ export class MeetingMinutesRepository {
     return data as AgendaItemMinutes | null;
   }
 
+  async findAgendaItemMinutesById(
+    id: string,
+    meetingId: string,
+    agendaItemId: string,
+  ) {
+    const { data, error } = await this.db
+      .from("agenda_item_minutes")
+      .select("*")
+      .eq("id", id)
+      .eq("meeting_id", meetingId)
+      .eq("agenda_item_id", agendaItemId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as AgendaItemMinutes | null;
+  }
+
   async findPrivateAgendaItemNote(
     meetingId: string,
     agendaItemId: string,
@@ -114,6 +142,18 @@ export class MeetingMinutesRepository {
       .eq("meeting_id", meetingId)
       .eq("agenda_item_id", agendaItemId)
       .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as AgendaItemPrivateNote | null;
+  }
+
+  async findPrivateMeetingNote(meetingId: string, userId: string) {
+    const { data, error } = await this.db
+      .from("agenda_item_private_notes")
+      .select("*")
+      .eq("meeting_id", meetingId)
+      .eq("user_id", userId)
+      .is("agenda_item_id", null)
       .maybeSingle();
     if (error) throw error;
     return data as AgendaItemPrivateNote | null;

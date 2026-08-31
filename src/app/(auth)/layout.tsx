@@ -1,11 +1,15 @@
 import Link from "next/link";
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="hidden bg-brand p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Link className="text-lg font-semibold tracking-tight" href="/">
-          Udvalgshukommelsen
+          BestyrelsesApp
         </Link>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">

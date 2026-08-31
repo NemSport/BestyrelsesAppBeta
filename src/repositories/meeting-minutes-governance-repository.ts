@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, TableInsert } from "@/types/database";
-import type { PendingMinutesApprovalReminder } from "@/types/domain";
+import type {
+  ApprovalActionSource,
+  PendingMinutesApprovalReminder,
+} from "@/types/domain";
 
 const attachmentBucket = "meeting-minute-attachments";
 
@@ -30,12 +33,35 @@ export class MeetingMinutesGovernanceRepository {
     organizationId: string,
     userId: string,
   ): Promise<PendingMinutesApprovalReminder[]> {
+    return (await this.listApprovalActionSources(organizationId, userId))
+      .filter(
+        (source) =>
+          source.minutesStatus === "ready_for_approval" &&
+          ["pending", "change_requested"].includes(source.approvalStatus),
+      )
+      .map((source) => ({
+        id: source.approvalId,
+        meetingMinutesId: source.meetingMinutesId,
+        meetingId: source.meetingId,
+        meetingTitle: source.meetingTitle,
+        meetingStartsAt: source.meetingStartsAt,
+        committeeId: source.committeeId,
+        committeeName: source.committeeName,
+        status: source.approvalStatus,
+        approvalDeadline: source.approvalDeadline,
+        updatedAt: source.updatedAt,
+      }));
+  }
+
+  async listApprovalActionSources(
+    organizationId: string,
+    userId: string,
+  ): Promise<ApprovalActionSource[]> {
     const { data: approvals, error: approvalsError } = await this.db
       .from("meeting_minute_approvals")
       .select("*")
       .eq("organization_id", organizationId)
       .eq("user_id", userId)
-      .in("status", ["pending", "change_requested"])
       .order("updated_at", { ascending: true });
     if (approvalsError) throw approvalsError;
     if (!approvals.length) return [];
@@ -47,8 +73,7 @@ export class MeetingMinutesGovernanceRepository {
       .from("meeting_minutes")
       .select("*")
       .eq("organization_id", organizationId)
-      .in("id", minutesIds)
-      .eq("status", "ready_for_approval");
+      .in("id", minutesIds);
     if (minutesError) throw minutesError;
     if (!minutesRows.length) return [];
 
@@ -93,14 +118,17 @@ export class MeetingMinutesGovernanceRepository {
 
       return [
         {
-          id: approval.id,
+          approvalId: approval.id,
+          organizationId,
+          userId: approval.user_id,
+          approvalStatus: approval.status,
           meetingMinutesId: minutes.id,
+          minutesStatus: minutes.status,
           meetingId: meeting.id,
           meetingTitle: meeting.title,
           meetingStartsAt: meeting.starts_at,
           committeeId: committee.id,
           committeeName: committee.name,
-          status: approval.status,
           approvalDeadline: minutes.approval_deadline,
           updatedAt: approval.updated_at,
         },
@@ -208,6 +236,35 @@ export class MeetingMinutesGovernanceRepository {
     return agendaResult.data;
   }
 
+  async findCentralCurrentVersion(documentId: string) {
+    const { data: document, error: documentError } = await this.db
+      .from("documents")
+      .select("id, current_version_number")
+      .eq("id", documentId)
+      .maybeSingle();
+    if (documentError) throw documentError;
+    if (!document) return null;
+    const { data, error } = await this.db
+      .from("document_versions")
+      .select("*")
+      .eq("document_id", documentId)
+      .eq("version_number", document.current_version_number)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async listCentralCurrentVersions(documentIds: string[]) {
+    if (!documentIds.length) return new Map<string, Database["public"]["Tables"]["document_versions"]["Row"]>();
+    const { data: documents, error: documentsError } = await this.db.from("documents").select("id, current_version_number").in("id", documentIds);
+    if (documentsError) throw documentsError;
+    if (!documents.length) return new Map<string, Database["public"]["Tables"]["document_versions"]["Row"]>();
+    const { data: versions, error: versionsError } = await this.db.from("document_versions").select("*").in("document_id", documents.map((document) => document.id));
+    if (versionsError) throw versionsError;
+    const currentNumbers = new Map(documents.map((document) => [document.id, document.current_version_number]));
+    return new Map(versions.filter((version) => currentNumbers.get(version.document_id) === version.version_number).map((version) => [version.document_id, version]));
+  }
+
   async deleteMeetingAttachment(attachmentId: string) {
     const { error } = await this.db
       .from("meeting_minute_attachments")
@@ -256,10 +313,30 @@ export class MeetingMinutesGovernanceRepository {
     return data.signedUrl;
   }
 
+  async createDocumentVersionUrl(
+    bucket: string,
+    storagePath: string,
+    downloadFileName: string | null = null,
+  ) {
+    const { data, error } = await this.db.storage.from(bucket).createSignedUrl(
+      storagePath,
+      60,
+      downloadFileName ? { download: downloadFileName } : undefined,
+    );
+    if (error) throw error;
+    return data.signedUrl;
+  }
+
   async download(storagePath: string) {
     const { data, error } = await this.db.storage
       .from(attachmentBucket)
       .download(storagePath);
+    if (error) throw error;
+    return new Uint8Array(await data.arrayBuffer());
+  }
+
+  async downloadDocumentVersion(bucket: string, storagePath: string) {
+    const { data, error } = await this.db.storage.from(bucket).download(storagePath);
     if (error) throw error;
     return new Uint8Array(await data.arrayBuffer());
   }

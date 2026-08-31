@@ -206,6 +206,7 @@ export function CommitteeDashboardPriority({
               </p>
               {nextMeeting ? (
                 <MeetingAgendaPreview
+                  meetingHref={`${root}/meetings/${nextMeeting.id}`}
                   occurrences={nextMeeting.agenda_item_occurrences}
                 />
               ) : null}

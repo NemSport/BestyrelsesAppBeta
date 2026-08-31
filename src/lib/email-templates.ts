@@ -169,6 +169,85 @@ export function meetingAgendaEmailTemplate({
   };
 }
 
+export function meetingMaterialsEmailTemplate({
+  organizationName,
+  committeeName,
+  meetingTitle,
+  meetingDate,
+  recipientName,
+  subject,
+  message,
+  contentLabels,
+  documentNames,
+  personalTaskList,
+  meetingUrl,
+  branding,
+}: {
+  organizationName: string;
+  committeeName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  recipientName: string;
+  subject: string;
+  message: string;
+  contentLabels: string[];
+  documentNames: string[];
+  personalTaskList: boolean;
+  meetingUrl: string;
+} & BrandingInput): TemplateResult {
+  const linkColor = branding?.primaryColor ?? "#0f4c81";
+  const intro =
+    message ||
+    `Her er mødematerialet til ${meetingTitle} den ${meetingDate}.`;
+  const personalNote = personalTaskList
+    ? "Opgavelisten er personlig og indeholder kun opgaver, der er tildelt dig."
+    : "";
+  const attachmentLines = [
+    ...contentLabels,
+    ...documentNames.map((name) => `Bilag: ${name}`),
+  ];
+
+  return {
+    subject,
+    text: [
+      `${organizationName} · ${committeeName}`,
+      "",
+      `Hej ${recipientName}`,
+      "",
+      intro,
+      personalNote,
+      "",
+      `Møde: ${meetingTitle}`,
+      `Dato: ${meetingDate}`,
+      "",
+      "Vedhæftet:",
+      ...attachmentLines.map((line) => `- ${line}`),
+      "",
+      `Åbn møde: ${meetingUrl}`,
+      "",
+      "Sendt fra BestyrelsesApp.",
+    ]
+      .filter((line, index, values) => line || values[index - 1] !== "")
+      .join("\n"),
+    html: shell({
+      title: subject,
+      intro: `Hej ${recipientName}. ${intro}`,
+      organizationName,
+      committeeName,
+      branding,
+      content: [
+        personalNote
+          ? `<p style="padding:10px 12px;background:#f2f5f4;border-left:3px solid ${escapeHtml(linkColor)}">${escapeHtml(personalNote)}</p>`
+          : "",
+        `<p><strong>Møde:</strong> ${escapeHtml(meetingTitle)}<br /><strong>Dato:</strong> ${escapeHtml(meetingDate)}</p>`,
+        `<h2 style="font-size:17px;margin-top:22px">Vedhæftet</h2>`,
+        `<ul>${attachmentLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
+        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn mødet i BestyrelsesApp</a></p>`,
+      ].join(""),
+    }),
+  };
+}
+
 export function approvedMinutesEmailTemplate({
   organizationName,
   committeeName,

@@ -10,6 +10,27 @@ import type {
 export class CommitteeRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async countActiveByOrganizations(organizationIds: string[]) {
+    if (organizationIds.length === 0) return new Map<string, number>();
+
+    const { data, error } = await this.db
+      .from("committees")
+      .select("organization_id")
+      .in("organization_id", organizationIds)
+      .is("archived_at", null)
+      .is("deleted_at", null);
+    if (error) throw error;
+
+    const counts = new Map<string, number>();
+    for (const committee of data) {
+      counts.set(
+        committee.organization_id,
+        (counts.get(committee.organization_id) ?? 0) + 1,
+      );
+    }
+    return counts;
+  }
+
   async listByOrganization(organizationId: string) {
     const { data, error } = await this.db
       .from("committees")

@@ -408,8 +408,9 @@ before introducing local layout classes.
 Phase 7.2 makes navigation the primary app-shell pattern for organization
 workspaces. `AppShell` owns the authenticated topbar and global organization
 entry point. `OrganizationNav` owns the sticky, responsive module rail and
-active-route state for Overview, Meetings, Decisions, Tasks, My Tasks, Annual
-Wheel, Job Cards, Members, and Trash. The rail is route-preserving and
+active-route state for Overview, Meetings, Decisions, Tasks, Annual Wheel, Job
+Cards, Members, and Trash. Personal task scope is selected inside Tasks, while
+the former My Tasks route redirects there. The rail is
 presentation-only; it does not alter authorization, RLS, services, AI
 contracts, or the organization hierarchy.
 
@@ -514,6 +515,13 @@ The V1.1 presentation bugfix keeps meetings and Annual Wheel activities visible
 in the month detail modal while tasks and deadlines are collapsed by default.
 Completed tasks suppress overdue badges and render as completed in Annual Wheel
 task lists.
+
+Version 3.5 keeps `AnnualWheelService.getOverview` as the sole page read model
+and derives Year, Quarter, Month, navigation, and attention-summary presentation
+from that already authorized payload in the client component. Quarter is the
+URL-state default, while explicit Year and Month choices remain serialized so
+deep links are stable. No repository, query, persistence, capability, or RLS
+boundary changes are introduced.
 
 Phase 7R.5 applies the organization workspace action hierarchy to Job Cards and
 onboarding. `JobCardRegister` remains the client component that calls the same
@@ -772,6 +780,47 @@ offer a write destination that the corresponding server workflow would reject.
 Loading and error boundaries cover the organization route, and the shared
 priority surface preserves the same content order at mobile widths.
 
+Dashboard UX V3.1 composes the same read model into a working dashboard rather
+than a reporting page. Deterministic presentation sorting places overdue tasks,
+today's deadlines, near deadlines, meeting preparation, and other active work
+in that order. Task rows link to their existing Task View anchors, decisions to
+the decision register, and agenda actions to their durable Agenda Item. The
+Committee list is rendered once as navigation and is capped on the dashboard;
+the full list remains on the existing Committee route. "Continue where you
+left off" uses accessible minutes ordered by `updated_at`, because navigation
+history is not currently an authoritative data source. This fallback adds no
+tracking, schema, workflow status, or authorization path.
+
+Version 3.1.1 is presentation-only polish: status cards use less vertical
+space, action rows put their linked title before muted Committee context, and
+the minutes fallback is labelled "Recent minutes" instead of implying tracked
+navigation history. Data selection, deterministic priority ordering,
+destinations, capabilities, RLS, and the organization overview read model are
+unchanged.
+
+Version 3.1.2 is a one-viewport presentation pass. At desktop widths the four
+status cards, action/meeting grid, up to four Committee summaries, and recent
+minutes strip use compact horizontal layouts and shared local visual cues.
+Rows with a single destination use one semantic link and contain no nested
+interactive control. Tablet and mobile retain the established vertical source
+order and touch targets. No client state, dependency, query, schema, role,
+capability, priority, or RLS change is introduced.
+
+The final layout composition uses two independent desktop stacks to avoid
+row-height coupling: action priority and recent minutes occupy the wider left
+column, while upcoming meetings and the vertical Committee list occupy the
+right. At smaller breakpoints the column wrappers use presentation-only
+`display: contents` ordering so the established mobile sequence remains
+actions, meetings, Committees, then recent minutes. No content is clipped or
+assigned an artificial fixed height.
+
+Version 3.1.2b compresses that composition without changing its read model.
+The action and meeting rows retain their 44-pixel minimum interactive target
+while using tighter internal leading and gaps. Committee summaries share one
+bordered vertical list, and each Committee or recent-minutes row has exactly
+one semantic destination. No fixed content height, clipping, overflow trick,
+query, authorization rule, or persistent state is added.
+
 This change deliberately adds no dashboard table, policy, RPC, mutation, or
 cross-tenant query. It also avoids a new recommendation engine. The existing
 organization overview still performs its established per-committee capability
@@ -782,8 +831,8 @@ Phase 3 extends this presentation read model with active decisions, open
 organization tasks, and open tasks assigned to the current user. The data is
 loaded through the existing RLS-scoped decision and task repositories and is
 limited to compact start-page excerpts. A responsive sticky organization
-navigation uses the current route to mark Overview, Decisions, Task View, My
-Tasks, and Members. Its Meetings entry now opens the organization-level
+navigation uses the current route to mark Overview, Decisions, Tasks, and
+Members. Mine/Alle is selected inside Tasks. Its Meetings entry opens the organization-level
 meetings overview, while the dashboard remains an attention-focused start page
 instead of a long module menu.
 
@@ -893,6 +942,35 @@ Agenda Item
 
 An agenda item can appear in multiple meetings. This allows unresolved topics
 to be deferred or revisited without fragmenting their history.
+
+Version 3.6.1 also permits several durable agenda items to represent separate
+treatments of the same case. `agenda_item_thread_id` is the stable explicit
+identity: ordinary inserts receive a fresh UUID, and inserts with the existing
+`parent_id` transfer relation inherit the parent's UUID in PostgreSQL. The
+reference is immutable and cannot cross organization or committee scope.
+No title or semantic matching participates in this relation.
+
+Version 3.6.2 adds `GET /api/agenda-items/[agendaItemId]/history` as a thin,
+authenticated adapter over `AgendaItemService.getAgendaItemHistory`. The
+workspace requests it only for the active point; the standalone agenda-item
+page reuses its server-loaded result. The shared client history component uses
+the existing portal-based modal in right-sheet placement and existing meeting
+`#agenda-point-[occurrenceId]` links. Repository enrichment loads decisions and
+open tasks with two scoped bulk queries for all visible agenda items in the
+thread, avoiding per-treatment queries and leaving RLS authoritative.
+
+Version 3.6.3 adds a reusable, capability-gated search/link API for manual
+history attachment. Candidate search remains an ordinary RLS query scoped by
+organization and committee, returns at most one representative treatment per
+thread, and performs textual matching only to help the user find candidates;
+matching never mutates data. The `link_agenda_item_to_history` RPC is the sole
+manual mutation path. It runs with deterministic row locks and revalidates
+`auth.uid()`, `can_edit_agenda_item`, both item scopes, the caller's expected
+source thread, and that the complete source thread contains exactly one agenda
+item. A transaction-local, item-and-target-specific guard lets that one update
+pass through `validate_agenda_item_thread`; every ordinary update remains
+immutable. The RPC never updates `parent_id`, `transferred_agenda_items`, or
+records owned by decisions, tasks, minutes, attachments, notes, or AI.
 
 ### Meeting
 
@@ -1324,6 +1402,13 @@ nearest deadline. Quick status and completion actions reuse the existing
 the shared register editor preserve navigation without introducing a personal
 task ownership or permission model.
 
+Version 3.4 makes `/organizations/[organizationId]/tasks` the single task
+workspace and primary navigation destination. Its **Mine opgaver** scope
+filters the already authorized register rows to the active user, while **Alle
+opgaver** retains the complete RLS-visible collection. The legacy `/tasks/my`
+page performs a server redirect to `/tasks?mine=1`; no duplicate client surface,
+query, mutation, capability, or RLS path remains.
+
 A later phase may extend Task View into a configurable workflow:
 
 ```text
@@ -1364,6 +1449,21 @@ separate subtask model. `annual_wheel_task_templates` stores inactive work
 steps scoped to the activity organization, and activation creates normal
 `tasks` with `annual_wheel_event_id`,
 `annual_wheel_task_template_id`, and `annual_wheel_activation_year`.
+Template propagation is deliberately conservative. After an occurrence update,
+the service reads only higher `occurrence_index` rows in the same `series_id`.
+It inserts fresh template rows for same-scope targets with zero active
+templates, no-ops when the comparable template fields already match, and
+reports partial or divergent targets for manual review. Relative deadline
+anchors/offsets are copied unchanged; ordinary `tasks` are not read or written
+by this synchronization. Activity duplication remains a presentation-level
+prefill of the existing create flow, which assigns a fresh series id and
+occurrence indexes server-side.
+The August 2026 legacy repair is kept as a versioned one-off backfill script.
+It locks the template table and six explicit event rows, validates series,
+occurrence, organization, committee, and source/target counts in one
+transaction, and inserts fresh template identities only for four approved
+targets. Exact existing copies are an idempotent no-op; partial or divergent
+state aborts the transaction. It never reads from or writes to `tasks`.
 `annual_wheel_key_people` stores practical activity contacts with optional
 `user_id`, display name, function, phone, email, and sort order. The trigger
 validates the linked activity and, when `user_id` is present, requires an
@@ -1620,6 +1720,7 @@ The durable topic record. Important fields include:
 
 - `organization_id`
 - `committee_id`
+- `agenda_item_thread_id`
 - `parent_id`
 - `title`
 - `description`
@@ -1640,6 +1741,19 @@ no longer expose or depend on it. The column and enum remain non-destructively
 for existing data and database-function compatibility; new records receive
 only an internal `backlog` or `scheduled` value based on whether they are
 created for a date or a meeting, and ordinary edits preserve the stored value.
+
+The V3.6.1 migration initially gives every existing agenda item its own thread,
+then computes connected components using only same-scope `parent_id` links and
+scheduled `transferred_agenda_items` source/target links. This safely preserves
+known transfer chains while leaving ambiguous legacy items separate. The
+partial `agenda_items_thread_history_idx` supports frequent active-history
+reads. Existing agenda-item RLS remains authoritative; the repository loads
+thread items with nested occurrences and meetings in one scoped query, drops
+relations hidden by RLS, and returns treatments chronologically. Version 3.6.2
+joins short decision summaries and open-task counts through two additional
+scope-filtered bulk reads. Minutes, attachments, and private notes remain
+outside the history response, and all decision/task records keep their
+existing `agenda_item_id` references.
 
 #### `agenda_item_occurrences`
 
@@ -1936,8 +2050,10 @@ Phase 2B.3 reuses that register and its modal from meeting, agenda-item, and
 decision contexts. Related-task links return to
 `/organizations/[organizationId]/tasks#task-[taskId]`.
 
-Phase 2B.4 exposes the active user's deadline-oriented view at
-`/organizations/[organizationId]/tasks/my`.
+The legacy Phase 2B.4 URL `/organizations/[organizationId]/tasks/my` redirects
+to the consolidated task workspace at
+`/organizations/[organizationId]/tasks?mine=1`,
+which defaults to the active user's **Mine opgaver** scope.
 
 ## API Route Structure
 
@@ -2004,6 +2120,17 @@ Meeting minutes use:
 - `GET /api/minutes-attachments/[attachmentId]/download`
 - `POST /api/transferred-agenda-items/[transferId]`
 - `PATCH /api/transferred-agenda-items/[transferId]`
+
+Personal meeting notes use `PUT /api/meetings/[meetingId]/private-note`.
+The route authenticates the request, requires the existing `viewMeeting`
+capability, derives `user_id` from the authenticated session, and upserts only
+that user's row. The existing `agenda_item_private_notes` table stores both
+scopes: `agenda_item_id is null` denotes the one meeting-level note identified
+by `(meeting_id, user_id)`, while a non-null agenda item retains the existing
+`(meeting_id, agenda_item_id, user_id)` identity. Legacy shared content is
+copied to the last editor's private row before the obsolete shared column is
+removed. RLS repeats the note-owner check for select, insert, update, and
+delete. Shared minutes and AI services never load the private-note table.
 
 The meeting-level endpoint creates or updates the single general minutes
 record, including status changes. The agenda-item endpoint creates or updates
@@ -2220,3 +2347,320 @@ The component never queries data, derives roles, or authorizes mutations.
 Loading remains a distinct route state with `aria-busy`, while errors retain
 alert semantics and retry/navigation actions. No database, repository, service,
 RLS, tenant-scope, or committee-scope changes are introduced.
+
+## Transferred Agenda Item Task References
+
+`transferred_agenda_items` is the source-to-target relation. Its existing
+`source_meeting_id`, `source_agenda_item_id`,
+`source_agenda_item_occurrence_id`, and `target_agenda_item_id` columns are
+sufficient; no task-copy table or task relation is introduced. The transfer
+read model resolves open source tasks under the current Committee membership
+and task RLS policies, deduplicates them by the original task ID, and removes
+`internal_note` for users without the existing agenda-item editor capability.
+
+The target meeting passes these task references to the normal related-task UI.
+The task dialog reuses the existing task PATCH and comment routes, whose
+services remain responsible for Committee authorization. Mutations preserve
+the original `meeting_id`, `agenda_item_id`, and `decision_id`. The scheduling
+function creates the new agenda item and occurrence without embedding previous
+minutes, decisions, or follow-up fields in the target item's editable
+description; those records remain readable only through the source relation
+and existing history views.
+
+## Documents V2 Architecture
+
+The central document boundary consists of four tenant-scoped tables:
+
+- `documents`: stable metadata, ownership, current-version pointer, and soft delete.
+- `document_versions`: append-only Storage metadata and version numbers.
+- `document_relations`: typed links to Organization, Committee, Meeting,
+  Agenda Item, Task, or Annual Wheel activity contexts.
+- `document_categories`: Organization categories deactivated instead of deleted.
+
+Validation triggers reject category, Committee, version, and relation
+references that cross `organization_id`. RLS authorizes reads from accessible
+relations (plus uploader/admin ownership), document mutation by the uploader
+or Organization administrator, and category administration only by
+Organization administrators. Private Storage policies derive Organization and
+document IDs from the path and apply the same authorization before reads or
+deletes.
+
+The initial file is version 1. Replacement uploads a new Storage object and
+uses `add_document_version` to serialize version allocation and update the
+current pointer transactionally. Older versions remain read-only and
+downloadable. Metadata and relations stay on the stable document record.
+
+Migration `202608140001_documents_v2.sql` backfills legacy minutes attachments
+idempotently without moving their Storage objects. IDs, timestamps, uploader,
+file metadata, and context are retained; compatibility triggers mirror later
+legacy uploads. Legacy cleanup is deferred. Removing a legacy attachment
+deletes only its matching relation, while the central file remains. Private
+notes are excluded from every backfill and document query path.
+
+## Global Search V1
+
+`GlobalSearch` is mounted once in `AppShell` and derives the active
+`organizationId` from the current organization route. Its modal reuses the
+shared focus trap and focus-return behavior, adds the global Cmd/Ctrl+K trigger,
+and sends a 250 ms debounced request with abort and sequence guards so stale
+responses cannot replace newer results. Result highlighting is rendered as
+ordinary React text fragments rather than injected HTML.
+
+`GET /api/organizations/[organizationId]/search` authenticates and requires
+active Organization membership before invoking `GlobalSearchService`.
+`GlobalSearchRepository` performs bounded, organization-scoped text queries
+against the existing tables; PostgreSQL RLS remains authoritative for
+Committee visibility, documents, and organization isolation. Results use the
+existing meeting, Agenda Item, task, decision, document, and Annual Wheel
+destinations. Approved minutes are the only minutes included, and the search
+path has no dependency on `agenda_item_private_notes`, `context_chunks`, AI,
+embeddings, or a denormalized search table. The current MVP data volume does
+not justify a migration or new text index; query limits and the service
+boundary leave room for later PostgreSQL full-text or semantic retrieval
+without changing the palette contract.
+
+## Committee Workspace V2 Read Model
+
+`/organizations/[organizationId]/committees/[committeeId]` kræver først aktiv
+Organization- og Committee-membership gennem `AuthorizationService`.
+`CommitteeService.getWorkspace` orkestrerer derefter parallelle, begrænsede
+queries til eksisterende repositories for møder, tasks, decisions, Annual
+Wheel events, Documents V2 og medlemmer. Hver workspace-query gentager
+`organization_id` og `committee_id` (eller dokumentets
+`primary_committee_id`), mens PostgreSQL RLS fortsat er den autoritative
+sikkerhedsgrænse. Counts og previews bygges kun af rækker, som den aktuelle
+RLS-session kan læse.
+
+Aktivitetslisten er en in-memory sammensortering af synlige timestamps fra
+meetings, tasks, decisions og documents. Den er read-only, henter små bounded
+result sets og opretter ikke en ny event- eller audit-platform. Aktuelt fokus
+er den førstkommende aktive Annual Wheel-aktivitet; der genereres ingen
+AI-status. Opret-handlinger navigerer til de eksisterende canonical moduler,
+som forudvælger det aktuelle Committee og fortsat udfører deres egne
+server-side capability- og RLS-checks.
+
+Workspace-overblikket viser denne liste én gang som “Seneste aktivitet”. En
+sekundær “Seneste ændringer”-opsummering er udeladt, fordi den byggede på samme
+bounded read-model og ikke tilførte unik historik.
+
+Der findes ingen voting-datamodel i denne version. Et senere voting-modul kan
+indgå som endnu en capability-beskyttet workspace-sektion og activity-kind,
+men 3.10 reserverer ingen tabel, route eller synlig fake handling til det.
+
+## Committee Directory Read Model
+
+`/organizations/[organizationId]/committees` kræver aktiv Organization-
+membership og kalder `CommitteeService.listDirectory`. Servicen henter synlige
+Committees, meetings, tasks, kommende Annual Wheel events og aktive Committee
+Members i parallelle, organisationsscopede batches. Kortdata aggregeres i
+memory, så rendering ikke udløser et query pr. Committee. Alle repositorykald
+bevarer `organization_id`, eksisterende RLS og de eksisterende recordtyper.
+
+Read-modelen beregner aktive og forsinkede task-counts, kommende meeting-counts
+og ét næste event pr. Committee. Et meeting prioriteres over en Annual Wheel-
+aktivitet. “Kræver handling” afledes kun af en overskredet deadline på en
+aktiv, synlig task; der lagres ingen ny status og indføres ingen health score.
+
+## Version 3.11 Action Center
+
+`ActionService` er det fælles organization-scopede read model for
+handlingscenteret, dashboardet og navigationens aktive antal. Servicen kræver
+først aktiv Organization-membership og kalder derefter eksisterende
+RLS-beskyttede repositories for tasks, minutes approvals og Annual Wheel.
+Afledning og prioritering ligger i den rene `src/lib/actions.ts`; React
+komponenter præsenterer data og kalder eksisterende mutationsgrænser.
+
+V1's derived-action pipeline er:
+
+```text
+RLS-synlige source records
+→ organization- og user-filter
+→ deterministisk trigger og stabil action key
+→ personlig action_user_states-overlay
+→ Min indbakke / Mine handlinger / Afsluttet
+```
+
+Den stabile identitet er som udgangspunkt
+`action_type + source_type + source_id`, scoped af `organization_id` og
+`user_id` i den unikke databaseconstraint. Task-reminders tilføjer det konkrete
+`reminder_at` som identity-variant, så en flyttet reminder ikke arver en
+tidligere reminders dismissal. Opgaver bruger denne prioritet og giver højst én
+række pr. task: overskredet deadline, højst syv dage til deadline, derefter nået
+`reminder_at`. Reminderens modtager udledes altid af taskens aktuelle
+`responsible_user_id`.
+Referatgodkendelse kræver både en pending/change-requested approval-række og et
+referat i `ready_for_approval`. Årshjulsaktiviteter kræver den aktuelle bruger
+som ansvarlig samt en aktiv status og en start- eller slutdato, der er
+overskredet eller højst syv dage væk. Ingen AI, semantisk inferens, event bus eller kopieret
+notification-payload indgår.
+
+`action_user_states` indeholder `organization_id`, `user_id`, `action_key`,
+source-identitet, `status`, `snoozed_until`, `dismissal_reason` og timestamps.
+Status er `claimed`, `snoozed` eller `dismissed`; løst tilstand udledes fortsat
+af source-recordet. Tabellen kopierer ikke task-, meeting-, document- eller
+eventtitler. En identity-guard gør organization, user, key, type og source
+immutable efter insert. RLS tillader kun den aktuelle bruger at læse, indsætte
+og opdatere egne rækker, når brugeren fortsat er aktivt medlem af Organization.
+Delete er ikke givet til authenticated.
+
+`PATCH /api/organizations/[organizationId]/actions` validerer claim, snooze og
+dismissal, genberegner den konkrete action og afviser stale eller fremmede
+identiteter før upsert. Task completion, deadline og delegation fortsætter via
+`PATCH /api/tasks/[taskId]`; referatgodkendelse fortsætter via det eksisterende
+minutes approval endpoint. De services gentager capabilities og source-scope,
+mens PostgreSQL RLS forbliver den uafhængige grænse.
+
+Handlingscenteret er globalt tilgængeligt i den eksisterende Organization-
+sidebar. Mobil bruger samme responsive drawer og viser handlingerne som
+fleksible rækker uden fast højde eller horisontal overflow. Dashboardet viser
+de første seks aktive actions i det eksisterende kompakte panel fra præcis samme `ActionService` og linker til
+det fulde center; det vedligeholder ikke længere en parallel action-ranking.
+`ActionService` returnerer desuden det tidligste relevante fremtidige
+`reminder_at`. Organization-layoutets lille client-boundary refresher ved dette
+tidspunkt samt ved window focus og synlig fane. Der bruges ingen polling,
+reminder-copy, notification-tabel eller mutation af taskens reminder ved
+personlig snooze/dismissal.
+
+## Stakeholder Domain V1
+
+Stakeholders er et Organization-ejet tværgående arbejdsmodul under den
+eksisterende tenant-grænse. Det ændrer ikke det krævede
+Organization → Committee → Agenda Item-hierarki for Committee-arbejde.
+
+```text
+Organization
+└── Stakeholder
+    ├── Stakeholder Contacts
+    ├── Stakeholder Contracts
+    │   └── Contract Deliverables
+    ├── Stakeholder Activities
+    ├── Sponsor Pipeline Entries
+    │   └── Pipeline Events
+    ├── Document V2 relations
+    └── Task V2 relations (fortsat Committee-scopede)
+```
+
+De autoritative tabeller er `stakeholders`, `stakeholder_contacts`,
+`stakeholder_contracts`, `stakeholder_contract_deliverables`,
+`stakeholder_activities`, `stakeholder_pipeline_entries` og
+`stakeholder_pipeline_events`. Alle har `organization_id`; child-relationer
+bruger composite foreign keys med `(organization_id, id)`, og triggers
+validerer owner-, contact- og contract-scope. Beløb er `numeric(14, 2)`, mens
+kontraktperioder og -frister er `date`.
+
+`StakeholderRepository` udfører de organisationsscopede databaseoperationer.
+`StakeholderService` autentificerer, autoriserer, validerer og samler register,
+KPI-, board- og profildata i batches. De centrale views laver derfor ikke et
+query pr. interessent. Den centrale capability-funktion giver read til aktive
+members; owner/admin/member får arbejdsmutationer, viewer er read-only, og kun
+owner/admin får stakeholder-arkivering. RLS gentager medlems- og skriverollen,
+og ingen af de nye tabeller giver fysisk delete til authenticated.
+
+Sponsor-pipelinen er en separat workflow-entitet med faserne `lead`,
+`contacted`, `dialogue`, `proposal_sent`, `won` og `lost`. En partial unique
+index tillader højst ét åbent sponsorforløb pr. interessent. Fasen må kun
+ændres gennem `update_stakeholder_pipeline_stage`, som låser rækken og i samme
+transaktion opretter et immutable pipeline-event og en systemaktivitet.
+
+Documents V2's `document_relations` understøtter `stakeholder` og
+`stakeholder_contract`; fjernelse af en relation ændrer ikke det kanoniske
+dokument. Tasks V2 får nullable stakeholder- og contract-FK'er, men beholder
+`committee_id`, eksisterende task-workflow og task-RLS. Global Search udvider
+det eksisterende repository med bounded stakeholder-, contact- og
+contract-queries, hvor sekundære matches altid navigerer til stakeholderen.
+
+`ActionService` henter RLS-synlige stakeholders, aktive kontrakter og åbne
+pipelineforløb og kalder den rene `deriveStakeholderActions`. Personlig
+synlighed følger intern ansvarlig. Pipeline-opfølgning undertrykker en direkte
+stakeholder-opfølgning for samme relation, og kontraktreglen vælger højst én
+aktuel grund i rækkefølgen overskredet først og derefter opsigelse, fornyelse,
+slutdato. Action keys indeholder den konkrete frist, så flyttede frister ikke
+arver en tidligere dismissal. De eksisterende `action_user_states`, dashboard,
+badge, handlingscenter og focus/visibility/timed refresh genbruges.
+
+## Organization Workspace Entry V2
+
+`OrganizationService.listWorkspaceEntries` samler den aktuelle brugers aktive
+Organization-memberships med to bounded, RLS-beskyttede batch-reads: aktive
+Committee-counts og valgfri Organization-branding. Resultatet er et rent
+presentation read model til `/organizations`; det giver ingen nye rettigheder
+og laver ikke et query pr. Organization.
+
+Selector-kort og topbar-switcher navigerer gennem de eksisterende canonical
+Organization-routes. Oprettelsesmodalen genbruger `ResourceForm`,
+`POST /api/organizations` og `create_organization_with_owner`. Fokusfangst,
+Escape, backdrop-lukning, scroll-lock og fokusretur kommer fra den fælles
+`Modal`/`useDialogFocus`-grænse. Versionen ændrer ingen database-, RLS-,
+session- eller permission-kontrakter.
+
+## Meeting Material Distribution
+
+`POST /api/meetings/[meetingId]/dispatch` er den samlede servergrænse for
+manuel udsendelse. `MeetingMaterialDispatchService` autentificerer afsenderen,
+kræver den eksisterende `sendAgendaEmail`-capability, validerer mødet mod URL-
+og tenant-konteksten og resolver modtagere fra meeting participants eller
+aktive Organization Members. Eksterne meeting participants med email kan
+indgå i deltagerudsendelser; frie emailadresser uden en eksisterende relation
+er ikke en del af denne version.
+
+Participant-resolution er en fælles pure read-model for server page og send-
+service. Interne attendee-rækker kobles via `user_id` til den allerede batch-
+hentede Organization Member-directory; email kopieres ikke til attendee-
+tabellen. Eksterne attendees bruger deres eget valgfrie emailfelt. Hvis et
+møde ikke har nogen interne eller eksterne attendee-rækker, følger udsendelsen
+den eksisterende meeting-fallback til aktive medlemmer af den konkrete
+Committee. UI'et viser både `X af Y med email`, fallback-status og navne/reason
+for deltagere, der ikke kan modtage. Send-service genberegner samme resultat
+efter authorization, så client counts aldrig er en permissionsgrænse.
+
+Dagsorden, referat og opgaveliste bruger de eksisterende PDF-read models og
+renderere. En personlig opgaveliste genereres inde i recipient-loopet fra
+`TaskService.getMeetingReviewTasks` filtreret på den konkrete modtagers
+`responsible_user_id`. Dokumentbilag resolver kun aktuelle versioner fra
+Documents V2-relationer på mødet eller dets Agenda Items og vedhæftes uden
+mutation af dokumentet.
+
+`meeting_material_dispatches` har RLS select for Organization admins og
+Committee Members og insert kun for den aktuelle afsender med
+`can_manage_committee`. Tabellen har ingen update/delete policy. Recipient- og
+document-snapshots er bevidst immutable audit-metadata: navn/email og
+document/relation/version-identitet fastholder hvad udsendelsen bestod af,
+mens filindhold, task-data og dokumentrecords ikke duplikeres.
+
+## Existing Document Attachment Boundary
+
+`attach_existing_document` og `detach_existing_document` er security-definer-
+funktioner med tomt search path og eksplicit kontrol af `auth.uid()`,
+`can_read_document`, Organization scope, mål-entitetens aktive tilstand og den
+relevante writer-capability. Funktionerne er den eneste bredere vej til at
+oprette/fjerne en kontekstrelation uden samtidig at eje det centrale dokument.
+Den normale Documents V2-mutationspolicy for metadata og versioner er uændret.
+
+Dokumentvælgeren henter højst 200 RLS-synlige, ikke-slettede dokumenter i én
+batch, med kategorier og current versions hydreret i bounded queries. Søgning,
+kategori og senest opdaterede rækkefølge er presentation state. Valg opretter
+kun én idempotent `document_relations`-række.
+
+## Agenda Item Draft AI
+
+`POST /api/committees/[committeeId]/agenda-items/draft-assistant` overskriver
+altid Committee-id fra ruten og validerer Organization-id gennem medlemskab og
+Agenda Item-editor-capability. Requesten indeholder kun titel, type, formål og
+baggrund fra den aktuelle formular; der udføres ingen bred historik- eller
+dokumentretrieval i denne version.
+
+`AgendaItemDraftProvider` isolerer provider-kaldet fra service og UI. OpenAI-
+implementeringen bruger Structured Outputs og `store: false`; tests kan levere
+en lokal mock. `ResourceForm` viser output som separat redigerbar suggestion
+state. Kun den eksplicitte `Brug forslag`-handler skriver suggestion til det
+kontrollerede felt, og den almindelige formularsubmit er fortsat eneste
+persistensvej.
+
+## Shared Rich-text PDF Prose
+
+`richTextToPdfBlocks` saniterer det eksisterende allowlist-HTML og producerer
+paragraph, heading, quote og list-item blocks med inline bold/italic runs,
+ordered index og stabil list depth. `PdfReport.addProse` er den fælles layout-
+grænse og beregner markørbredde, niveauindryk, wrapping og sideskift, så
+listepunkter beholder bullet/nummer uden horisontal overflow. Agenda-, minutes-
+og Job Card-renderere fortsætter med at genbruge denne grænse.

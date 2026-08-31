@@ -13,6 +13,7 @@ function getAgendaItemCreateFields(
   meetings: MeetingOption[],
   defaultMeetingId: string | null,
   allowMeetingSelection: boolean,
+  assistantEndpoint: string,
 ): ResourceFormField[] {
   const defaultMode =
     allowMeetingSelection && defaultMeetingId ? "meeting" : "date";
@@ -27,8 +28,14 @@ function getAgendaItemCreateFields(
       name: "objective",
       label: "Formål med beslutning eller drøftelse",
       type: "textarea",
+      aiSuggestion: { endpoint: assistantEndpoint },
     },
-    { name: "description", label: "Baggrund", type: "textarea" },
+    {
+      name: "description",
+      label: "Baggrund",
+      type: "textarea",
+      aiSuggestion: { endpoint: assistantEndpoint },
+    },
     {
       name: "itemType",
       label: "Type",
@@ -111,6 +118,7 @@ export function AgendaItemCreateForm({
         meetings,
         meetingId ?? null,
         allowMeetingSelection,
+        `/api/committees/${committeeId}/agenda-items/draft-assistant`,
       )}
       hidden={{
         organizationId,

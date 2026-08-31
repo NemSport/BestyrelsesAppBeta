@@ -30,7 +30,7 @@ export function parseAnnualWheelState(
   return {
     view: validViews.has(rawView as AnnualWheelView)
       ? (rawView as AnnualWheelView)
-      : "year",
+      : "quarter",
     focusMonth:
       Number.isInteger(rawMonth) && rawMonth >= 1 && rawMonth <= 12
         ? rawMonth - 1
@@ -53,7 +53,7 @@ export function annualWheelSearchParams(
     next.delete(key);
   }
 
-  if (state.view !== "year") next.set("view", state.view);
+  if (state.view !== "quarter") next.set("view", state.view);
   if (state.view !== "year") {
     next.set("month", String(state.focusMonth + 1));
   }

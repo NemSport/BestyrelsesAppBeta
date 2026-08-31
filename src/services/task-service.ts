@@ -14,6 +14,7 @@ import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { TaskCommentRepository } from "@/repositories/task-comment-repository";
 import { TaskRepository } from "@/repositories/task-repository";
+import { StakeholderRepository } from "@/repositories/stakeholder-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
@@ -33,6 +34,7 @@ export class TaskService {
   private readonly decisions: DecisionRepository;
   private readonly members: OrganizationMemberRepository;
   private readonly comments: TaskCommentRepository;
+  private readonly stakeholders: StakeholderRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
@@ -45,6 +47,7 @@ export class TaskService {
     this.decisions = new DecisionRepository(db);
     this.members = new OrganizationMemberRepository(db);
     this.comments = new TaskCommentRepository(db);
+    this.stakeholders = new StakeholderRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
   }
@@ -52,15 +55,25 @@ export class TaskService {
   async getRegister(organizationId: string) {
     const user = await this.auth.requireUser();
     await this.authorization.requireOrganizationMember(organizationId, user.id);
-    const [tasks, committees, meetings, agendaItems, decisions, members] =
-      await Promise.all([
+    const [
+      tasks,
+      committees,
+      meetings,
+      agendaItems,
+      decisions,
+      members,
+      stakeholders,
+      stakeholderContracts,
+    ] = await Promise.all([
       this.tasks.listByOrganization(organizationId),
       this.committees.listByOrganization(organizationId),
       this.meetings.listByOrganization(organizationId),
       this.agendaItems.listByOrganization(organizationId),
       this.decisions.listByOrganization(organizationId),
       this.members.listMembers(organizationId),
-      ]);
+      this.stakeholders.listStakeholders(organizationId),
+      this.stakeholders.listContracts(organizationId),
+    ]);
     const editableCommitteeIds = (
       await Promise.all(
         committees.map(async (committee) => {
@@ -91,6 +104,10 @@ export class TaskService {
       agendaItems,
       decisions,
       members,
+      stakeholders: stakeholders.map(({ id, name }) => ({ id, name })),
+      stakeholderContracts: stakeholderContracts.map(
+        ({ id, stakeholder_id, title }) => ({ id, stakeholder_id, title }),
+      ),
       editableCommitteeIds,
     };
   }
@@ -193,35 +210,53 @@ export class TaskService {
         (occurrence) => occurrence.agenda_item_id,
       ),
     );
-    const decisionIds = new Set(meetingDecisions.map((decision) => decision.id));
+    const decisionIds = new Set(
+      meetingDecisions.map((decision) => decision.id),
+    );
     const agendaItemTitles = new Map(
       meeting.agenda_item_occurrences.flatMap((occurrence) =>
         occurrence.agenda_items
-          ? [[occurrence.agenda_items.id, occurrence.agenda_items.title] as const]
+          ? [
+              [
+                occurrence.agenda_items.id,
+                occurrence.agenda_items.title,
+              ] as const,
+            ]
           : [],
       ),
     );
     const decisionTitles = new Map(
-      meetingDecisions.map((decision) => [decision.id, decision.title] as const),
+      meetingDecisions.map(
+        (decision) => [decision.id, decision.title] as const,
+      ),
     );
 
     const recentlyCompletedAfter = new Date();
     recentlyCompletedAfter.setDate(recentlyCompletedAfter.getDate() - 14);
 
     const relevantTasks = committeeTasks.filter((task) => {
-      if (task.organization_id !== organizationId || task.committee_id !== committeeId) {
+      if (
+        task.organization_id !== organizationId ||
+        task.committee_id !== committeeId
+      ) {
         return false;
       }
       if (task.archived_at) return false;
 
       const directlyLinked =
         task.meeting_id === meetingId ||
-        (task.agenda_item_id ? agendaItemIds.has(task.agenda_item_id) : false) ||
+        (task.agenda_item_id
+          ? agendaItemIds.has(task.agenda_item_id)
+          : false) ||
         (task.decision_id ? decisionIds.has(task.decision_id) : false);
       const isClosed =
         task.status === "completed" || task.status === "cancelled";
       if (!isClosed) return true;
-      if (!directlyLinked || task.status !== "completed" || !task.completed_at) {
+      if (
+        !directlyLinked ||
+        task.status !== "completed" ||
+        !task.completed_at
+      ) {
         return false;
       }
       return new Date(task.completed_at) >= recentlyCompletedAfter;
@@ -301,6 +336,8 @@ export class TaskService {
       meeting_id: parsed.meetingId ?? null,
       agenda_item_id: parsed.agendaItemId ?? null,
       decision_id: parsed.decisionId ?? null,
+      stakeholder_id: parsed.stakeholderId ?? null,
+      stakeholder_contract_id: parsed.stakeholderContractId ?? null,
       title: parsed.title,
       description: parsed.description,
       status: parsed.status,
@@ -342,6 +379,8 @@ export class TaskService {
       meeting_id: parsed.meetingId ?? null,
       agenda_item_id: parsed.agendaItemId ?? null,
       decision_id: parsed.decisionId ?? null,
+      stakeholder_id: parsed.stakeholderId ?? null,
+      stakeholder_contract_id: parsed.stakeholderContractId ?? null,
       title: parsed.title,
       description: parsed.description,
       status: parsed.status,
@@ -356,7 +395,9 @@ export class TaskService {
       internal_note: parsed.internalNote ?? null,
       updated_by: user.id,
       completed_at:
-        parsed.status === "completed" ? task.completed_at ?? new Date().toISOString() : null,
+        parsed.status === "completed"
+          ? (task.completed_at ?? new Date().toISOString())
+          : null,
     });
     await this.maybeCompleteAnnualWheelEvent(updated, user.id);
     return updated;
@@ -512,18 +553,27 @@ export class TaskService {
     meetingId?: string | null;
     agendaItemId?: string | null;
     decisionId?: string | null;
+    stakeholderId?: string | null;
+    stakeholderContractId?: string | null;
   }) {
-    const [meeting, agendaItem, decision] = await Promise.all([
-      input.meetingId
-        ? this.meetings.findWithAgenda(input.meetingId)
-        : Promise.resolve(null),
-      input.agendaItemId
-        ? this.agendaItems.findWithHistory(input.agendaItemId)
-        : Promise.resolve(null),
-      input.decisionId
-        ? this.decisions.findById(input.decisionId)
-        : Promise.resolve(null),
-    ]);
+    const [meeting, agendaItem, decision, stakeholder, stakeholderContract] =
+      await Promise.all([
+        input.meetingId
+          ? this.meetings.findWithAgenda(input.meetingId)
+          : Promise.resolve(null),
+        input.agendaItemId
+          ? this.agendaItems.findWithHistory(input.agendaItemId)
+          : Promise.resolve(null),
+        input.decisionId
+          ? this.decisions.findById(input.decisionId)
+          : Promise.resolve(null),
+        input.stakeholderId
+          ? this.stakeholders.findStakeholder(input.stakeholderId)
+          : Promise.resolve(null),
+        input.stakeholderContractId
+          ? this.stakeholders.findContract(input.stakeholderContractId)
+          : Promise.resolve(null),
+      ]);
     if (
       input.meetingId &&
       (!meeting ||
@@ -548,6 +598,21 @@ export class TaskService {
     ) {
       throw new NotFoundError("Den valgte beslutning");
     }
+    if (
+      input.stakeholderId &&
+      (!stakeholder ||
+        stakeholder.organization_id !== input.organizationId ||
+        stakeholder.archived_at)
+    )
+      throw new NotFoundError("Den valgte interessent");
+    if (
+      input.stakeholderContractId &&
+      (!stakeholderContract ||
+        stakeholderContract.organization_id !== input.organizationId ||
+        stakeholderContract.stakeholder_id !== input.stakeholderId ||
+        stakeholderContract.archived_at)
+    )
+      throw new NotFoundError("Den valgte stakeholder-kontrakt");
   }
 
   private async contextResult(

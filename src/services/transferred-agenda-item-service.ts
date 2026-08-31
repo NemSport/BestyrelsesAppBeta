@@ -1,14 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppError, NotFoundError } from "@/lib/errors";
+import { isOpenTransferredTask } from "@/lib/transferred-task-references";
 import { scheduleTransferredAgendaItemSchema } from "@/lib/validation";
 import type { PdfTransferredAgendaItemHistory } from "@/lib/meeting-document-pdf";
 import { MeetingRepository } from "@/repositories/meeting-repository";
+import { TaskRepository } from "@/repositories/task-repository";
 import { TransferredAgendaItemRepository } from "@/repositories/transferred-agenda-item-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
 import type {
+  IncomingTransferredAgendaItemView,
   TransferMeetingOption,
   TransferredAgendaItemView,
 } from "@/types/domain";
@@ -17,12 +20,14 @@ export class TransferredAgendaItemService {
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
   private readonly meetings: MeetingRepository;
+  private readonly tasks: TaskRepository;
   private readonly transfers: TransferredAgendaItemRepository;
 
   constructor(db: SupabaseClient<Database>) {
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
     this.meetings = new MeetingRepository(db);
+    this.tasks = new TaskRepository(db);
     this.transfers = new TransferredAgendaItemRepository(db);
   }
 
@@ -32,23 +37,7 @@ export class TransferredAgendaItemService {
     meetingId: string,
   ): Promise<{
     items: TransferredAgendaItemView[];
-    incomingItems: Array<{
-      id: string;
-      targetAgendaItemId: string | null;
-      sourceStatus: Database["public"]["Enums"]["agenda_item_minutes_status"];
-      transferReason: Database["public"]["Enums"]["agenda_item_transfer_reason"];
-      targetItemType: Database["public"]["Enums"]["agenda_item_type"];
-      sourceMeeting: {
-        id: string;
-        title: string;
-        starts_at: string;
-      } | null;
-      sourceAgendaItem: {
-        id: string;
-        title: string;
-        item_type: Database["public"]["Enums"]["agenda_item_type"];
-      } | null;
-    }>;
+    incomingItems: IncomingTransferredAgendaItemView[];
     futureMeetings: TransferMeetingOption[];
   }> {
     const user = await this.auth.requireUser();
@@ -113,17 +102,42 @@ export class TransferredAgendaItemService {
         ];
       })
       .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-    const [sourceMeetings, sourceAgendaItems] = await Promise.all([
+    const sourceAgendaItemIds = [
+      ...new Set(
+        incomingTransfers.map((transfer) => transfer.source_agenda_item_id),
+      ),
+    ];
+    const [
+      sourceMeetings,
+      sourceAgendaItems,
+      sourceOccurrences,
+      sourceMinutes,
+      sourceTasks,
+      canEditSourceTasks,
+    ] = await Promise.all([
       this.transfers.listSourceMeetings([
         ...new Set(
           incomingTransfers.map((transfer) => transfer.source_meeting_id),
         ),
       ]),
-      this.transfers.listSourceAgendaItems([
-        ...new Set(
-          incomingTransfers.map((transfer) => transfer.source_agenda_item_id),
+      this.transfers.listSourceAgendaItems(sourceAgendaItemIds),
+      this.transfers.listSourceOccurrences(
+        incomingTransfers.flatMap((transfer) =>
+          transfer.source_agenda_item_occurrence_id
+            ? [transfer.source_agenda_item_occurrence_id]
+            : [],
         ),
-      ]),
+      ),
+      this.transfers.listSourceMinutes(
+        incomingTransfers.map(
+          (transfer) => transfer.source_agenda_item_minutes_id,
+        ),
+      ),
+      this.tasks.listByAgendaItems(sourceAgendaItemIds),
+      this.authorization
+        .requireAgendaItemEditor(organizationId, committeeId, user.id)
+        .then(() => true)
+        .catch(() => false),
     ]);
     const sourceMeetingsById = new Map(
       sourceMeetings.map((sourceMeeting) => [sourceMeeting.id, sourceMeeting]),
@@ -134,6 +148,28 @@ export class TransferredAgendaItemService {
         sourceAgendaItem,
       ]),
     );
+    const sourceOccurrencesById = new Map(
+      sourceOccurrences.map((occurrence) => [occurrence.id, occurrence]),
+    );
+    const sourceMinutesById = new Map(
+      sourceMinutes.map((minutes) => [minutes.id, minutes]),
+    );
+    const sourceTasksByAgendaItemId = new Map<string, typeof sourceTasks>();
+    for (const task of sourceTasks) {
+      if (
+        task.organization_id !== organizationId ||
+        task.committee_id !== committeeId ||
+        !isOpenTransferredTask(task)
+      ) {
+        continue;
+      }
+      const agendaItemTasks =
+        sourceTasksByAgendaItemId.get(task.agenda_item_id ?? "") ?? [];
+      agendaItemTasks.push(
+        canEditSourceTasks ? task : { ...task, internal_note: null },
+      );
+      sourceTasksByAgendaItemId.set(task.agenda_item_id ?? "", agendaItemTasks);
+    }
 
     return {
       items,
@@ -147,6 +183,15 @@ export class TransferredAgendaItemService {
           sourceMeetingsById.get(transfer.source_meeting_id) ?? null,
         sourceAgendaItem:
           sourceAgendaItemsById.get(transfer.source_agenda_item_id) ?? null,
+        sourceOccurrence: transfer.source_agenda_item_occurrence_id
+          ? (sourceOccurrencesById.get(
+              transfer.source_agenda_item_occurrence_id,
+            ) ?? null)
+          : null,
+        sourceMinutes:
+          sourceMinutesById.get(transfer.source_agenda_item_minutes_id) ?? null,
+        sourceTasks:
+          sourceTasksByAgendaItemId.get(transfer.source_agenda_item_id) ?? [],
       })),
       futureMeetings: futureMeetings
         .filter(({ status }) => status !== "cancelled")
@@ -173,25 +218,13 @@ export class TransferredAgendaItemService {
     const sourceAgendaItemIds = transfers.map(
       (transfer) => transfer.source_agenda_item_id,
     );
-    const [sourceMinutes, sourceDecisions, sourceTasks] = await Promise.all([
-      this.transfers.listSourceMinutes(
-        transfers.map((transfer) => transfer.source_agenda_item_minutes_id),
-      ),
+    const [sourceDecisions, sourceTasks] = await Promise.all([
       this.transfers.listSourceDecisions(sourceAgendaItemIds),
       this.transfers.listSourceTasks(sourceAgendaItemIds),
     ]);
-    const transferById = new Map(
-      transfers.map((transfer) => [transfer.id, transfer]),
-    );
-    const minutesById = new Map(
-      sourceMinutes.map((minutes) => [minutes.id, minutes]),
-    );
 
     return result.incomingItems.flatMap((item) => {
-      const transfer = transferById.get(item.id);
-      const minutes = transfer
-        ? minutesById.get(transfer.source_agenda_item_minutes_id)
-        : null;
+      const minutes = item.sourceMinutes;
       if (
         !item.targetAgendaItemId ||
         !item.sourceMeeting ||

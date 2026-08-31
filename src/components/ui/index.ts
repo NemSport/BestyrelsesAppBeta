@@ -1,5 +1,6 @@
 export * from "@/components/ui/action-menu";
 export * from "@/components/ui/button";
+export * from "@/components/ui/breadcrumbs";
 export * from "@/components/ui/dropdown";
 export * from "@/components/ui/empty-state";
 export * from "@/components/ui/feedback-state";

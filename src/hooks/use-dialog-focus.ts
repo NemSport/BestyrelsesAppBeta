@@ -14,11 +14,13 @@ const focusableSelector = [
 export function useDialogFocus({
   active,
   containerRef,
+  initialFocusRef,
   onEscape,
   returnFocusRef,
 }: {
   active: boolean;
   containerRef: RefObject<HTMLElement | null>;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   onEscape: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
@@ -42,7 +44,7 @@ export function useDialogFocus({
         container?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
       ).filter((element) => !element.hidden && element.offsetParent !== null);
 
-    const initialFocusTarget = focusables()[0] ?? container;
+    const initialFocusTarget = initialFocusRef?.current ?? focusables()[0] ?? container;
     initialFocusTarget?.focus();
 
     function isTopmostDialog() {
@@ -89,5 +91,5 @@ export function useDialogFocus({
       document.removeEventListener("keydown", handleKeyDown);
       if (returnTarget?.isConnected) returnTarget.focus();
     };
-  }, [active, containerRef, returnFocusRef]);
+  }, [active, containerRef, initialFocusRef, returnFocusRef]);
 }

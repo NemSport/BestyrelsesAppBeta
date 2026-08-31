@@ -1,16 +1,19 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
 import { AgendaItemAssistant } from "@/components/agenda-items/agenda-item-assistant";
+import { AgendaItemHistoryInline } from "@/components/agenda-items/agenda-item-history-inline";
+import { AgendaItemHistoryLink } from "@/components/agenda-items/agenda-item-history-link";
 import { EditAgendaItemModal } from "@/components/agenda-items/edit-agenda-item-modal";
 import { DecisionCreateModal } from "@/components/decisions/decision-create-modal";
 import { DecisionHistory } from "@/components/decisions/decision-history";
+import { RichTextContent } from "@/components/forms/rich-text-content";
 import { RelatedTasks } from "@/components/tasks/related-tasks";
 import { TaskCreateModal } from "@/components/tasks/task-create-modal";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
   ActionMenu,
+  Breadcrumbs,
   ContentPanel,
   DocumentPanel,
   EmptyState,
@@ -20,7 +23,6 @@ import {
 } from "@/components/ui";
 import {
   formatDate,
-  occurrenceStatusLabels,
   standardAgendaItemLabels,
 } from "@/lib/localization";
 import { canEditAgendaItems } from "@/lib/permissions";
@@ -52,7 +54,12 @@ export default async function AgendaItemPage({
     .get(organizationId, committeeId, agendaItemId)
     .catch(() => null);
   if (!item) notFound();
-  const [decisionHistory, taskContext] = await Promise.all([
+  const [agendaItemHistory, decisionHistory, taskContext] = await Promise.all([
+    new AgendaItemService(db).getAgendaItemHistory(
+      organizationId,
+      committeeId,
+      agendaItemId,
+    ),
     new DecisionService(db).getAgendaItemHistory(
       organizationId,
       committeeId,
@@ -68,9 +75,29 @@ export default async function AgendaItemPage({
     context.organizationMembership.role,
     context.membership?.role ?? null,
   );
+  const root = `/organizations/${organizationId}/committees/${committeeId}`;
+  const meeting = item.agenda_item_occurrences[0]?.meetings ?? null;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
+    <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[1fr_340px]">
+      <Breadcrumbs
+        className="lg:col-span-2"
+        items={[
+          { label: context.committee.name, href: root },
+          meeting
+            ? { label: "Møder", href: `${root}/meetings` }
+            : { label: "Dagsordenspunkter", href: `${root}/agenda-items` },
+          ...(meeting
+            ? [{ label: meeting.title, href: `${root}/meetings/${meeting.id}` }]
+            : []),
+          { label: item.title },
+        ]}
+        mobileBack={
+          meeting
+            ? { label: "mødet", href: `${root}/meetings/${meeting.id}` }
+            : { label: "dagsordenspunkter", href: `${root}/agenda-items` }
+        }
+      />
       <div>
         <PageHeader
           actions={
@@ -116,6 +143,12 @@ export default async function AgendaItemPage({
               ) : null}
               {canEdit ? (
                 <ActionMenu>
+                  <AgendaItemHistoryLink
+                    agendaItemId={item.id}
+                    committeeId={committeeId}
+                    currentTitle={item.title}
+                    organizationId={organizationId}
+                  />
                   <EditAgendaItemModal
                     committeeId={committeeId}
                     item={item}
@@ -150,9 +183,11 @@ export default async function AgendaItemPage({
 
         <DocumentPanel className="mt-6">
           <p className="page-eyebrow">Formål</p>
-          <p className="mt-3 whitespace-pre-wrap text-lg leading-8">
-            {item.objective || "Der er endnu ikke angivet et formål."}
-          </p>
+          <RichTextContent
+            className="mt-3 text-lg leading-8"
+            emptyText="Der er endnu ikke angivet et formål."
+            value={item.objective}
+          />
         </DocumentPanel>
 
         <AgendaItemAssistant
@@ -161,44 +196,13 @@ export default async function AgendaItemPage({
           organizationId={organizationId}
         />
 
-        <PageSection
-          className="mt-8"
-          description="Hver mødeforekomst forbliver knyttet til dette dagsordenspunkt."
-          title="Historisk kontekst"
-        >
-          {item.agenda_item_occurrences.length > 0 ? (
-            <div className="divide-y divide-line border-y border-line">
-              {item.agenda_item_occurrences.map((occurrence) => {
-                const meeting = occurrence.meetings;
-                if (!meeting) return null;
-                return (
-                  <Link
-                    className="block px-1 py-5 transition hover:bg-surface/60 sm:px-3"
-                    href={`/organizations/${organizationId}/committees/${committeeId}/meetings/${meeting.id}`}
-                    key={occurrence.id}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <h3 className="font-semibold">{meeting.title}</h3>
-                      <time className="text-xs text-muted">
-                        {formatDate(meeting.starts_at)}
-                      </time>
-                    </div>
-                    <p className="mt-2 text-sm text-muted">
-                      {occurrenceStatusLabels[occurrence.meeting_status]}
-                    </p>
-                    {occurrence.outcome_summary ? (
-                      <p className="mt-3 text-sm">
-                        {occurrence.outcome_summary}
-                      </p>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState title="Dagsordenspunktet er endnu ikke planlagt på et møde." />
-          )}
-        </PageSection>
+        <AgendaItemHistoryInline
+          agendaItemId={agendaItemId}
+          committeeId={committeeId}
+          currentOccurrenceId={item.agenda_item_occurrences[0]?.id ?? null}
+          initialHistory={agendaItemHistory}
+          organizationId={organizationId}
+        />
 
         <PageSection
           className="mt-8"
@@ -230,9 +234,11 @@ export default async function AgendaItemPage({
       <aside className="space-y-4">
         <ContentPanel className="p-6">
           <h2 className="font-semibold">Baggrund</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted">
-            {item.description || "Der er endnu ikke angivet en baggrund."}
-          </p>
+          <RichTextContent
+            className="mt-3 text-sm leading-6 text-muted"
+            emptyText="Der er endnu ikke angivet en baggrund."
+            value={item.description}
+          />
         </ContentPanel>
         <ContentPanel className="p-6">
           <h2 className="font-semibold">Detaljer</h2>

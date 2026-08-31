@@ -5,22 +5,35 @@ import { TaskService } from "@/services/task-service";
 
 export default async function TasksPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
+  searchParams: Promise<{
+    create?: string;
+    stakeholderId?: string;
+    stakeholderContractId?: string;
+  }>;
 }) {
   const { organizationId } = await params;
+  const { create, stakeholderId, stakeholderContractId } = await searchParams;
   const data = await new TaskService(await createClient()).getRegister(
     organizationId,
   );
 
   return (
-    <div className="page-flow">
+    <div className="page-flow w-full max-w-none" data-task-register-page>
       <PageHeader
-        description="Saml organisationens opgaver, ansvar og deadlines på tværs af udvalg."
+        description="Få overblik over ansvar, deadlines og fremdrift på tværs af organisationen."
         eyebrow="Handling og eksekvering"
         title="Opgaver"
       />
-      <TaskRegister data={data} organizationId={organizationId} />
+      <TaskRegister
+        data={data}
+        openCreateOnLoad={create === "1"}
+        initialStakeholderId={stakeholderId ?? ""}
+        initialStakeholderContractId={stakeholderContractId ?? ""}
+        organizationId={organizationId}
+      />
     </div>
   );
 }

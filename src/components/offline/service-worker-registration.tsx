@@ -5,6 +5,38 @@ import { useEffect } from "react";
 export function ServiceWorkerRegistration() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+
+    if (process.env.NODE_ENV !== "production") {
+      void Promise.all([
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) =>
+            Promise.all(
+              registrations.map(async (registration) => {
+                registration.active?.postMessage({
+                  type: "CLEAR_OFFLINE_CACHE",
+                });
+                return registration.unregister();
+              }),
+            ),
+          ),
+        "caches" in window
+          ? window.caches
+              .keys()
+              .then((keys) =>
+                Promise.all(
+                  keys
+                    .filter((key) => key.startsWith("bestyrelsesapp-"))
+                    .map((key) => window.caches.delete(key)),
+                ),
+              )
+          : Promise.resolve([]),
+      ]).catch(() => {
+        // Development remains usable if a stale registration cannot be removed.
+      });
+      return;
+    }
+
     void navigator.serviceWorker
       .register("/sw.js", {
         scope: "/",

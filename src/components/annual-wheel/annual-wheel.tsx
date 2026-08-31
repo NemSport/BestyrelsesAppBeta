@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -20,8 +20,8 @@ import {
   type AnnualWheelView,
 } from "@/lib/annual-wheel-state";
 import {
+  ActionMenu,
   Button,
-  buttonClassName,
   EmptyState,
   Input,
   Modal,
@@ -30,6 +30,7 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
+import { AppIcon } from "@/components/icons/app-icon";
 import type {
   AnnualWheelCalendarItem,
   AnnualWheelEventView,
@@ -226,6 +227,36 @@ function draftFromEvent(event: AnnualWheelEventView): EventDraft {
   };
 }
 
+function duplicateDraftFromEvent(event: AnnualWheelEventView): EventDraft {
+  return {
+    committeeId: event.committee_id ?? "",
+    title: event.title,
+    description: event.description,
+    startsOn: event.starts_on,
+    endsOn: event.ends_on,
+    responsibleUserId: event.responsible_user_id ?? "",
+    category: event.category ?? "",
+    priority: event.priority,
+    status: "planned",
+    recurrence: event.recurrence,
+    recurrenceInterval: event.recurrence_interval,
+    taskTemplates: event.taskTemplates.map((template) => ({
+      title: template.title,
+      description: template.description,
+      suggestedResponsibleUserId: template.suggested_responsible_user_id ?? "",
+      deadlineAnchor: template.deadline_anchor,
+      deadlineOffsetDays: template.deadline_offset_days,
+    })),
+    keyPeople: event.keyPeople.map((person) => ({
+      userId: person.user_id ?? "",
+      name: person.name,
+      roleTitle: person.role_title,
+      phone: person.phone ?? "",
+      email: person.email ?? "",
+    })),
+  };
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium" }).format(
     new Date(`${value}T00:00:00`),
@@ -273,18 +304,39 @@ function eventIsOverdue(event: AnnualWheelEventView) {
   );
 }
 
+function itemIsClosed(item: AnnualWheelTimelineItem) {
+  if (item.kind === "task" && "status" in item) {
+    return item.status === "completed" || item.status === "cancelled";
+  }
+  return Boolean(
+    item.event && ["completed", "cancelled"].includes(item.event.status),
+  );
+}
+
+function isWithinNextDays(value: string, days: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const limit = new Date(today);
+  limit.setDate(limit.getDate() + days);
+  const date = new Date(`${value}T00:00:00`);
+  return date >= today && date <= limit;
+}
+
 export function AnnualWheel({
   organizationId,
   data,
   initialCommitteeId = "",
+  openCreateOnLoad = false,
 }: {
   organizationId: string;
   data: AnnualWheelOverview;
   initialCommitteeId?: string;
+  openCreateOnLoad?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const openedCreate = useRef(false);
   const initialState = parseAnnualWheelState(
     new URLSearchParams(searchParams.toString()),
     initialCommitteeId,
@@ -329,6 +381,26 @@ export function AnnualWheel({
 
   const canCreate =
     data.canEditOrganization || data.editableCommitteeIds.length > 0;
+
+  useEffect(() => {
+    if (!openCreateOnLoad || !canCreate || openedCreate.current) return;
+    openedCreate.current = true;
+    const defaultCommittee =
+      initialCommitteeId ||
+      (data.canEditOrganization ? "" : (data.editableCommitteeIds[0] ?? ""));
+    setError(null);
+    setNotice(null);
+    setFieldErrors({});
+    const nextDraft = emptyDraft(defaultCommittee);
+    setDraftBaseline(nextDraft);
+    setDraft(nextDraft);
+  }, [
+    canCreate,
+    data.canEditOrganization,
+    data.editableCommitteeIds,
+    initialCommitteeId,
+    openCreateOnLoad,
+  ]);
   const visibleMonths =
     view === "year"
       ? monthNames.map((_, index) => index)
@@ -361,21 +433,26 @@ export function AnnualWheel({
       .sort((left, right) => left.date.localeCompare(right.date));
   }, [committeeId, data.calendarItems, data.events, kind, responsibleId]);
 
-  const deadlines = items
-    .filter(
+  const visibleItems = items.filter((item) =>
+    visibleMonths.includes(Number(item.date.slice(5, 7)) - 1),
+  );
+  const attentionItems = visibleItems.filter(
+    (item) => item.kind !== "meeting" && !itemIsClosed(item),
+  );
+  const attentionCounts = {
+    overdue: attentionItems.filter(
       (item) =>
-        item.kind !== "meeting" &&
-        visibleMonths.includes(Number(item.date.slice(5, 7)) - 1),
-    )
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .slice(0, 12);
+        annualWheelDeadlineState(item.date, item.priority) === "overdue",
+    ).length,
+    unassigned: attentionItems.filter((item) => !item.responsibleUserId).length,
+    next30Days: attentionItems.filter((item) => isWithinNextDays(item.date, 30))
+      .length,
+  };
 
   const selectedMonthItems =
     selectedMonth === null ? [] : getMonthItems(items, selectedMonth);
   const selectedMonthGroups = splitMonthItems(selectedMonthItems);
-  const visibleItemCount = items.filter((item) =>
-    visibleMonths.includes(Number(item.date.slice(5, 7)) - 1),
-  ).length;
+  const visibleItemCount = visibleItems.length;
   const hasActiveFilters =
     committeeId !== initialCommitteeId || responsibleId !== "" || kind !== "";
   const selectedScopeLabel = committeeId
@@ -486,23 +563,24 @@ export function AnnualWheel({
       : "Ingen ansvarlig";
     const content = (
       <>
-        <div className="flex min-w-0 flex-1 items-start gap-2">
-          <span className="mt-0.5 w-12 shrink-0 text-xs font-semibold text-muted">
-            {variant === "detail"
-              ? shortDate(item.date)
-              : item.date.slice(8, 10)}
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="mt-0.5 w-11 shrink-0 text-center text-[11px] font-semibold uppercase leading-4 text-muted">
+            {shortDate(item.date)}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="break-words text-sm font-medium text-ink">
+            <p className="break-words text-sm font-semibold leading-5 text-ink">
               {item.title}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-              <StatusBadge tone="neutral">{scopeLabel}</StatusBadge>
-              <span>Ansvarlig: {responsibleLabel}</span>
+            <p className="mt-0.5 break-words text-xs text-muted">
+              {scopeLabel} · {responsibleLabel}
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
               {item.kind === "meeting" ? (
                 <StatusBadge tone="neutral">Møde</StatusBadge>
               ) : (
-                <span>{kindLabels[item.kind]}</span>
+                <StatusBadge tone="neutral">
+                  {kindLabels[item.kind]}
+                </StatusBadge>
               )}
               {taskStatus ? (
                 <StatusBadge
@@ -546,22 +624,44 @@ export function AnnualWheel({
       </>
     );
 
-    const rowClass =
-      "group flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left transition hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30";
+    const rowClass = `group flex w-full min-w-0 items-start gap-2 rounded-md px-2 text-left transition hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30 ${variant === "detail" ? "py-3" : "py-2.5"}`;
 
     if (item.event) {
+      const canDuplicate = eventCanEdit(item.event);
       return (
-        <button
-          className={rowClass}
-          key={item.id}
-          onClick={() => {
-            setSelectedMonth(null);
-            openEdit(item.event);
-          }}
-          type="button"
-        >
-          {content}
-        </button>
+        <div className="flex min-w-0 items-start gap-1" key={item.id}>
+          <button
+            className={`${rowClass} flex-1`}
+            onClick={() => {
+              setSelectedMonth(null);
+              openEdit(item.event);
+            }}
+            type="button"
+          >
+            {content}
+          </button>
+          {canDuplicate ? (
+            <ActionMenu
+              align="right"
+              ariaLabel={`Handlinger for ${item.title}`}
+              label={<AppIcon name="more" size={16} />}
+              showChevron={false}
+              triggerClassName="mt-1 min-h-9 h-9 w-9 shrink-0 border-transparent bg-transparent px-2 py-1"
+            >
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+                onClick={() => {
+                  setSelectedMonth(null);
+                  openDuplicate(item.event);
+                }}
+                type="button"
+              >
+                <AppIcon name="duplicate" size={16} />
+                Duplikér aktivitet
+              </button>
+            </ActionMenu>
+          ) : null}
+        </div>
       );
     }
 
@@ -585,12 +685,18 @@ export function AnnualWheel({
     meetings: AnnualWheelTimelineItem[],
     otherItems: AnnualWheelTimelineItem[],
     variant: "card" | "detail" = "card",
+    compactLimit = 5,
   ) {
     const visibleMeetings =
-      variant === "card" ? meetings.slice(0, 3) : meetings;
+      variant === "card"
+        ? meetings.slice(0, Math.min(3, compactLimit))
+        : meetings;
     const visibleOtherItems =
       variant === "card"
-        ? otherItems.slice(0, Math.max(0, 5 - visibleMeetings.length))
+        ? otherItems.slice(
+            0,
+            Math.max(0, compactLimit - visibleMeetings.length),
+          )
         : otherItems;
     const hiddenCount =
       meetings.length +
@@ -645,6 +751,16 @@ export function AnnualWheel({
     setNotice(null);
     setFieldErrors({});
     const nextDraft = draftFromEvent(event);
+    mutation.reset();
+    setDraftBaseline(nextDraft);
+    setDraft(nextDraft);
+  }
+
+  function openDuplicate(event: AnnualWheelEventView) {
+    setError(null);
+    setNotice(null);
+    setFieldErrors({});
+    const nextDraft = duplicateDraftFromEvent(event);
     mutation.reset();
     setDraftBaseline(nextDraft);
     setDraft(nextDraft);
@@ -851,18 +967,19 @@ export function AnnualWheel({
     : null;
 
   return (
-    <div className="content-flow">
-      <div className="section-header border-b border-line pb-4">
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+    <div className="content-flow min-w-0">
+      <div className="flex flex-col gap-3 border-b border-line pb-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <Link
-            className="button-secondary justify-center"
+            className="button-secondary justify-center px-3"
             href={yearHref(data.year - 1)}
           >
-            ← {data.year - 1}
+            <AppIcon className="mr-1.5" name="arrowLeft" size={15} />
+            {data.year - 1}
           </Link>
           <div
             aria-label="Vælg periodevisning"
-            className="order-3 col-span-2 grid grid-cols-3 gap-2 sm:order-none sm:flex sm:flex-wrap"
+            className="order-3 col-span-2 grid grid-cols-3 rounded-[var(--radius-control)] bg-subtle p-1 sm:order-none sm:flex"
             role="group"
           >
             {(["year", "quarter", "month"] as const).map((mode) => (
@@ -870,7 +987,8 @@ export function AnnualWheel({
                 aria-pressed={view === mode}
                 key={mode}
                 onClick={() => replaceAnnualWheelState({ view: mode })}
-                variant={view === mode ? "primary" : "secondary"}
+                size="sm"
+                variant={view === mode ? "primary" : "ghost"}
               >
                 <span className="sm:hidden">
                   {mode === "year"
@@ -890,166 +1008,220 @@ export function AnnualWheel({
             ))}
           </div>
           <Link
-            className="button-secondary justify-center"
+            className="button-secondary justify-center px-3"
             href={yearHref(data.year + 1)}
           >
-            {data.year + 1} →
+            {data.year + 1}
+            <AppIcon className="ml-1.5" name="arrowRight" size={15} />
           </Link>
         </div>
-        <div className="action-cluster hidden sm:flex sm:justify-end">
-          <Link
-            className={buttonClassName({
-              size: "sm",
-              variant: "secondary",
-            })}
-            href={`/api/organizations/${organizationId}/annual-wheel/pdf/overview?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
-          >
-            Download overblik som PDF
-          </Link>
-          <Link
-            className={buttonClassName({
-              size: "sm",
-              variant: "secondary",
-            })}
-            href={`/api/organizations/${organizationId}/annual-wheel/pdf/wheel?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
-          >
-            Download årshjul som PDF
-          </Link>
+        <div className="flex items-center gap-2 sm:justify-end">
           {canCreate ? (
-            <Button onClick={openCreate}>Opret aktivitet</Button>
-          ) : null}
-        </div>
-        <div className="flex w-full items-start gap-2 sm:hidden">
-          <details className="relative flex-1 rounded-[var(--radius-control)] border border-line bg-surface">
-            <summary className="min-h-11 cursor-pointer px-3 py-2.5 text-center text-sm font-semibold">
-              Eksportér PDF
-            </summary>
-            <div className="space-y-2 border-t border-line p-2">
-              <Link
-                className={buttonClassName({
-                  size: "sm",
-                  variant: "secondary",
-                })}
-                href={`/api/organizations/${organizationId}/annual-wheel/pdf/overview?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
-              >
-                Download overblik
-              </Link>
-              <Link
-                className={buttonClassName({
-                  size: "sm",
-                  variant: "secondary",
-                })}
-                href={`/api/organizations/${organizationId}/annual-wheel/pdf/wheel?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
-              >
-                Download årshjul
-              </Link>
-            </div>
-          </details>
-          {canCreate ? (
-            <Button className="flex-1" onClick={openCreate}>
+            <Button className="flex-1 sm:flex-none" onClick={openCreate}>
               Opret aktivitet
+            </Button>
+          ) : null}
+          <ActionMenu
+            ariaLabel="Eksportér årshjul"
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <AppIcon name="more" size={16} />
+                Eksportér
+              </span>
+            }
+          >
+            <Link
+              className="block rounded-md px-3 py-2 text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+              href={`/api/organizations/${organizationId}/annual-wheel/pdf/overview?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
+            >
+              Download overblik som PDF
+            </Link>
+            <Link
+              className="block rounded-md px-3 py-2 text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+              href={`/api/organizations/${organizationId}/annual-wheel/pdf/wheel?year=${data.year}${committeeId ? `&committeeId=${committeeId}` : ""}`}
+            >
+              Download årshjul som PDF
+            </Link>
+          </ActionMenu>
+        </div>
+      </div>
+
+      <div className="rounded-[var(--radius-panel)] border border-line bg-surface px-3 py-3 lg:py-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:gap-1.5 xl:grid-cols-[minmax(11rem,1.35fr)_minmax(10rem,1fr)_minmax(9rem,.8fr)_minmax(9rem,.8fr)]">
+          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted lg:gap-0.5">
+            Udvalg
+            <Select
+              aria-label="Filtrér på udvalg"
+              disabled={Boolean(initialCommitteeId)}
+              onChange={(event) =>
+                replaceAnnualWheelState({ committeeId: event.target.value })
+              }
+              value={committeeId}
+            >
+              {initialCommitteeId ? null : (
+                <option value="">Alle udvalg og organisationen</option>
+              )}
+              {data.committees
+                .filter(
+                  (committee) =>
+                    !initialCommitteeId || committee.id === initialCommitteeId,
+                )
+                .map((committee) => (
+                  <option key={committee.id} value={committee.id}>
+                    {committee.name}
+                  </option>
+                ))}
+            </Select>
+          </label>
+          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted lg:gap-0.5">
+            Ansvarlig
+            <Select
+              aria-label="Filtrér på ansvarlig"
+              onChange={(event) =>
+                replaceAnnualWheelState({ responsibleId: event.target.value })
+              }
+              value={responsibleId}
+            >
+              <option value="">Alle ansvarlige</option>
+              {data.members.map((member) => (
+                <option key={member.user_id} value={member.user_id}>
+                  {member.full_name || member.email}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted lg:gap-0.5">
+            Type
+            <Select
+              aria-label="Filtrér på aktivitetstype"
+              onChange={(event) =>
+                replaceAnnualWheelState({
+                  kind: event.target.value as AnnualWheelKind,
+                })
+              }
+              value={kind}
+            >
+              <option value="">Alle typer</option>
+              <option value="activity">Aktiviteter</option>
+              <option value="meeting">Møder</option>
+              <option value="task">Opgaver</option>
+              <option value="decision">Beslutningsdeadlines</option>
+            </Select>
+          </label>
+          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted lg:gap-0.5">
+            Måned
+            <Select
+              aria-label="Vælg måned"
+              disabled={view === "year"}
+              onChange={(event) =>
+                replaceAnnualWheelState({
+                  focusMonth: Number(event.target.value),
+                })
+              }
+              value={focusMonth}
+            >
+              {monthNames.map((name, index) => (
+                <option key={name} value={index}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
+        <div
+          aria-live="polite"
+          className="mt-2 flex min-h-8 flex-wrap items-center justify-between gap-2 text-xs lg:mt-1"
+        >
+          <p>
+            <span className="font-semibold">{visibleItemCount} elementer</span>
+            <span className="text-muted">
+              {" "}
+              · {selectedPeriodLabel} · {selectedScopeLabel}
+            </span>
+          </p>
+          {hasActiveFilters ? (
+            <Button onClick={resetFilters} size="sm" variant="secondary">
+              Nulstil filtre
             </Button>
           ) : null}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-        <Select
-          aria-label="Filtrér på udvalg"
-          disabled={Boolean(initialCommitteeId)}
-          onChange={(event) =>
-            replaceAnnualWheelState({ committeeId: event.target.value })
-          }
-          value={committeeId}
-        >
-          {initialCommitteeId ? null : (
-            <option value="">Alle udvalg og organisationen</option>
-          )}
-          {data.committees
-            .filter(
-              (committee) =>
-                !initialCommitteeId || committee.id === initialCommitteeId,
-            )
-            .map((committee) => (
-              <option key={committee.id} value={committee.id}>
-                {committee.name}
-              </option>
-            ))}
-        </Select>
-        <Select
-          aria-label="Filtrér på ansvarlig"
-          onChange={(event) =>
-            replaceAnnualWheelState({ responsibleId: event.target.value })
-          }
-          value={responsibleId}
-        >
-          <option value="">Alle ansvarlige</option>
-          {data.members.map((member) => (
-            <option key={member.user_id} value={member.user_id}>
-              {member.full_name || member.email}
-            </option>
-          ))}
-        </Select>
-        <Select
-          aria-label="Filtrér på aktivitetstype"
-          onChange={(event) =>
-            replaceAnnualWheelState({
-              kind: event.target.value as AnnualWheelKind,
-            })
-          }
-          value={kind}
-        >
-          <option value="">Alle typer</option>
-          <option value="activity">Aktiviteter</option>
-          <option value="meeting">Møder</option>
-          <option value="task">Opgaver</option>
-          <option value="decision">Beslutningsdeadlines</option>
-        </Select>
-        <Select
-          aria-label="Vælg måned"
-          disabled={view === "year"}
-          onChange={(event) =>
-            replaceAnnualWheelState({
-              focusMonth: Number(event.target.value),
-            })
-          }
-          value={focusMonth}
-        >
-          {monthNames.map((name, index) => (
-            <option key={name} value={index}>
-              {name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <div aria-live="polite" className="filter-result-bar">
-        <p>
-          <span className="font-semibold">{visibleItemCount} elementer</span>
-          <span className="text-muted">
-            {" "}
-            · {selectedPeriodLabel} · {selectedScopeLabel}
-          </span>
-        </p>
-        {hasActiveFilters ? (
-          <Button onClick={resetFilters} size="sm" variant="secondary">
-            Nulstil filtre
-          </Button>
-        ) : null}
-      </div>
+      <nav
+        aria-label="Året i overblik"
+        className="grid grid-cols-4 gap-1 rounded-[var(--radius-panel)] border border-line bg-surface p-1.5 sm:grid-cols-6 xl:grid-cols-12"
+      >
+        {monthNames.map((name, month) => {
+          const isActive = view !== "year" && visibleMonths.includes(month);
+          return (
+            <button
+              aria-current={isActive ? "true" : undefined}
+              className={`rounded-md px-2 py-1.5 text-center text-xs transition focus:outline-none focus:ring-2 focus:ring-brand/30 ${isActive ? "bg-brand-soft font-semibold text-brand" : "text-muted hover:bg-subtle hover:text-ink"}`}
+              key={name}
+              onClick={() =>
+                replaceAnnualWheelState({ view: "month", focusMonth: month })
+              }
+              type="button"
+            >
+              <span className="block">{name.slice(0, 3)}</span>
+              <span className="text-[10px]">
+                {getMonthItems(items, month).length}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
 
-      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-brand/20 bg-surface">
-        <div className="section-header bg-brand-soft px-4 py-4">
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="page-eyebrow">AI-planlægningsassistent</p>
-            <h2 className="mt-1 font-semibold">Find mangler i årets plan</h2>
-            <p className="mt-1 text-sm text-muted">
-              AI foreslår aktiviteter og dagsordenspunkter. Intet oprettes uden
-              din godkendelse.
+            <h2 className="text-sm font-semibold text-ink">
+              Kræver opmærksomhed
+            </h2>
+            <p className="text-xs text-muted">
+              Kompakt overblik for den valgte periode.
             </p>
+          </div>
+          <dl className="grid flex-1 grid-cols-1 gap-2 sm:max-w-2xl sm:grid-cols-3">
+            <div className="rounded-md bg-danger-soft px-3 py-2">
+              <dt className="text-xs text-muted">Forsinkede</dt>
+              <dd className="text-lg font-semibold text-danger">
+                {attentionCounts.overdue}
+              </dd>
+            </div>
+            <div className="rounded-md bg-subtle px-3 py-2">
+              <dt className="text-xs text-muted">Uden ansvarlig</dt>
+              <dd className="text-lg font-semibold text-ink">
+                {attentionCounts.unassigned}
+              </dd>
+            </div>
+            <div className="rounded-md bg-warning-soft px-3 py-2">
+              <dt className="text-xs text-muted">Deadlines næste 30 dage</dt>
+              <dd className="text-lg font-semibold text-ink">
+                {attentionCounts.next30Days}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line/70 bg-subtle/35">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <AppIcon className="shrink-0 text-muted" name="ai" size={17} />
+            <div>
+              <h2 className="text-sm font-semibold">
+                Find mangler i årets plan
+              </h2>
+              <p className="text-xs text-muted">
+                Forslag oprettes kun efter din godkendelse.
+              </p>
+            </div>
           </div>
           <Button
             disabled={aiLoading}
             onClick={() => void analyzeAnnualWheel()}
+            size="sm"
             variant="secondary"
           >
             {aiLoading ? "Analyserer..." : "Analysér årshjul"}
@@ -1174,9 +1346,90 @@ export function AnnualWheel({
               : "Perioden er tom"
           }
         />
+      ) : null}
+
+      {view === "year" ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {monthNames.map((name, month) => {
+            const monthItems = getMonthItems(items, month);
+            const meetingCount = monthItems.filter(
+              (item) => item.kind === "meeting",
+            ).length;
+            const taskCount = monthItems.filter(
+              (item) => item.kind === "task",
+            ).length;
+            const deadlineCount = monthItems.filter(
+              (item) => item.kind === "decision" || item.kind === "activity",
+            ).length;
+            const activities = monthItems.filter((item) => item.event);
+            const overdueCount = monthItems.filter(
+              (item) =>
+                item.kind !== "meeting" &&
+                !itemIsClosed(item) &&
+                annualWheelDeadlineState(item.date, item.priority) ===
+                  "overdue",
+            ).length;
+            return (
+              <section
+                className="rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3"
+                key={name}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-ink">{name}</h2>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {monthItems.length} elementer
+                    </p>
+                  </div>
+                  {overdueCount ? (
+                    <StatusBadge tone="danger">
+                      {overdueCount} forsinkede
+                    </StatusBadge>
+                  ) : null}
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 border-y border-line py-2.5 text-xs">
+                  <div>
+                    <dt className="text-muted">Møder</dt>
+                    <dd className="mt-0.5 font-semibold text-ink">
+                      {meetingCount}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Opgaver</dt>
+                    <dd className="mt-0.5 font-semibold text-ink">
+                      {taskCount}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Deadlines</dt>
+                    <dd className="mt-0.5 font-semibold text-ink">
+                      {deadlineCount}
+                    </dd>
+                  </div>
+                </dl>
+                {activities.length
+                  ? renderMonthList([], activities, "card", 2)
+                  : null}
+                <button
+                  className="mt-2.5 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  onClick={() =>
+                    replaceAnnualWheelState({
+                      view: "month",
+                      focusMonth: month,
+                    })
+                  }
+                  type="button"
+                >
+                  Se {name.toLocaleLowerCase("da-DK")}
+                  <AppIcon name="arrowRight" size={14} />
+                </button>
+              </section>
+            );
+          })}
+        </div>
       ) : (
         <div
-          className={`grid gap-4 ${view === "year" ? "md:grid-cols-3 xl:grid-cols-4" : view === "quarter" ? "md:grid-cols-3" : "grid-cols-1"}`}
+          className={`grid gap-4 ${view === "quarter" ? "lg:grid-cols-3" : "grid-cols-1"}`}
         >
           {visibleMonths.map((month) => {
             const monthItems = getMonthItems(items, month);
@@ -1184,13 +1437,18 @@ export function AnnualWheel({
               splitMonthItems(monthItems);
             return (
               <section
-                className="entity-record min-h-44 px-3 py-4 sm:px-4"
+                className="rounded-[var(--radius-panel)] border border-line bg-surface px-3 py-4 sm:px-4"
                 key={month}
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
                     className="min-w-0 text-left hover:text-brand"
-                    onClick={() => setSelectedMonth(month)}
+                    onClick={() =>
+                      replaceAnnualWheelState({
+                        view: "month",
+                        focusMonth: month,
+                      })
+                    }
                     type="button"
                   >
                     <h2 className="font-semibold">
@@ -1202,16 +1460,27 @@ export function AnnualWheel({
                         : "Ingen planlagte aktiviteter"}
                     </p>
                   </button>
-                  <Button
-                    onClick={() => setSelectedMonth(month)}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    Vis måned
-                  </Button>
+                  {view === "quarter" ? (
+                    <Button
+                      onClick={() =>
+                        replaceAnnualWheelState({
+                          view: "month",
+                          focusMonth: month,
+                        })
+                      }
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Vis måned
+                    </Button>
+                  ) : null}
                 </div>
                 {monthItems.length ? (
-                  renderMonthList(meetings, [...activities, ...otherItems])
+                  renderMonthList(
+                    meetings,
+                    [...activities, ...otherItems],
+                    view === "month" ? "detail" : "card",
+                  )
                 ) : (
                   <p className="mt-3 text-sm text-muted">
                     Ingen planlagte aktiviteter.
@@ -1222,70 +1491,6 @@ export function AnnualWheel({
           })}
         </div>
       )}
-
-      <section className="border-t border-line pt-6">
-        <h2 className="section-title">Deadline-overblik</h2>
-        <p className="mt-1 text-sm text-muted">
-          Aktiviteter, opgaver og beslutninger i ét overblik.
-        </p>
-        {deadlines.length ? (
-          <div className="mt-4 divide-y divide-line">
-            {deadlines.map((item) => {
-              const taskStatus =
-                item.kind === "task" && "status" in item ? item.status : null;
-              const closedTask =
-                item.kind === "task" &&
-                (taskStatus === "completed" || taskStatus === "cancelled");
-              const state =
-                closedTask ||
-                (item.event &&
-                  ["completed", "cancelled"].includes(item.event.status))
-                  ? null
-                  : annualWheelDeadlineState(item.date, item.priority);
-              return (
-                <div
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                  key={`deadline-${item.id}`}
-                >
-                  <div>
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-sm text-muted">
-                      {formatDate(item.date)}
-                    </p>
-                  </div>
-                  <StatusBadge
-                    tone={
-                      taskStatus === "completed"
-                        ? "success"
-                        : taskStatus === "cancelled"
-                          ? "neutral"
-                          : state === "overdue"
-                            ? "danger"
-                            : state === "critical"
-                              ? "warning"
-                              : "neutral"
-                    }
-                  >
-                    {taskStatus === "completed"
-                      ? "Gennemført"
-                      : taskStatus === "cancelled"
-                        ? "Annulleret"
-                        : state === "overdue"
-                          ? "Forsinket"
-                          : state === "critical"
-                            ? "Kritisk deadline"
-                            : state === "upcoming"
-                              ? "Kommende"
-                              : "Planlagt"}
-                  </StatusBadge>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState title="Der er ingen deadlines i den valgte periode." />
-        )}
-      </section>
 
       {!draft ? <MutationFeedback feedback={mutation.feedback} /> : null}
       <EventModal
@@ -1299,6 +1504,7 @@ export function AnnualWheel({
         onClose={closeDraft}
         onActivate={(eventId) => void activateTasks(eventId)}
         onDraft={setDraft}
+        onDuplicate={openDuplicate}
         onRemove={() => void remove()}
         onSubmit={submit}
         organizationId={organizationId}
@@ -1391,6 +1597,7 @@ function EventModal({
   onActivate,
   onClose,
   onDraft,
+  onDuplicate,
   onRemove,
   onSubmit,
   organizationId,
@@ -1410,6 +1617,7 @@ function EventModal({
   onActivate: (eventId: string) => void;
   onClose: () => void;
   onDraft: (draft: EventDraft) => void;
+  onDuplicate: (event: AnnualWheelEventView) => void;
   onRemove: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   organizationId: string;
@@ -1460,6 +1668,7 @@ function EventModal({
           error={error}
           notice={notice}
           onActivate={onActivate}
+          onDuplicate={() => onDuplicate(currentEvent)}
           onEdit={() => setIsEditing(true)}
           organizationId={organizationId}
         />
@@ -1751,6 +1960,7 @@ function AnnualWheelEventReadView({
   error,
   notice,
   onActivate,
+  onDuplicate,
   onEdit,
   organizationId,
 }: {
@@ -1762,6 +1972,7 @@ function AnnualWheelEventReadView({
   error: string | null;
   notice: string | null;
   onActivate: (eventId: string) => void;
+  onDuplicate: () => void;
   onEdit: () => void;
   organizationId: string;
 }) {
@@ -1803,15 +2014,6 @@ function AnnualWheelEventReadView({
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            className={buttonClassName({
-              size: "sm",
-              variant: "secondary",
-            })}
-            href={`/api/annual-wheel/${currentEvent.id}/pdf?organizationId=${organizationId}`}
-          >
-            Download som PDF
-          </Link>
           {canEdit ? (
             <Button onClick={onEdit} type="button">
               Rediger aktivitet
@@ -1819,6 +2021,31 @@ function AnnualWheelEventReadView({
           ) : (
             <StatusBadge tone="neutral">Skrivebeskyttet</StatusBadge>
           )}
+          <ActionMenu
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <AppIcon name="more" size={16} />
+                Flere
+              </span>
+            }
+          >
+            <Link
+              className="block rounded-md px-3 py-2 text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+              href={`/api/annual-wheel/${currentEvent.id}/pdf?organizationId=${organizationId}`}
+            >
+              Download som PDF
+            </Link>
+            {canEdit ? (
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+                onClick={onDuplicate}
+                type="button"
+              >
+                <AppIcon name="duplicate" size={16} />
+                Duplikér aktivitet
+              </button>
+            ) : null}
+          </ActionMenu>
         </div>
       </div>
 

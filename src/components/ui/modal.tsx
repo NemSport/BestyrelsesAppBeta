@@ -22,7 +22,9 @@ export function Modal({
   description,
   children,
   footer,
+  initialFocusRef,
   maxWidth = "2xl",
+  placement = "center",
   style,
 }: {
   open: boolean;
@@ -32,7 +34,9 @@ export function Modal({
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   maxWidth?: "lg" | "2xl" | "3xl" | "6xl";
+  placement?: "center" | "right";
   style?: CSSProperties;
 }) {
   const titleId = useId();
@@ -47,6 +51,7 @@ export function Modal({
   useDialogFocus({
     active: open && Boolean(portalTarget),
     containerRef: dialogRef,
+    initialFocusRef,
     onEscape: onClose,
   });
 
@@ -57,7 +62,12 @@ export function Modal({
       aria-describedby={description ? descriptionId : undefined}
       aria-labelledby={titleId}
       aria-modal="true"
-      className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto overscroll-contain bg-ink/45 px-0 py-4 backdrop-blur-sm sm:px-6 sm:py-8"
+      className={clsx(
+        "fixed inset-0 z-[1000] flex overflow-y-auto overscroll-contain bg-ink/45 backdrop-blur-sm",
+        placement === "right"
+          ? "items-stretch justify-end p-0"
+          : "items-start justify-center px-0 py-4 sm:px-6 sm:py-8",
+      )}
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) onClose();
       }}
@@ -69,6 +79,8 @@ export function Modal({
       <div
         className={clsx(
           "flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[var(--radius-dialog)] border border-line bg-surface shadow-dialog sm:max-h-[calc(100dvh-3rem)]",
+          placement === "right" &&
+            "h-dvh !max-h-none !rounded-none border-y-0 border-r-0 sm:!max-h-none sm:!rounded-l-[var(--radius-dialog)]",
           maxWidth === "lg" && "max-w-lg",
           maxWidth === "2xl" && "max-w-2xl",
           maxWidth === "3xl" && "max-w-3xl",

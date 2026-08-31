@@ -5,6 +5,20 @@ export type AnnualWheelPriority =
 export type AnnualWheelRecurrence =
   Database["public"]["Enums"]["annual_wheel_recurrence"];
 
+export type AnnualWheelTemplateComparable = {
+  title: string;
+  description: string;
+  suggested_responsible_user_id: string | null;
+  deadline_anchor: "start" | "end";
+  deadline_offset_days: number | null;
+  sort_order: number;
+};
+
+export type AnnualWheelTemplateSyncDecision =
+  | "copy"
+  | "unchanged"
+  | "manual_review";
+
 export const annualWheelPriorityLabels: Record<AnnualWheelPriority, string> = {
   low: "Lav",
   medium: "Normal",
@@ -125,4 +139,54 @@ export function canEditAnnualWheelEvent(
   return committeeId
     ? editableCommitteeIds.includes(committeeId)
     : canEditOrganization;
+}
+
+function annualWheelTemplateSignature(template: AnnualWheelTemplateComparable) {
+  return JSON.stringify([
+    template.title,
+    template.description,
+    template.suggested_responsible_user_id,
+    template.deadline_anchor,
+    template.deadline_offset_days,
+    template.sort_order,
+  ]);
+}
+
+export function annualWheelTemplateSyncDecision(
+  source: readonly AnnualWheelTemplateComparable[],
+  target: readonly AnnualWheelTemplateComparable[],
+): AnnualWheelTemplateSyncDecision {
+  if (source.length === 0) return "unchanged";
+  if (target.length === 0) return "copy";
+  if (source.length !== target.length) return "manual_review";
+
+  const sourceSignatures = source.map(annualWheelTemplateSignature).sort();
+  const targetSignatures = target.map(annualWheelTemplateSignature).sort();
+  return sourceSignatures.every(
+    (signature, index) => signature === targetSignatures[index],
+  )
+    ? "unchanged"
+    : "manual_review";
+}
+
+export function buildAnnualWheelTemplateCopies(
+  source: readonly AnnualWheelTemplateComparable[],
+  target: {
+    organizationId: string;
+    eventId: string;
+    userId: string;
+  },
+) {
+  return source.map((template) => ({
+    organization_id: target.organizationId,
+    annual_wheel_event_id: target.eventId,
+    title: template.title,
+    description: template.description,
+    suggested_responsible_user_id: template.suggested_responsible_user_id,
+    deadline_anchor: template.deadline_anchor,
+    deadline_offset_days: template.deadline_offset_days,
+    sort_order: template.sort_order,
+    created_by: target.userId,
+    updated_by: target.userId,
+  }));
 }

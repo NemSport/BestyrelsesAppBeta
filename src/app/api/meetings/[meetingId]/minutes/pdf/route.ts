@@ -18,6 +18,7 @@ export async function GET(
     const meetingId = (await params).meetingId;
     const organizationId = searchParams.get("organizationId") ?? "";
     const committeeId = searchParams.get("committeeId") ?? "";
+    const includeAttachments = searchParams.get("includeAttachments") === "1";
     const db = await createClient();
     const service = new MeetingMinutesService(db);
     const data = await service.getApprovedPdfData(
@@ -31,9 +32,11 @@ export async function GET(
       data.organization.name,
     );
     const [attachmentsForPdf, transferredHistories] = await Promise.all([
-      service.getPdfAttachments(organizationId, committeeId, meetingId, {
-        includeMeetingAttachments: true,
-      }),
+      includeAttachments
+        ? service.getPdfAttachments(organizationId, committeeId, meetingId, {
+            includeMeetingAttachments: true,
+          })
+        : Promise.resolve([]),
       new TransferredAgendaItemService(db).listPdfHistoryForMeeting(
         organizationId,
         committeeId,
@@ -60,7 +63,9 @@ export async function GET(
       attachmentsForPdf,
       transferredHistories,
     });
-    const fileName = `referat-${formatDanishDateKey(data.meeting.starts_at)}.pdf`;
+    const fileName = `referat-${formatDanishDateKey(data.meeting.starts_at)}${
+      includeAttachments ? "-med-bilag" : ""
+    }.pdf`;
 
     return new NextResponse(Buffer.from(pdf), {
       headers: {

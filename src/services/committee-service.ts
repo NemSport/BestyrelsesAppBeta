@@ -12,8 +12,15 @@ import { MeetingRepository } from "@/repositories/meeting-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { TaskRepository } from "@/repositories/task-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
+import { AnnualWheelRepository } from "@/repositories/annual-wheel-repository";
+import { DocumentRepository } from "@/repositories/document-repository";
 import type { Database } from "@/types/database";
-import type { CommitteeOverview } from "@/types/domain";
+import type {
+  CommitteeOverview,
+  CommitteeDirectoryEntry,
+  CommitteeWorkspace,
+  CommitteeWorkspaceActivity,
+} from "@/types/domain";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 
@@ -24,6 +31,8 @@ export class CommitteeService {
   private readonly decisions: DecisionRepository;
   private readonly tasks: TaskRepository;
   private readonly organizationMembers: OrganizationMemberRepository;
+  private readonly annualWheel: AnnualWheelRepository;
+  private readonly documents: DocumentRepository;
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
@@ -34,14 +43,237 @@ export class CommitteeService {
     this.decisions = new DecisionRepository(db);
     this.tasks = new TaskRepository(db);
     this.organizationMembers = new OrganizationMemberRepository(db);
+    this.annualWheel = new AnnualWheelRepository(db);
+    this.documents = new DocumentRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
+  }
+
+  async getWorkspace(
+    organizationId: string,
+    committeeId: string,
+  ): Promise<CommitteeWorkspace> {
+    const user = await this.auth.requireUser();
+    const context = await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const [
+      upcomingMeetings,
+      recentMeetings,
+      activeTasks,
+      recentTasks,
+      recentDecisions,
+      upcomingActivities,
+      recentDocuments,
+      organizationMembers,
+    ] = await Promise.all([
+      this.meetings.listWorkspaceMeetings(
+        organizationId,
+        committeeId,
+        now.toISOString(),
+      ),
+      this.meetings.listRecentWorkspaceMeetings(organizationId, committeeId),
+      this.tasks.listWorkspaceOpen(organizationId, committeeId),
+      this.tasks.listWorkspaceRecent(organizationId, committeeId),
+      this.decisions.listWorkspaceRecent(organizationId, committeeId),
+      this.annualWheel.listWorkspaceUpcoming(
+        organizationId,
+        committeeId,
+        today,
+      ),
+      this.documents.listWorkspaceRecent(organizationId, committeeId),
+      this.organizationMembers.listMembers(organizationId),
+    ]);
+
+    const [versions, uploaders] = await Promise.all([
+      this.documents.listVersions(
+        recentDocuments.map((document) => document.id),
+      ),
+      this.documents.listProfiles(
+        recentDocuments.map((document) => document.uploaded_by),
+      ),
+    ]);
+    const uploaderNames = new Map(
+      uploaders.map((profile) => [profile.id, profile.full_name]),
+    );
+    const documentItems = recentDocuments.map((document) => {
+      const version = versions.find(
+        (candidate) =>
+          candidate.document_id === document.id &&
+          candidate.version_number === document.current_version_number,
+      );
+      return {
+        id: document.id,
+        name: document.name,
+        updatedAt: document.updated_at,
+        fileName: version?.file_name ?? null,
+        mimeType: version?.mime_type ?? null,
+        uploaderName:
+          uploaderNames.get(document.uploaded_by) || "Ukendt bruger",
+      };
+    });
+    const root = `/organizations/${organizationId}`;
+    const activity: CommitteeWorkspaceActivity[] = [
+      ...recentMeetings.map((meeting) => ({
+        id: `meeting:${meeting.id}`,
+        kind: "meeting" as const,
+        title: meeting.title,
+        detail:
+          new Date(meeting.starts_at).getTime() < now.getTime()
+            ? "Møde afholdt eller opdateret"
+            : "Møde oprettet eller opdateret",
+        occurredAt: meeting.updated_at,
+        href: `${root}/committees/${committeeId}/meetings/${meeting.id}`,
+      })),
+      ...recentTasks.map((task) => ({
+        id: `task:${task.id}`,
+        kind: "task" as const,
+        title: task.title,
+        detail:
+          task.status === "completed"
+            ? "Opgave gennemført"
+            : "Opgave opdateret",
+        occurredAt: task.updated_at,
+        href: `${root}/tasks?scope=all&committee=${committeeId}&editTask=${task.id}#task-${task.id}`,
+      })),
+      ...recentDecisions.map((decision) => ({
+        id: `decision:${decision.id}`,
+        kind: "decision" as const,
+        title: decision.title,
+        detail: "Beslutning registreret eller opdateret",
+        occurredAt: decision.updated_at,
+        href: `${root}/decisions#decision-${decision.id}`,
+      })),
+      ...documentItems.map((document) => ({
+        id: `document:${document.id}`,
+        kind: "document" as const,
+        title: document.name,
+        detail: "Dokument uploadet eller opdateret",
+        occurredAt: document.updatedAt,
+        href: `${root}/documents/${document.id}`,
+      })),
+      ...upcomingActivities.map((event) => ({
+        id: `activity:${event.id}`,
+        kind: "activity" as const,
+        title: event.title,
+        detail: "Aktivitet oprettet eller opdateret",
+        occurredAt: event.updated_at,
+        href: `${root}/committees/${committeeId}/annual-wheel?event=${event.id}`,
+      })),
+    ]
+      .sort(
+        (left, right) =>
+          Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
+      )
+      .slice(0, 8);
+
+    return {
+      committee: context.committee,
+      members: organizationMembers.flatMap((member) => {
+        const membership = member.committees.find(
+          (committee) => committee.id === committeeId,
+        );
+        return membership
+          ? [
+              {
+                userId: member.user_id,
+                name: member.full_name || member.email,
+                email: member.email,
+                role: membership.role,
+              },
+            ]
+          : [];
+      }),
+      nextMeeting: upcomingMeetings[0] ?? null,
+      activeTasks,
+      upcomingActivities,
+      recentDocuments: documentItems,
+      recentActivity: activity,
+    };
   }
 
   async list(organizationId: string) {
     const user = await this.auth.requireUser();
     await this.authorization.requireOrganizationMember(organizationId, user.id);
     return this.committees.listByOrganization(organizationId);
+  }
+
+  async listDirectory(
+    organizationId: string,
+  ): Promise<CommitteeDirectoryEntry[]> {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationMember(organizationId, user.id);
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const today = nowIso.slice(0, 10);
+    const [committees, meetings, tasks, activities, organizationMembers] =
+      await Promise.all([
+        this.committees.listByOrganization(organizationId),
+        this.meetings.listByOrganization(organizationId),
+        this.tasks.listByOrganization(organizationId),
+        this.annualWheel.listCommitteeDirectoryUpcoming(organizationId, today),
+        this.organizationMembers.listMembers(organizationId),
+      ]);
+
+    return committees.map((committee) => {
+      const upcomingMeetings = meetings
+        .filter(
+          (meeting) =>
+            meeting.committee_id === committee.id &&
+            meeting.status !== "cancelled" &&
+            meeting.starts_at >= nowIso,
+        )
+        .sort((left, right) => left.starts_at.localeCompare(right.starts_at));
+      const activeTasks = tasks.filter(
+        (task) =>
+          task.committee_id === committee.id &&
+          !task.archived_at &&
+          task.status !== "completed" &&
+          task.status !== "cancelled",
+      );
+      const nextActivity = activities.find(
+        (activity) => activity.committee_id === committee.id,
+      );
+
+      return {
+        committee,
+        members: organizationMembers.flatMap((member) => {
+          if (member.status !== "active") return [];
+          const membership = member.committees.find(
+            (candidate) => candidate.id === committee.id,
+          );
+          return membership
+            ? [
+                {
+                  userId: member.user_id,
+                  name: member.full_name || member.email,
+                  email: member.email,
+                  role: membership.role,
+                },
+              ]
+            : [];
+        }),
+        activeTaskCount: activeTasks.length,
+        overdueTaskCount: activeTasks.filter(
+          (task) => task.deadline && task.deadline < today,
+        ).length,
+        upcomingMeetingCount: upcomingMeetings.length,
+        nextMeeting: upcomingMeetings[0] ?? null,
+        nextActivity: nextActivity
+          ? {
+              id: nextActivity.id,
+              title: nextActivity.title,
+              starts_on: nextActivity.starts_on,
+              ends_on: nextActivity.ends_on,
+            }
+          : null,
+      };
+    });
   }
 
   async create(input: unknown) {

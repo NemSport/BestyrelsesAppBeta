@@ -1,14 +1,17 @@
 import type { MeetingCapabilities } from "@/lib/meeting-capabilities";
+import type { Database } from "@/types/database";
 import type { MeetingWithAgendaPreview } from "@/types/domain";
 
 export type MeetingListPeriod = "upcoming" | "previous" | "cancelled";
 export type MeetingListStatus = MeetingWithAgendaPreview["status"];
 
 export type MeetingListFilters = {
+  committeeId: string;
   date: string;
   period: MeetingListPeriod | "";
   status: MeetingListStatus | "";
 };
+type MinutesStatus = Database["public"]["Enums"]["meeting_minutes_status"];
 
 const meetingStatuses = new Set<MeetingListStatus>([
   "draft",
@@ -29,10 +32,12 @@ function meetingListDateKey(value: string) {
 }
 
 export function parseMeetingListFilters(input: {
+  committee?: string;
   date?: string;
   period?: string;
   status?: string;
 }): MeetingListFilters {
+  const committeeId = input.committee?.trim() ?? "";
   const date =
     input.date && /^\d{4}-\d{2}-\d{2}$/.test(input.date) ? input.date : "";
   const period = ["upcoming", "previous", "cancelled"].includes(
@@ -45,7 +50,7 @@ export function parseMeetingListFilters(input: {
       ? (input.status as MeetingListStatus)
       : "";
 
-  return { date, period, status };
+  return { committeeId, date, period, status };
 }
 
 export function getMeetingListPeriod(
@@ -63,10 +68,12 @@ export function getMeetingListPeriod(
   return "upcoming";
 }
 
-export function sortMeetingList<T extends Pick<
-  MeetingWithAgendaPreview,
-  "created_at" | "starts_at" | "status"
->>(meetings: T[], period: MeetingListPeriod) {
+export function sortMeetingList<
+  T extends Pick<
+    MeetingWithAgendaPreview,
+    "created_at" | "starts_at" | "status"
+  >,
+>(meetings: T[], period: MeetingListPeriod) {
   const direction = period === "upcoming" ? 1 : -1;
   return [...meetings].sort((left, right) => {
     const byStart =
@@ -82,16 +89,15 @@ export function sortMeetingList<T extends Pick<
   });
 }
 
-export function filterMeetingList<T extends Pick<
-  MeetingWithAgendaPreview,
-  "starts_at" | "status"
->>(
-  meetings: T[],
-  filters: MeetingListFilters,
-  now: number,
-) {
+export function filterMeetingList<
+  T extends Pick<
+    MeetingWithAgendaPreview,
+    "committee_id" | "starts_at" | "status"
+  >,
+>(meetings: T[], filters: MeetingListFilters, now: number) {
   return meetings.filter(
     (meeting) =>
+      (!filters.committeeId || meeting.committee_id === filters.committeeId) &&
       (!filters.date ||
         meetingListDateKey(meeting.starts_at) === filters.date) &&
       (!filters.period ||
@@ -100,10 +106,12 @@ export function filterMeetingList<T extends Pick<
   );
 }
 
-export function groupMeetingList<T extends Pick<
-  MeetingWithAgendaPreview,
-  "created_at" | "starts_at" | "status"
->>(meetings: T[], now: number) {
+export function groupMeetingList<
+  T extends Pick<
+    MeetingWithAgendaPreview,
+    "created_at" | "starts_at" | "status"
+  >,
+>(meetings: T[], now: number) {
   const upcoming = meetings.filter(
     (meeting) => getMeetingListPeriod(meeting, now) === "upcoming",
   );
@@ -127,17 +135,18 @@ export function getMeetingListAction(
     MeetingCapabilities,
     "editOfficialMinutes" | "updateMeeting"
   >,
+  minutesStatus: MinutesStatus | null = null,
 ) {
-  if (
-    capabilities.updateMeeting &&
-    (status === "draft" || status === "scheduled")
-  ) {
-    return { destination: "edit", label: "Redigér møde" } as const;
+  if (status === "draft" || status === "scheduled") {
+    return { destination: "meeting", label: "Åbn dagsorden" } as const;
   }
   if (capabilities.editOfficialMinutes && status === "in_progress") {
-    return { destination: "minutes", label: "Før referat" } as const;
+    return { destination: "minutes", label: "Fortsæt møde" } as const;
   }
   if (status === "completed") {
+    if (capabilities.editOfficialMinutes && minutesStatus === "draft") {
+      return { destination: "minutes", label: "Færdiggør referat" } as const;
+    }
     return { destination: "minutes", label: "Se referat" } as const;
   }
   return { destination: "meeting", label: "Åbn møde" } as const;

@@ -1,4 +1,5 @@
 import { agendaItemTransferReasonLabels } from "@/lib/localization";
+import { formatDanishDate } from "@/lib/date-format";
 import { formatPdfDate } from "@/lib/pdf-report";
 import type { PdfProseBlock } from "@/lib/pdf-report";
 import { richTextToPdfBlocks, richTextToPlainText } from "@/lib/rich-text";
@@ -32,6 +33,45 @@ type MeetingDocumentReport = {
   addParagraph: (text: string) => void;
   addProse: (blocks: PdfProseBlock[], emptyText?: string) => void;
 };
+
+function normalizedSectionLine(value: string) {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("da-DK");
+}
+
+export function removeDuplicatePdfSectionLabel(
+  label: string,
+  blocks: PdfProseBlock[],
+) {
+  const [first, ...rest] = blocks;
+  if (!first) return blocks;
+
+  const lineEnd = first.text.indexOf("\n");
+  const firstLine = lineEnd === -1 ? first.text : first.text.slice(0, lineEnd);
+  if (normalizedSectionLine(firstLine) !== normalizedSectionLine(label)) {
+    return blocks;
+  }
+  if (lineEnd === -1) return rest;
+
+  let contentStart = lineEnd + 1;
+  while (/\s/u.test(first.text[contentStart] ?? "")) contentStart += 1;
+  if (contentStart >= first.text.length) return rest;
+
+  let remaining = contentStart;
+  const runs = first.runs?.flatMap((run) => {
+    if (remaining >= run.text.length) {
+      remaining -= run.text.length;
+      return [];
+    }
+    const text = run.text.slice(remaining);
+    remaining = 0;
+    return text ? [{ ...run, text }] : [];
+  });
+  return [{ ...first, text: first.text.slice(contentStart), runs }, ...rest];
+}
 
 export function addTransferredAgendaItemHistory(
   report: MeetingDocumentReport,
@@ -75,5 +115,19 @@ export function addTransferredAgendaItemHistory(
       );
     }
   }
+  report.endInformationBox();
+}
+
+export function addTransferredAgendaItemSummary(
+  report: MeetingDocumentReport,
+  history: PdfTransferredAgendaItemHistory,
+) {
+  report.beginInformationBox("Overført punkt");
+  report.addSubsection("Overført fra");
+  report.addParagraph(
+    `${history.sourceMeetingTitle} (${formatDanishDate(history.sourceMeetingDate, "short")})`,
+  );
+  report.addSubsection("Årsag");
+  report.addParagraph(agendaItemTransferReasonLabels[history.transferReason]);
   report.endInformationBox();
 }

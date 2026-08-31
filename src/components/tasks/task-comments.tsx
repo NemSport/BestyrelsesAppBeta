@@ -13,9 +13,11 @@ function formatCommentTime(value: string) {
 }
 
 export function TaskComments({
+  canComment = true,
   organizationId,
   taskId,
 }: {
+  canComment?: boolean;
   organizationId: string;
   taskId: string;
 }) {
@@ -115,28 +117,30 @@ export function TaskComments({
         </p>
       ) : null}
 
-      <div className="space-y-2">
-        <label className="label" htmlFor={`task-comment-${taskId}`}>
-          Ny kommentar
-        </label>
-        <Textarea
-          className="min-h-16"
-          id={`task-comment-${taskId}`}
-          maxLength={5000}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Skriv en kort opdatering..."
-          value={body}
-        />
-        <div className="flex justify-end">
-          <Button
-            disabled={saving || !body.trim()}
-            onClick={() => void addComment()}
-            size="sm"
-          >
-            {saving ? "Gemmer..." : "Tilføj kommentar"}
-          </Button>
+      {canComment ? (
+        <div className="space-y-2">
+          <label className="label" htmlFor={`task-comment-${taskId}`}>
+            Ny kommentar
+          </label>
+          <Textarea
+            className="min-h-16"
+            id={`task-comment-${taskId}`}
+            maxLength={5000}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Skriv en kort opdatering..."
+            value={body}
+          />
+          <div className="flex justify-end">
+            <Button
+              disabled={saving || !body.trim()}
+              onClick={() => void addComment()}
+              size="sm"
+            >
+              {saving ? "Gemmer..." : "Tilføj kommentar"}
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {loading ? (
         <p aria-live="polite" className="text-sm text-muted" role="status">
@@ -169,18 +173,24 @@ export function TaskComments({
       ) : (
         <EmptyState
           action={
-            <Button
-              onClick={() =>
-                document.getElementById(`task-comment-${taskId}`)?.focus()
-              }
-              size="sm"
-              variant="secondary"
-            >
-              Skriv første kommentar
-            </Button>
+            canComment ? (
+              <Button
+                onClick={() =>
+                  document.getElementById(`task-comment-${taskId}`)?.focus()
+                }
+                size="sm"
+                variant="secondary"
+              >
+                Skriv første kommentar
+              </Button>
+            ) : undefined
           }
           compact
-          description="Tilføj en kommentar, når der er nyt om opgaven."
+          description={
+            canComment
+              ? "Tilføj en kommentar, når der er nyt om opgaven."
+              : "Der er ingen kommentarer at vise."
+          }
           title="Der er endnu ingen kommentarer."
         />
       )}
