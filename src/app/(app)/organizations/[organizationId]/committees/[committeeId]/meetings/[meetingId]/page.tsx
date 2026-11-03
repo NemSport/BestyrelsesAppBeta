@@ -10,6 +10,7 @@ import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-he
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
+import { ContinueAgendaItemsButton } from "@/components/meetings/continue-agenda-items-button";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import { Dropdown, StatusBadge } from "@/components/ui";
 import {
@@ -525,6 +526,10 @@ export default async function MeetingPage({
       />
 
       <section aria-label="Referat workspace" className="mt-1">
+        {meetingCapabilities.manageTransferredAgendaItems &&
+        ["draft", "scheduled", "in_progress"].includes(meeting.status) ? (
+          <ContinueAgendaItemsButton meetingId={meetingId} />
+        ) : null}
         <MeetingMinutesSection
           agendaAction={
             meetingCapabilities.scheduleAgendaItem ? (

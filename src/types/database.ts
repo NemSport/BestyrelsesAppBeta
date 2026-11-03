@@ -1651,6 +1651,10 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["agenda_item_occurrences"]["Row"];
       };
+      continue_agenda_items_on_meeting: {
+        Args: { target_meeting_id: string };
+        Returns: number;
+      };
       schedule_transferred_agenda_item: {
         Args: {
           target_transfer_id: string;

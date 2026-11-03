@@ -186,4 +186,15 @@ export class TransferredAgendaItemRepository {
     if (error) throw error;
     return data as TransferredAgendaItem;
   }
+
+  async continueOnMeeting(meetingId: string) {
+    const { data, error } = await this.db.rpc(
+      "continue_agenda_items_on_meeting",
+      {
+        target_meeting_id: meetingId,
+      },
+    );
+    if (error) throw error;
+    return data;
+  }
 }

@@ -265,6 +265,19 @@ export class TransferredAgendaItemService {
     });
   }
 
+  async continueOnMeeting(meetingId: string) {
+    const user = await this.auth.requireUser();
+    const meeting = await this.meetings.findWithAgenda(meetingId);
+    if (!meeting) throw new NotFoundError("Mødet");
+    await this.authorization.requireMeetingCapability(
+      meeting.organization_id,
+      meeting.committee_id,
+      user.id,
+      "manageTransferredAgendaItems",
+    );
+    return this.transfers.continueOnMeeting(meetingId);
+  }
+
   async schedule(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = scheduleTransferredAgendaItemSchema.parse(input);

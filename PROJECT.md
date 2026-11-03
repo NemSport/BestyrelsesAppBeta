@@ -1,5 +1,14 @@
 # AI Committee Assistant
 
+## Next-meeting continuation fix
+
+Saving “Fortsættes næste møde” schedules the discussion on its next active
+meeting when available. Otherwise ordinary meeting creation picks up the
+pending continuation atomically with its standard agenda. Existing meetings
+offer “Hent punkter fra forrige møde” to recover older pending continuations.
+Other transfer reasons remain manual. Already scheduled or dismissed transfers
+are not imported again, and historical minutes remain linked to the source.
+
 ## Product Principle
 
 > Help committees remember decisions and execute actions.
