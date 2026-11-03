@@ -69,12 +69,9 @@ export const agendaItemMinutesStatusOptions: Record<
 };
 
 /**
- * Stable preparation contract for Codex 5.
- *
- * These rules only describe when a completed meeting may suggest carrying an
- * agenda item into the next meeting. They do not create, schedule, or mutate
- * agenda items. Codex 5 must still require an explicit user confirmation
- * before applying a suggestion.
+ * Rules for transfer intents created when point minutes are saved.
+ * This helper is pure. The database schedules an explicit discussion_continue
+ * on the next meeting; other rules retain the manual transfer workflow.
  *
  * D + Fortsættes næste møde -> D
  * D + Kræver beslutning -> B

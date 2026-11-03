@@ -2338,6 +2338,24 @@ and pay for the service.
 **Success criterion:** The system supports complex organizations while
 preserving reliable committee memory, accountability, and tenant isolation.
 
+## Next-meeting Discussion Continuation
+
+`continue_agenda_items_on_meeting` requires an authenticated Committee manager,
+filters pending `discussion_continue` transfers against current source minutes,
+active source records, and the chronological next meeting in the same
+Organization and Committee. It uses `schedule_transferred_agenda_item` for
+atomic creation and linked history. Transfer row locks and the existing
+scheduled-state guard prevent duplicates. Completed targets are not mutated.
+Ordinary meeting creation invokes it in the standard-agenda transaction; an
+after-insert transfer trigger handles a continuation saved after the next
+meeting exists. Quick meeting creation retains its no-agenda contract.
+
+For older meetings, explicit POST to
+`/api/meetings/[meetingId]/continue-agenda-items` repeats the service-level
+`manageTransferredAgendaItems` check before calling the same RPC. Page reads
+do not mutate records. Other transfer reasons remain manual, and no private
+notes or historical minutes are copied into the new point.
+
 # Issue 13 Presentation-state Boundary
 
 The shared empty-state component models `empty`, `filtered`, `read-only`, and
