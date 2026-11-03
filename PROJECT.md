@@ -11,6 +11,13 @@ are not imported again, and historical minutes remain linked to the source.
 
 ## Product Principle
 
+The meeting workspace distinguishes meeting and minutes status, discloses
+participant details on demand, and shows agenda completion with an unfinished
+filter. Point actions name their outcome explicitly. Saved transfer records
+show the actual target meeting; prior treatment is a read-only excerpt linked
+to the source. Before approval, managers can review saved continuations and
+open tasks missing an owner or deadline through the existing editors.
+
 > Help committees remember decisions and execute actions.
 
 The product is designed primarily for associations, sports clubs, volunteer

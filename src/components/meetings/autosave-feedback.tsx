@@ -9,10 +9,10 @@ import type {
 const statusLabels: Record<AutosaveStatus, string> = {
   idle: "",
   saving: "Gemmer…",
-  saved: "Autogemt",
+  saved: "Alle ændringer i feltet er gemt",
   error: "Kunne ikke gemme",
-  offline: "Offline – gemmes lokalt",
-  pending: "Afventer synkronisering",
+  offline: "Offline – afventer forbindelse",
+  pending: "Ændringer afventer gemning",
   conflict: "Konflikt kræver handling",
 };
 
@@ -21,7 +21,7 @@ export function AutosaveStatusLine({
   errorMessage,
   onRetry,
   lastSavedAt,
-  savedLabel = "Autogemt",
+  savedLabel = "Alle ændringer i feltet er gemt",
 }: {
   status: AutosaveStatus;
   errorMessage: string | null;

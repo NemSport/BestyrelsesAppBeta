@@ -571,6 +571,7 @@ export default async function MeetingPage({
           decisionHistoryByAgendaItem={decisionContext.historyByAgendaItem}
           initialAgendaItemMinutes={minutes.agendaItemMinutes}
           initialMeetingMinutes={minutes.meetingMinutes}
+          outgoingTransfers={transferredAgendaItems.items}
           incomingTransfers={transferredAgendaItems.incomingItems}
           meetingAttachments={minutes.meetingAttachments}
           privateMeetingNote={minutes.privateMeetingNote}

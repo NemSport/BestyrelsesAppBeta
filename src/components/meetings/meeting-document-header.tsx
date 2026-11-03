@@ -81,13 +81,14 @@ export function MeetingDocumentHeader({
               {meeting.title}
             </h1>
             <StatusBadge tone={meetingStatusTones[meeting.status]}>
-              {meetingStatusLabels[meeting.status]}
+              Møde: {meetingStatusLabels[meeting.status]}
             </StatusBadge>
             <StatusBadge
               tone={
                 minutesStatus ? minutesStatusTones[minutesStatus] : "neutral"
               }
             >
+              Referat:{" "}
               {minutesStatus
                 ? meetingMinutesStatusLabels[minutesStatus]
                 : "Ikke påbegyndt"}
@@ -120,35 +121,40 @@ export function MeetingDocumentHeader({
             ) : null}
           </div>
           {participantSummary ? (
-            <div
-              className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 xl:ml-2 xl:inline-flex xl:align-middle"
+            <details
+              className="mt-0.5 min-w-0 flex-wrap items-center gap-1.5 xl:ml-2 xl:inline-flex xl:align-middle"
               id="meeting-participants-heading"
               tabIndex={-1}
             >
-              {visibleParticipantNames.map((name, index) => (
-                <span
-                  aria-label={name}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-brand/15 bg-brand-soft text-[0.68rem] font-bold text-brand shadow-sm"
-                  key={`${name}-${index}`}
-                  title={name}
-                >
-                  {initials(name)}
+              <summary className="cursor-pointer text-xs font-semibold text-brand">
+                Deltagere · {participantSummary.registeredCount}
+              </summary>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {visibleParticipantNames.map((name, index) => (
+                  <span
+                    aria-label={name}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-brand/15 bg-brand-soft text-[0.68rem] font-bold text-brand shadow-sm"
+                    key={`${name}-${index}`}
+                    title={name}
+                  >
+                    {initials(name)}
+                  </span>
+                ))}
+                {hiddenParticipantCount > 0 ? (
+                  <span
+                    aria-label={`${hiddenParticipantCount} yderligere deltagere`}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-subtle text-[0.68rem] font-bold text-muted"
+                    title={`${hiddenParticipantCount} yderligere deltagere`}
+                  >
+                    +{hiddenParticipantCount}
+                  </span>
+                ) : null}
+                <span className="text-xs text-muted">
+                  {participantCountLabel}
                 </span>
-              ))}
-              {hiddenParticipantCount > 0 ? (
-                <span
-                  aria-label={`${hiddenParticipantCount} yderligere deltagere`}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-subtle text-[0.68rem] font-bold text-muted"
-                  title={`${hiddenParticipantCount} yderligere deltagere`}
-                >
-                  +{hiddenParticipantCount}
-                </span>
-              ) : null}
-              <span className="text-xs text-muted">
-                {participantCountLabel}
-              </span>
-              {participantSummary.action}
-            </div>
+                {participantSummary.action}
+              </div>
+            </details>
           ) : null}
         </div>
         <div className="meeting-header-action-zone flex min-w-0 flex-wrap items-center gap-1.5 xl:justify-self-stretch">

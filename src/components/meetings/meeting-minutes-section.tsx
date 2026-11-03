@@ -85,6 +85,7 @@ import type {
   MinuteAttachmentView,
   PreviousMeetingMinutesReference,
   TaskView,
+  TransferredAgendaItemView,
 } from "@/types/domain";
 import type {
   MeetingDocumentContext,
@@ -701,6 +702,7 @@ function AgendaMinutesCard({
   decisionHistory,
   minutesStatus,
   incomingTransfers = [],
+  outgoingTransfers = [],
   meetingTitle = "Aktuelt møde",
   isActive = false,
   historyMetadata = null,
@@ -741,6 +743,7 @@ function AgendaMinutesCard({
     decisions: DecisionView[];
   };
   incomingTransfers?: IncomingTransferredAgendaItemView[];
+  outgoingTransfers?: TransferredAgendaItemView[];
   meetingTitle?: string;
   isActive?: boolean;
   historyMetadata?: AgendaItemHistoryMetadata | null;
@@ -750,6 +753,11 @@ function AgendaMinutesCard({
   const router = useRouter();
   const item = occurrence.agenda_items!;
   const itemType = item.item_type;
+  const outgoingTransfer = outgoingTransfers.find(
+    (transfer) =>
+      transfer.source_agenda_item_id === item.id &&
+      transfer.status !== "dismissed",
+  );
   const [minutes, setMinutes] = useState(initialMinutes);
   const [notes, setNotes] = useState(initialMinutes?.notes ?? "");
   const [decision, setDecision] = useState(initialMinutes?.decision ?? "");
@@ -1222,7 +1230,11 @@ function AgendaMinutesCard({
               type="button"
             >
               <AppIcon aria-hidden="true" name="preparation" size={14} />
-              {markingCompleted ? "Markerer…" : "Markér som behandlet"}
+              {markingCompleted
+                ? "Markerer…"
+                : itemType === "decision"
+                  ? "Godkend beslutning"
+                  : "Afslut punkt"}
             </button>
           ) : null}
           {minutes?.updated_at ? (
@@ -1269,6 +1281,27 @@ function AgendaMinutesCard({
         </div>
       </header>
 
+      {incomingTransfer?.sourceMeeting ? (
+        <div className="border-b border-line bg-subtle/30 px-4 py-3">
+          <button
+            type="button"
+            className="text-sm font-semibold text-brand underline"
+            onClick={() => setSourceModalOpen(true)}
+          >
+            Sidst drøftet {formatDate(incomingTransfer.sourceMeeting.starts_at)}{" "}
+            · Læs tidligere referat
+          </button>
+          {incomingTransfer.sourceMinutes ? (
+            <p className="mt-1 line-clamp-3 text-sm text-muted">
+              {firstRichTextToPlainText(
+                incomingTransfer.sourceMinutes.decision,
+                incomingTransfer.sourceMinutes.notes,
+                incomingTransfer.sourceMinutes.follow_up,
+              )}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {incomingTransfer ? (
         <Modal
           description={
@@ -1601,6 +1634,58 @@ function AgendaMinutesCard({
               </div>
               <div className="space-y-2 rounded-[var(--radius-control)] bg-subtle/25 px-2 py-1.5">
                 <div className="flex flex-wrap items-center gap-2">
+                  {itemType === "discussion" ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setStatus("discussion_continue");
+                        setActiveActionPanel("followUp");
+                      }}
+                    >
+                      Fortsæt næste møde
+                    </Button>
+                  ) : null}
+                  {canEditTasks ? (
+                    <TaskCreateModal
+                      agendaItems={[{ id: item.id, title: item.title }]}
+                      categorySource={taskCategorySource}
+                      committeeId={committeeId}
+                      decisions={relatedDecisions}
+                      initialAgendaItemId={item.id}
+                      initialDeadline={minutes?.deadline ?? ""}
+                      initialDescription={firstRichTextToPlainText(
+                        minutes?.follow_up,
+                        minutes?.notes,
+                        minutes?.decision,
+                      )}
+                      initialMeetingId={meetingId}
+                      initialResponsibleUserId={
+                        minutes?.responsible_user_id ?? ""
+                      }
+                      initialTitle={item.title}
+                      instanceId={`agenda-task-primary-${item.id}`}
+                      meetings={[
+                        {
+                          id: meetingId,
+                          title: "Aktuelt møde",
+                          starts_at: meetingDate,
+                        },
+                      ]}
+                      organizationId={organizationId}
+                      responsiblePeople={responsiblePeople}
+                      sourceLabel="punktreferatet"
+                      trigger={(open) => (
+                        <button
+                          className="inline-flex min-h-8 items-center rounded-[var(--radius-control)] border border-brand/20 bg-surface px-2.5 py-1 text-xs font-semibold text-brand transition hover:border-brand/40 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+                          onClick={open}
+                          type="button"
+                        >
+                          Opret opgave
+                        </button>
+                      )}
+                    />
+                  ) : null}
                   <button
                     aria-expanded={activeActionPanel === "followUp"}
                     aria-label={
@@ -1621,7 +1706,7 @@ function AgendaMinutesCard({
                     onClick={() => toggleActionPanel("followUp")}
                     type="button"
                   >
-                    + Opfølgning
+                    Opfølgningsnote
                     {shouldHighlightFollowUp ? (
                       <span className="ml-2 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide">
                         anbefalet
@@ -1648,7 +1733,23 @@ function AgendaMinutesCard({
                   </p>
                 ) : shouldConfirmFollowUp ? (
                   <p className="rounded-[var(--radius-control)] border border-success/20 bg-success/10 px-3 py-2 text-sm font-medium text-success">
-                    Opfølgning er registreret for dette punkt.
+                    {outgoingTransfer?.status === "scheduled" &&
+                    outgoingTransfer.targetMeeting ? (
+                      <>
+                        Punktet er tilføjet{" "}
+                        <Link
+                          className="underline"
+                          href={`${root}/meetings/${outgoingTransfer.targetMeeting.id}`}
+                        >
+                          {outgoingTransfer.targetMeeting.title}
+                        </Link>
+                        .
+                      </>
+                    ) : outgoingTransfer?.status === "pending" ? (
+                      "Punktet afventer overførsel til et kommende møde. Se Videreførelse under Læsning/godkendelse."
+                    ) : (
+                      "Opfølgningsnoten er registreret. En note opretter ikke i sig selv en opgave eller overfører punktet."
+                    )}
                   </p>
                 ) : null}
                 {activeActionPanel === "followUp" ? (
@@ -2924,6 +3025,7 @@ type MeetingMinutesSectionProps = Parameters<
   meetingTitle: string;
   privateMeetingNote: AgendaItemPrivateNote | null;
   reviewSupplement?: ReactNode;
+  outgoingTransfers?: TransferredAgendaItemView[];
 };
 
 function occurrenceIdFromHash(hash: string, occurrences: AgendaOccurrence[]) {
@@ -3008,6 +3110,7 @@ export function MeetingMinutesSection({
   decisionHistoryByAgendaItem,
   approvalRecipientInfo,
   reviewSupplement,
+  outgoingTransfers = [],
 }: MeetingMinutesSectionProps) {
   const [minutes, setMinutes] = useState(initialMeetingMinutes);
   const [meetingStatus, setMeetingStatus] = useState<MinutesStatus>(
@@ -3016,6 +3119,7 @@ export function MeetingMinutesSection({
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const [referentLock, setReferentLock] = useState(initialReferentLock);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [onlyUnfinished, setOnlyUnfinished] = useState(false);
   const [agendaItemStatusOverrides, setAgendaItemStatusOverrides] = useState<
     Record<string, AgendaMinutesStatus>
   >({});
@@ -3170,6 +3274,23 @@ export function MeetingMinutesSection({
     setWorkspaceMode("review");
   }
 
+  const completedCount = occurrences.filter((occurrence) =>
+    isCompletedAgendaStatus(
+      agendaItemStatusOverrides[occurrence.agenda_item_id] ??
+        initialAgendaItemMinutes.find(
+          (entry) => entry.agenda_item_id === occurrence.agenda_item_id,
+        )?.status ??
+        "not_started",
+    ),
+  ).length;
+  const tasksNeedingAttention = meetingTasks.filter(
+    (task) =>
+      !task.archived_at &&
+      task.status !== "completed" &&
+      task.status !== "cancelled" &&
+      (!task.responsible_user_id || !task.deadline),
+  );
+
   function renderAgendaChoice(
     occurrence: AgendaOccurrence,
     index: number,
@@ -3188,6 +3309,7 @@ export function MeetingMinutesSection({
     );
     const isActive = occurrence.id === activeOccurrence?.id;
     const isCompleted = isCompletedAgendaStatus(itemStatus);
+    if (onlyUnfinished && isCompleted) return null;
 
     return (
       <Link
@@ -3222,7 +3344,12 @@ export function MeetingMinutesSection({
               <span className="shrink-0 text-xs font-bold text-muted">
                 {index + 1}.
               </span>
-              <span className="rounded bg-subtle/50 px-1 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-muted/70">
+              <span
+                title={agendaItemTypeLabels[item.item_type].label}
+                tabIndex={0}
+                aria-label={agendaItemTypeLabels[item.item_type].label}
+                className="rounded bg-subtle/50 px-1 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-muted/70"
+              >
                 {agendaItemTypeLabels[item.item_type].short}
               </span>
             </span>
@@ -3330,6 +3457,30 @@ export function MeetingMinutesSection({
 
   return (
     <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm">
+        <span>
+          {completedCount} af {occurrences.length} punkter afsluttet
+        </span>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={onlyUnfinished}
+            onChange={(event) => setOnlyUnfinished(event.target.checked)}
+          />
+          Vis kun uafsluttede punkter
+        </label>
+        <details>
+          <summary className="cursor-pointer text-brand">
+            Punkttyper O / D / B / F
+          </summary>
+          <p>O: Orientering · D: Drøftelse · B: Beslutning · F: Opfølgning</p>
+        </details>
+        {onlyUnfinished && completedCount === occurrences.length ? (
+          <p className="w-full text-muted">
+            Alle punkter er afsluttet. Fjern filteret for at se dem.
+          </p>
+        ) : null}
+      </div>
       <span className="sr-only" id="general-minutes-heading" tabIndex={-1}>
         Dagsordenspunkter
       </span>
@@ -3446,7 +3597,8 @@ export function MeetingMinutesSection({
                           )}
                           relatedDocuments={documentContext.agendaItemDocuments.filter(
                             (document) =>
-                              document.agendaItemId === occurrence.agenda_item_id,
+                              document.agendaItemId ===
+                              occurrence.agenda_item_id,
                           )}
                           canEdit={canEditOfficialMinutes}
                           canUploadAttachment={canUploadAttachments}
@@ -3489,6 +3641,7 @@ export function MeetingMinutesSection({
                                 occurrence.agenda_item_id,
                             ) ?? null
                           }
+                          outgoingTransfers={outgoingTransfers}
                           incomingTransfers={incomingTransfers}
                           isActive={occurrence.id === activeOccurrence.id}
                           historyMetadata={
@@ -3604,6 +3757,64 @@ export function MeetingMinutesSection({
         </>
       ) : (
         <section aria-labelledby="minutes-review-heading">
+          {canEdit ? (
+            <section
+              className="mb-4 rounded-lg border border-line bg-surface p-4"
+              aria-label="Før referatet sendes"
+            >
+              <h2 className="font-bold">Før referatet sendes</h2>
+              <p className="mt-1 text-sm text-muted">
+                Kontrollér gemte opfølgninger, ansvarlige og frister. Åbn et
+                punkt eller en opgave for at rette det.
+              </p>
+              <p className="mt-2 text-sm">
+                {
+                  outgoingTransfers.filter(
+                    (transfer) => transfer.status !== "dismissed",
+                  ).length
+                }{" "}
+                punkter til videre behandling · {tasksNeedingAttention.length}{" "}
+                opgaver mangler ansvarlig eller frist
+              </p>
+              <ul className="my-3 space-y-2">
+                {outgoingTransfers
+                  .filter((transfer) => transfer.status !== "dismissed")
+                  .map((transfer) => (
+                    <li key={transfer.id} className="text-sm">
+                      <Link
+                        className="text-brand underline"
+                        href={
+                          "#agenda-point-" +
+                          transfer.source_agenda_item_occurrence_id
+                        }
+                        onClick={() => {
+                          setWorkspaceMode("editing");
+                          setOnlyUnfinished(false);
+                          if (transfer.source_agenda_item_occurrence_id)
+                            selectOccurrence(
+                              transfer.source_agenda_item_occurrence_id,
+                            );
+                        }}
+                      >
+                        {transfer.sourceAgendaItem.title}
+                      </Link>{" "}
+                      ·{" "}
+                      {transfer.targetMeeting
+                        ? "Planlagt: " + transfer.targetMeeting.title
+                        : "Afventer overførsel"}
+                    </li>
+                  ))}
+              </ul>
+              <RelatedTasks
+                tasks={tasksNeedingAttention}
+                organizationId={organizationId}
+                canEdit={canEditTasks}
+                responsiblePeople={responsiblePeople}
+                compact
+                openInModal
+              />
+            </section>
+          ) : null}
           <details className="group mb-3 rounded-[var(--radius-control)] border border-line bg-surface xl:hidden">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
               Dagsorden · {occurrences.length} punkter
@@ -3665,11 +3876,16 @@ export function MeetingMinutesSection({
                     ? "dagsordenspunkt"
                     : "dagsordenspunkter"}
                 </p>
-                {meetingAttachments.length + documentContext.meetingDocuments.length > 0 ? (
+                {meetingAttachments.length +
+                  documentContext.meetingDocuments.length >
+                0 ? (
                   <details className="group mt-2 text-sm">
                     <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 font-semibold text-brand hover:underline [&::-webkit-details-marker]:hidden">
                       <AppIcon name="attachments" size={14} />
-                      Mødebilag ({meetingAttachments.length + documentContext.meetingDocuments.length})
+                      Mødebilag (
+                      {meetingAttachments.length +
+                        documentContext.meetingDocuments.length}
+                      )
                     </summary>
                     <div className="mt-2 border-l-2 border-line pl-3">
                       <MinuteAttachments
@@ -3867,9 +4083,10 @@ export function MeetingMinutesSection({
             <aside className="xl:sticky xl:top-20">
               <MinutesApprovalPanel
                 attachmentCount={
-                  meetingAttachments.length + agendaItemAttachments.length
-                  + documentContext.meetingDocuments.length
-                  + documentContext.agendaItemDocuments.length
+                  meetingAttachments.length +
+                  agendaItemAttachments.length +
+                  documentContext.meetingDocuments.length +
+                  documentContext.agendaItemDocuments.length
                 }
                 approvalRecipientInfo={approvalRecipientInfo}
                 approvals={approvals}
