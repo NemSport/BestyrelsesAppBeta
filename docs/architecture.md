@@ -2,6 +2,14 @@
 
 ## Product Principle
 
+Meeting UX improvements use the existing authorized transfer and task read
+models. Outgoing transfer views are passed into point cards and the pre-send
+review; no client-inferred status claims a successful transfer. Agenda filters
+retain original numbering and do not change persisted ordering or unmount
+point editors. The review links to existing point/task editors and preserves
+their permission checks. Historical excerpts come only from public source
+minutes; private notes remain excluded. Autosave feedback stays field-scoped.
+
 > Help committees remember decisions and execute actions.
 
 This product is a multi-tenant SaaS application for associations, sports clubs,
