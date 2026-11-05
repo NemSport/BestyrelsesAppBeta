@@ -454,7 +454,7 @@ test("final visual polish uses signal colors, stronger CTAs, and wider workspace
   assert.match(relatedDecisions, /compact \? \(/);
   assert.match(relatedDecisions, /decision\.status === "completed"/);
   assert.match(aiAssistant, /border-brand\/20 bg-surface/);
-  assert.match(meetingPage, /data-meeting-workspace/);
+  assert.match(meetingPage, /<MeetingLayoutPreference>/);
   assert.match(globalStyles, /data-meeting-workspace/);
 });
 

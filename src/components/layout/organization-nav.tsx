@@ -104,6 +104,12 @@ export function OrganizationNav({
 
   return (
     <aside className="org-sidebar">
+      <details className="meeting-organization-menu">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
+          Organisationsmenu
+        </summary>
+        <nav aria-label="Organisation under mødet">{navLinks()}</nav>
+      </details>
       <div className="org-mobile-context">
         <div className="min-w-0">
           <p className="org-mobile-organization truncate">

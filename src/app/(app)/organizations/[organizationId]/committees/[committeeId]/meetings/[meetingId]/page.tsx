@@ -1,3 +1,4 @@
+import { MeetingLayoutPreference } from "@/components/meetings/meeting-layout-preference";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -353,14 +354,13 @@ export default async function MeetingPage({
       .filter((member) => member.status === "active")
       .map((member) => member.user_id),
   });
-  const organizationRecipientOptions = selectedRecipientResolution.recipients.map(
-    (recipient) => ({
+  const organizationRecipientOptions =
+    selectedRecipientResolution.recipients.map((recipient) => ({
       userId: recipient.userId!,
       name: recipient.name,
       email: recipient.email,
       isMeetingParticipant: participantUserIds.has(recipient.userId!),
-    }),
-  );
+    }));
   const approvalRecipientInfo = {
     mode:
       registeredInternalParticipantCount > 0
@@ -399,7 +399,7 @@ export default async function MeetingPage({
           )
           .map((recipient) => recipient.name);
   return (
-    <div data-meeting-workspace>
+    <MeetingLayoutPreference>
       <MeetingDocumentHeader
         actions={
           <>
@@ -412,9 +412,9 @@ export default async function MeetingPage({
                 meetingTitle={meeting.title}
                 minutesAvailable={Boolean(
                   minutes.meetingMinutes &&
-                    ["ready_for_approval", "approved"].includes(
-                      minutes.meetingMinutes.status,
-                    ),
+                  ["ready_for_approval", "approved"].includes(
+                    minutes.meetingMinutes.status,
+                  ),
                 )}
                 organizationId={organizationId}
                 participantSummary={{
@@ -463,6 +463,12 @@ export default async function MeetingPage({
               panelId="meeting-secondary-actions"
             >
               <div className="grid gap-1">
+                {meetingCapabilities.manageTransferredAgendaItems &&
+                ["draft", "scheduled", "in_progress"].includes(
+                  meeting.status,
+                ) ? (
+                  <ContinueAgendaItemsButton meetingId={meetingId} />
+                ) : null}
                 <div className="[&>button]:w-full [&>button]:justify-start [&>button]:border-0 [&>button]:px-3 [&>button]:shadow-none">
                   <MeetingAiOverview
                     committeeId={committeeId}
@@ -526,10 +532,6 @@ export default async function MeetingPage({
       />
 
       <section aria-label="Referat workspace" className="mt-1">
-        {meetingCapabilities.manageTransferredAgendaItems &&
-        ["draft", "scheduled", "in_progress"].includes(meeting.status) ? (
-          <ContinueAgendaItemsButton meetingId={meetingId} />
-        ) : null}
         <MeetingMinutesSection
           agendaAction={
             meetingCapabilities.scheduleAgendaItem ? (
@@ -599,6 +601,6 @@ export default async function MeetingPage({
           userId={user.id}
         />
       </section>
-    </div>
+    </MeetingLayoutPreference>
   );
 }

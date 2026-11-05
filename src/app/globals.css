@@ -1136,3 +1136,104 @@ a {
     content: attr(data-placeholder);
   }
 }
+
+/* Meeting focus is presentation-only. Keep hidden editors mounted for autosave. */
+.meeting-point-views,
+.meeting-organization-menu {
+  display: none;
+}
+[data-meeting-layout="focused"] .meeting-point-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 0.5rem 1.5rem 0;
+  border-bottom: 1px solid rgb(var(--brand-border));
+}
+[data-meeting-layout="focused"] .meeting-point-views button {
+  padding: 0.75rem 0;
+  color: rgb(var(--brand-text-muted));
+  font-size: 0.875rem;
+  border-bottom: 2px solid transparent;
+}
+[data-meeting-layout="focused"]
+  .meeting-point-views
+  button[aria-pressed="true"] {
+  color: rgb(var(--brand-primary));
+  border-color: currentColor;
+  font-weight: 600;
+}
+[data-meeting-layout="focused"] .meeting-point-body {
+  display: block;
+}
+[data-meeting-layout="focused"] .meeting-point-minutes {
+  padding: 1rem;
+}
+[data-meeting-layout="focused"] [data-point-context] {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  padding: 1rem;
+  background: rgb(var(--brand-surface));
+}
+[data-meeting-layout="focused"]
+  [data-point-view="minutes"]
+  [data-point-context],
+[data-meeting-layout="focused"]
+  [data-point-view]:not([data-point-view="minutes"])
+  .meeting-point-minutes,
+[data-meeting-layout="focused"]
+  [data-point-view="actions"]
+  [data-point-panel]:not([data-point-panel="actions"]),
+[data-meeting-layout="focused"]
+  [data-point-view="notes"]
+  [data-point-panel]:not([data-point-panel="notes"]),
+[data-meeting-layout="focused"]
+  [data-point-view="tools"]
+  [data-point-panel]:not([data-point-panel="tools"]) {
+  display: none;
+}
+[data-meeting-layout="focused"] [data-point-view] > header {
+  padding: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .org-layout:has([data-meeting-layout="focused"]) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .org-layout:has([data-meeting-layout="focused"]) > .org-sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    padding: 0.35rem 1.5rem;
+  }
+  .org-layout:has([data-meeting-layout="focused"]) .org-desktop-navigation {
+    display: none;
+  }
+  .org-layout:has([data-meeting-layout="focused"]) .meeting-organization-menu {
+    display: block;
+  }
+  .org-layout:has([data-meeting-layout="focused"])
+    .meeting-organization-menu
+    .org-nav-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+  .org-layout-content:has(> [data-meeting-layout="focused"]) {
+    width: 100%;
+    max-width: 100rem;
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1280px) {
+  [data-meeting-layout="focused"] .meeting-agenda-layout {
+    grid-template-columns: minmax(15rem, 24%) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  [data-meeting-layout="focused"] .meeting-agenda-actions {
+    width: 24%;
+    min-width: 15rem;
+  }
+}

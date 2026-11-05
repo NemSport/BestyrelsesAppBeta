@@ -758,6 +758,7 @@ function AgendaMinutesCard({
       transfer.source_agenda_item_id === item.id &&
       transfer.status !== "dismissed",
   );
+  const [pointView, setPointView] = useState("minutes");
   const [minutes, setMinutes] = useState(initialMinutes);
   const [notes, setNotes] = useState(initialMinutes?.notes ?? "");
   const [decision, setDecision] = useState(initialMinutes?.decision ?? "");
@@ -1074,6 +1075,7 @@ function AgendaMinutesCard({
         isTransferredItem && "border-l-[3px] border-l-progress/50",
         isAnyOtherBusiness && "border-dashed",
       )}
+      data-point-view={pointView}
       id={`agenda-point-${occurrence.id}`}
     >
       <header
@@ -1481,8 +1483,32 @@ function AgendaMinutesCard({
         </Modal>
       ) : null}
 
-      <div className="xl:grid xl:grid-cols-[minmax(0,27fr)_minmax(16rem,14fr)] xl:items-start">
-        <div className="min-w-0">
+      <div
+        className="meeting-point-views"
+        role="group"
+        aria-label="Vis indhold for punktet"
+      >
+        {[
+          ["minutes", "Referat"],
+          [
+            "actions",
+            `Beslutninger & opgaver (${relatedDecisions.length + relatedTasks.length})`,
+          ],
+          ...(canEditPrivateNotes ? [["notes", "Mine noter"]] : []),
+          ["tools", "Historik & AI"],
+        ].map(([view, label]) => (
+          <button
+            key={view}
+            type="button"
+            aria-pressed={pointView === view}
+            onClick={() => setPointView(view)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="meeting-point-body xl:grid xl:grid-cols-[minmax(0,27fr)_minmax(16rem,14fr)] xl:items-start">
+        <div className="meeting-point-minutes min-w-0">
           {item.standard_key === "previous_minutes_approval" ? (
             <PreviousMinutesReference
               reference={previousMeetingMinutes}
@@ -2095,11 +2121,13 @@ function AgendaMinutesCard({
         </div>
 
         <aside
+          data-point-context
           aria-label="Kontekst for aktivt dagsordenspunkt"
           className="workspace-scrollbar border-t border-line/70 bg-subtle/15 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:border-l xl:border-t-0"
         >
           <section
             className="border-b border-line/70 p-2.5"
+            data-point-panel="actions"
             aria-labelledby={`context-decisions-${occurrence.id}`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -2164,6 +2192,7 @@ function AgendaMinutesCard({
 
           <section
             className="border-b border-line/70 p-2.5"
+            data-point-panel="actions"
             aria-labelledby={`context-tasks-${occurrence.id}`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -2241,7 +2270,10 @@ function AgendaMinutesCard({
           </section>
 
           {historyMetadata && historyMetadata.historyCount >= 2 ? (
-            <section className="border-b border-line/70 px-2.5 py-1">
+            <section
+              data-point-panel="tools"
+              className="border-b border-line/70 px-2.5 py-1"
+            >
               <AgendaItemHistoryReadMode
                 agendaItemId={item.id}
                 committeeId={committeeId}
@@ -2256,6 +2288,7 @@ function AgendaMinutesCard({
           {canEditPrivateNotes ? (
             <section
               className="border-b border-line/70 bg-warning-soft/55 p-2.5"
+              data-point-panel="notes"
               aria-labelledby={`context-private-note-${occurrence.id}`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -2311,6 +2344,7 @@ function AgendaMinutesCard({
 
           <section
             className="p-2.5"
+            data-point-panel="tools"
             aria-labelledby={`context-ai-${occurrence.id}`}
           >
             <h4
@@ -3511,7 +3545,7 @@ export function MeetingMinutesSection({
             aria-labelledby="agenda-minutes-heading"
             className="relative pb-4 xl:pb-5"
           >
-            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 xl:absolute xl:bottom-5 xl:left-0 xl:z-10 xl:mb-0 xl:w-[18%] xl:border-t xl:border-line/70 xl:bg-surface xl:p-2">
+            <div className="meeting-agenda-actions mb-1.5 flex flex-wrap items-center justify-between gap-2 xl:absolute xl:bottom-5 xl:left-0 xl:z-10 xl:mb-0 xl:w-[18%] xl:border-t xl:border-line/70 xl:bg-surface xl:p-2">
               <h2
                 className="scroll-mt-24 text-sm font-semibold text-ink xl:hidden"
                 id="agenda-minutes-heading"
@@ -3562,7 +3596,7 @@ export function MeetingMinutesSection({
                   </Button>
                 </div>
 
-                <div className="grid min-w-0 gap-2 xl:grid-cols-[minmax(12rem,18fr)_minmax(0,82fr)] xl:items-start xl:gap-0 xl:overflow-hidden xl:rounded-[var(--radius-panel)] xl:border xl:border-line/70 xl:bg-surface">
+                <div className="meeting-agenda-layout grid min-w-0 gap-2 xl:grid-cols-[minmax(12rem,18fr)_minmax(0,82fr)] xl:items-start xl:gap-0 xl:overflow-hidden xl:rounded-[var(--radius-panel)] xl:border xl:border-line/70 xl:bg-surface">
                   <nav
                     aria-label="Dagsordenspunkter"
                     className="workspace-scrollbar sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain bg-surface pb-14 xl:block xl:border-r xl:border-line/70"
