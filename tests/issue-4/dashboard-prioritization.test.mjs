@@ -97,7 +97,10 @@ test("viewer presentation contains read destinations and no write CTA", () => {
   assert.match(organizationPriority, /Seneste godkendte referat/);
   assert.match(organizationPriority, /Læs referat/);
   assert.match(committeePriority, /data-dashboard-audience/);
-  assert.match(committeePage, /capabilities\.createMeeting \|\| capabilities\.editTasks/);
+  assert.match(
+    committeePage,
+    /capabilities\.createMeeting \|\| capabilities\.editTasks/,
+  );
   assert.match(committeePage, /canManageCommittee \?/);
   assert.match(
     quickActionMenu,
@@ -152,7 +155,7 @@ test("priority, empty, loading, and error states remain responsive and actionabl
   );
   assert.match(sharedPanel, /flex-col/);
   assert.match(sharedPanel, /lg:flex-row/);
-  assert.match(organizationPriority, /md:grid-cols-2/);
+  assert.match(organizationPriority, /dashboard-summary/);
   assert.match(committeePriority, /lg:grid-cols-2/);
   assert.match(committeePriority, /Der er intet kommende møde/);
   assert.match(loadingState, /aria-busy="true"/);
@@ -165,13 +168,10 @@ test("priority, empty, loading, and error states remain responsive and actionabl
 test("Version 3.1.2 keeps the approved data structure in a compact visual cockpit", () => {
   assert.match(organizationPriority, /Næste møde/);
   assert.match(organizationPriority, /Mine opgaver/);
-  assert.match(organizationPriority, /Beslutninger/);
-  assert.match(organizationPriority, /Mødeforberedelse/);
+  assert.match(organizationPriority, /Aktive beslutninger/);
+  assert.match(organizationPriority, /Referat til godkendelse/);
   assert.match(organizationPriority, /Kræver handling nu/);
   assert.match(organizationPriority, /DashboardGlyph name="calendar"/);
-  assert.match(organizationPriority, /DashboardGlyph name="tasks"/);
-  assert.match(organizationPriority, /DashboardGlyph name="decisions"/);
-  assert.match(organizationPriority, /DashboardGlyph name="preparation"/);
   assert.match(organizationPriority, /DashboardCardCue/);
   assert.match(organizationPriority, /variant="card"/);
   assert.match(organizationPriority, /DashboardGlyph compact/);
@@ -179,10 +179,7 @@ test("Version 3.1.2 keeps the approved data structure in a compact visual cockpi
   assert.doesNotMatch(organizationPriority, /▦|✓|◇|≡|•/);
   assert.match(organizationPriority, /Se dagsorden/);
   assert.match(organizationPage, /Seneste referater/);
-  assert.match(
-    organizationPage,
-    /Senest opdaterede referater, du har adgang til\./,
-  );
+  assert.match(organizationPage, /Det vigtigste fra dine udvalg/);
   assert.doesNotMatch(organizationPage, /Fortsæt hvor du slap/);
   assert.match(organizationPage, /recentActivity\.map/);
   assert.match(organizationPage, /\.slice\(0, 4\)/);
@@ -193,7 +190,6 @@ test("Version 3.1.2 keeps the approved data structure in a compact visual cockpi
   );
   assert.match(organizationPage, /Du har ikke adgang til nogen udvalg endnu\./);
   assert.match(organizationPage, /divide-y divide-line/);
-  assert.match(organizationPage, /sm:grid-cols-2/);
   assert.match(organizationPriority, /committeeSection/);
   assert.match(organizationPriority, /recentMinutesSection/);
   assert.match(organizationPriority, /contents xl:block xl:space-y-/);
@@ -201,19 +197,15 @@ test("Version 3.1.2 keeps the approved data structure in a compact visual cockpi
   assert.match(organizationPriority, /order-2 p-/);
   assert.match(organizationPriority, /className="order-3"/);
   assert.match(organizationPriority, /className="order-4"/);
-  assert.match(organizationPriority, /flex flex-wrap items-center gap-1\.5/);
   assert.match(organizationPriority, /\.slice\(0, 6\)/);
   assert.match(organizationPage, /divide-y divide-line/);
 });
 
-test("Version 3.1.2c widens only the large desktop dashboard", () => {
+test("dashboard uses the shared wide layout and responsive columns", () => {
   assert.match(organizationPage, /data-organization-dashboard/);
-  assert.match(
-    globalStyles,
-    /@media \(min-width: 1536px\)[\s\S]*\.org-layout-content:has\(> \[data-organization-dashboard\]\)[\s\S]*max-width: 96rem/,
-  );
+  assert.match(globalStyles, /\.org-layout-content\s*\{[^}]*max-width: 100rem/);
   assert.match(
     organizationPriority,
-    /xl:grid-cols-\[minmax\(0,1\.9fr\)_minmax\(20rem,1fr\)\]/,
+    /xl:grid-cols-\[minmax\(0,1\.7fr\)_minmax\(18rem,1fr\)\]/,
   );
 });

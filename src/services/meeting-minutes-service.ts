@@ -14,6 +14,7 @@ import {
   meetingPrivateNoteInputSchema,
   meetingMinutesReferentActionSchema,
   minutesApprovalResponseSchema,
+  minutesApprovalOnBehalfSchema,
   sendMinutesForApprovalSchema,
 } from "@/lib/validation";
 import { MeetingMinutesGovernanceRepository } from "@/repositories/meeting-minutes-governance-repository";
@@ -256,7 +257,7 @@ export class MeetingMinutesService {
 
   async get(organizationId: string, committeeId: string, meetingId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireMeetingCapability(
+    const access = await this.authorization.requireMeetingCapability(
       organizationId,
       committeeId,
       user.id,
@@ -331,6 +332,9 @@ export class MeetingMinutesService {
         })),
       approvals: approvals.map((approval) => ({
         ...approval,
+        canApproveOnBehalf: ["owner", "admin"].includes(
+          access.organizationMembership.role,
+        ),
         memberName:
           membersById.get(approval.user_id)?.full_name ||
           membersById.get(approval.user_id)?.email ||
@@ -885,6 +889,23 @@ export class MeetingMinutesService {
     );
   }
 
+  async approveOnBehalf(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = minutesApprovalOnBehalfSchema.parse(input);
+    await this.authorization.requireOrganizationAdmin(
+      parsed.organizationId,
+      user.id,
+    );
+    await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+    const minutes = await this.minutes.findMeetingMinutes(parsed.meetingId);
+    if (!minutes) throw new NotFoundError("Referatet");
+    return this.governance.approveOnBehalf(minutes.id, parsed.targetUserId);
+  }
+
   async markNoResponse(input: unknown) {
     const user = await this.auth.requireUser();
     const parsed = markNoResponseSchema.parse(input);
@@ -1127,7 +1148,8 @@ export class MeetingMinutesService {
     await this.auth.requireUser();
     const attachment = await this.governance.findAttachment(attachmentId);
     if (!attachment) throw new NotFoundError("Vedhæftningen");
-    const currentVersion = await this.governance.findCentralCurrentVersion(attachmentId);
+    const currentVersion =
+      await this.governance.findCentralCurrentVersion(attachmentId);
     if (currentVersion) {
       return {
         url: await this.governance.createDocumentVersionUrl(
@@ -1138,7 +1160,13 @@ export class MeetingMinutesService {
         fileName: currentVersion.file_name,
       };
     }
-    return { url: await this.governance.createDownloadUrl(attachment.storage_path, download ? attachment.file_name : null), fileName: attachment.file_name };
+    return {
+      url: await this.governance.createDownloadUrl(
+        attachment.storage_path,
+        download ? attachment.file_name : null,
+      ),
+      fileName: attachment.file_name,
+    };
   }
 
   async removeAttachment(attachmentId: string) {
@@ -1254,15 +1282,15 @@ export class MeetingMinutesService {
       const currentVersion = currentVersions.get(attachment.id);
       const fileName = currentVersion?.file_name ?? attachment.file_name;
       const mimeType = currentVersion?.mime_type ?? attachment.mime_type;
-      const embedType = attachmentEmbedType(
-        fileName,
-        mimeType,
-      );
+      const embedType = attachmentEmbedType(fileName, mimeType);
       let bytes: Uint8Array | null = null;
       if (embedType !== "unsupported") {
         try {
           bytes = currentVersion
-            ? await this.governance.downloadDocumentVersion(currentVersion.storage_bucket, currentVersion.storage_path)
+            ? await this.governance.downloadDocumentVersion(
+                currentVersion.storage_bucket,
+                currentVersion.storage_path,
+              )
             : await this.governance.download(attachment.storage_path);
         } catch (error) {
           console.warn("[meeting-minutes] Bilag kunne ikke hentes til PDF.", {

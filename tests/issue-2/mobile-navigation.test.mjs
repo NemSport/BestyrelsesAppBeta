@@ -92,46 +92,35 @@ test("viewer, member, chair, and admin retain existing action visibility", () =>
   assert.equal(canManageOrganizationTrash("admin"), true);
 });
 
-test("mobile drawer implements dialog semantics and interaction lifecycle", async () => {
-  const [navigation, dialogFocus, styles] = await Promise.all([
-    source("../../src/components/layout/organization-nav.tsx"),
-    source("../../src/hooks/use-dialog-focus.ts"),
-    source("../../src/app/globals.css"),
-  ]);
-
-  assert.match(navigation, /aria-expanded=\{mobileOpen\}/);
-  assert.match(navigation, /aria-haspopup="dialog"/);
-  assert.match(navigation, /aria-modal="true"/);
-  assert.match(navigation, /role="dialog"/);
-  assert.match(navigation, /useDialogFocus/);
-  assert.match(dialogFocus, /event\.key === "Escape"/);
-  assert.match(dialogFocus, /event\.key !== "Tab"/);
-  assert.match(dialogFocus, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(dialogFocus, /returnTarget\?\.isConnected/);
-  assert.match(navigation, /window\.matchMedia\("\(min-width: 1024px\)"\)/);
-  assert.match(navigation, /aria-current=\{active \? "page" : undefined\}/);
-  assert.match(navigation, /organizationNavIconNames\[item\.suffix\]/);
-  assert.match(navigation, /<AppIcon name="menu"/);
-  assert.match(styles, /\.org-mobile-drawer[\s\S]*overflow-y: auto/);
-  assert.match(styles, /min-height: 2\.75rem/);
-});
-
-test("desktop navigation remains present outside the mobile breakpoint", async () => {
+test("navigation is always available with active route and keyboard focus", async () => {
   const [navigation, styles] = await Promise.all([
     source("../../src/components/layout/organization-nav.tsx"),
     source("../../src/app/globals.css"),
   ]);
-  assert.match(navigation, /className="org-desktop-navigation"/);
-  assert.match(styles, /@media \(min-width: 1024px\)/);
-  assert.match(styles, /\.org-sidebar[\s\S]*position: sticky/);
-  assert.match(styles, /\.org-nav-link-active[\s\S]*inset 3px 0 0/);
+  assert.match(navigation, /aria-label="Arbejdsområder"/);
+  assert.match(navigation, /aria-label="Organisationsnavigation"/);
+  assert.match(navigation, /aria-current=\{active \? "page" : undefined\}/);
+  assert.doesNotMatch(navigation, /mobileOpen|<summary|aria-haspopup="dialog"/);
+  assert.match(styles, /\.org-topnav-links[\s\S]*flex-wrap: wrap/);
+  assert.match(styles, /\.org-topnav-link:focus-visible/);
+  assert.match(styles, /min-height: 2\.75rem/);
+});
+
+test("desktop top navigation follows the header height and mobile stays in flow", async () => {
+  const [navigation, styles] = await Promise.all([
+    source("../../src/components/layout/organization-nav.tsx"),
+    source("../../src/app/globals.css"),
+  ]);
+  assert.match(navigation, /ResizeObserver/);
+  assert.match(navigation, /observer.disconnect/);
+  assert.match(styles, /top: var\(--org-header-height, 3rem\)/);
   assert.match(
     styles,
-    /@media \(max-width: 1023px\)[\s\S]*\.org-desktop-navigation[\s\S]*display: none/,
+    /@media \(max-width: 767px\)[\s\S]*\.org-topnav[\s\S]*position: static/,
   );
 });
 
-test("every existing organization destination has one decorative Lucide icon", async () => {
+test("every organization destination has an icon available for primary navigation", async () => {
   const [navigation, iconSystem] = await Promise.all([
     source("../../src/components/layout/organization-nav.tsx"),
     source("../../src/components/icons/app-icon.tsx"),
@@ -185,10 +174,7 @@ test("global topbar reuses memberships, capabilities, and existing create flows"
   assert.match(tasksPage, /openCreateOnLoad=\{create === "1"\}/);
   assert.match(taskRegister, /!openCreateOnLoad \|\| !canCreate/);
   assert.match(dropdown, /aria-expanded=\{open\}/);
-  assert.doesNotMatch(
-    styles,
-    /\.app-header-inner \{\s*flex-wrap: wrap/,
-  );
+  assert.doesNotMatch(styles, /\.app-header-inner \{\s*flex-wrap: wrap/);
   assert.match(
     styles,
     /@media \(max-width: 1023px\)[\s\S]*\.app-header-action[\s\S]*min-height: 2\.75rem/,
@@ -226,7 +212,7 @@ test("Version 3.1.4b shares the organization theme and dropdown pattern", async 
   );
   assert.match(
     styles,
-    /\.org-sidebar \{[\s\S]*background: rgb\(var\(--brand-primary\)\)/,
+    /\.org-topnav \{[\s\S]*background: rgb\(var\(--brand-surface\)\)/,
   );
   assert.match(switcher, /active \? "bg-brand-soft text-brand" : "text-ink"/);
   assert.match(dropdown, /dropdown-panel[\s\S]*bg-surface[\s\S]*text-ink/);

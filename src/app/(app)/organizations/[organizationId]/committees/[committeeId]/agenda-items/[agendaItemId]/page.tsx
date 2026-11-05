@@ -21,10 +21,7 @@ import {
   PageSection,
   StatusBadge,
 } from "@/components/ui";
-import {
-  formatDate,
-  standardAgendaItemLabels,
-} from "@/lib/localization";
+import { formatDate, standardAgendaItemLabels } from "@/lib/localization";
 import { canEditAgendaItems } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { AgendaItemService } from "@/services/agenda-item-service";
@@ -79,7 +76,7 @@ export default async function AgendaItemPage({
   const meeting = item.agenda_item_occurrences[0]?.meetings ?? null;
 
   return (
-    <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[1fr_340px]">
+    <div className="mx-auto max-w-5xl space-y-6">
       <Breadcrumbs
         className="lg:col-span-2"
         items={[
@@ -188,21 +185,38 @@ export default async function AgendaItemPage({
             emptyText="Der er endnu ikke angivet et formål."
             value={item.objective}
           />
+          {item.description ? (
+            <details className="mt-4 border-t border-line pt-4">
+              <summary className="cursor-pointer text-sm font-semibold text-muted">
+                Baggrund for sagen
+              </summary>
+              <RichTextContent
+                className="mt-3 text-sm leading-6 text-muted"
+                value={item.description}
+              />
+            </details>
+          ) : null}
         </DocumentPanel>
-
-        <AgendaItemAssistant
-          agendaItemId={agendaItemId}
-          committeeId={committeeId}
-          organizationId={organizationId}
-        />
 
         <AgendaItemHistoryInline
           agendaItemId={agendaItemId}
           committeeId={committeeId}
           currentOccurrenceId={item.agenda_item_occurrences[0]?.id ?? null}
+          currentBackground={item.description}
           initialHistory={agendaItemHistory}
           organizationId={organizationId}
         />
+
+        <details className="mt-6 rounded-xl border border-line bg-surface p-4">
+          <summary className="cursor-pointer font-semibold text-brand">
+            Forbered punktet med AI
+          </summary>
+          <AgendaItemAssistant
+            agendaItemId={agendaItemId}
+            committeeId={committeeId}
+            organizationId={organizationId}
+          />
+        </details>
 
         <PageSection
           className="mt-8"
@@ -232,14 +246,6 @@ export default async function AgendaItemPage({
       </div>
 
       <aside className="space-y-4">
-        <ContentPanel className="p-6">
-          <h2 className="font-semibold">Baggrund</h2>
-          <RichTextContent
-            className="mt-3 text-sm leading-6 text-muted"
-            emptyText="Der er endnu ikke angivet en baggrund."
-            value={item.description}
-          />
-        </ContentPanel>
         <ContentPanel className="p-6">
           <h2 className="font-semibold">Detaljer</h2>
           <dl className="mt-4 divide-y divide-line text-sm">

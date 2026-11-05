@@ -54,6 +54,14 @@ export async function POST(
         message: minutesApprovalMessage(result.email),
       });
     }
+    if (body.action === "approve_on_behalf") {
+      const approval = await service.approveOnBehalf({ ...body, meetingId });
+      return NextResponse.json({
+        approval,
+        message:
+          "Godkendelsen er registreret med dig som administrator på vegne af deltageren.",
+      });
+    }
     if (body.action === "respond") {
       const approval = await service.respondToApproval({ ...body, meetingId });
       return NextResponse.json({

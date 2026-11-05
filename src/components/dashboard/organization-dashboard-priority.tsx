@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DANISH_TIME_ZONE } from "@/lib/date-format";
 import type { ReactNode } from "react";
 
 import { DashboardPriorityPanel } from "@/components/dashboard/dashboard-priority-panel";
@@ -64,6 +65,7 @@ function DashboardCardCue({ label }: { label: string }) {
 
 function formatMeetingDate(value: string) {
   return new Intl.DateTimeFormat("da-DK", {
+    timeZone: DANISH_TIME_ZONE,
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -72,6 +74,7 @@ function formatMeetingDate(value: string) {
 
 function formatMeetingTime(value: string) {
   return new Intl.DateTimeFormat("da-DK", {
+    timeZone: DANISH_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -148,11 +151,11 @@ export function OrganizationDashboardPriority({
   const allActionsHref = `${organizationRoot}/actions`;
 
   return (
-    <div className="space-y-3 xl:space-y-2" data-dashboard-audience={audience}>
-      <section
-        aria-label="Status"
-        className="grid gap-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4"
-      >
+    <div
+      className="dashboard-calm space-y-6"
+      data-dashboard-audience={audience}
+    >
+      <section aria-label="Status" className="dashboard-summary">
         {nextMeeting ? (
           <Link
             className={interactiveSurfaceClassName(
@@ -206,106 +209,56 @@ export function OrganizationDashboardPriority({
           </div>
         )}
 
-        <Link
-          className={interactiveSurfaceClassName(
-            "order-2 flex min-h-36 flex-col justify-between p-2.5 xl:min-h-32",
+        <div className="dashboard-counts">
+          {audience !== "viewer" ? (
+            <>
+              <Link
+                href={
+                  audience === "admin"
+                    ? `${organizationRoot}/tasks`
+                    : `${organizationRoot}/tasks/my`
+                }
+              >
+                <span className="text-2xl font-semibold">
+                  {relevantTaskCount}
+                </span>
+                <span>
+                  {audience === "admin"
+                    ? "Opgaver i organisationen"
+                    : "Mine opgaver"}
+                </span>
+                {dueThisWeek > 0 ? (
+                  <small>{dueThisWeek} med frist denne uge</small>
+                ) : null}
+              </Link>
+              <Link href={`${organizationRoot}/decisions`}>
+                <span className="text-2xl font-semibold">{decisionCount}</span>
+                <span>Aktive beslutninger</span>
+              </Link>
+            </>
+          ) : (
+            <Link href={`${organizationRoot}/meetings`}>
+              Se møder og referater →
+            </Link>
           )}
-          href={
-            audience === "member" || audience === "chair"
-              ? `${organizationRoot}/tasks/my`
-              : `${organizationRoot}/tasks`
-          }
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <DashboardGlyph name="tasks" />
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                Mine opgaver
-              </p>
-            </div>
-            <p className="mt-1.5 text-3xl font-semibold leading-none tabular-nums">
-              {relevantTaskCount}
-            </p>
-            <p className="mt-0.5 text-sm leading-5 text-muted">
-              {dueThisWeek
-                ? `${dueThisWeek} med frist denne uge`
-                : relevantTaskCount > relevantTasks.length
-                  ? "Se prioriterede opgaver"
-                  : "Ingen frister denne uge"}
-            </p>
-          </div>
-          <DashboardCardCue
-            label={
-              audience === "member" || audience === "chair"
-                ? "Åbn mine opgaver"
-                : "Se opgaver"
-            }
-          />
-        </Link>
-
-        <Link
-          className={interactiveSurfaceClassName(
-            "order-3 flex min-h-36 flex-col justify-between p-2.5 xl:min-h-32",
-          )}
-          href={`${organizationRoot}/decisions`}
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <DashboardGlyph name="decisions" />
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                Beslutninger
-              </p>
-            </div>
-            <p className="mt-1.5 text-3xl font-semibold leading-none tabular-nums">
-              {decisionCount}
-            </p>
-            <p className="mt-0.5 text-sm leading-5 text-muted">
-              {decisionCount
-                ? "aktive eller afventende"
-                : "Ingen kræver handling"}
-            </p>
-          </div>
-          <DashboardCardCue label="Se beslutninger" />
-        </Link>
-
-        <Link
-          className={interactiveSurfaceClassName(
-            "order-4 flex min-h-36 flex-col justify-between p-2.5 xl:min-h-32",
-          )}
-          href={
-            managedMinutes
-              ? `${organizationRoot}/committees/${managedMinutes.committeeId}/meetings/${managedMinutes.meetingId}#minutes-approval`
-              : managedMeeting
-                ? `${organizationRoot}/committees/${managedMeeting.committee_id}/meetings/${managedMeeting.id}`
-                : `${organizationRoot}/meetings`
-          }
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <DashboardGlyph name="preparation" />
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                Mødeforberedelse
-              </p>
-            </div>
-            <p className="mt-1.5 text-3xl font-semibold leading-none tabular-nums">
-              {preparationCount}
-            </p>
-            <p className="mt-0.5 text-sm leading-5 text-muted">
-              {preparationCount
-                ? "referater afventer din godkendelse"
-                : nextMeeting
-                  ? `${nextMeeting.agenda_item_occurrences.length} punkter på næste dagsorden`
-                  : "Intet afventer"}
-            </p>
-          </div>
-          <DashboardCardCue
-            label={managedMinutes ? "Gå til godkendelse" : "Åbn mødeoversigt"}
-          />
-        </Link>
+          {managedMinutes ? (
+            <Link
+              className="text-brand"
+              href={`${organizationRoot}/committees/${managedMinutes.committeeId}/meetings/${managedMinutes.meetingId}#minutes-approval`}
+            >
+              <span className="font-semibold">Referat til godkendelse</span>
+              <span>{managedMinutes.meetingTitle} →</span>
+            </Link>
+          ) : preparationCount > 0 ? (
+            <Link href={`${organizationRoot}/actions`}>
+              {preparationCount} referater afventer din godkendelse →
+            </Link>
+          ) : null}
+        </div>
       </section>
 
-      <div className="grid items-start gap-2 xl:grid-cols-[minmax(0,1.9fr)_minmax(20rem,1fr)]">
-        <div className="contents xl:block xl:space-y-2">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
+        <div className="contents xl:block xl:space-y-6">
           <div className="order-1">
             <DashboardPriorityPanel
               action={
@@ -321,8 +274,8 @@ export function OrganizationDashboardPriority({
                   </Link>
                 ) : null
               }
-              description="De vigtigste konkrete handlinger på tværs af dine udvalg."
-              eyebrow="Prioriteret"
+              description=""
+              eyebrow=""
               title="Kræver handling nu"
               variant="card"
             >
@@ -335,13 +288,13 @@ export function OrganizationDashboardPriority({
                         ? "tasks"
                         : action.sourceType.startsWith("stakeholder")
                           ? "stakeholders"
-                        : action.sourceType === "meeting_minutes"
-                          ? "preparation"
-                          : "calendar";
+                          : action.sourceType === "meeting_minutes"
+                            ? "preparation"
+                            : "calendar";
                     return (
                       <article key={action.key}>
                         <Link
-                          className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-[var(--radius-control)] px-1 py-1 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+                          className="dashboard-action-row group grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-[var(--radius-control)] px-1 py-1 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
                           href={href}
                         >
                           <DashboardGlyph compact name={glyphName} />
@@ -404,80 +357,86 @@ export function OrganizationDashboardPriority({
           <div className="order-4">{recentMinutesSection}</div>
         </div>
 
-        <div className="contents xl:block xl:space-y-2">
-          <section
-            aria-labelledby="upcoming-meetings-title"
-            className={staticSurfaceClassName("order-2 p-2.5 sm:p-3")}
-          >
-            <div className="flex items-end justify-between gap-3 border-b border-line pb-1.5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                  Kalender
-                </p>
-                <h2
-                  className="mt-0.5 text-xl font-semibold"
-                  id="upcoming-meetings-title"
+        <div className="contents xl:block xl:space-y-6">
+          {overview.upcomingMeetings.length > 1 ? (
+            <section
+              aria-labelledby="upcoming-meetings-title"
+              className={staticSurfaceClassName("order-2 p-2.5 sm:p-3")}
+            >
+              <div className="flex items-end justify-between gap-3 border-b border-line pb-1.5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    Kalender
+                  </p>
+                  <h2
+                    className="mt-0.5 text-xl font-semibold"
+                    id="upcoming-meetings-title"
+                  >
+                    Senere møder
+                  </h2>
+                </div>
+                <Link
+                  className="text-sm font-semibold text-brand hover:underline"
+                  href={`${organizationRoot}/meetings`}
                 >
-                  Næste møder
-                </h2>
+                  Se kalender
+                </Link>
               </div>
-              <Link
-                className="text-sm font-semibold text-brand hover:underline"
-                href={`${organizationRoot}/meetings`}
-              >
-                Se kalender
-              </Link>
-            </div>
-            {overview.upcomingMeetings.length ? (
-              <div className="divide-y divide-line">
-                {overview.upcomingMeetings.slice(0, 4).map((meeting) => (
-                  <article key={meeting.id}>
-                    <Link
-                      className="group grid min-h-11 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-1.5 rounded-[var(--radius-control)] py-1 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                      href={`${organizationRoot}/committees/${meeting.committee_id}/meetings/${meeting.id}`}
-                    >
-                      <time
-                        className="text-center"
-                        dateTime={meeting.starts_at}
+              {overview.upcomingMeetings.length ? (
+                <div className="divide-y divide-line">
+                  {overview.upcomingMeetings.slice(1, 4).map((meeting) => (
+                    <article key={meeting.id}>
+                      <Link
+                        className="group grid min-h-11 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-1.5 rounded-[var(--radius-control)] py-1 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                        href={`${organizationRoot}/committees/${meeting.committee_id}/meetings/${meeting.id}`}
                       >
-                        <span className="block text-lg font-semibold leading-none">
-                          {new Intl.DateTimeFormat("da-DK", {
-                            day: "2-digit",
-                          }).format(new Date(meeting.starts_at))}
+                        <time
+                          className="text-center"
+                          dateTime={meeting.starts_at}
+                        >
+                          <span className="block text-lg font-semibold leading-none">
+                            {new Intl.DateTimeFormat("da-DK", {
+                              timeZone: DANISH_TIME_ZONE,
+                              day: "2-digit",
+                            }).format(new Date(meeting.starts_at))}
+                          </span>
+                          <span className="mt-0.5 block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-muted">
+                            {new Intl.DateTimeFormat("da-DK", {
+                              timeZone: DANISH_TIME_ZONE,
+                              month: "short",
+                            }).format(new Date(meeting.starts_at))}
+                          </span>
+                        </time>
+                        <span className="min-w-0">
+                          <span className="block text-xs leading-4 text-muted">
+                            {meeting.committeeName}
+                          </span>
+                          <span className="block break-words text-sm font-semibold leading-5 group-hover:text-brand group-hover:underline">
+                            {meeting.title}
+                          </span>
+                          <span className="block text-xs leading-4 text-muted">
+                            {formatMeetingTime(meeting.starts_at)}
+                          </span>
                         </span>
-                        <span className="mt-0.5 block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-muted">
-                          {new Intl.DateTimeFormat("da-DK", {
-                            month: "short",
-                          }).format(new Date(meeting.starts_at))}
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                          <span className="hidden 2xl:inline">
+                            Se dagsorden
+                          </span>
+                          <span aria-hidden="true">→</span>
                         </span>
-                      </time>
-                      <span className="min-w-0">
-                        <span className="block text-xs leading-4 text-muted">
-                          {meeting.committeeName}
-                        </span>
-                        <span className="block break-words text-sm font-semibold leading-5 group-hover:text-brand group-hover:underline">
-                          {meeting.title}
-                        </span>
-                        <span className="block text-xs leading-4 text-muted">
-                          {formatMeetingTime(meeting.starts_at)}
-                        </span>
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand">
-                        <span className="hidden 2xl:inline">Se dagsorden</span>
-                        <span aria-hidden="true">→</span>
-                      </span>
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                description="Planlagte møder fra dine udvalg vises her."
-                title="Du har ingen kommende møder."
-              />
-            )}
-          </section>
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  compact
+                  description="Planlagte møder fra dine udvalg vises her."
+                  title="Du har ingen kommende møder."
+                />
+              )}
+            </section>
+          ) : null}
 
           <div className="order-3">{committeeSection}</div>
         </div>

@@ -20,7 +20,7 @@ import {
   occurrenceStatusLabels,
 } from "@/lib/localization";
 import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
-import { isRichTextEmpty } from "@/lib/rich-text";
+import { isRichTextEmpty, richTextToPlainText } from "@/lib/rich-text";
 import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
 import type { AgendaItemHistoryEntry } from "@/types/domain";
 
@@ -45,12 +45,18 @@ function formatShortDate(value: string | null) {
 function isFutureTreatment(entry: AgendaItemHistoryEntry) {
   return Boolean(
     entry.meetingDate &&
-      (entry.meetingStatus === "draft" || entry.meetingStatus === "scheduled") &&
-      new Date(entry.meetingDate).getTime() > Date.now(),
+    (entry.meetingStatus === "draft" || entry.meetingStatus === "scheduled") &&
+    new Date(entry.meetingDate).getTime() > Date.now(),
   );
 }
 
-function TreatmentContent({ entry }: { entry: AgendaItemHistoryEntry }) {
+function TreatmentContent({
+  entry,
+  showDescription,
+}: {
+  entry: AgendaItemHistoryEntry;
+  showDescription: boolean;
+}) {
   const hasBackground = !isRichTextEmpty(entry.background);
   const hasObjective = !isRichTextEmpty(entry.objective);
   const hasNotes = !isRichTextEmpty(entry.minutes?.notes);
@@ -60,8 +66,11 @@ function TreatmentContent({ entry }: { entry: AgendaItemHistoryEntry }) {
 
   return (
     <div className="space-y-4 border-t border-line/70 px-3 pb-4 pt-3 sm:px-4">
-      {hasBackground || hasObjective ? (
-        <section>
+      {showDescription && (hasBackground || hasObjective) ? (
+        <details>
+          <summary className="cursor-pointer text-xs text-muted">
+            Punktbeskrivelse (ikke mødereferat)
+          </summary>
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
             {hasBackground ? "Baggrund" : "Formål"}
           </h4>
@@ -69,7 +78,7 @@ function TreatmentContent({ entry }: { entry: AgendaItemHistoryEntry }) {
             className="mt-1.5 text-sm leading-6 text-ink"
             value={hasBackground ? entry.background : entry.objective}
           />
-        </section>
+        </details>
       ) : null}
 
       {hasNotes || hasOutcome ? (
@@ -206,9 +215,7 @@ function TreatmentContent({ entry }: { entry: AgendaItemHistoryEntry }) {
         </section>
       ) : null}
 
-      {!hasBackground &&
-      !hasObjective &&
-      !hasNotes &&
+      {!hasNotes &&
       !hasOutcome &&
       !hasDecisionNote &&
       entry.decisions.length === 0 &&
@@ -216,7 +223,7 @@ function TreatmentContent({ entry }: { entry: AgendaItemHistoryEntry }) {
       !entry.transfer &&
       entry.tasks.length === 0 ? (
         <p className="text-sm text-muted">
-          Der er ikke registreret behandlingsindhold endnu.
+          Der er endnu ikke skrevet referat til dette møde.
         </p>
       ) : null}
     </div>
@@ -230,6 +237,7 @@ export function AgendaItemHistoryInline({
   initialHistory,
   organizationId,
   presentation = "detail",
+  currentBackground = "",
 }: {
   agendaItemId: string;
   committeeId: string;
@@ -237,15 +245,17 @@ export function AgendaItemHistoryInline({
   initialHistory: AgendaItemHistoryResult;
   organizationId: string;
   presentation?: "detail" | "embedded";
+  currentBackground?: string | null;
 }) {
   const [history, setHistory] = useState(initialHistory);
-  const [expandedIds, setExpandedIds] = useState(() =>
-    new Set(
-      getInitialExpandedAgendaHistoryIds(
-        initialHistory.entries,
-        currentOccurrenceId,
+  const [expandedIds, setExpandedIds] = useState(
+    () =>
+      new Set(
+        getInitialExpandedAgendaHistoryIds(
+          initialHistory.entries,
+          currentOccurrenceId,
+        ),
       ),
-    ),
   );
 
   useEffect(() => {
@@ -262,8 +272,9 @@ export function AgendaItemHistoryInline({
 
   useEffect(() => {
     function refreshHistory(event: Event) {
-      const changedAgendaItemId = (event as CustomEvent<{ agendaItemId?: string }>)
-        .detail?.agendaItemId;
+      const changedAgendaItemId = (
+        event as CustomEvent<{ agendaItemId?: string }>
+      ).detail?.agendaItemId;
       if (changedAgendaItemId && changedAgendaItemId !== agendaItemId) return;
 
       fetch(
@@ -291,22 +302,43 @@ export function AgendaItemHistoryInline({
   }, [agendaItemId, committeeId, currentOccurrenceId, organizationId]);
 
   if (history.entries.length < 2) return null;
+  const seenDescriptions = new Set([
+    richTextToPlainText(currentBackground ?? "").trim(),
+  ]);
+  const descriptionsToShow = new Set<string>();
+  for (const entry of history.entries) {
+    const text = richTextToPlainText(
+      entry.background || entry.objective || "",
+    ).trim();
+    if (text && !seenDescriptions.has(text)) {
+      descriptionsToShow.add(entry.occurrenceId ?? entry.id);
+      seenDescriptions.add(text);
+    }
+  }
 
   return (
     <section
       aria-label={presentation === "embedded" ? "Sagens historik" : undefined}
-      aria-labelledby={presentation === "detail" ? "agenda-history-heading" : undefined}
+      aria-labelledby={
+        presentation === "detail" ? "agenda-history-heading" : undefined
+      }
       className={presentation === "detail" ? "mt-8" : "mt-3"}
     >
-      {presentation === "detail" ? <div>
-        <p className="page-eyebrow">Sagens forløb</p>
-        <h2 className="mt-1 text-xl font-semibold text-ink" id="agenda-history-heading">
-          Historik
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          {history.entries.length} behandlinger af denne sag
-        </p>
-      </div> : null}
+      {presentation === "detail" ? (
+        <div>
+          <p className="page-eyebrow">Sagens forløb</p>
+          <h2
+            className="mt-1 text-xl font-semibold text-ink"
+            id="agenda-history-heading"
+          >
+            Historik
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            {history.entries.length} møder · Referat, beslutninger og opfølgning
+            fra hvert møde
+          </p>
+        </div>
+      ) : null}
 
       <ol
         className={clsx("relative", presentation === "detail" && "mt-4")}
@@ -320,7 +352,9 @@ export function AgendaItemHistoryInline({
           const expanded = expandedIds.has(entryKey);
           const statusLabel = entry.minutes
             ? agendaItemMinutesStatusLabels[entry.minutes.status]
-            : occurrenceStatusLabels[entry.status as keyof typeof occurrenceStatusLabels];
+            : occurrenceStatusLabels[
+                entry.status as keyof typeof occurrenceStatusLabels
+              ];
 
           return (
             <li
@@ -381,7 +415,9 @@ export function AgendaItemHistoryInline({
                       </span>
                       {entry.title}
                     </span>
-                    {entry.decisions.length > 0 || entry.openTaskCount > 0 || entry.transfer ? (
+                    {entry.decisions.length > 0 ||
+                    entry.openTaskCount > 0 ||
+                    entry.transfer ? (
                       <span className="mt-1.5 block text-xs text-muted">
                         {[
                           entry.decisions.length > 0
@@ -391,7 +427,9 @@ export function AgendaItemHistoryInline({
                             ? `${entry.openTaskCount} åbne ${entry.openTaskCount === 1 ? "opgave" : "opgaver"}`
                             : null,
                           entry.transfer
-                            ? agendaItemTransferReasonLabels[entry.transfer.reason]
+                            ? agendaItemTransferReasonLabels[
+                                entry.transfer.reason
+                              ]
                             : null,
                         ]
                           .filter(Boolean)
@@ -410,7 +448,10 @@ export function AgendaItemHistoryInline({
                 </button>
 
                 <div hidden={!expanded} id={panelId}>
-                  <TreatmentContent entry={entry} />
+                  <TreatmentContent
+                    entry={entry}
+                    showDescription={descriptionsToShow.has(entryKey)}
+                  />
                   {entry.meetingId && entry.occurrenceId ? (
                     <div className="border-t border-line/70 px-3 py-2 sm:px-4">
                       <Link

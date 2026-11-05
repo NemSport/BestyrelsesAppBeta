@@ -465,6 +465,7 @@ export type MeetingMinutesBundle = {
 };
 
 export type MeetingMinuteApprovalView = MeetingMinuteApproval & {
+  canApproveOnBehalf?: boolean;
   memberName: string;
   memberEmail: string;
 };

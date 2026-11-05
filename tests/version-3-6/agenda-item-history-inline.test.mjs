@@ -24,17 +24,14 @@ function entry(id) {
 test("one treatment hides inline history while two treatments show the RLS-visible count", () => {
   assert.match(inlineHistory, /history\.entries\.length < 2\) return null/);
   assert.match(inlineHistory, />\s*Historik\s*</);
-  assert.match(
-    inlineHistory,
-    /\{history\.entries\.length\} behandlinger af denne sag/,
-  );
+  assert.match(inlineHistory, /\{history\.entries\.length\} møder/);
   assert.doesNotMatch(inlineHistory, /totalCount|unfilteredCount/);
 });
 
-test("agenda detail uses one inline history experience after the assistant", () => {
+test("agenda detail uses one inline history experience before the optional assistant", () => {
   assert.match(
     agendaPage,
-    /<AgendaItemAssistant[\s\S]*<AgendaItemHistoryInline[\s\S]*title="Tidligere beslutninger om dette emne"/,
+    /<AgendaItemHistoryInline[\s\S]*<AgendaItemAssistant[\s\S]*title="Tidligere beslutninger om dette emne"/,
   );
   assert.doesNotMatch(agendaPage, /<AgendaItemHistory\s/);
   assert.doesNotMatch(agendaPage, /Historisk kontekst/);
@@ -80,7 +77,7 @@ test("accordion is keyboard-accessible and mobile-safe", () => {
 });
 
 test("expanded treatment renders shared rich text, decisions, follow-up, transfer and tasks", () => {
-  assert.match(inlineHistory, /<TreatmentContent entry=\{entry\}/);
+  assert.match(inlineHistory, /<TreatmentContent\s+entry=\{entry\}/);
   assert.match(inlineHistory, /"Baggrund" : "Formål"/);
   assert.match(inlineHistory, />\s*Referat \/ noter/);
   assert.match(inlineHistory, />\s*Beslutninger/);
@@ -99,7 +96,10 @@ test("rich text goes through the shared sanitizer and private notes are absent",
   );
   assert.match(inlineHistory, /value=\{entry\.minutes\?\.followUp\}/);
   assert.match(agendaPage, /<RichTextContent[\s\S]*value=\{item\.objective\}/);
-  assert.match(agendaPage, /<RichTextContent[\s\S]*value=\{item\.description\}/);
+  assert.match(
+    agendaPage,
+    /<RichTextContent[\s\S]*value=\{item\.description\}/,
+  );
   assert.doesNotMatch(inlineHistory, /private[_ A-Z-]?note/i);
   assert.doesNotMatch(repository, /agenda_item_private_notes/);
 });
@@ -115,7 +115,10 @@ test("full treatment data is bulk-loaded in a constant number of scoped queries"
   assert.match(historyMethod, /\.from\("tasks"\)/);
   assert.match(historyMethod, /\.from\("transferred_agenda_items"\)/);
   assert.match(historyMethod, /\.in\("agenda_item_id", agendaItemIds\)/);
-  assert.match(historyMethod, /const treatmentKey = `\$\{item\.id\}:\$\{occurrence\.meetings!\.id\}`/);
+  assert.match(
+    historyMethod,
+    /const treatmentKey = `\$\{item\.id\}:\$\{occurrence\.meetings!\.id\}`/,
+  );
   assert.doesNotMatch(
     historyMethod,
     /visibleOccurrences\.map[\s\S]*?await this\.db/,
@@ -132,7 +135,10 @@ test("optional meeting navigation uses meetingId plus occurrenceId", () => {
 
 test("manual linking refreshes inline history without a page reload", () => {
   assert.match(historyLink, /agendaItemHistoryChangedEvent/);
-  assert.match(inlineHistory, /addEventListener\(agendaItemHistoryChangedEvent/);
+  assert.match(
+    inlineHistory,
+    /addEventListener\(agendaItemHistoryChangedEvent/,
+  );
   assert.match(inlineHistory, /\/history\?organizationId=/);
   assert.doesNotMatch(inlineHistory, /window\.location\.reload/);
 });
