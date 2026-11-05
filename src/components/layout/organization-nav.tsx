@@ -3,15 +3,31 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { AppIcon, organizationNavIconNames } from "@/components/icons/app-icon";
-import { useDialogFocus } from "@/hooks/use-dialog-focus";
 import {
   getActiveCommitteeId,
   isOrganizationNavItemActive,
   organizationNavItems,
 } from "@/lib/organization-navigation";
+
+const workOrder = [
+  "",
+  "/actions",
+  "/meetings",
+  "/decisions",
+  "/tasks",
+  "/documents",
+  "/annual-wheel",
+];
+const organizationOrder = [
+  "/committees",
+  "/members",
+  "/stakeholders",
+  "/job-cards",
+  "/trash",
+];
 
 export function OrganizationNav({
   canManageTrash = false,
@@ -28,176 +44,87 @@ export function OrganizationNav({
   activeActionCount?: number;
 }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
+  const navigationRef = useRef<HTMLElement>(null);
   const root = `/organizations/${organizationId}`;
-  const items = useMemo(
-    () =>
-      organizationNavItems.filter(
-        (item) => item.suffix !== "/trash" || canManageTrash,
-      ),
-    [canManageTrash],
+  const items = organizationNavItems.filter(
+    (item) => item.suffix !== "/trash" || canManageTrash,
   );
-  const activeItem = items.find((item) =>
-    isOrganizationNavItemActive(pathname, root, item),
-  );
-  const activeLabel =
-    activeItem?.label ??
-    (pathname === `${root}/edit` ? "Indstillinger" : "Organisation");
   const activeCommitteeId = getActiveCommitteeId(pathname, root);
   const activeCommittee = committees.find(
     (committee) => committee.id === activeCommitteeId,
   );
-  useDialogFocus({
-    active: mobileOpen,
-    containerRef: drawerRef,
-    onEscape: () => setMobileOpen(false),
-    returnFocusRef: triggerRef,
-  });
 
+  // Use the real header height: text wrapping and browser zoom can change it.
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    const desktopMedia = window.matchMedia("(min-width: 1024px)");
-    const closeOnDesktop = (event: MediaQueryListEvent) => {
-      if (event.matches) setMobileOpen(false);
+    const header = document.getElementById("app-header");
+    const navigation = navigationRef.current;
+    if (!header || !navigation) return;
+    const workspace = navigation.closest<HTMLElement>(".org-layout");
+    const update = () => {
+      const headerHeight = header.getBoundingClientRect().height;
+      navigation.style.setProperty("--org-header-height", `${headerHeight}px`);
+      workspace?.style.setProperty(
+        "--org-content-top",
+        `${headerHeight + navigation.getBoundingClientRect().height + 12}px`,
+      );
     };
-    desktopMedia.addEventListener("change", closeOnDesktop);
-    return () => desktopMedia.removeEventListener("change", closeOnDesktop);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    observer.observe(navigation);
+    return () => {
+      observer.disconnect();
+      workspace?.style.removeProperty("--org-content-top");
+    };
   }, []);
 
-  const navLinks = (onNavigate?: () => void) => (
-    <div className="org-nav-list">
-      {items.map((item) => {
-        const href = `${root}${item.suffix}`;
+  const navLinks = (order: string[], secondary = false) => (
+    <div className="org-topnav-links">
+      {order.flatMap((suffix) => {
+        const item = items.find((candidate) => candidate.suffix === suffix);
+        if (!item) return [];
         const active = isOrganizationNavItemActive(pathname, root, item);
-
-        return (
+        return [
           <Link
             aria-current={active ? "page" : undefined}
-            className={clsx("org-nav-link", active && "org-nav-link-active")}
-            href={href}
-            key={item.label}
-            onClick={onNavigate}
+            className={clsx(
+              "org-topnav-link",
+              active && "org-topnav-link-active",
+            )}
+            href={`${root}${item.suffix}`}
+            key={item.suffix}
           >
-            <span className="org-nav-icon">
-              <AppIcon name={organizationNavIconNames[item.suffix]} />
-            </span>
+            {!secondary ? (
+              <AppIcon name={organizationNavIconNames[item.suffix]} size={16} />
+            ) : null}
             <span>{item.label}</span>
             {item.suffix === "/actions" && activeActionCount > 0 ? (
               <span
                 aria-label={`${activeActionCount} aktive handlinger`}
-                className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-[0.65rem] font-bold text-ink"
+                className="rounded-full bg-warning-soft px-1.5 text-xs text-ink"
               >
                 {activeActionCount > 99 ? "99+" : activeActionCount}
               </span>
             ) : null}
-          </Link>
-        );
+          </Link>,
+        ];
       })}
     </div>
   );
 
   return (
-    <aside className="org-sidebar">
-      <details className="meeting-organization-menu">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
-          Organisationsmenu
-        </summary>
-        <nav aria-label="Organisation under mødet">{navLinks()}</nav>
-      </details>
-      <div className="org-mobile-context">
-        <div className="min-w-0">
-          <p className="org-mobile-organization truncate">
-            {organizationName ?? "Organisation"}
-          </p>
-          <p className="org-mobile-location truncate">
-            {activeCommittee ? `${activeCommittee.name} · ` : ""}
-            {activeLabel}
-          </p>
-        </div>
-        <button
-          aria-controls="organization-mobile-navigation"
-          aria-expanded={mobileOpen}
-          aria-haspopup="dialog"
-          className="org-mobile-menu-trigger"
-          onClick={() => setMobileOpen(true)}
-          ref={triggerRef}
-          type="button"
-        >
-          Menu
-          <AppIcon name="menu" size={17} />
-        </button>
+    <aside className="org-topnav" ref={navigationRef}>
+      <nav aria-label="Arbejdsområder">{navLinks(workOrder)}</nav>
+      <div className="org-topnav-secondary">
+        <span className="org-topnav-label">Organisation</span>
+        <nav aria-label="Organisationsnavigation">
+          {navLinks(organizationOrder, true)}
+        </nav>
+        <span className="org-topnav-context">
+          {organizationName ?? "Organisation"}
+          {activeCommittee ? ` · ${activeCommittee.name}` : ""}
+        </span>
       </div>
-
-      <nav
-        aria-label="Organisationsnavigation"
-        className="org-desktop-navigation"
-      >
-        <div className="org-sidebar-header">
-          <p className="org-sidebar-kicker text-[0.62rem] font-semibold uppercase tracking-[0.16em]">
-            Organisation
-          </p>
-          <p className="org-sidebar-title mt-0.5 text-[0.82rem] font-semibold leading-5">
-            {organizationName ?? "Organisation"}
-          </p>
-          <p className="org-sidebar-current mt-1.5 text-[0.72rem] font-medium">
-            Aktuel side: <span>{activeLabel}</span>
-          </p>
-        </div>
-        {navLinks()}
-      </nav>
-
-      {mobileOpen ? (
-        <div
-          className="org-mobile-overlay"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setMobileOpen(false);
-          }}
-        >
-          <div
-            aria-labelledby={titleId}
-            aria-modal="true"
-            className="org-mobile-drawer"
-            id="organization-mobile-navigation"
-            ref={drawerRef}
-            role="dialog"
-          >
-            <div className="org-mobile-drawer-header">
-              <div className="min-w-0">
-                <p className="org-sidebar-kicker text-xs font-semibold uppercase tracking-[0.14em]">
-                  Organisation
-                </p>
-                <h2
-                  className="org-sidebar-title mt-1 truncate text-base font-semibold"
-                  id={titleId}
-                >
-                  {organizationName ?? "Organisation"}
-                </h2>
-                <p className="org-sidebar-current mt-1 text-sm">
-                  {activeCommittee ? `${activeCommittee.name} · ` : ""}
-                  <span>{activeLabel}</span>
-                </p>
-              </div>
-              <button
-                aria-label="Luk navigation"
-                className="org-mobile-close"
-                onClick={() => setMobileOpen(false)}
-                type="button"
-              >
-                Luk
-              </button>
-            </div>
-            <nav aria-label="Mobil organisationsnavigation">
-              {navLinks(() => setMobileOpen(false))}
-            </nav>
-          </div>
-        </div>
-      ) : null}
     </aside>
   );
 }
