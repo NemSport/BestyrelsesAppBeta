@@ -851,7 +851,7 @@ export function MinutesApprovalPanel({
   const hasApprovalRound =
     minutes?.status === "ready_for_approval" || minutes?.status === "approved";
   const canSendForApproval =
-    canEdit && Boolean(minutes) && approvalRecipientInfo.eligibleCount > 0;
+    canEdit && approvalRecipientInfo.eligibleCount > 0;
   const canStartApproval = canEdit;
   const approvalRecipientHelp =
     approvalRecipientInfo.mode === "participants"

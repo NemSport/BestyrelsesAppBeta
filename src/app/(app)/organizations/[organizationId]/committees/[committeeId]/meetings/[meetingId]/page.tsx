@@ -509,7 +509,10 @@ export default async function MeetingPage({
         }
         committeeName={context.committee.name}
         meeting={meeting}
-        minutesStatus={minutes.meetingMinutes?.status ?? null}
+        minutesStatus={
+          minutes.meetingMinutes?.status ??
+          (minutes.agendaItemMinutes.length > 0 ? "draft" : null)
+        }
         participantSummary={{
           action: (
             <MeetingParticipantsPanel
