@@ -1750,3 +1750,25 @@ Den fælles PDF-proserenderer bevarer paragraphs, line breaks, bold, italic,
 unordered og ordered lists samt TipTap-listedybde. Derfor bruger dagsorden,
 referat, formål, baggrund og øvrige eksisterende rich-text PDF-felter samme
 wrapping- og sideskiftlogik.
+
+### Administrator approval on behalf of a participant
+
+`POST /api/meetings/[meetingId]/minutes/approval` accepts action
+`approve_on_behalf` with `targetUserId` and the existing organization/committee
+scope. Only active organization owners/admins may use it; committee management
+permissions alone do not grant this action. The service authorizes the scope,
+and `approve_meeting_minutes_on_behalf` independently enforces organization
+admin access, an existing approval recipient, a non-deleted meeting and a
+ready-for-approval/approved minutes round in one transaction.
+
+The recipient remains `user_id`; `updated_by` records the acting administrator,
+`responded_at` records the time, and a server-generated comment snapshots the
+administrator name for display and existing PDF exports. Already-approved
+responses are unchanged on retry. The last outstanding response completes the
+round; pending and change-requested responses otherwise keep it open. No
+existing RLS policies are relaxed. Migration: `202611050001_admin_minutes_approval.sql`.
+
+The organization overview separates the next meeting from later meetings.
+Agenda-item history shows meeting-specific minutes and outcomes; shared case
+background appears once above the timeline, with distinct historical descriptions
+available in collapsed details. These presentation changes do not rewrite data.

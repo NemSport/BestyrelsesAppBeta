@@ -1772,6 +1772,10 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"];
       };
+      approve_meeting_minutes_on_behalf: {
+        Args: { target_meeting_minutes_id: string; target_user_id: string };
+        Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"];
+      };
       mark_missing_approval_responses: {
         Args: { target_meeting_minutes_id: string };
         Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"][];

@@ -165,6 +165,18 @@ export class MeetingMinutesGovernanceRepository {
     return data;
   }
 
+  async approveOnBehalf(meetingMinutesId: string, userId: string) {
+    const { data, error } = await this.db.rpc(
+      "approve_meeting_minutes_on_behalf",
+      {
+        target_meeting_minutes_id: meetingMinutesId,
+        target_user_id: userId,
+      },
+    );
+    if (error) throw error;
+    return data;
+  }
+
   async markNoResponse(meetingMinutesId: string) {
     const { data, error } = await this.db.rpc(
       "mark_missing_approval_responses",

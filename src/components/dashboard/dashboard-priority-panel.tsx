@@ -31,9 +31,11 @@ export function DashboardPriorityPanel({
     >
       <div className="section-header flex-col lg:flex-row">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
-            {eyebrow}
-          </p>
+          {eyebrow ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+              {eyebrow}
+            </p>
+          ) : null}
           <h2
             className={clsx(
               "text-xl font-semibold",
@@ -43,14 +45,16 @@ export function DashboardPriorityPanel({
           >
             {title}
           </h2>
-          <p
-            className={clsx(
-              "max-w-3xl text-sm text-muted",
-              variant === "card" ? "mt-0.5 leading-5" : "mt-1",
-            )}
-          >
-            {description}
-          </p>
+          {description ? (
+            <p
+              className={clsx(
+                "max-w-3xl text-sm text-muted",
+                variant === "card" ? "mt-0.5 leading-5" : "mt-1",
+              )}
+            >
+              {description}
+            </p>
+          ) : null}
         </div>
         {action ? <div className="section-actions">{action}</div> : null}
       </div>

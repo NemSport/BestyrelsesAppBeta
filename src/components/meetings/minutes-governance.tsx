@@ -87,11 +87,15 @@ export function MinuteAttachments({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerCategory, setPickerCategory] = useState("");
-  const [linkingDocumentId, setLinkingDocumentId] = useState<string | null>(null);
+  const [linkingDocumentId, setLinkingDocumentId] = useState<string | null>(
+    null,
+  );
   const [visibleDocuments, setVisibleDocuments] = useState(
     relatedDocuments.filter(
       (document) =>
-        !attachments.some((attachment) => attachment.id === document.document.id),
+        !attachments.some(
+          (attachment) => attachment.id === document.document.id,
+        ),
     ),
   );
   const uploadingRef = useRef(false);
@@ -327,9 +331,7 @@ export function MinuteAttachments({
           <p className="mt-0.5 text-xs text-muted">
             {attachmentCount === 0
               ? "Ingen vedhæftninger"
-              : `${attachmentCount} ${
-                  attachmentCount === 1 ? "fil" : "filer"
-                }`}
+              : `${attachmentCount} ${attachmentCount === 1 ? "fil" : "filer"}`}
           </p>
         </div>
         <span className="text-xs font-semibold text-brand">
@@ -459,19 +461,27 @@ export function MinuteAttachments({
                   key={relatedDocument.relationId}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={document.name}>
+                    <p
+                      className="truncate text-sm font-medium"
+                      title={document.name}
+                    >
                       {document.name}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-muted">
                       Fra dokumentbiblioteket
-                      {document.categoryName ? ` · ${document.categoryName}` : ""}
+                      {document.categoryName
+                        ? ` · ${document.categoryName}`
+                        : ""}
                       {version ? ` · ${version.file_name}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {version ? (
                       <a
-                        className={buttonClassName({ size: "sm", variant: "secondary" })}
+                        className={buttonClassName({
+                          size: "sm",
+                          variant: "secondary",
+                        })}
                         href={`/api/documents/${document.id}/versions/${version.id}/download`}
                         rel="noopener noreferrer"
                         target="_blank"
@@ -480,7 +490,10 @@ export function MinuteAttachments({
                       </a>
                     ) : null}
                     <a
-                      className={buttonClassName({ size: "sm", variant: "ghost" })}
+                      className={buttonClassName({
+                        size: "sm",
+                        variant: "ghost",
+                      })}
                       href={`/organizations/${organizationId}/documents/${document.id}`}
                     >
                       Dokumentdetalje
@@ -488,12 +501,16 @@ export function MinuteAttachments({
                     {canUpload ? (
                       <Button
                         disabled={removingId === relatedDocument.relationId}
-                        onClick={() => void detachExistingDocument(relatedDocument)}
+                        onClick={() =>
+                          void detachExistingDocument(relatedDocument)
+                        }
                         size="sm"
                         type="button"
                         variant="ghost"
                       >
-                        {removingId === relatedDocument.relationId ? "Fjerner..." : "Fjern"}
+                        {removingId === relatedDocument.relationId
+                          ? "Fjerner..."
+                          : "Fjern"}
                       </Button>
                     ) : null}
                   </div>
@@ -552,12 +569,17 @@ export function MinuteAttachments({
                   key={document.id}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold" title={document.name}>
+                    <p
+                      className="truncate text-sm font-semibold"
+                      title={document.name}
+                    >
                       {document.name}
                     </p>
                     <p className="truncate text-xs text-muted">
                       {document.categoryName ?? "Ukategoriseret"}
-                      {document.currentVersion ? ` · ${document.currentVersion.file_name}` : ""}
+                      {document.currentVersion
+                        ? ` · ${document.currentVersion.file_name}`
+                        : ""}
                     </p>
                   </div>
                   <Button
@@ -566,7 +588,9 @@ export function MinuteAttachments({
                     size="sm"
                     type="button"
                   >
-                    {linkingDocumentId === document.id ? "Vedhæfter…" : "Vedhæft"}
+                    {linkingDocumentId === document.id
+                      ? "Vedhæfter…"
+                      : "Vedhæft"}
                   </Button>
                 </article>
               ))}
@@ -583,7 +607,11 @@ export function MinuteAttachments({
               title="Ingen dokumenter at vælge"
             />
           )}
-          {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+          {error ? (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
       </Modal>
     </details>
@@ -624,6 +652,7 @@ export function MinutesApprovalPanel({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const actionPending = useRef(false);
   const [deadline, setDeadline] = useState(minutes?.approval_deadline ?? "");
   const [comment, setComment] = useState("");
   const [showChangeRequest, setShowChangeRequest] = useState(false);
@@ -655,6 +684,8 @@ export function MinutesApprovalPanel({
   }, [minutes?.approval_deadline]);
 
   async function act(body: Record<string, unknown>) {
+    if (actionPending.current) return;
+    actionPending.current = true;
     setWorking(true);
     setError(null);
     setMessage(null);
@@ -723,6 +754,7 @@ export function MinutesApprovalPanel({
           : "Godkendelseshandlingen mislykkedes.",
       );
     } finally {
+      actionPending.current = false;
       setWorking(false);
     }
   }
@@ -830,6 +862,46 @@ export function MinutesApprovalPanel({
         ? `Ingen deltagere er registreret endnu. Ved afsendelse bruges fallback til ${approvalRecipientInfo.eligibleCount} aktive udvalgsmedlemmer.`
         : "Der findes ingen mulige godkendere. Registrer deltagere eller opdater udvalgets medlemmer.";
 
+  function delegatedApproval(approval: MeetingMinuteApprovalView) {
+    return (
+      <div className="mt-1 space-y-1">
+        {approval.status === "approved" &&
+        approval.updated_by !== approval.user_id ? (
+          <p className="whitespace-pre-wrap text-xs text-muted">
+            {approval.comment || "Godkendt på vegne af deltageren"}
+            {approval.responded_at
+              ? ` · ${formatDateTime(approval.responded_at)}`
+              : ""}
+          </p>
+        ) : null}
+        {approval.canApproveOnBehalf &&
+        approval.status !== "approved" &&
+        hasApprovalRound ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={working}
+            type="button"
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Godkend referatet på vegne af ${approval.memberName}? Dit navn og tidspunkt bliver registreret på godkendelsen.`,
+                )
+              ) {
+                void act({
+                  action: "approve_on_behalf",
+                  targetUserId: approval.user_id,
+                });
+              }
+            }}
+          >
+            Godkend på vegne af {approval.memberName}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (compact) {
     return (
       <section
@@ -864,7 +936,7 @@ export function MinutesApprovalPanel({
           <div className="mt-2 divide-y divide-line/70 border-y border-line/70">
             {approvals.map((approval) => (
               <div
-                className="flex min-w-0 items-center gap-2 py-2"
+                className="flex min-w-0 flex-wrap items-center gap-2 py-2"
                 key={approval.id}
               >
                 <span
@@ -880,6 +952,7 @@ export function MinutesApprovalPanel({
                 <span className="shrink-0 text-[0.68rem] text-muted">
                   {meetingMinuteApprovalStatusLabels[approval.status]}
                 </span>
+                <div className="w-full">{delegatedApproval(approval)}</div>
               </div>
             ))}
           </div>
@@ -1303,7 +1376,12 @@ export function MinutesApprovalPanel({
                     {meetingMinuteApprovalStatusLabels[approval.status]}
                   </StatusBadge>
                 </div>
-                {approval.comment ? (
+                {delegatedApproval(approval)}
+                {approval.comment &&
+                !(
+                  approval.status === "approved" &&
+                  approval.updated_by !== approval.user_id
+                ) ? (
                   <div className="mt-3 rounded-lg border-l-4 border-warning/40 bg-warning-soft p-3 text-sm text-warning">
                     <p className="text-xs font-semibold uppercase tracking-wide">
                       Kommentar

@@ -482,6 +482,10 @@ export const markNoResponseSchema = z.object({
   meetingId: uuidSchema,
 });
 
+export const minutesApprovalOnBehalfSchema = markNoResponseSchema.extend({
+  targetUserId: uuidSchema,
+});
+
 export const meetingParticipantsInputSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,

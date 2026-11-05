@@ -8,7 +8,6 @@ import {
   EmptyState,
   PageHeader,
   StatusBadge,
-  buttonClassName,
   staticSurfaceClassName,
 } from "@/components/ui";
 import { resolveOrganizationDashboardAudience } from "@/lib/dashboard-prioritization";
@@ -42,9 +41,6 @@ export default async function OrganizationPage({
     context.membership.role,
     overview.committees.map(({ capabilities }) => capabilities),
   );
-  const meetingCommittee = overview.committees.find(
-    ({ capabilities }) => capabilities.createMeeting,
-  );
   const committeeHighlights = [...overview.committees]
     .sort((left, right) => {
       const leftAttention =
@@ -70,9 +66,6 @@ export default async function OrganizationPage({
     <section aria-labelledby="committees-title">
       <div className="mb-1.5 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Navigation
-          </p>
           <h2 className="mt-0.5 text-xl font-semibold" id="committees-title">
             Mine udvalg
           </h2>
@@ -90,10 +83,6 @@ export default async function OrganizationPage({
       {committeeHighlights.length ? (
         <div className={staticSurfaceClassName("divide-y divide-line")}>
           {committeeHighlights.map((item) => {
-            const attention =
-              item.openTaskCount +
-              item.activeDecisionCount +
-              item.openFollowUpCount;
             const committeeRoot = `${organizationRoot}/committees/${item.committee.id}`;
             return (
               <article key={item.committee.id}>
@@ -105,9 +94,6 @@ export default async function OrganizationPage({
                     {item.committee.name}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <StatusBadge tone={attention ? "warning" : "success"}>
-                      {attention ? "Kræver handling" : "Roligt"}
-                    </StatusBadge>
                     <span
                       aria-hidden="true"
                       className="font-semibold text-brand"
@@ -160,9 +146,6 @@ export default async function OrganizationPage({
     >
       <div className="mb-1.5 flex flex-wrap items-end justify-between gap-x-3 gap-y-0.5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Referater
-          </p>
           <h2
             className="mt-0.5 text-xl font-semibold"
             id="recent-minutes-title"
@@ -170,17 +153,14 @@ export default async function OrganizationPage({
             Seneste referater
           </h2>
         </div>
-        <p className="text-sm text-muted">
-          Senest opdaterede referater, du har adgang til.
-        </p>
       </div>
       {recentActivity.length ? (
-        <div className="grid gap-1.5 sm:grid-cols-2">
+        <div className="divide-y divide-line">
           {recentActivity.map((minutes) => (
             <article key={minutes.id}>
               <Link
                 className={staticSurfaceClassName(
-                  "group grid min-h-11 gap-x-2 gap-y-0.5 px-2.5 py-1.5 transition hover:border-brand/45 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+                  "group grid min-h-11 gap-x-2 gap-y-1 border-0 rounded-none shadow-none px-3 py-4 transition hover:border-brand/45 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
                 )}
                 href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
               >
@@ -221,25 +201,11 @@ export default async function OrganizationPage({
   );
 
   return (
-    <div className="space-y-4 xl:space-y-2.5" data-organization-dashboard>
+    <div className="space-y-6" data-organization-dashboard>
       <PageHeader
         className="xl:gap-2 xl:pb-2 [&_.page-lead]:mt-1 [&_.page-title]:mt-1"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {meetingCommittee ? (
-              <Link
-                className={buttonClassName({ size: "sm" })}
-                href={`${organizationRoot}/committees/${meetingCommittee.committee.id}/meetings/new`}
-              >
-                Nyt møde
-              </Link>
-            ) : null}
-            <Link
-              className={buttonClassName({ size: "sm", variant: "secondary" })}
-              href={`${organizationRoot}/meetings`}
-            >
-              Åbn kalender
-            </Link>
             {canManage ? (
               <ActionMenu label="Indstillinger">
                 <Link
@@ -259,7 +225,7 @@ export default async function OrganizationPage({
             ) : null}
           </div>
         }
-        description="Få overblik over møder, opgaver og beslutninger"
+        description="Det vigtigste fra dine udvalg"
         eyebrow={
           <Link
             className="text-muted transition hover:text-brand"
@@ -268,7 +234,7 @@ export default async function OrganizationPage({
             {context.organization.name}
           </Link>
         }
-        title="Dashboard"
+        title="Overblik"
       />
 
       <OrganizationDashboardPriority

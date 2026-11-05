@@ -1059,3 +1059,54 @@ a {
     scroll-margin-top: var(--org-content-top, 10rem);
   }
 }
+
+/* A single next meeting and a quiet summary, with space between work areas. */
+.dashboard-summary {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+.dashboard-summary > :first-child {
+  padding: 1.5rem;
+}
+.dashboard-summary > :first-child > div > p:first-of-type {
+  font-size: 1.3rem;
+  line-height: 1.5;
+  margin-top: 0.75rem;
+}
+.dashboard-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+.dashboard-counts > a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: rgb(var(--brand-text-muted));
+}
+.dashboard-counts > a:hover {
+  color: rgb(var(--brand-primary));
+  text-decoration: underline;
+}
+.dashboard-calm .dashboard-action-row {
+  padding-block: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.dashboard-calm .dashboard-action-row > span:nth-last-child(2) {
+  grid-column: 2;
+  justify-content: start;
+}
+.dashboard-calm .dashboard-action-row > span:last-child {
+  grid-column: 3;
+  grid-row: 1;
+}
+@media (max-width: 767px) {
+  .dashboard-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+}
