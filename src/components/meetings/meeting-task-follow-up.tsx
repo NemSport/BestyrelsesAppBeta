@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ListPlus,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionMenu } from "@/components/ui/action-menu";
 import {
   useMutationFeedback,
   useUnsavedChanges,
@@ -26,6 +34,10 @@ const statuses = {
 };
 type State = FollowUpState & { canEdit: boolean; canLink: boolean };
 type Scope = { organizationId: string; committeeId: string; meetingId: string };
+const taskActionClass =
+  "inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted transition hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40";
+const agendaChoiceClass =
+  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40";
 async function responseBody(response: Response) {
   const body = await response.json();
   if (!response.ok)
@@ -303,21 +315,23 @@ export function MeetingTaskFollowUp({
                     {task.latest_note}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap gap-2">
+                <div className="-ml-2 flex flex-wrap items-center gap-x-1">
                   {canEdit ? (
                     <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
+                      <button
+                        type="button"
+                        className={taskActionClass}
+                        title="Rediger opgaven eller tilføj en note"
                         onClick={() => setEditing(task)}
                         disabled={feedback.pending || Boolean(editing)}
                       >
-                        Rediger / tilføj note
-                      </Button>
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        Rediger
+                      </button>
                       {task.status !== "completed" ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
+                        <button
+                          type="button"
+                          className={taskActionClass}
                           disabled={feedback.pending || Boolean(editing)}
                           onClick={() =>
                             mutate(task, {
@@ -326,53 +340,70 @@ export function MeetingTaskFollowUp({
                             })
                           }
                         >
-                          Afslut opgave
-                        </Button>
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                          Afslut
+                        </button>
                       ) : null}
                     </>
                   ) : null}
                   {link ? (
                     <a
-                      className="self-center text-sm font-semibold text-brand"
+                      className={taskActionClass}
                       href={`#agenda-point-${link.occurrence_id}`}
                     >
-                      Åbn dagsordenspunkt
+                      <ListPlus className="h-4 w-4" aria-hidden="true" />
+                      Åbn punkt
                     </a>
                   ) : data.canLink && data.writable ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
+                    <ActionMenu
+                      align="left"
+                      ariaLabel={`Dagsordenspunkt for ${task.title}`}
+                      label={
+                        <>
+                          <ListPlus
+                            className="mr-1.5 h-4 w-4"
+                            aria-hidden="true"
+                          />
+                          Dagsordenspunkt
+                        </>
+                      }
+                      triggerClassName="!rounded-md !border-0 !bg-transparent !px-2 !font-medium !text-muted hover:!bg-subtle hover:!text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                    >
+                      <button
+                        type="button"
+                        className={agendaChoiceClass}
                         disabled={feedback.pending || Boolean(editing)}
                         onClick={() => mutate(task, { action: "link" })}
                       >
-                        Opret særskilt punkt
-                      </Button>
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        Opret nyt punkt
+                      </button>
                       {data.occurrences.length ? (
-                        <label className="text-sm">
-                          Tilknyt eksisterende punkt
-                          <select
-                            className="field mt-1"
-                            value=""
-                            disabled={feedback.pending || Boolean(editing)}
-                            onChange={(event) => {
-                              if (event.target.value)
-                                void mutate(task, {
-                                  action: "link",
-                                  occurrenceId: event.target.value,
-                                });
-                            }}
-                          >
-                            <option value="">Vælg punkt…</option>
+                        <div className="border-t border-line pt-1">
+                          <p className="px-3 py-2 text-xs text-muted">
+                            Tilknyt eksisterende punkt
+                          </p>
+                          <div className="max-h-60 max-w-72 overflow-y-auto">
                             {data.occurrences.map((item) => (
-                              <option value={item.id} key={item.id}>
+                              <button
+                                type="button"
+                                key={item.id}
+                                className={agendaChoiceClass}
+                                disabled={feedback.pending || Boolean(editing)}
+                                onClick={() =>
+                                  mutate(task, {
+                                    action: "link",
+                                    occurrenceId: item.id,
+                                  })
+                                }
+                              >
                                 {item.title}
-                              </option>
+                              </button>
                             ))}
-                          </select>
-                        </label>
+                          </div>
+                        </div>
                       ) : null}
-                    </>
+                    </ActionMenu>
                   ) : null}
                 </div>
                 {editing?.id === task.id ? (
