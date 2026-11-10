@@ -356,7 +356,7 @@ export function MeetingTaskFollowUp({
                     </a>
                   ) : data.canLink && data.writable ? (
                     <ActionMenu
-                      align="left"
+                      align="right"
                       ariaLabel={`Dagsordenspunkt for ${task.title}`}
                       label={
                         <>
