@@ -355,6 +355,7 @@ export class MeetingMaterialDispatchService {
       task_list_mode: needsTasks ? parsed.taskListMode ?? null : null,
       recipient_count: recipients.length,
       recipient_snapshot: recipients as unknown as Json,
+      task_snapshot: (tasklist?.tasks ?? []).map(task => ({ id: task.id, title: task.title, status: task.status, deadline: task.deadline, responsible_name: task.responsible?.full_name ?? null })) as Json,
       document_snapshot: documents.map((document) => document.snapshot) as unknown as Json,
       delivery_status: summary.deliveryStatus,
       delivery_mode: summary.deliveryMode,

@@ -1,5 +1,47 @@
 # System Architecture
 
+## A4.2 — Meeting task follow-up
+
+Apply `202611100001_task_follow_up_key.sql` and then
+`202611100002_meeting_task_follow_up.sql` (separate transactions for the enum).
+The latter extends canonical `tasks` with `is_critical` and adds
+`meeting_task_links` (unique meeting/task, references an agenda occurrence) and
+append-only `meeting_task_events` with Organization, Committee, actor, request
+id, shared note and whitelisted before/after state. Canonical task origin FKs
+are unchanged. Standard meeting creation adds the system point atomically and
+retains the existing continuation call. No domain hierarchy changes.
+
+`GET/POST/PATCH /api/meetings/[meetingId]/task-follow-up` validates input through
+MeetingTaskFollowUpService. It authenticates and checks Committee membership
+before reading the meeting and rejects Organization/Committee mismatches.
+Task edits require editTasks; creating or linking an occurrence requires
+scheduleAgendaItem. Repositories are the database boundary. The read RPC is
+security-invoker and respects RLS. Read policies follow existing task/comment
+visibility; events contain no personal notes or internal task note.
+
+Writes to links/events are denied to clients. The security-definer mutation RPC
+has a fixed empty search path, explicit authenticated role/scope checks, meeting
+and task locks, active-assignee validation and optimistic `updated_at` comparison.
+It atomically saves task fields, shared comment, Annual Wheel completion and
+immutable event. Request UUIDs make retries idempotent. The occurrence must be
+in the same meeting; manager-only scheduling is rechecked in PostgreSQL. Archived
+tasks, closed/cancelled meetings and approved minutes reject new mutations.
+Trash restoration remains in the existing administrator workflow.
+
+The UI loads only the active agenda card, polls at 20 seconds and on focus,
+preserves editor drafts and refreshes after writes. Task View uses the same
+canonical rows and refreshes while not editing. Its captured edit timestamp and
+conditional repository update prevent stale overwrites. Legacy API callers may
+omit the optional timestamp, but still get a conditional write against the
+version read by TaskService. History is separate from authoritative minutes;
+no automatic decisions, tasks or AI actions are introduced.
+
+Dispatch `task_snapshot` is an immutable JSON metadata array generated from the
+already-authorized tasklist used for document generation, not a later database
+reread. It omits private/internal notes. Existing delivery statuses distinguish
+real, stubbed, partial and failed sends. Existing dispatch history is saved after
+delivery, so a failure to save history after sending remains a documented limit.
+
 ## Organization PDF Letterhead
 
 Migration `202611090002_pdf_template_configurator.sql` adds nullable
@@ -1037,11 +1079,12 @@ occurrences and stores attendance, order, allocated time, and
 meeting-specific outcomes.
 
 Meeting creation uses one transactional PostgreSQL function that also creates
-three standard agenda items in positions 0, 1, and 2: agenda approval, previous
-minutes approval, and any other business. Their stable `standard_key` metadata
+four standard agenda items in positions 0, 1, 2 and 3: agenda approval, previous
+minutes approval, task follow-up, and any other business. Their stable `standard_key` metadata
 supports the Danish “Standardpunkt” label without restricting normal editing
-or manager-authorized deletion. A database trigger keeps Eventuelt last when
-additional items are inserted into the meeting.
+or manager-authorized deletion. Additional points append using the current
+maximum position; the older Eventuelt-reordering trigger is disabled by the
+existing agenda-position hotfix. Managers can reorder the complete agenda.
 
 Standard agenda items are presented as administrative meeting points. Their
 point-minutes UI omits responsible-person and deadline controls based on

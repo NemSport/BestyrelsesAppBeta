@@ -398,7 +398,7 @@ export class TaskService {
         parsed.status === "completed"
           ? (task.completed_at ?? new Date().toISOString())
           : null,
-    });
+    }, parsed.expectedVersion ?? task.updated_at);
     await this.maybeCompleteAnnualWheelEvent(updated, user.id);
     return updated;
   }

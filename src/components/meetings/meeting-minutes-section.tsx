@@ -1,5 +1,8 @@
 "use client";
 
+import { MeetingTaskFollowUp } from "@/components/meetings/meeting-task-follow-up";
+import { beforeTaskFollowUpReviewEvent } from "@/lib/meeting-task-follow-up";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -1483,6 +1486,13 @@ function AgendaMinutesCard({
 
       <div className="xl:grid xl:grid-cols-[minmax(0,27fr)_minmax(16rem,14fr)] xl:items-start">
         <div className="min-w-0">
+          <MeetingTaskFollowUp
+            organizationId={organizationId}
+            committeeId={committeeId}
+            meetingId={meetingId}
+            active={isActive}
+            occurrenceId={item.standard_key === "task_follow_up" ? undefined : occurrence.id}
+          />
           {item.standard_key === "previous_minutes_approval" ? (
             <PreviousMinutesReference
               reference={previousMeetingMinutes}
@@ -3270,6 +3280,9 @@ export function MeetingMinutesSection({
   );
 
   function openReviewMode() {
+    if (!window.dispatchEvent(
+      new Event(beforeTaskFollowUpReviewEvent, { cancelable: true }),
+    )) return;
     window.dispatchEvent(new Event(flushActiveAgendaDraftEvent));
     setWorkspaceMode("review");
   }

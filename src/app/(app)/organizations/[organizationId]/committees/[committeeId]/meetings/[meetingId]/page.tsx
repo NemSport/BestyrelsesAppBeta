@@ -1,3 +1,4 @@
+import { EnableMeetingTaskFollowUp } from "@/components/meetings/meeting-task-follow-up";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -529,6 +530,9 @@ export default async function MeetingPage({
         {meetingCapabilities.manageTransferredAgendaItems &&
         ["draft", "scheduled", "in_progress"].includes(meeting.status) ? (
           <ContinueAgendaItemsButton meetingId={meetingId} />
+        ) : null}
+        {meetingCapabilities.scheduleAgendaItem && ["draft", "scheduled", "in_progress"].includes(meeting.status) && minutes.meetingMinutes?.status !== "approved" && !meeting.agenda_item_occurrences.some(item => item.agenda_items?.standard_key === "task_follow_up") ? (
+          <EnableMeetingTaskFollowUp organizationId={organizationId} committeeId={committeeId} meetingId={meetingId} />
         ) : null}
         <MeetingMinutesSection
           agendaAction={
