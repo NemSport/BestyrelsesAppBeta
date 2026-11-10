@@ -45,7 +45,7 @@ test("database enforces valid geometry, tenant asset scope and private Storage p
     await db.query("insert into storage.objects(bucket_id,name) values ('organization-letterheads',$1)", [`${org}/${org}.png`]);
     await db.exec("set test.admin='no'");
     await db.exec("update organization_branding set pdf_template=null");
-    assert.notEqual((await db.query("select pdf_template from organization_branding")).rows[0].pdf_template, null);
+    assert.notEqual((await db.query<{ pdf_template: unknown }>("select pdf_template from organization_branding")).rows[0].pdf_template, null);
     await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('organization-letterheads',$1)", [`${org}/${org}.jpg`]));
     await db.exec("set test.organization='22222222-2222-4222-8222-222222222222'");
     assert.equal((await db.query("select * from storage.objects")).rows.length, 0);

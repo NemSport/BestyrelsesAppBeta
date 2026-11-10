@@ -41,6 +41,7 @@ export const standardAgendaItemLabels = {
   agenda_approval: "Standardpunkt",
   previous_minutes_approval: "Standardpunkt",
   any_other_business: "Standardpunkt",
+  task_follow_up: "Systempunkt",
 } as const;
 
 export const meetingStatusLabels: Record<MeetingStatus, string> = {

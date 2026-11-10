@@ -1,5 +1,33 @@
 # AI Committee Assistant
 
+## A4.2 — Interactive meeting task follow-up
+
+New ordinary meetings include **Opgaver & opfølgning** as a fourth standard agenda item,
+before Eventuelt. Existing active meetings and Quick Action ad hoc meetings offer an explicit add button. The
+system item uses the existing agenda navigation, numbering, reorder and trash
+controls, preserving A4.1a/b. Removing it does not remove tasks or history.
+
+The default **Kræver opfølgning** tab shows critical, overdue, due-within-seven-
+days and waiting tasks from this Committee. **Alle aktive** shows all open,
+unarchived tasks. Dates use Europe/Copenhagen. Members with task editing rights
+can change status, deadline, responsible Committee Member, critical flag, and
+add a shared note. Completion updates the canonical task and Annual Wheel
+completion workflow; notes appear in existing task comments. No task is copied.
+
+Managers can link a task to an ordinary agenda occurrence or create a separate
+discussion point. One task has at most one such link per meeting; its original
+meeting, agenda-item and decision references remain intact. Subsequent meetings
+reuse the linked durable agenda item. Before/after events remain available in
+the meeting after completion. They are supporting history, not automatically
+approved minutes or decisions. The existing minutes editor remains authoritative.
+
+Meeting and Task View lists refresh every 20 seconds while visible and on focus.
+Editors retain their drafts and reject stale saves. Closed meetings and approved
+minutes allow read-only follow-up. Dispatches including a task list retain a
+task metadata snapshot from the same read model used for the PDFs; this is not
+an archive of the original PDF bytes. See `docs/testing/a4-2.md` for rollout,
+acceptance tests and known limitations.
+
 ## Organization PDF Letterhead
 
 The Branding page now includes a document-template configurator. Organization
@@ -212,8 +240,9 @@ Time-bound working sessions that schedule agenda items. Meetings provide
 attendance, ordering, timing, meeting-specific outcomes, and one approval flow
 for meeting minutes.
 
-New meetings are created atomically with three editable standard agenda items:
-Godkendelse af dagsorden, Godkendelse af seneste referat, and Eventuelt.
+New meetings are created atomically with four standard agenda items:
+Godkendelse af dagsorden, Godkendelse af seneste referat, Opgaver & opfølgning,
+and Eventuelt.
 Eventuelt is kept last when additional items are scheduled. Standard items use
 stable metadata and may be edited or removed by committee managers.
 

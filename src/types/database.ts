@@ -70,6 +70,7 @@ export type Database = {
           task_list_mode: string | null;
           recipient_count: number;
           recipient_snapshot: Json;
+          task_snapshot?: Json;
           document_snapshot: Json;
           delivery_status: string;
           delivery_mode: string;
@@ -87,6 +88,7 @@ export type Database = {
           task_list_mode?: string | null;
           recipient_count: number;
           recipient_snapshot: Json;
+          task_snapshot?: Json;
           document_snapshot?: Json;
           delivery_status: string;
           delivery_mode: string;
@@ -1082,6 +1084,7 @@ export type Database = {
       };
       tasks: {
         Row: {
+          is_critical?: boolean;
           id: string;
           organization_id: string;
           committee_id: string;
@@ -1121,6 +1124,7 @@ export type Database = {
           decision_id?: string | null;
           stakeholder_id?: string | null;
           stakeholder_contract_id?: string | null;
+          is_critical?: boolean;
           role_profile_id?: string | null;
           task_template_id?: string | null;
           annual_wheel_event_id?: string | null;
@@ -1591,6 +1595,9 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      read_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: Json };
+      ensure_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: string };
+      mutate_meeting_task_follow_up: { Args: { target_meeting_id: string; target_task_id: string; request_id: string; expected_version: string; mutation: Json }; Returns: undefined };
       update_stakeholder_pipeline_stage: {
         Args: { target_organization_id: string; target_pipeline_entry_id: string; target_stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; target_lost_reason?: string | null };
         Returns: Database["public"]["Tables"]["stakeholder_pipeline_entries"]["Row"];
@@ -1926,6 +1933,7 @@ export type Database = {
       standard_agenda_item_key:
         | "agenda_approval"
         | "previous_minutes_approval"
+        | "task_follow_up"
         | "any_other_business";
       transferred_agenda_item_status: "pending" | "scheduled" | "dismissed";
       agenda_item_transfer_reason:

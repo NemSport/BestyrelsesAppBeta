@@ -56,6 +56,7 @@ import type {
 
 type TaskDraft = {
   id?: string;
+  expectedVersion?: string;
   committeeId: string;
   meetingId: string;
   agendaItemId: string;
@@ -109,6 +110,7 @@ function isOpenTask(task: TaskView) {
 }
 
 function deadlineLabel(task: TaskView) {
+  if (task.is_critical) return "Kritisk";
   const state = getTaskDeadlineState(task);
   if (state === "overdue") return "Overskredet";
   if (state === "today") return "I dag";
@@ -145,6 +147,7 @@ function toDateTimeLocal(value: string | null) {
 function draftFromTask(task: TaskView): TaskDraft {
   return {
     id: task.id,
+    expectedVersion: task.updated_at,
     committeeId: task.committee_id,
     meetingId: task.meeting ? (task.meeting_id ?? "") : "",
     agendaItemId: task.agendaItem ? (task.agenda_item_id ?? "") : "",
@@ -217,6 +220,18 @@ export function TaskRegister({
   );
 
   useEffect(() => setTasks(data.tasks), [data.tasks]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (!document.hidden && !draft && !actionId) router.refresh();
+    };
+    const timer = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [router, draft, actionId]);
 
   useEffect(() => {
     const nextState = parseTaskRegisterState(
@@ -447,8 +462,8 @@ export function TaskRegister({
   const mineOpenTasks = openTasks.filter(
     (task) => task.responsible_user_id === data.userId,
   );
-  const attentionTasks = openTasks.filter((task) =>
-    ["overdue", "today", "soon"].includes(getTaskDeadlineState(task)),
+  const attentionTasks = openTasks.filter(
+    (task) => task.is_critical || ["overdue", "today", "soon"].includes(getTaskDeadlineState(task)),
   );
   const overdueCount = attentionTasks.filter(
     (task) => getTaskDeadlineState(task) === "overdue",
@@ -553,6 +568,7 @@ export function TaskRegister({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               organizationId,
+              expectedVersion: draft.expectedVersion,
               committeeId: draft.committeeId,
               meetingId: draft.meetingId || null,
               agendaItemId: draft.agendaItemId || null,
@@ -657,6 +673,7 @@ export function TaskRegister({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           organizationId,
+          expectedVersion: task.updated_at,
           committeeId: task.committee_id,
           meetingId: task.meeting ? task.meeting_id : null,
           agendaItemId: task.agendaItem ? task.agenda_item_id : null,

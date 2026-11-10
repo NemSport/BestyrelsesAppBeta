@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, TableInsert, TableUpdate } from "@/types/database";
 import type { TaskView } from "@/types/domain";
+import { AppError } from "@/lib/errors";
 
 export class TaskRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
@@ -198,14 +199,23 @@ export class TaskRepository {
     return data;
   }
 
-  async update(taskId: string, input: TableUpdate<"tasks">) {
-    const { data, error } = await this.db
+  async update(
+    taskId: string,
+    input: TableUpdate<"tasks">,
+    expectedVersion?: string,
+  ) {
+    let query = this.db
       .from("tasks")
       .update(input)
-      .eq("id", taskId)
-      .select()
-      .single();
+      .eq("id", taskId);
+    if (expectedVersion) query = query.eq("updated_at", expectedVersion);
+    const { data, error } = await query.select().maybeSingle();
     if (error) throw error;
+    if (!data) throw new AppError(
+      "Opgaven er ændret af en anden. Genindlæs opgaven og prøv igen.",
+      409,
+      "TASK_CONFLICT",
+    );
     return data;
   }
 

@@ -620,6 +620,7 @@ export const taskInputSchema = z.object({
 
 export const taskUpdateSchema = taskInputSchema.extend({
   taskId: uuidSchema,
+  expectedVersion: z.string().datetime({ offset: true }).optional(),
 });
 
 const stakeholderOptionalText = (label: string, max: number) =>
