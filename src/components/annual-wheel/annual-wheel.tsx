@@ -649,7 +649,7 @@ export function AnnualWheel({
               triggerClassName="mt-1 min-h-9 h-9 w-9 shrink-0 border-transparent bg-transparent px-2 py-1"
             >
               <button
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+                className="ui-action ui-action-menu w-full text-left text-sm text-ink"
                 onClick={() => {
                   setSelectedMonth(null);
                   openDuplicate(item.event);
@@ -1156,7 +1156,7 @@ export function AnnualWheel({
           return (
             <button
               aria-current={isActive ? "true" : undefined}
-              className={`rounded-md px-2 py-1.5 text-center text-xs transition focus:outline-none focus:ring-2 focus:ring-brand/30 ${isActive ? "bg-brand-soft font-semibold text-brand" : "text-muted hover:bg-subtle hover:text-ink"}`}
+              className={`rounded-md px-2 py-1.5 text-center text-xs transition focus:outline-none focus:ring-2 focus:ring-brand/30 ${isActive ? "bg-brand-soft font-medium text-brand" : "text-muted hover:bg-subtle hover:text-ink"}`}
               key={name}
               onClick={() =>
                 replaceAnnualWheelState({ view: "month", focusMonth: month })
@@ -1411,7 +1411,7 @@ export function AnnualWheel({
                   ? renderMonthList([], activities, "card", 2)
                   : null}
                 <button
-                  className="mt-2.5 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className="ui-action mt-2.5 text-sm text-brand hover:underline"
                   onClick={() =>
                     replaceAnnualWheelState({
                       view: "month",
@@ -2037,7 +2037,7 @@ function AnnualWheelEventReadView({
             </Link>
             {canEdit ? (
               <button
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-brand/30"
+                className="ui-action ui-action-menu w-full text-left text-sm text-ink"
                 onClick={onDuplicate}
                 type="button"
               >

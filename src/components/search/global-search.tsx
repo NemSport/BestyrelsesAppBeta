@@ -268,7 +268,7 @@ export function GlobalSearch() {
             {globalSearchCategories.map((value) => (
               <button
                 aria-pressed={category === value}
-                className={category === value ? "button-primary min-h-11 shrink-0 px-3 py-1.5 sm:min-h-9" : "button-secondary min-h-11 shrink-0 px-3 py-1.5 sm:min-h-9"}
+                className={category === value ? "button-primary min-h-11 shrink-0 px-3 py-1.5 sm:min-h-11" : "button-secondary min-h-11 shrink-0 px-3 py-1.5 sm:min-h-11"}
                 key={value}
                 onClick={() => setCategory(value)}
                 type="button"

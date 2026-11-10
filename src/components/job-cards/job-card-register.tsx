@@ -567,7 +567,7 @@ export function JobCardRegister({
             </Button>
             <ActionMenu>
               <button
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                className="ui-action ui-action-menu w-full text-left text-sm"
                 disabled={aiLoadingId !== null}
                 onClick={() => void suggest()}
                 type="button"
@@ -699,7 +699,7 @@ export function JobCardRegister({
                     </div>
                     <ActionMenu>
                       <button
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                        className="ui-action ui-action-menu w-full text-left text-sm"
                         disabled={pdfDownloadingId === role.id}
                         onClick={() => void downloadPdf(role)}
                         type="button"
@@ -711,7 +711,7 @@ export function JobCardRegister({
                       {data.canManage ? (
                         <>
                           <button
-                            className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                            className="ui-action ui-action-menu w-full text-left text-sm"
                             disabled={aiLoadingId !== null}
                             onClick={() => void suggest(role)}
                             type="button"
@@ -721,7 +721,7 @@ export function JobCardRegister({
                               : "Foreslå opdatering med AI"}
                           </button>
                           <button
-                            className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle"
+                            className="ui-action ui-action-menu w-full text-left text-sm"
                             onClick={() => setDraft(fromRole(role))}
                             type="button"
                           >
@@ -1216,7 +1216,7 @@ function RoleModal(props: {
             <div className="flex flex-wrap gap-2">
               {draft.responsibilityAreaNames.map((name) => (
                 <button
-                  className="rounded border border-brand/30 bg-brand-soft px-3 py-1 text-sm text-brand"
+                  className="ui-action text-sm text-brand"
                   key={normalizeAreaName(name)}
                   onClick={() =>
                     props.onDraft({

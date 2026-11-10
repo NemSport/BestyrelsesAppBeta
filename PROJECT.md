@@ -1,5 +1,15 @@
 # AI Committee Assistant
 
+## Shared action design
+
+Actions across the app use the same quiet, borderless visual language:
+medium-weight labels, small icons, modest corner radii and visible keyboard focus.
+Primary actions and selected views use a light brand tint; destructive actions
+use danger text. Menus use left-aligned rows rather than outlined buttons.
+The shared Button, Dropdown, ActionMenu and legacy button classes share these
+rules. Inputs remain recognisable as editable fields. Native task rows, calendar
+items and rich-text tools retain their layout and selected-state semantics.
+
 ## A4.2 — Interactive meeting task follow-up
 
 New ordinary meetings include **Opgaver & opfølgning** as a fourth standard agenda item,

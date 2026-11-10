@@ -14,6 +14,7 @@ import { TransferredAgendaItemsSection } from "@/components/meetings/transferred
 import { ContinueAgendaItemsButton } from "@/components/meetings/continue-agenda-items-button";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import { Dropdown, StatusBadge } from "@/components/ui";
+import { buttonClassName } from "@/components/ui/button";
 import {
   agendaItemMinutesStatusLabels,
   agendaItemTransferReasonLabels,
@@ -437,19 +438,21 @@ export default async function MeetingPage({
                 ]}
               />
             ) : null}
-            <Dropdown label="Eksportér" panelId="meeting-export-actions">
+            <Dropdown label={<><AppIcon name="download" size={16} />Eksportér</>} panelId="meeting-export-actions">
               <div className="grid gap-1">
                 <a
-                  className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-ink hover:bg-subtle"
+                  className={buttonClassName({variant: "menu"})}
                   href={`/api/meetings/${meetingId}/agenda/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
                 >
-                  Download dagsorden
+                  <AppIcon name="agenda" size={16} />
+                  Dagsorden · PDF
                 </a>
                 <a
-                  className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-ink hover:bg-subtle"
+                  className={buttonClassName({variant: "menu"})}
                   href={`/api/meetings/${meetingId}/tasks/pdf?organizationId=${organizationId}&committeeId=${committeeId}`}
                 >
-                  Download opgaveliste PDF
+                  <AppIcon name="tasks" size={16} />
+                  Opgaveliste · PDF
                 </a>
               </div>
             </Dropdown>
@@ -485,7 +488,7 @@ export default async function MeetingPage({
                     label="Flyt møde til papirkurv"
                     pendingLabel="Flytter..."
                     redirectTo={root}
-                    variant="secondary"
+                    variant="menu"
                   />
                 ) : null}
               </div>

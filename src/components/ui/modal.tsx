@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useDialogFocus } from "@/hooks/use-dialog-focus";
@@ -103,9 +104,10 @@ export function Modal({
             aria-label="Luk modal"
             onClick={onClose}
             size="sm"
-            variant="secondary"
+            variant="quiet"
           >
-            Luk
+            <X size={16} aria-hidden="true" />
+            <span className="sr-only">Luk</span>
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">

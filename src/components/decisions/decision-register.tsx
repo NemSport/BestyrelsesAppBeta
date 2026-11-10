@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Archive, CircleX, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -576,7 +577,7 @@ export function DecisionRegister({
         </div>
 
         <details className="group">
-          <summary className="inline-flex min-h-10 w-fit cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-brand transition hover:border-brand/40 hover:bg-subtle">
+          <summary className="ui-action w-fit cursor-pointer list-none text-sm text-brand">
             Avancerede filtre
           </summary>
           <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -734,7 +735,7 @@ export function DecisionRegister({
               <div aria-label="Aktive filtre" className="flex flex-wrap gap-2">
                 {activeFilterLabels.map((filter) => (
                   <button
-                    className="inline-flex min-h-9 items-center gap-1 rounded-full border border-brand/30 bg-brand/5 px-3 text-xs font-semibold text-brand transition hover:bg-brand/10"
+                    className="ui-action ui-action-primary text-xs text-brand"
                     key={filter.key}
                     onClick={() => clearFilter(filter.key)}
                     type="button"
@@ -938,6 +939,7 @@ export function DecisionRegister({
                         size="sm"
                         variant="secondary"
                       >
+                        <Pencil size={16} aria-hidden="true" />
                         Rediger
                       </Button>
                       {!decision.archived_at ? (
@@ -947,6 +949,7 @@ export function DecisionRegister({
                           size="sm"
                           variant="secondary"
                         >
+                          <Archive size={16} aria-hidden="true" />
                           Arkiver
                         </Button>
                       ) : null}
@@ -957,6 +960,7 @@ export function DecisionRegister({
                           size="sm"
                           variant="danger"
                         >
+                          <CircleX size={16} aria-hidden="true" />
                           Annuller
                         </Button>
                       ) : null}

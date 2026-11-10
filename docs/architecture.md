@@ -1,5 +1,14 @@
 # System Architecture
 
+## Shared action presentation
+
+`ui-action` and its primary/danger/menu modifiers in `globals.css` are the
+shared action styles. `buttonClassName` applies them to buttons and action links;
+Dropdown, ActionMenu and legacy button aliases use the same treatment.
+Specialised native controls preserve their layout, accessible names, selection
+state and event handlers while using the same visual vocabulary. Styling does
+not infer actions from labels or change permissions, confirmations or mutations.
+
 ## A4.2 — Meeting task follow-up
 
 Migration `202611100003_meeting_task_links_api_compatibility.sql` changes the

@@ -54,7 +54,7 @@ export function RelatedDecisions({
             <article className="py-0.5" key={decision.id}>
               <button
                 className={clsx(
-                  "flex min-h-11 w-full items-center rounded-[var(--radius-control)] px-1.5 py-1.5 text-left transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+                  "flex min-h-11 w-full items-center rounded-md px-1.5 py-1.5 text-left transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
                   (decision.status === "completed" || decision.archived_at) &&
                     "text-muted",
                 )}

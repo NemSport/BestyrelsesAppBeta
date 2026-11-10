@@ -389,7 +389,7 @@ export function StakeholderProfile({
           {data.capabilities.updateStakeholders ? (
             <ActionMenu label="Flere handlinger">
               <button
-                className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-subtle"
+                className="ui-action ui-action-menu w-full text-left text-sm"
                 onClick={() => setDialog("edit")}
                 type="button"
               >
@@ -397,7 +397,7 @@ export function StakeholderProfile({
               </button>
               {!activePipeline && data.capabilities.managePipeline ? (
                 <button
-                  className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-subtle"
+                  className="ui-action ui-action-menu w-full text-left text-sm"
                   onClick={() => {
                     setSelectedPipeline(null);
                     setDialog("pipeline");
@@ -526,7 +526,7 @@ export function StakeholderProfile({
                       ))}
                       {data.capabilities.manageContracts ? (
                         <button
-                          className="rounded-full border border-dashed border-line px-2 py-1 text-xs font-semibold text-brand"
+                          className="ui-action text-xs text-brand"
                           onClick={() => {
                             setSelectedContractId(contract.id);
                             setDialog("deliverable");
@@ -538,7 +538,7 @@ export function StakeholderProfile({
                       ) : null}
                       {data.capabilities.manageContracts ? (
                         <button
-                          className="rounded-full border border-dashed border-line px-2 py-1 text-xs font-semibold text-brand"
+                          className="ui-action text-xs text-brand"
                           onClick={() => {
                             setSelectedContractId(contract.id);
                             setDialog("document");
@@ -562,7 +562,7 @@ export function StakeholderProfile({
                           stakeholders={data.taskStakeholders}
                           trigger={(open) => (
                             <button
-                              className="rounded-full border border-dashed border-line px-2 py-1 text-xs font-semibold text-brand"
+                              className="ui-action text-xs text-brand"
                               onClick={open}
                               type="button"
                             >

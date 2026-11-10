@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
 
 import { Button, Modal, StatusBadge } from "@/components/ui";
 import type { AiMeetingOverviewOutput } from "@/lib/ai-meeting-overview";
@@ -121,7 +122,8 @@ export function MeetingAiOverview({
 
   return (
     <>
-      <Button onClick={generateOverview} size="sm" variant="secondary">
+      <Button onClick={generateOverview} size="sm" variant="menu">
+        <Sparkles size={16} aria-hidden="true" />
         AI-overblik
       </Button>
       <Modal

@@ -155,7 +155,7 @@ export function AgendaItemHistory({
   return (
     <>
       <button
-        className="inline-flex min-h-8 items-center gap-1.5 rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-brand transition hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+        className="ui-action text-xs text-brand"
         onClick={() => setOpen(true)}
         type="button"
       >

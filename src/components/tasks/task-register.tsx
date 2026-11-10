@@ -744,7 +744,7 @@ export function TaskRegister({
       >
         <div className="space-y-1">
           <button
-            className="block w-full rounded px-3 py-2 text-left text-sm font-medium text-ink hover:bg-subtle"
+            className="ui-action ui-action-menu w-full text-left text-sm text-ink"
             onClick={() => openEdit(task)}
             type="button"
           >
@@ -756,7 +756,7 @@ export function TaskRegister({
             </p>
             {taskStatusOptions.map((option) => (
               <button
-                className="block w-full rounded px-3 py-2 text-left text-sm text-ink hover:bg-subtle disabled:opacity-60"
+                className="ui-action ui-action-menu w-full text-left text-sm text-ink"
                 disabled={actionId === task.id || task.status === option.value}
                 key={option.value}
                 onClick={() => void changeStatus(task, option.value)}
@@ -768,7 +768,7 @@ export function TaskRegister({
           </div>
           {!task.archived_at ? (
             <button
-              className="block w-full rounded border-t border-line px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-60"
+              className="ui-action ui-action-menu ui-action-danger w-full text-left text-sm text-danger"
               disabled={actionId === task.id}
               onClick={() => void performAction(task, "archive")}
               type="button"
@@ -914,9 +914,9 @@ export function TaskRegister({
       >
         <button
           aria-pressed={filters.mineOnly}
-          className={`rounded-[calc(var(--radius-control)-2px)] px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+          className={`rounded-md px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
             filters.mineOnly
-              ? "bg-brand text-white shadow-sm"
+              ? "bg-brand/10 text-brand "
               : "text-muted hover:bg-surface hover:text-ink"
           }`}
           onClick={() => applyFilterPatch({ mineOnly: true })}
@@ -926,9 +926,9 @@ export function TaskRegister({
         </button>
         <button
           aria-pressed={!filters.mineOnly}
-          className={`rounded-[calc(var(--radius-control)-2px)] px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+          className={`rounded-md px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
             !filters.mineOnly
-              ? "bg-brand text-white shadow-sm"
+              ? "bg-brand/10 text-brand "
               : "text-muted hover:bg-surface hover:text-ink"
           }`}
           onClick={() => applyFilterPatch({ mineOnly: false })}
@@ -1040,7 +1040,7 @@ export function TaskRegister({
             <button
               aria-controls="task-more-filters"
               aria-expanded={showMoreFilters}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line-strong bg-surface px-2.5 text-xs font-semibold text-muted transition hover:border-accent/55 hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="ui-action text-xs text-muted"
               onClick={() => setShowMoreFilters((open) => !open)}
               type="button"
             >
@@ -1150,7 +1150,7 @@ export function TaskRegister({
             {activeFilterLabels.map((filter) => (
               <button
                 aria-label={`Fjern filter: ${filter.label}`}
-                className="inline-flex min-h-9 items-center rounded-full border border-brand/25 bg-brand-soft px-3 py-1 text-xs font-semibold text-brand hover:border-brand"
+                className="ui-action ui-action-primary text-xs text-brand"
                 key={filter.key}
                 onClick={() => clearFilter(filter.key)}
                 type="button"
@@ -1194,9 +1194,9 @@ export function TaskRegister({
                 return (
                   <button
                     aria-pressed={active}
-                    className={`min-h-11 min-w-0 rounded-[var(--radius-control)] px-1.5 py-2 text-xs font-semibold leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                    className={`min-h-11 min-w-0 rounded-md px-1.5 py-2 text-xs font-medium leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                       active
-                        ? "bg-surface text-ink shadow-sm"
+                        ? "bg-surface text-ink "
                         : "text-muted hover:bg-surface/70 hover:text-ink"
                     }`}
                     key={status}

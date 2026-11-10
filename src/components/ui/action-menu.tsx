@@ -65,7 +65,7 @@ export function ActionMenu({
         aria-expanded={open}
         aria-label={ariaLabel}
         className={clsx(
-          "inline-flex min-h-11 max-w-full cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent/55 hover:bg-mist/65",
+          "ui-action max-w-full cursor-pointer text-xs",
           triggerClassName,
         )}
         onClick={() => setOpen((current) => !current)}

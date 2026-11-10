@@ -363,7 +363,7 @@ export function MemberAdministration({
                                 }`}
                               >
                                 <button
-                                  className="block min-h-11 w-full px-3 py-2 text-left text-sm font-semibold text-danger hover:bg-danger-soft"
+                                  className="ui-action ui-action-menu ui-action-danger w-full text-left text-sm text-danger"
                                   disabled={
                                     loadingKey === `remove-${member.user_id}`
                                   }

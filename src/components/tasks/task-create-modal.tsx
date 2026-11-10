@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { ListPlus } from "lucide-react";
 
 import {
   Button,
@@ -236,6 +237,7 @@ export function TaskCreateModal({
         trigger(showModal)
       ) : (
         <Button onClick={showModal} size="sm" variant="secondary">
+          <ListPlus size={16} aria-hidden="true" />
           {triggerLabel}
         </Button>
       )}

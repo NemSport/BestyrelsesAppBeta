@@ -51,7 +51,7 @@ function QuickAction({
   href?: string;
 }) {
   const className =
-    "group flex min-h-10 w-full items-center gap-2.5 rounded-[var(--radius-control)] px-2 py-1.5 text-left text-sm font-medium text-ink transition hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+    "ui-action ui-action-menu group";
   const content = (
     <>
       <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-subtle text-muted transition group-hover:text-brand">
@@ -201,7 +201,7 @@ function DocumentRow({
           ariaLabel={`Flere handlinger for ${item.name}`}
           label={<AppIcon name="more" size={17} />}
           showChevron={false}
-          triggerClassName="size-10 min-h-10 px-0"
+          triggerClassName="size-11 min-h-11 px-0"
         >
           <Link
             className="flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-ink hover:bg-subtle"
@@ -520,7 +520,7 @@ export function DocumentRegister({
                 </Select>
               </label>
               <button
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-muted transition hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-45"
+                className="ui-action text-xs text-muted"
                 disabled={!filtersActive}
                 onClick={resetFilters}
                 type="button"
@@ -658,7 +658,7 @@ export function DocumentRegister({
               {categoryCounts.length ? (
                 categoryCounts.map((item) => (
                   <button
-                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-subtle px-2.5 py-1 text-xs font-medium text-muted transition hover:border-brand/35 hover:bg-brand-soft hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    className="ui-action text-xs"
                     key={item.id}
                     onClick={() => setCategory(item.id)}
                     type="button"

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { Pencil } from "lucide-react";
 
 import { MeetingEditForm } from "@/components/meetings/meeting-edit-form";
 import { Button, Modal } from "@/components/ui";
@@ -27,7 +28,8 @@ export function EditMeetingModal({
 
   return (
     <>
-      <Button onClick={() => setIsOpen(true)} size="sm" variant="secondary">
+      <Button onClick={() => setIsOpen(true)} size="sm" variant="menu">
+        <Pencil size={16} aria-hidden="true" />
         Rediger møde
       </Button>
       <Modal

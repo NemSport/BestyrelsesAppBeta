@@ -509,7 +509,7 @@ export function StakeholderWorkspace({
                     </Link>
                     {data.capabilities.archiveStakeholders ? (
                       <button
-                        className="block w-full rounded px-3 py-2 text-left text-sm text-danger hover:bg-subtle"
+                        className="ui-action ui-action-menu ui-action-danger w-full text-left text-sm text-danger"
                         onClick={() => archiveStakeholder(item.id)}
                         type="button"
                       >

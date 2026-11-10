@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { ListPlus } from "lucide-react";
 
 export function ContinueAgendaItemsButton({
   meetingId,
@@ -50,18 +51,17 @@ export function ContinueAgendaItemsButton({
   }
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-3 space-y-1">
       <Button
         disabled={pending}
         onClick={importItems}
         type="button"
-        variant="secondary"
+        variant="quiet"
+        title="Hent afventende punkter med status Fortsættes næste møde"
       >
-        {pending ? "Henter punkter..." : "Hent punkter fra forrige møde"}
+        <ListPlus size={16} aria-hidden="true" />
+        {pending ? "Henter punkter…" : "Hent punkter fra forrige møde"}
       </Button>
-      <p className="text-sm text-muted">
-        Hent afventende punkter med status “Fortsættes næste møde”.
-      </p>
       {message ? (
         <p className="text-sm" role="status">
           {message}
