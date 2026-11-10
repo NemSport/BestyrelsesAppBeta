@@ -1,5 +1,55 @@
 # System Architecture
 
+## Organization PDF Letterhead
+
+Migration `202611090002_pdf_template_configurator.sql` adds nullable
+`organization_branding.pdf_template` JSONB. Zod and a PostgreSQL CHECK validate
+the version, density, page rectangles, non-overlap, minimum usable dimensions,
+common body widths and Organization-scoped asset paths. Existing Organization
+admin-write/member-read RLS remains authoritative. No domain hierarchy changes.
+
+`PATCH /api/organizations/[organizationId]/branding/template` saves only the
+template via OrganizationBrandingService, retaining other branding. Ordinary
+branding and logo saves retain this field. The private `organization-letterheads`
+bucket accepts immutable PNG/JPG objects up to 5 MB at `{organization_id}/{uuid}`
+paths with extensions. Admin-only upload and member-only read policies enforce
+the same scope independently of the upload/read service. No arbitrary URLs or
+paths are fetched; PDF image bytes are downloaded through the scoped repository.
+
+`pdf-template-config.ts` owns validation and editor transformations;
+`pdf-template.ts` converts millimetres to PDF coordinates, draws page backgrounds
+without stretching and fits headers inside their configured fields. PdfReport
+and Annual Wheel renderers use the current page's body boundaries for wrapping
+and pagination. Continued body widths are fixed across page variants; vertical
+space may differ. Source PDF attachments remain untouched.
+
+The template preview GET endpoint returns at most 100 RLS-visible meetings after
+Organization admin authorization. POST generates an unsaved PDF using the draft
+configuration. OrganizationPdfPreviewService repeats existing Committee and
+meeting read permissions and reuses the authoritative export read models;
+minutes still require ready-for-approval/approved status. No personal notes or
+original appendix contents enter preview. Responses are private/no-store and
+include page count. Preview never sends email, mutates a meeting or saves config.
+
+
+`organization_branding.pdf_letterhead` is a nullable preset identifier, limited
+by a PostgreSQL constraint and Zod validation to `vorbasse-marked`. The existing
+Organization member read and owner/admin write RLS policies apply unchanged.
+The existing branding PATCH route validates the route's Organization id and
+uses OrganizationBrandingService; logo updates preserve the selected preset.
+No Organization name matching, automatic opt-in, arbitrary file path or remote
+background fetch is used. The supplied artwork is a bundled public asset.
+
+`getPdfBranding` passes the authorized Organization's selection to the shared
+PDF renderers. `pdf-letterhead.ts` embeds the fixed asset and defines safe page
+margins, with proportion-preserving cropped decoration for landscape pages.
+`pdf-report.ts` and Annual Wheel overview renderers paginate inside those
+margins and omit duplicate logos/header fills. Appended source PDF pages are
+copied unchanged. Email branding and application theme do not consume this
+field. Print uses the exported PDF. Apply migration
+`202611090001_organization_pdf_letterhead.sql` before using the selector.
+
+
 ## Product Principle
 
 Meeting UX improvements use the existing authorized transfer and task read

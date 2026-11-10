@@ -10,6 +10,18 @@ import type {
 export class MeetingRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async listForPdfPreview(organizationId: string) {
+    const { data, error } = await this.db
+      .from("meetings")
+      .select("id, committee_id, title, starts_at")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("starts_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return data;
+  }
+
   async listByCommittee(committeeId: string) {
     const { data, error } = await this.db
       .from("meetings")

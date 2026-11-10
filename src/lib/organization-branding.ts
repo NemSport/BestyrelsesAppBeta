@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { z } from "zod";
+import { pdfTemplateConfigSchema } from "@/lib/pdf-template-config";
 
 import type { OrganizationBranding } from "@/types/domain";
 
@@ -57,6 +58,11 @@ const optionalHexColorSchema = optionalText.pipe(
 );
 
 export const organizationBrandingInputSchema = z.object({
+  pdfTemplate: pdfTemplateConfigSchema.nullable().optional(),
+  pdfLetterhead: z.preprocess(
+    (value) => (value === "" ? null : value),
+    z.enum(["vorbasse-marked"]).nullable().optional(),
+  ),
   organizationId: z.string().uuid("Ugyldigt organisations-id"),
   logoUrl: optionalText.pipe(
     z
@@ -107,14 +113,20 @@ const defaultBrandRgb = {
 };
 
 const fontStacks: Record<(typeof organizationBrandFonts)[number], string> = {
-  Inter: 'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  System: 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  Arial: 'Arial, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  Roboto: 'Roboto, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  Inter:
+    'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  System:
+    'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  Arial:
+    'Arial, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  Roboto:
+    'Roboto, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   "Source Sans 3":
     '"Source Sans 3", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  Ubuntu: 'Ubuntu, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  Share: 'Share, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  Ubuntu:
+    'Ubuntu, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  Share:
+    'Share, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   Montserrat:
     'Montserrat, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   "Open Sans":
@@ -124,11 +136,10 @@ const fontStacks: Record<(typeof organizationBrandFonts)[number], string> = {
     'Poppins, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   Nunito:
     'Nunito, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  Merriweather:
-    'Merriweather, Georgia, Cambria, "Times New Roman", serif',
+  Merriweather: 'Merriweather, Georgia, Cambria, "Times New Roman", serif',
   Georgia: 'Georgia, Cambria, "Times New Roman", serif',
-  Verdana: 'Verdana, Geneva, ui-sans-serif, sans-serif',
-  Tahoma: 'Tahoma, Geneva, ui-sans-serif, sans-serif',
+  Verdana: "Verdana, Geneva, ui-sans-serif, sans-serif",
+  Tahoma: "Tahoma, Geneva, ui-sans-serif, sans-serif",
   "Trebuchet MS": '"Trebuchet MS", Arial, ui-sans-serif, sans-serif',
   "Times New Roman": '"Times New Roman", Times, serif',
   "Courier New": '"Courier New", Courier, monospace',
@@ -195,7 +206,10 @@ function contrastTextFor(primary: string) {
 export function resolveOrganizationBranding(
   branding: OrganizationBranding | null,
 ): SafeOrganizationBranding {
-  const primary = safeHexToRgb(branding?.primary_color, defaultBrandRgb.primary);
+  const primary = safeHexToRgb(
+    branding?.primary_color,
+    defaultBrandRgb.primary,
+  );
   const fontFamily = safeFontFamily(branding?.font_family);
   const onPrimary = contrastTextFor(primary);
 

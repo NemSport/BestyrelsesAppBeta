@@ -11,6 +11,12 @@ import { OrganizationBrandingRepository } from "@/repositories/organization-bran
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
+import { PDFDocument } from "pdf-lib";
+import {
+  pdfTemplateConfigSchema,
+  templateAssetPaths,
+  templateAssetsBelongTo,
+} from "@/lib/pdf-template-config";
 
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -152,7 +158,125 @@ export class OrganizationBrandingService {
     const user = await this.auth.requireUser();
     await this.authorization.requireOrganizationMember(organizationId, user.id);
     const branding = await this.branding.findByOrganization(organizationId);
-    return resolvePdfReportBranding(branding, organizationName);
+    const resolved = await resolvePdfReportBranding(branding, organizationName);
+    return this.withTemplateImages(organizationId, resolved);
+  }
+
+  private async withTemplateImages(
+    organizationId: string,
+    branding: Awaited<ReturnType<typeof resolvePdfReportBranding>>,
+  ) {
+    if (!branding.pdfTemplate) return branding;
+    if (!templateAssetsBelongTo(branding.pdfTemplate, organizationId))
+      throw new AppError(
+        "Brevpapiret tilhører en anden organisation.",
+        403,
+        "TEMPLATE_SCOPE",
+      );
+    const images = await Promise.all(
+      templateAssetPaths(branding.pdfTemplate).map(
+        async (path) =>
+          [
+            path,
+            {
+              bytes: await this.branding.downloadLetterhead(path),
+              mimeType: path.endsWith(".png")
+                ? ("image/png" as const)
+                : ("image/jpeg" as const),
+            },
+          ] as const,
+      ),
+    );
+    return { ...branding, templateImages: Object.fromEntries(images) };
+  }
+
+  async getPreviewBranding(
+    organizationId: string,
+    organizationName: string,
+    input: unknown,
+  ) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationAdmin(organizationId, user.id);
+    const config = pdfTemplateConfigSchema.parse(input);
+    const stored = await this.branding.findByOrganization(organizationId);
+    const resolved = await resolvePdfReportBranding(stored, organizationName);
+    return this.withTemplateImages(organizationId, {
+      ...resolved,
+      pdfTemplate: config,
+    });
+  }
+
+  async saveTemplate(organizationId: string, input: unknown) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationAdmin(organizationId, user.id);
+    const config = input === null ? null : pdfTemplateConfigSchema.parse(input);
+    if (config && !templateAssetsBelongTo(config, organizationId))
+      throw new AppError(
+        "Brevpapiret tilhører en anden organisation.",
+        403,
+        "TEMPLATE_SCOPE",
+      );
+    if (config)
+      await this.withTemplateImages(organizationId, { pdfTemplate: config });
+    const previous = await this.branding.findByOrganization(organizationId);
+    return this.branding.upsert({
+      organization_id: organizationId,
+      logo_url: previous?.logo_url ?? null,
+      primary_color: previous?.primary_color ?? null,
+      secondary_color: previous?.secondary_color ?? null,
+      accent_color: previous?.accent_color ?? null,
+      font_family: previous?.font_family ?? null,
+      pdf_letterhead: previous?.pdf_letterhead ?? null,
+      pdf_template: config,
+    });
+  }
+
+  async uploadLetterhead(organizationId: string, file: File) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationAdmin(organizationId, user.id);
+    if (!file.size || file.size > 5 * 1024 * 1024)
+      throw new AppError("Vælg et billede på højst 5 MB.", 422, "FILE_SIZE");
+    const bytes = await file.arrayBuffer();
+    let extension: "png" | "jpg";
+    try {
+      const doc = await PDFDocument.create();
+      const signature = new Uint8Array(bytes);
+      extension = signature[0] === 137 && signature[1] === 80 ? "png" : "jpg";
+      const image =
+        extension === "png"
+          ? await doc.embedPng(bytes)
+          : await doc.embedJpg(bytes);
+      if (image.width * image.height > 24000000)
+        throw new Error("Image too large");
+    } catch {
+      throw new AppError(
+        "Brug et gyldigt PNG- eller JPG-billede på højst 24 megapixel.",
+        422,
+        "IMAGE_INVALID",
+      );
+    }
+    const path = `${organizationId}/${crypto.randomUUID()}.${extension}`;
+    await this.branding.uploadLetterhead(
+      path,
+      bytes,
+      extension === "png" ? "image/png" : "image/jpeg",
+    );
+    return { path };
+  }
+
+  async readLetterhead(organizationId: string, path: string) {
+    const user = await this.auth.requireUser();
+    await this.authorization.requireOrganizationMember(organizationId, user.id);
+    if (
+      !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(png|jpg)$/.test(path) ||
+      path.split("/")[0] !== organizationId
+    )
+      throw new AppError(
+        "Brevpapiret tilhører en anden organisation.",
+        403,
+        "TEMPLATE_SCOPE",
+      );
+    return this.branding.downloadLetterhead(path);
   }
 
   async getEmailBranding(organizationId: string, organizationName: string) {
@@ -169,7 +293,27 @@ export class OrganizationBrandingService {
       parsed.organizationId,
       user.id,
     );
+    const previous = await this.branding.findByOrganization(
+      parsed.organizationId,
+    );
+    if (
+      parsed.pdfTemplate &&
+      !templateAssetsBelongTo(parsed.pdfTemplate, parsed.organizationId)
+    )
+      throw new AppError(
+        "Brevpapiret tilhører en anden organisation.",
+        403,
+        "TEMPLATE_SCOPE",
+      );
     return this.branding.upsert({
+      pdf_template:
+        parsed.pdfTemplate === undefined
+          ? (previous?.pdf_template ?? null)
+          : parsed.pdfTemplate,
+      pdf_letterhead:
+        parsed.pdfLetterhead === undefined
+          ? (previous?.pdf_letterhead ?? null)
+          : parsed.pdfLetterhead,
       organization_id: parsed.organizationId,
       logo_url: parsed.logoUrl ?? null,
       primary_color: parsed.primaryColor ?? null,
@@ -221,6 +365,8 @@ export class OrganizationBrandingService {
         input.organizationId,
       );
       return await this.branding.upsert({
+        pdf_template: branding?.pdf_template ?? null,
+        pdf_letterhead: branding?.pdf_letterhead ?? null,
         organization_id: input.organizationId,
         logo_url: logoUrl,
         primary_color: branding?.primary_color ?? null,

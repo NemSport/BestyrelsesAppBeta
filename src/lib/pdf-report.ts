@@ -7,8 +7,19 @@ import {
   type RGB,
 } from "pdf-lib";
 
+import {
+  preparePdfTemplate,
+  pdfRect,
+  drawTemplateHeader,
+  drawTemplateFooter,
+} from "@/lib/pdf-template";
 import { formatDanishDate, formatDanishDateTime } from "@/lib/date-format";
 import { embedPdfFonts } from "@/lib/pdf-fonts";
+import {
+  drawLetterhead,
+  embedLetterhead,
+  letterheadLayout,
+} from "@/lib/pdf-letterhead";
 import { resolvePdfTheme, type PdfReportBranding } from "@/lib/pdf-theme";
 
 export type { PdfReportBranding } from "@/lib/pdf-theme";
@@ -101,8 +112,7 @@ type AgendaItemCardInput = {
 };
 
 const portraitPageSize: [number, number] = [595.28, 841.89];
-const margin = 46;
-const footerHeight = 34;
+
 export function safePdfText(value: string) {
   return value
     .normalize("NFC")
@@ -166,6 +176,19 @@ export async function createPdfReport(options: PdfReportOptions) {
       ? [portraitPageSize[1], portraitPageSize[0]]
       : portraitPageSize;
   const document = await PDFDocument.create();
+  const template = await preparePdfTemplate(
+    document,
+    options.branding,
+    options.orientation ?? "portrait",
+  );
+  let margin = template ? pdfRect(template.layout(0).body, pageSize[1]).x : 46;
+  const spacing = template?.config.density === "compact" ? 0.82 : 1;
+  const letterhead = await embedLetterhead(
+    document,
+    template ? null : options.branding?.pdfLetterhead,
+  );
+  const letterheadMargins = letterheadLayout(pageSize[0] > pageSize[1]);
+  const footerHeight = letterhead ? letterheadMargins.footerHeight : 34;
   const { regular, bold, italic, boldItalic, drawText } =
     await embedPdfFonts(document);
   const generatedAt = options.generatedAt ?? new Date();
@@ -176,7 +199,12 @@ export async function createPdfReport(options: PdfReportOptions) {
   document.setTitle(safePdfText(options.title));
   const reportPalette = resolvePdfTheme(options.branding);
   let logoImage: PDFImage | null = null;
-  if (options.branding?.logoBytes && options.branding.logoMimeType) {
+  if (
+    !template &&
+    !letterhead &&
+    options.branding?.logoBytes &&
+    options.branding.logoMimeType
+  ) {
     try {
       logoImage =
         options.branding.logoMimeType === "image/png"
@@ -186,8 +214,14 @@ export async function createPdfReport(options: PdfReportOptions) {
       logoImage = null;
     }
   }
-  const contentWidth = pageSize[0] - margin * 2;
-  const headerTextWidth = logoImage ? contentWidth - 96 : contentWidth;
+  const contentWidth = template
+    ? pdfRect(template.layout(0).body, pageSize[1]).width
+    : pageSize[0] - margin * 2;
+  const headerTextWidth = letterhead
+    ? contentWidth - 135
+    : logoImage
+      ? contentWidth - 96
+      : contentWidth;
   const titleLines = wrapText(options.title, bold, 14.5, headerTextWidth);
   const context = [
     options.branding?.organizationName ?? options.organizationName,
@@ -200,8 +234,9 @@ export async function createPdfReport(options: PdfReportOptions) {
     ? wrapText(context, regular, 8.8, headerTextWidth)
     : [];
   const reportHeaderHeight = Math.max(
+    letterhead ? letterheadMargins.headerHeight : 0,
     86,
-    43 + titleLines.length * 16 + contextLines.length * 11,
+    (letterhead ? 72 : 43) + titleLines.length * 16 + contextLines.length * 11,
   );
   let page: PDFPage;
   let y = pageSize[1] - margin - reportHeaderHeight;
@@ -216,27 +251,47 @@ export async function createPdfReport(options: PdfReportOptions) {
     startY: number;
   } | null = null;
 
-  const contentTop = () => pageSize[1] - margin - reportHeaderHeight;
+  const contentTop = (index = Math.max(0, pageNumber - 1)) =>
+    template
+      ? pdfRect(template.layout(index).body, pageSize[1]).top - 12
+      : pageSize[1] - margin - reportHeaderHeight;
+  const contentBottom = (index = Math.max(0, pageNumber - 1)) =>
+    template
+      ? pdfRect(template.layout(index).body, pageSize[1]).bottom + 4
+      : footerHeight + margin;
   const flowInset = () =>
     (activeCard ? 12 : 0) + (activeInformationBox ? 12 : 0);
   const flowX = () => margin + flowInset();
   const flowWidth = () => contentWidth - flowInset() * 2;
 
   const drawHeader = () => {
-    page.drawRectangle({
-      x: 0,
-      y: pageSize[1] - reportHeaderHeight,
-      width: pageSize[0],
-      height: reportHeaderHeight,
-      color: reportPalette.brandHeader,
-    });
-    page.drawRectangle({
-      x: 0,
-      y: pageSize[1] - 4,
-      width: pageSize[0],
-      height: 4,
-      color: reportPalette.brand,
-    });
+    if (template) {
+      drawTemplateHeader(
+        page,
+        template.layout(pageNumber - 1).header,
+        `${options.documentType}: ${options.title}`,
+        context,
+        bold,
+        drawText,
+      );
+      return;
+    }
+    if (!letterhead) {
+      page.drawRectangle({
+        x: 0,
+        y: pageSize[1] - reportHeaderHeight,
+        width: pageSize[0],
+        height: reportHeaderHeight,
+        color: reportPalette.brandHeader,
+      });
+      page.drawRectangle({
+        x: 0,
+        y: pageSize[1] - 4,
+        width: pageSize[0],
+        height: 4,
+        color: reportPalette.brand,
+      });
+    }
     const logoMaxWidth = 78;
     const logoMaxHeight = 38;
     if (logoImage) {
@@ -259,13 +314,13 @@ export async function createPdfReport(options: PdfReportOptions) {
       safePdfText(options.documentType.toLocaleUpperCase("da-DK")),
       {
         x: margin,
-        y: pageSize[1] - 32,
+        y: pageSize[1] - (letterhead ? 58 : 32),
         font: bold,
         size: 8.5,
         color: reportPalette.brandText,
       },
     );
-    let titleY = pageSize[1] - 50;
+    let titleY = pageSize[1] - (letterhead ? 79 : 50);
     for (const line of titleLines) {
       drawText(page, line, {
         x: margin,
@@ -289,16 +344,26 @@ export async function createPdfReport(options: PdfReportOptions) {
     }
     page.drawLine({
       start: { x: margin, y: pageSize[1] - reportHeaderHeight },
-      end: { x: pageSize[0] - margin, y: pageSize[1] - reportHeaderHeight },
+      end: { x: margin + contentWidth, y: pageSize[1] - reportHeaderHeight },
       thickness: 0.7,
       color: reportPalette.line,
     });
   };
 
   const drawFooter = () => {
+    if (template) {
+      drawTemplateFooter(
+        page,
+        template.layout(pageNumber - 1).footer,
+        `Eksporteret ${formatPdfDate(generatedAt)}`,
+        pageNumber,
+        regular,
+      );
+      return;
+    }
     page.drawLine({
       start: { x: margin, y: footerHeight + 8 },
-      end: { x: pageSize[0] - margin, y: footerHeight + 8 },
+      end: { x: margin + contentWidth, y: footerHeight + 8 },
       thickness: 0.5,
       color: reportPalette.line,
     });
@@ -321,15 +386,21 @@ export async function createPdfReport(options: PdfReportOptions) {
   const newPage = () => {
     if (pageNumber > 0) drawFooter();
     page = document.addPage(pageSize);
-    page.drawRectangle({
-      x: 0,
-      y: 0,
-      width: pageSize[0],
-      height: pageSize[1],
-      color: reportPalette.pageBackground,
-    });
+    if (template) {
+      template.drawBackground(page, pageNumber);
+      margin = pdfRect(template.layout(pageNumber).body, pageSize[1]).x;
+    } else if (letterhead) {
+      drawLetterhead(page, letterhead);
+    } else
+      page.drawRectangle({
+        x: 0,
+        y: 0,
+        width: pageSize[0],
+        height: pageSize[1],
+        color: reportPalette.pageBackground,
+      });
     pageNumber += 1;
-    y = pageSize[1] - margin - reportHeaderHeight;
+    y = contentTop();
     drawHeader();
     if (activeCard) {
       page.drawRectangle({
@@ -381,7 +452,7 @@ export async function createPdfReport(options: PdfReportOptions) {
   };
 
   const ensureSpace = (height: number) => {
-    if (y - height < footerHeight + margin) {
+    if (y - height < contentBottom()) {
       newPage();
       return true;
     }
@@ -499,7 +570,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     const font = textOptions.font ?? regular;
     const size = textOptions.size ?? 10;
     const indent = textOptions.indent ?? 0;
-    const lineHeight = size * 1.35;
+    const lineHeight = size * 1.35 * spacing;
     const fallback = textOptions.fallback ?? "Ikke angivet";
     const lines = wrapText(
       text.trim() || fallback,
@@ -521,7 +592,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       });
       y -= lineHeight;
     }
-    y -= textOptions.gapAfter ?? 0;
+    y -= (textOptions.gapAfter ?? 0) * spacing;
   };
 
   const addParagraph = (text: string, textOptions: TextOptions = {}) => {
@@ -542,7 +613,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       const size = options.size ?? 10.2;
       const indent = options.indent ?? 0;
       const bulletWidth = options.bullet ? 18 : 0;
-      const lineHeight = size * 1.48;
+      const lineHeight = size * 1.48 * spacing;
       const maxWidth = options.maxWidth ?? flowWidth() - indent - bulletWidth;
       const lines = options.runs?.length
         ? wrapRuns(options.runs, size, maxWidth)
@@ -580,7 +651,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         }
         y -= lineHeight;
       }
-      y -= options.gapAfter ?? 0;
+      y -= (options.gapAfter ?? 0) * spacing;
     };
 
     for (const [blockIndex, block] of blocks.entries()) {
@@ -662,7 +733,7 @@ export async function createPdfReport(options: PdfReportOptions) {
     y -= 18;
     page.drawLine({
       start: { x: margin, y },
-      end: { x: pageSize[0] - margin, y },
+      end: { x: margin + contentWidth, y },
       thickness: 0.5,
       color: reportPalette.line,
     });
@@ -759,8 +830,8 @@ export async function createPdfReport(options: PdfReportOptions) {
     const endPageIndex = pageNumber - 1;
     for (let index = startPageIndex; index <= endPageIndex; index += 1) {
       const targetPage = pages[index];
-      const top = index === startPageIndex ? startY : contentTop();
-      const bottom = index === endPageIndex ? endY : footerHeight + margin - 4;
+      const top = index === startPageIndex ? startY : contentTop(index);
+      const bottom = index === endPageIndex ? endY : contentBottom(index) - 4;
       if (top <= bottom) continue;
       targetPage.drawRectangle({
         x: margin + inset,
@@ -908,8 +979,7 @@ export async function createPdfReport(options: PdfReportOptions) {
         36,
         Math.max(...prepared.map((item) => item.valueLines.length)) * 10.5 + 21,
       );
-      const maxCardHeight =
-        pageSize[1] - reportHeaderHeight - footerHeight - margin * 2 - 20;
+      const maxCardHeight = contentTop() - contentBottom() - 20;
       if (rowHeight > maxCardHeight) {
         for (const item of row) {
           addSubsection(item.label);
@@ -1013,7 +1083,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       width: column.width * scale,
     }));
     const headerHeight = 22;
-    const lineHeight = 12;
+    const lineHeight = 12 * spacing;
     const minimumContinuationLines = Math.max(
       2,
       tableOptions.minimumContinuationLines ?? 3,
@@ -1074,17 +1144,12 @@ export async function createPdfReport(options: PdfReportOptions) {
       while (lineOffset < lineCount) {
         const fullRowHeight = Math.max(26, lineCount * lineHeight + 12);
         const freshPageHeight =
-          pageSize[1] -
-          margin -
-          reportHeaderHeight -
+          contentTop(pageNumber) -
+          contentBottom(pageNumber) -
           headerHeight -
-          (footerHeight + margin) -
           12;
         const currentHeightAfterHeader =
-          y -
-          (footerHeight + margin) -
-          12 -
-          (shouldDrawHeader ? headerHeight : 0);
+          y - contentBottom() - 12 - (shouldDrawHeader ? headerHeight : 0);
         if (
           tableOptions.keepRowsTogether &&
           lineOffset === 0 &&
@@ -1101,7 +1166,7 @@ export async function createPdfReport(options: PdfReportOptions) {
           ensureSpace(headerHeight + 26);
           drawTableHeader();
         }
-        const availableHeight = y - (footerHeight + margin) - 12;
+        const availableHeight = y - contentBottom() - 12;
         const availableLines = Math.max(
           1,
           Math.floor((availableHeight - 12) / lineHeight),
@@ -1257,7 +1322,7 @@ export async function createPdfReport(options: PdfReportOptions) {
       return;
     }
 
-    const availableHeight = y - (footerHeight + margin);
+    const availableHeight = y - contentBottom();
     const maxHeight = Math.max(120, availableHeight);
     const scale = Math.min(
       contentWidth / image.width,

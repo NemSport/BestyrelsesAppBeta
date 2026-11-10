@@ -1,6 +1,10 @@
 import { rgb, type RGB } from "pdf-lib";
+import type { PdfTemplateConfig } from "@/lib/pdf-template-config";
 
 export type PdfReportBranding = {
+  pdfTemplate?: PdfTemplateConfig | null;
+  templateImages?: Record<string, { bytes: Uint8Array; mimeType: "image/png" | "image/jpeg" }>;
+  pdfLetterhead?: "vorbasse-marked" | null;
   organizationName?: string;
   logoUrl?: string | null;
   logoBytes?: Uint8Array | null;

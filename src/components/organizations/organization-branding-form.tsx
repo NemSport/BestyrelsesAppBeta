@@ -1,5 +1,6 @@
 "use client";
 
+import { PdfTemplateConfigurator } from "@/components/organizations/pdf-template-configurator";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { organizationBrandFonts } from "@/lib/organization-branding";
 import type { OrganizationBranding } from "@/types/domain";
 
 type BrandingFormState = {
+  pdfLetterhead: string;
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
@@ -16,8 +18,11 @@ type BrandingFormState = {
   fontFamily: string;
 };
 
-function initialState(branding: OrganizationBranding | null): BrandingFormState {
+function initialState(
+  branding: OrganizationBranding | null,
+): BrandingFormState {
   return {
+    pdfLetterhead: branding?.pdf_letterhead ?? "",
     logoUrl: branding?.logo_url ?? "",
     primaryColor: branding?.primary_color ?? "",
     secondaryColor: branding?.secondary_color ?? "",
@@ -232,8 +237,8 @@ export function OrganizationBrandingForm({
                 Logo URL
               </label>
               <p className="mb-2 text-xs text-muted">
-                Upload et logo, eller brug en sikker http(s)-URL. Tøm feltet
-                og gem for at bruge fallback uden logo.
+                Upload et logo, eller brug en sikker http(s)-URL. Tøm feltet og
+                gem for at bruge fallback uden logo.
               </p>
               <div className="mb-3 flex flex-wrap items-end gap-2">
                 <div className="min-w-0 flex-1">
@@ -249,7 +254,7 @@ export function OrganizationBrandingForm({
                   />
                 </div>
                 <Button
-                  disabled={uploadingLogo || !logoFile}
+                  disabled={loading || uploadingLogo || !logoFile}
                   onClick={() => void uploadLogo()}
                   type="button"
                   variant="secondary"
@@ -335,8 +340,52 @@ export function OrganizationBrandingForm({
               ) : null}
             </div>
 
+            <div className="border-t border-line pt-4">
+              <label className="label" htmlFor="pdfLetterhead">
+                Brevpapir til PDF og print
+              </label>
+              <Select
+                id="pdfLetterhead"
+                name="pdfLetterhead"
+                value={values.pdfLetterhead}
+                disabled={loading || uploadingLogo}
+                aria-invalid={Boolean(fieldErrors.pdfLetterhead)}
+                onChange={(event) =>
+                  updateField("pdfLetterhead", event.target.value)
+                }
+              >
+                <option value="">Standard uden brevpapir</option>
+                <option value="vorbasse-marked">Vorbasse Marked</option>
+              </Select>
+              <p className="mt-2 text-sm text-muted">
+                Bruges på organisationens dagsordener, referater, opgavelister,
+                årshjul og jobkort. Udskriv den hentede PDF for samme layout på
+                papir. E-mails ændres ikke. Liggende sider får tilpasset top og
+                bund. Originale PDF-bilag bevares.
+              </p>
+              {fieldErrors.pdfLetterhead ? (
+                <p role="alert" className="mt-1 text-sm text-danger">
+                  {fieldErrors.pdfLetterhead}
+                </p>
+              ) : null}
+              {values.pdfLetterhead === "vorbasse-marked" ? (
+                <figure className="mt-4 max-w-64">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/letterheads/vorbasse-marked.png"
+                    alt="Vorbasse Markeds brevpapir med logo øverst og markedsillustrationer nederst"
+                    className="h-auto w-full border border-line"
+                  />
+                  <figcaption className="mt-2 text-xs text-muted">
+                    Brevpapiret gentages på hver genereret side. Gem branding
+                    for at bruge det.
+                  </figcaption>
+                </figure>
+              ) : null}
+            </div>
+
             <div className="pt-2">
-              <Button disabled={loading} type="submit">
+              <Button disabled={loading || uploadingLogo} type="submit">
                 {loading ? "Gemmer..." : "Gem branding"}
               </Button>
             </div>
@@ -428,6 +477,7 @@ export function OrganizationBrandingForm({
           </div>
         </div>
       </div>
+      <PdfTemplateConfigurator branding={branding} organizationId={organizationId} />
     </section>
   );
 }

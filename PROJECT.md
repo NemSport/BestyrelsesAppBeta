@@ -1,5 +1,31 @@
 # AI Committee Assistant
 
+## Organization PDF Letterhead
+
+The Branding page now includes a document-template configurator. Organization
+administrators configure portrait and landscape A4 separately, with first-page
+and optional continuation layouts. Each page has header, flowing body and footer
+rectangles in millimetres. Body width and left position remain common within an
+orientation so continued tables retain their columns. Compact spacing, a
+space-saving preset and blank continuation backgrounds reduce page count.
+Users can select the bundled artwork or upload private PNG/JPG backgrounds.
+The configurator only takes precedence after its separate Save action; disabling
+it restores the simple letterhead selection. Preview generates sample documents
+or authorized meeting agendas, minutes and task lists with a page count, without
+saving the draft or distributing anything. Original attached PDFs are unchanged.
+
+
+Organization owners and administrators can select the supplied Vorbasse Marked
+letterhead under Branding on the Organization edit page. The selection is
+stored per Organization and applies to generated agendas, minutes, task lists,
+Annual Wheel exports and Job Cards, including PDFs attached to dispatches.
+Printing the exported PDF preserves that layout. Email HTML is unchanged.
+The default is no letterhead; existing Organizations are not opted in.
+Portrait pages reserve space for the original artwork; landscape pages use
+proportion-preserving header and footer crops. Content paginates within these
+reserved margins. Original appended PDF documents remain unchanged.
+
+
 ## Next-meeting continuation fix
 
 Saving “Fortsættes næste møde” schedules the discussion on its next active

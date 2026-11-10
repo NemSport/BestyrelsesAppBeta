@@ -11,6 +11,17 @@ import {
   safePdfText,
   type PdfReportBranding,
 } from "@/lib/pdf-report";
+import {
+  drawLetterhead,
+  embedLetterhead,
+  letterheadLayout,
+} from "@/lib/pdf-letterhead";
+import {
+  preparePdfTemplate,
+  pdfRect,
+  drawTemplateHeader,
+  drawTemplateFooter,
+} from "@/lib/pdf-template";
 import { embedPdfFonts } from "@/lib/pdf-fonts";
 import type {
   AnnualWheelEventView,
@@ -28,8 +39,7 @@ type AnnualWheelOverviewPdfInput = {
 
 const landscapeA4: [number, number] = [841.89, 595.28];
 const margin = 30;
-const headerHeight = 72;
-const footerHeight = 28;
+
 const months = [
   "Jan",
   "Feb",
@@ -191,7 +201,20 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
   document.setModificationDate(input.exportedAt);
   document.setCreator("BestyrelsesApp");
   document.setProducer("BestyrelsesApp PDF export");
-  const logo = await embedLogo(document, input.branding);
+  const template = await preparePdfTemplate(
+    document,
+    input.branding,
+    "landscape",
+  );
+  const letterhead = await embedLetterhead(
+    document,
+    template ? null : input.branding?.pdfLetterhead,
+  );
+  const { headerHeight, footerHeight } = letterhead
+    ? letterheadLayout(true)
+    : { headerHeight: 72, footerHeight: 28 };
+  const logo =
+    template || letterhead ? null : await embedLogo(document, input.branding);
   const colors = {
     ink: rgb(0.1, 0.13, 0.14),
     muted: rgb(0.4, 0.45, 0.45),
@@ -205,20 +228,36 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
 
   const addPage = (title: string, documentType: string) => {
     const page = document.addPage(landscapeA4);
-    page.drawRectangle({
-      x: 0,
-      y: landscapeA4[1] - headerHeight,
-      width: landscapeA4[0],
-      height: headerHeight,
-      color: colors.brandSoft,
-    });
-    page.drawRectangle({
-      x: 0,
-      y: landscapeA4[1] - 4,
-      width: landscapeA4[0],
-      height: 4,
-      color: colors.brand,
-    });
+    if (template) {
+      const index = document.getPageCount() - 1;
+      template.drawBackground(page, index);
+      drawTemplateHeader(
+        page,
+        template.layout(index).header,
+        `${documentType}: ${title}`,
+        input.organizationName,
+        bold,
+        drawText,
+      );
+      return page;
+    }
+    if (letterhead) drawLetterhead(page, letterhead);
+    if (!letterhead) {
+      page.drawRectangle({
+        x: 0,
+        y: landscapeA4[1] - headerHeight,
+        width: landscapeA4[0],
+        height: headerHeight,
+        color: colors.brandSoft,
+      });
+      page.drawRectangle({
+        x: 0,
+        y: landscapeA4[1] - 4,
+        width: landscapeA4[0],
+        height: 4,
+        color: colors.brand,
+      });
+    }
     drawText(page, safePdfText(documentType.toLocaleUpperCase("da-DK")), {
       x: margin,
       y: landscapeA4[1] - 28,
@@ -253,6 +292,16 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
   };
 
   const footer = (page: PDFPage, pageNumber: number) => {
+    if (template) {
+      drawTemplateFooter(
+        page,
+        template.layout(pageNumber - 1).footer,
+        `Eksporteret ${formatPdfDate(input.exportedAt)}`,
+        pageNumber,
+        regular,
+      );
+      return;
+    }
     page.drawLine({
       start: { x: margin, y: footerHeight + 5 },
       end: { x: landscapeA4[0] - margin, y: footerHeight + 5 },
@@ -275,7 +324,27 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
     });
   };
 
-  return { document, regular, bold, colors, addPage, footer, drawText };
+  return {
+    template,
+    bounds: (index: number) =>
+      template
+        ? pdfRect(template.layout(index).body, landscapeA4[1])
+        : {
+            x: margin,
+            width: landscapeA4[0] - margin * 2,
+            top: landscapeA4[1] - headerHeight - 18,
+            bottom: footerHeight + 18,
+          },
+    document,
+    regular,
+    bold,
+    colors,
+    addPage,
+    footer,
+    drawText,
+    headerHeight,
+    footerHeight,
+  };
 }
 
 export async function generateAnnualWheelMatrixPdf(
@@ -292,7 +361,8 @@ export async function generateAnnualWheelMatrixPdf(
       left.title.localeCompare(right.title, "da-DK")
     );
   });
-  const contentWidth = landscapeA4[0] - margin * 2;
+  const margin = pdf.bounds(0).x;
+  const contentWidth = pdf.bounds(0).width;
   const widths = {
     group: 100,
     title: 150,
@@ -300,8 +370,8 @@ export async function generateAnnualWheelMatrixPdf(
     responsible: 85,
     month: (contentWidth - 100 - 150 - 70 - 85) / 12,
   };
-  const tableTop = landscapeA4[1] - headerHeight - 20;
-  const tableBottom = footerHeight + 17;
+  let tableTop = pdf.bounds(0).top - 2;
+  let tableBottom = pdf.bounds(0).bottom + 4;
   const columns = [
     { label: "Udvalg / kategori", width: widths.group },
     { label: "Aktivitet", width: widths.title },
@@ -322,6 +392,8 @@ export async function generateAnnualWheelMatrixPdf(
       `Årshjul overblik ${input.overview.year}`,
       "Arbejdsoversigt",
     );
+    tableTop = pdf.bounds(pageNumber - 1).top - 2;
+    tableBottom = pdf.bounds(pageNumber - 1).bottom + 4;
     y = tableTop;
     let x = margin;
     for (const column of columns) {
@@ -468,9 +540,10 @@ export async function generateAnnualWheelVisualPdf(
   const pdf = await createLandscapeDocument(input);
   const { events, calendarItems } = filteredOverview(input);
   const page = pdf.addPage(`Årshjul ${input.overview.year}`, "Visuelt årshjul");
-  const contentTop = landscapeA4[1] - headerHeight - 18;
-  const contentBottom = footerHeight + 18;
-  const contentWidth = landscapeA4[0] - margin * 2;
+  const contentTop = pdf.bounds(0).top - (pdf.template ? 18 : 0);
+  const contentBottom = pdf.bounds(0).bottom + 4;
+  const margin = pdf.bounds(0).x;
+  const contentWidth = pdf.bounds(0).width;
   const gap = 9;
   const quarterWidth = (contentWidth - gap * 3) / 4;
   const quarterHeader = 23;
@@ -527,7 +600,10 @@ export async function generateAnnualWheelVisualPdf(
           Number(item.date.slice(5, 7)) - 1 === month,
       ).length;
       const primaryItems = [...eventItems, ...meetingItems];
-      const maxItems = 4;
+      const maxItems = Math.max(
+        0,
+        Math.min(4, Math.floor((monthHeight - 48) / 21)),
+      );
 
       page.drawRectangle({
         x: quarterX,
@@ -618,34 +694,34 @@ export async function generateAnnualWheelVisualPdf(
   }
 
   page.drawCircle({
-    x: 260,
-    y: landscapeA4[1] - 60,
+    x: pdf.template ? margin + 3 : 260,
+    y: pdf.template ? contentTop + 9 : landscapeA4[1] - 60,
     size: 2.5,
     color: pdf.colors.brand,
   });
   pdf.drawText(page, "Aktivitet", {
-    x: 267,
-    y: landscapeA4[1] - 63,
+    x: pdf.template ? margin + 10 : 267,
+    y: pdf.template ? contentTop + 6 : landscapeA4[1] - 63,
     font: pdf.regular,
     size: 6.8,
     color: pdf.colors.muted,
   });
   page.drawCircle({
-    x: 322,
-    y: landscapeA4[1] - 60,
+    x: pdf.template ? margin + 68 : 322,
+    y: pdf.template ? contentTop + 9 : landscapeA4[1] - 60,
     size: 2.5,
     color: pdf.colors.accent,
   });
   pdf.drawText(page, "Møde", {
-    x: 329,
-    y: landscapeA4[1] - 63,
+    x: pdf.template ? margin + 75 : 329,
+    y: pdf.template ? contentTop + 6 : landscapeA4[1] - 63,
     font: pdf.regular,
     size: 6.8,
     color: pdf.colors.muted,
   });
   pdf.drawText(page, "Fuld aktivitetsliste følger på de næste sider.", {
-    x: 365,
-    y: landscapeA4[1] - 63,
+    x: pdf.template ? margin + 116 : 365,
+    y: pdf.template ? contentTop + 6 : landscapeA4[1] - 63,
     font: pdf.bold,
     size: 6.8,
     color: pdf.colors.muted,
@@ -655,9 +731,8 @@ export async function generateAnnualWheelVisualPdf(
   let pageNumber = 1;
   let appendixPage!: PDFPage;
   let appendixY = 0;
-  const appendixTop = landscapeA4[1] - headerHeight - 20;
-  const appendixBottom = footerHeight + 18;
-  const appendixWidth = landscapeA4[0] - margin * 2;
+  let appendixBottom = pdf.bounds(1).bottom + 4;
+  const appendixWidth = pdf.bounds(1).width;
 
   const newAppendixPage = () => {
     if (pageNumber > 1) pdf.footer(appendixPage, pageNumber);
@@ -666,7 +741,8 @@ export async function generateAnnualWheelVisualPdf(
       `Aktivitetsliste ${input.overview.year}`,
       "Komplet årshjul",
     );
-    appendixY = appendixTop;
+    appendixY = pdf.bounds(pageNumber - 1).top - 12;
+    appendixBottom = pdf.bounds(pageNumber - 1).bottom + 4;
   };
 
   const ensureAppendixSpace = (height: number) => {

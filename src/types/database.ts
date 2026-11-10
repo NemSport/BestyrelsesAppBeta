@@ -217,6 +217,8 @@ export type Database = {
         Row: {
           id: string;
           organization_id: string;
+          pdf_template: Json | null;
+          pdf_letterhead: "vorbasse-marked" | null;
           logo_url: string | null;
           primary_color: string | null;
           secondary_color: string | null;
@@ -248,6 +250,8 @@ export type Database = {
         Insert: {
           id?: string;
           organization_id: string;
+          pdf_template?: Json | null;
+          pdf_letterhead?: "vorbasse-marked" | null;
           logo_url?: string | null;
           primary_color?: string | null;
           secondary_color?: string | null;
@@ -275,6 +279,8 @@ export type Database = {
             | null;
         };
         Update: {
+          pdf_template?: Json | null;
+          pdf_letterhead?: "vorbasse-marked" | null;
           logo_url?: string | null;
           primary_color?: string | null;
           secondary_color?: string | null;

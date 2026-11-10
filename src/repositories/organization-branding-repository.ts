@@ -8,6 +8,25 @@ const logoBucket = "organization-logos";
 export class OrganizationBrandingRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async uploadLetterhead(
+    storagePath: string,
+    bytes: ArrayBuffer,
+    contentType: string,
+  ) {
+    const { error } = await this.db.storage
+      .from("organization-letterheads")
+      .upload(storagePath, bytes, { contentType, upsert: false });
+    if (error) throw error;
+  }
+
+  async downloadLetterhead(storagePath: string) {
+    const { data, error } = await this.db.storage
+      .from("organization-letterheads")
+      .download(storagePath);
+    if (error) throw error;
+    return new Uint8Array(await data.arrayBuffer());
+  }
+
   async listByOrganizations(organizationIds: string[]) {
     if (organizationIds.length === 0) return [];
 
@@ -44,14 +63,12 @@ export class OrganizationBrandingRepository {
     fileBody: ArrayBuffer,
     contentType: string,
   ) {
-    const { error } = await this.db.storage.from(logoBucket).upload(
-      storagePath,
-      fileBody,
-      {
+    const { error } = await this.db.storage
+      .from(logoBucket)
+      .upload(storagePath, fileBody, {
         contentType,
         upsert: false,
-      },
-    );
+      });
     if (error) throw error;
   }
 

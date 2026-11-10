@@ -1,3 +1,4 @@
+import type { PdfTemplateConfig } from "../../src/lib/pdf-template-config";
 import { generateMeetingAgendaPdf } from "../../src/lib/agenda-pdf";
 import { generateAnnualWheelEventPdf } from "../../src/lib/annual-wheel-pdf";
 import {
@@ -150,8 +151,13 @@ const role = {
   })),
 };
 
-export async function generateIssue12Fixtures() {
+export async function generateIssue12Fixtures(
+  pdfLetterhead?: "vorbasse-marked",
+  pdfTemplate?: PdfTemplateConfig,
+) {
   const branding = {
+    pdfLetterhead,
+    pdfTemplate,
     organizationName: `UX Testorganisation ${unicodeMarker}`,
     primaryColor: "#174f45",
     secondaryColor: "#d6b45f",

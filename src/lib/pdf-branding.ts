@@ -1,6 +1,7 @@
 import type { PdfReportBranding } from "@/lib/pdf-theme";
 import { organizationBrandFonts } from "@/lib/organization-branding";
 import type { OrganizationBranding } from "@/types/domain";
+import { pdfTemplateConfigSchema } from "@/lib/pdf-template-config";
 
 const fallbackPrimary = "#12313e";
 const fallbackAccent = "#476f65";
@@ -77,6 +78,8 @@ export async function resolvePdfReportBranding(
   const logo = await loadLogo(logoUrl);
 
   return {
+    pdfTemplate: pdfTemplateConfigSchema.safeParse(branding?.pdf_template).data ?? null,
+    pdfLetterhead: branding?.pdf_letterhead ?? null,
     organizationName,
     logoUrl,
     logoBytes: logo?.bytes ?? null,
