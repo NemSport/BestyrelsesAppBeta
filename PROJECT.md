@@ -28,6 +28,10 @@ task metadata snapshot from the same read model used for the PDFs; this is not
 an archive of the original PDF bytes. See `docs/testing/a4-2.md` for rollout,
 acceptance tests and known limitations.
 
+The A4.2 compatibility hotfix preserves existing task-to-meeting reads across
+older app deployments sharing the database. Task links keep their meeting/task
+uniqueness while using a separate primary key; no task records are moved.
+
 ## Organization PDF Letterhead
 
 The Branding page now includes a document-template configurator. Organization

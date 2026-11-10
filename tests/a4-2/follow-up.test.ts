@@ -64,6 +64,7 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(await readFile("supabase/migrations/202611100003_meeting_task_links_api_compatibility.sql", "utf8"));
 });
 after(async () => {
   await db.close();
@@ -115,6 +116,17 @@ async function mutate(
     change,
   ]);
 }
+
+test("link identity avoids implicit many-to-many API embedding and retains meeting/task uniqueness", async () => {
+  const keys = await db.query<{ kind: string; columns: string[] }>(`
+    select c.contype as kind, array_agg(a.attname order by k.ordinality) as columns
+    from pg_constraint c cross join lateral unnest(c.conkey) with ordinality k(attnum, ordinality)
+    join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.attnum
+    where c.conrelid='meeting_task_links'::regclass and c.contype in ('p','u')
+    group by c.oid, c.contype`);
+  assert.deepEqual(keys.rows.find(key => key.kind === 'p')?.columns, ['id']);
+  assert.deepEqual(keys.rows.find(key => key.kind === 'u')?.columns, ['meeting_id', 'task_id']);
+});
 
 test("attention filters use Copenhagen date, include day 7 and exclude completed/archived", () => {
   const sample: FollowUpTask = {

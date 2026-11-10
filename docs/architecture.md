@@ -2,6 +2,15 @@
 
 ## A4.2 — Meeting task follow-up
 
+Migration `202611100003_meeting_task_links_api_compatibility.sql` changes the
+link table primary key to a surrogate UUID and retains UNIQUE(meeting_id, task_id).
+PostgREST otherwise discovers an implicit many-to-many tasks/meetings relation
+from the composite primary key, making existing `meeting:meetings(...)` embeds
+ambiguous (PGRST201). This database fix restores old deployments as well as the
+preview. TaskRepository additionally selects `meetings!tasks_meeting_id_fkey`
+explicitly. The RPC, link uniqueness, FKs, RLS and authorization are unchanged.
+See [PostgREST relationship discovery](https://docs.postgrest.org/en/v12/references/api/resource_embedding.html).
+
 Apply `202611100001_task_follow_up_key.sql` and then
 `202611100002_meeting_task_follow_up.sql` (separate transactions for the enum).
 The latter extends canonical `tasks` with `is_critical` and adds

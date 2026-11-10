@@ -8,7 +8,7 @@ export class TaskRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
   private readonly viewSelect =
-    "*, committee:committees(id, name, deleted_at), meeting:meetings(id, title, starts_at, deleted_at), agendaItem:agenda_items(id, title, item_type, deleted_at), decision:decisions(id, title), stakeholder:stakeholders(id, name, stakeholder_type), stakeholderContract:stakeholder_contracts(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
+    "*, committee:committees(id, name, deleted_at), meeting:meetings!tasks_meeting_id_fkey(id, title, starts_at, deleted_at), agendaItem:agenda_items(id, title, item_type, deleted_at), decision:decisions(id, title), stakeholder:stakeholders(id, name, stakeholder_type), stakeholderContract:stakeholder_contracts(id, title), responsible:profiles!tasks_responsible_user_id_fkey(id, full_name)";
 
   async listByOrganization(organizationId: string) {
     const { data, error } = await this.db
