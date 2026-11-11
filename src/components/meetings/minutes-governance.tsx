@@ -827,7 +827,11 @@ export function MinutesApprovalPanel({
         ? `Sendes til ${approvalRecipientInfo.eligibleCount} interne deltagere markeret som til stede.`
         : "Ingen interne deltagere er markeret som til stede. Registrer deltagere før referatet sendes til godkendelse."
       : approvalRecipientInfo.eligibleCount > 0
-        ? `Ingen deltagere er registreret endnu. Ved afsendelse bruges fallback til ${approvalRecipientInfo.eligibleCount} aktive udvalgsmedlemmer.`
+        ? `Ingen mødedeltagere er registreret endnu. Referatet sendes til godkendelse hos ${
+            approvalRecipientInfo.eligibleCount === 1
+              ? "1 aktivt udvalgsmedlem"
+              : `${approvalRecipientInfo.eligibleCount} aktive udvalgsmedlemmer`
+          }.`
         : "Der findes ingen mulige godkendere. Registrer deltagere eller opdater udvalgets medlemmer.";
 
   if (compact) {

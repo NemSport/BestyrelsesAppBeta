@@ -53,12 +53,12 @@ export async function generateAgendaItemDraftSuggestion(
   };
 }
 
-export const agendaItemDraftPromptVersion = "agenda-item-draft-v1";
+export const agendaItemDraftPromptVersion = "agenda-item-draft-v2";
 
 export const agendaItemDraftInstructions = `
 Du er en dansk skriveassistent for udvalg og foreninger. Du hjælper en bruger
 med at formulere ét felt i et dagsordenspunkt. Du må aldrig gemme, ændre eller
-oprette records.
+oprette oplysninger i appen.
 
 Skriv kun et forslag til det efterspurgte felt:
 - objective: et kort og konkret formål med orienteringen, drøftelsen,

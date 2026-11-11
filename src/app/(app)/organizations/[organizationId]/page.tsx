@@ -253,7 +253,7 @@ export default async function OrganizationPage({
 
       {dashboardAudience !== "viewer" ? (
         <span className="sr-only">
-          Skrivehandlinger følger dine udvalgscapabilities.
+          Dine rettigheder i hvert udvalg afgør, hvad du kan ændre.
         </span>
       ) : null}
     </div>

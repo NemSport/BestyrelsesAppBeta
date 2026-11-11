@@ -238,7 +238,7 @@ export function OrganizationBrandingForm({
               </label>
               <p className="mb-2 text-xs text-muted">
                 Upload et logo, eller brug en sikker http(s)-URL. Tøm feltet og
-                gem for at bruge fallback uden logo.
+                gem for at fjerne logoet.
               </p>
               <div className="mb-3 flex flex-wrap items-end gap-2">
                 <div className="min-w-0 flex-1">
@@ -330,8 +330,8 @@ export function OrganizationBrandingForm({
                 ))}
               </Select>
               <p className="mt-1 text-xs text-muted">
-                Listen er kontrolleret. Der uploades ikke fonte, og browseren
-                bruger sikre fallback-fonte hvis en font ikke er installeret.
+                Hvis den valgte skrifttype ikke er installeret, bruger browseren
+                en anden skrifttype.
               </p>
               {fieldErrors.fontFamily ? (
                 <p className="mt-1 text-sm text-danger">
