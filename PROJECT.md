@@ -57,6 +57,8 @@ email provider. A verified account with the invited address must explicitly
 accept within seven days. Acceptance adds Organization membership with the
 invited role. Committee assignments continue to be managed separately.
 Password recovery retains the invitation after the user sets a new password.
+The Organization selector also lists actionable invitations for the signed-in
+account and lets the recipient accept directly.
 
 ## Organization PDF Letterhead
 

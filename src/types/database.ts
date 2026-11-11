@@ -1734,6 +1734,14 @@ export type Database = {
         Args: { target_organization_id: string; target_invitation_id: string };
         Returns: Database["public"]["Tables"]["organization_invitations"]["Row"];
       };
+      list_my_organization_invitations: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          invitation_id: string;
+          organization_name: string;
+          invited_role: Database["public"]["Enums"]["organization_role"];
+        }[];
+      };
       respond_to_organization_invitation: {
         Args: { target_invitation_id: string; accept_invitation: boolean };
         Returns: {

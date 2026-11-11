@@ -64,6 +64,14 @@ reread. It omits private/internal notes. Existing delivery statuses distinguish
 real, stubbed, partial and failed sends. Existing dispatch history is saved after
 delivery, so a failure to save history after sending remains a documented limit.
 
+## Organization invitation discovery
+
+The Organization selector uses `list_my_organization_invitations()` to read
+pending invitations for the verified address of the authenticated user. The
+RPC exposes only the invitation ID, Organization name and invited role. The
+selector's accept action calls the same `respond_to_organization_invitation`
+RPC as the email link so validity and membership writes are checked together.
+
 ## Organization PDF Letterhead
 
 Migration `202611090002_pdf_template_configurator.sql` adds nullable

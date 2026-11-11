@@ -23,6 +23,12 @@ export class OrganizationMemberRepository {
     })) satisfies OrganizationMemberDirectoryEntry[];
   }
 
+  async listMyInvitations() {
+    const { data, error } = await this.db.rpc("list_my_organization_invitations");
+    if (error) throw error;
+    return data;
+  }
+
   async listPendingInvitations(organizationId: string) {
     const { data, error } = await this.db
       .from("organization_invitations")

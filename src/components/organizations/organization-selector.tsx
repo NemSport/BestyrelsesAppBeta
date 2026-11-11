@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { ResourceForm } from "@/components/forms/resource-form";
 import { AppIcon } from "@/components/icons/app-icon";
@@ -32,8 +32,12 @@ function committeeLabel(count: number) {
 }
 
 export function OrganizationSelector({
+  children,
+  hasInvitations,
   organizations,
 }: {
+  children?: ReactNode;
+  hasInvitations: boolean;
   organizations: OrganizationWorkspaceEntry[];
 }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -56,6 +60,8 @@ export function OrganizationSelector({
         eyebrow="Organisationer"
         title="Vælg organisation"
       />
+
+      {children}
 
       {organizations.length > 0 ? (
         <section aria-label="Dine organisationer">
@@ -103,7 +109,7 @@ export function OrganizationSelector({
             ))}
           </div>
         </section>
-      ) : (
+      ) : hasInvitations ? null : (
         <EmptyState
           action={
             <Button onClick={() => setCreateOpen(true)}>

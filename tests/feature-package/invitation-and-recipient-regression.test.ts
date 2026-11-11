@@ -51,7 +51,7 @@ test("auth links retain the invitation and reject external redirects", () => {
   }
 });
 
-test("a verified invitee can accept once without changing an existing role", async () => {
+test("only a verified invitee can see and accept an actionable invitation", async () => {
   const db = new PGlite();
   try {
     await db.exec(`
@@ -82,6 +82,12 @@ test("a verified invitee can accept once without changing an existing role", asy
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        "supabase/migrations/202611120001_list_my_organization_invitations.sql",
+        "utf8",
+      ),
+    );
     const [
       organization,
       otherOrg,
@@ -109,9 +115,9 @@ test("a verified invitee can accept once without changing an existing role", asy
       insert into organization_invitations (id, organization_id, email, role, invited_by, updated_at)
       values ($1, $2, 'member@example.test', 'viewer', $3, now()),
              ($4, $2, 'member@example.test', 'viewer', $3, now() - interval '8 days'),
-             ($5, $2, 'member@example.test', 'owner', $3, now())
+             ($5, $2, 'member@example.test', 'owner', $6, now())
     `,
-      [invitation, organization, owner, expired, elevated],
+      [invitation, organization, owner, expired, elevated, outsider],
     );
     const respond = async (actor: string, id: string, accept: boolean) => {
       await db.query("select set_config('test.user_id', $1, false)", [actor]);
@@ -132,12 +138,33 @@ test("a verified invitee can accept once without changing an existing role", asy
       }
     };
 
+    const list = async (actor: string) => {
+      await db.query("select set_config('test.user_id', $1, false)", [actor]);
+      await db.exec("set role authenticated");
+      try {
+        const { rows } = await db.query(
+          "select * from list_my_organization_invitations()",
+        );
+        return rows;
+      } finally {
+        await db.exec("reset role");
+      }
+    };
+    assert.deepEqual(await list(outsider), []);
+    assert.deepEqual(await list(recipient), []);
     assert.equal((await respond(outsider, invitation, true)).length, 0);
     assert.equal((await respond(recipient, invitation, true)).length, 0);
     await db.query(
       "update auth.users set email_confirmed_at = now() where id=$1",
       [recipient],
     );
+    assert.deepEqual(await list(recipient), [
+      {
+        invitation_id: invitation,
+        organization_name: "Testorganisation",
+        invited_role: "viewer",
+      },
+    ]);
     assert.equal((await respond(recipient, expired, true)).length, 0);
     assert.equal(
       (await respond(recipient, invitation, false))[0].invitation_status,
@@ -194,10 +221,15 @@ test("a verified invitee can accept once without changing an existing role", asy
       (await respond(recipient, invitation, true))[0].organization_id,
       organization,
     );
+    await db.query(
+      "update organization_invitations set invited_by = $1 where id = $2",
+      [owner, elevated],
+    );
     assert.equal(
       (await respond(recipient, elevated, true))[0].invitation_status,
       "accepted",
     );
+    assert.deepEqual(await list(recipient), []);
     assert.deepEqual((await member()).rows, [{ role: "viewer" }]);
     await db.query("delete from organization_members where user_id=$1", [
       recipient,
