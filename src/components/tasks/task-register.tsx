@@ -465,13 +465,8 @@ export function TaskRegister({
     openCreateOnLoad,
     resetMutation,
   ]);
-  const activeTasks = useMemo(
-    () => tasks.filter((task) => !task.archived_at),
-    [tasks],
-  );
-  const openTasks = useMemo(
-    () => activeTasks.filter(isOpenTask),
-    [activeTasks],
+  const openTasks = filteredTasks.filter(
+    (task) => !task.archived_at && isOpenTask(task),
   );
   const mineOpenTasks = openTasks.filter(
     (task) => task.responsible_user_id === data.userId,
@@ -500,7 +495,6 @@ export function TaskRegister({
     {
       label: "Afventer",
       value: openTasks.filter((task) => task.status === "waiting").length,
-      detail: "Fra andre",
       icon: "progress" as const,
       tone: "text-warning",
     },
@@ -978,9 +972,11 @@ export function TaskRegister({
                 <span className="text-lg font-semibold leading-none tabular-nums text-ink">
                   {card.value}
                 </span>
-                <span className="truncate text-xs text-muted">
-                  {card.detail}
-                </span>
+                {card.detail ? (
+                  <span className="truncate text-xs text-muted">
+                    {card.detail}
+                  </span>
+                ) : null}
               </span>
             </div>
           </div>

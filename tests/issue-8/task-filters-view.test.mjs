@@ -162,6 +162,15 @@ test("Board and list share one filtered collection and URL contract", () => {
   assert.doesNotMatch(register, />\s*Kanban\s*</);
 });
 
+test("task summaries use the same filtered collection and exclude archived tasks", () => {
+  assert.match(
+    register,
+    /const openTasks = filteredTasks\.filter\(\s*\(task\) => !task\.archived_at && isOpenTask\(task\)/,
+  );
+  assert.match(register, /const attentionTasks = openTasks\.filter/);
+  assert.match(register, /const overdueCount = attentionTasks\.filter/);
+});
+
 test("primary and advanced filters expose results, active state, and reset", () => {
   assert.match(register, /htmlFor="task-search"/);
   assert.match(register, /htmlFor="task-status-filter"/);
