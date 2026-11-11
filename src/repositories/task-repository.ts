@@ -44,19 +44,52 @@ export class TaskRepository {
     return this.activeRelations(data as unknown as TaskViewWithTrash[]);
   }
 
-  async listWorkspaceOpen(organizationId: string, committeeId: string) {
-    const { data, error } = await this.db
+  private workspaceOpenTasks(
+    organizationId: string,
+    committeeId: string,
+    columns: string,
+    options?: { count: "exact"; head: true },
+  ) {
+    return this.db
       .from("tasks")
-      .select(this.viewSelect)
+      .select(columns, options)
       .eq("organization_id", organizationId)
       .eq("committee_id", committeeId)
       .is("archived_at", null)
-      .not("status", "in", "(completed,cancelled)")
+      .not("status", "in", "(completed,cancelled)");
+  }
+
+  async listWorkspaceOpen(organizationId: string, committeeId: string) {
+    const { data, error } = await this.workspaceOpenTasks(
+      organizationId,
+      committeeId,
+      this.viewSelect,
+    )
       .order("deadline", { ascending: true, nullsFirst: false })
       .order("updated_at", { ascending: false })
       .limit(12);
     if (error) throw error;
     return this.activeRelations(data as unknown as TaskViewWithTrash[]);
+  }
+
+  async countWorkspaceDeadlines(
+    organizationId: string,
+    committeeId: string,
+    today: string,
+    dueSoonThrough: string,
+  ) {
+    const options = { count: "exact", head: true } as const;
+    const [overdue, dueSoon] = await Promise.all([
+      this.workspaceOpenTasks(organizationId, committeeId, "id", options)
+        .lt("deadline", today),
+      this.workspaceOpenTasks(organizationId, committeeId, "id", options)
+        .gte("deadline", today)
+        .lte("deadline", dueSoonThrough),
+    ]);
+
+    if (overdue.error) throw overdue.error;
+    if (dueSoon.error) throw dueSoon.error;
+    return { overdueCount: overdue.count ?? 0, dueSoonCount: dueSoon.count ?? 0 };
   }
 
   async listWorkspaceRecent(organizationId: string, committeeId: string) {

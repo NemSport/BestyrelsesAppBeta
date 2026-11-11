@@ -18,11 +18,7 @@ import {
 import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
 import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
 import { isOrganizationAdmin } from "@/lib/permissions";
-import {
-  getTaskDeadlineState,
-  taskStatusLabels,
-  taskStatusTones,
-} from "@/lib/tasks";
+import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -140,27 +136,11 @@ export default async function CommitteeWorkspacePage({
   const committeeRoot = `${root}/committees/${committeeId}`;
   const taskHref = `${root}/tasks?scope=all&committee=${committeeId}`;
   const documentHref = `${root}/documents?committee=${committeeId}`;
-  const deadlineRank = {
-    overdue: 0,
-    today: 1,
-    soon: 2,
-    upcoming: 3,
-    none: 4,
-    closed: 5,
-  };
-  const sortedTasks = [...workspace.activeTasks].sort(
-    (left, right) =>
-      deadlineRank[getTaskDeadlineState(left)] -
-      deadlineRank[getTaskDeadlineState(right)],
-  );
-  const attentionTasks = sortedTasks.filter((task) =>
-    ["overdue", "today", "soon"].includes(getTaskDeadlineState(task)),
-  );
-  const overdueTasks = attentionTasks.filter(
-    (task) => getTaskDeadlineState(task) === "overdue",
-  );
-  const dueSoonTasks = attentionTasks.filter((task) =>
-    ["today", "soon"].includes(getTaskDeadlineState(task)),
+  const { overdueCount, dueSoonCount, today, dueSoonThrough } =
+    workspace.taskDeadlines;
+  const hasAttentionTasks = overdueCount + dueSoonCount > 0;
+  const attentionTasks = workspace.activeTasks.filter(
+    (task) => task.deadline && task.deadline <= dueSoonThrough,
   );
   const focus =
     workspace.upcomingActivities.find(
@@ -317,12 +297,12 @@ export default async function CommitteeWorkspacePage({
         >
           <div>
             <SectionHeading
-              href={attentionTasks.length ? taskHref : undefined}
-              linkLabel={attentionTasks.length ? "Se alle opgaver" : undefined}
+              href={hasAttentionTasks ? taskHref : undefined}
+              linkLabel={hasAttentionTasks ? "Se alle opgaver" : undefined}
               title="Kræver opmærksomhed"
               titleId="attention-title"
             />
-            {attentionTasks.length ? (
+            {hasAttentionTasks ? (
               <>
                 <p
                   className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line pb-3 text-sm text-muted"
@@ -330,44 +310,41 @@ export default async function CommitteeWorkspacePage({
                 >
                   <span>
                     <strong className="font-semibold text-danger">
-                      {overdueTasks.length}
+                      {overdueCount}
                     </strong>{" "}
-                    {overdueTasks.length === 1 ? "forsinket" : "forsinkede"}
+                    {overdueCount === 1 ? "forsinket" : "forsinkede"}
                   </span>
                   <span aria-hidden="true" className="text-line-strong">
                     ·
                   </span>
                   <span>
                     <strong className="font-semibold text-warning">
-                      {dueSoonTasks.length}
+                      {dueSoonCount}
                     </strong>{" "}
                     med deadline snart
                   </span>
                 </p>
                 <div className="mt-3 divide-y divide-line">
-                  {attentionTasks.slice(0, 2).map((task) => {
-                    const state = getTaskDeadlineState(task);
-                    return (
-                      <article className="py-2.5" key={task.id}>
-                        <Link
-                          className="font-semibold hover:text-brand hover:underline"
-                          href={`${taskHref}&editTask=${task.id}#task-${task.id}`}
-                        >
-                          {task.title}
-                        </Link>
-                        <p className="mt-0.5 text-xs text-muted">
-                          {state === "overdue"
-                            ? "Opgave overskredet"
-                            : state === "today"
-                              ? "Deadline i dag"
-                              : "Deadline denne uge"}
-                          {task.deadline
-                            ? ` · ${formatDate(task.deadline)}`
-                            : ""}
-                        </p>
-                      </article>
-                    );
-                  })}
+                  {attentionTasks.slice(0, 2).map((task) => (
+                    <article className="py-2.5" key={task.id}>
+                      <Link
+                        className="font-semibold hover:text-brand hover:underline"
+                        href={`${taskHref}&editTask=${task.id}#task-${task.id}`}
+                      >
+                        {task.title}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {task.deadline && task.deadline < today
+                          ? "Opgave overskredet"
+                          : task.deadline === today
+                            ? "Deadline i dag"
+                            : "Deadline denne uge"}
+                        {task.deadline
+                          ? ` · ${formatDate(task.deadline)}`
+                          : ""}
+                      </p>
+                    </article>
+                  ))}
                 </div>
               </>
             ) : (
@@ -449,9 +426,9 @@ export default async function CommitteeWorkspacePage({
             title="Aktive opgaver"
             titleId="active-tasks-title"
           />
-          {sortedTasks.length ? (
+          {workspace.activeTasks.length ? (
             <div className="divide-y divide-line">
-              {sortedTasks.slice(0, 6).map((task) => (
+              {workspace.activeTasks.slice(0, 6).map((task) => (
                 <article
                   className="grid gap-2 py-3 first:pt-0 sm:grid-cols-[minmax(0,1fr)_minmax(8rem,.5fr)_auto] sm:items-center"
                   key={task.id}
@@ -468,12 +445,12 @@ export default async function CommitteeWorkspacePage({
                   </p>
                   <StatusBadge
                     tone={
-                      getTaskDeadlineState(task) === "overdue"
+                      task.deadline && task.deadline < today
                         ? "danger"
                         : taskStatusTones[task.status]
                     }
                   >
-                    {getTaskDeadlineState(task) === "overdue"
+                    {task.deadline && task.deadline < today
                       ? "Forsinket"
                       : taskStatusLabels[task.status]}
                   </StatusBadge>

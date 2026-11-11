@@ -76,6 +76,23 @@ export class AnnualWheelRepository {
     return data;
   }
 
+  async findCommitteeActivityStartDate(
+    organizationId: string,
+    committeeId: string,
+    eventId: string,
+  ) {
+    const { data, error } = await this.db
+      .from("annual_wheel_events")
+      .select("starts_on")
+      .eq("organization_id", organizationId)
+      .eq("committee_id", committeeId)
+      .eq("id", eventId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.starts_on ?? null;
+  }
+
   async findById(eventId: string) {
     const { data, error } = await this.db
       .from("annual_wheel_events")

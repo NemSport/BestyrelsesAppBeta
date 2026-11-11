@@ -283,6 +283,12 @@ export type CommitteeWorkspace = {
   members: CommitteeOverviewMember[];
   nextMeeting: MeetingWithAgendaPreview | null;
   activeTasks: TaskView[];
+  taskDeadlines: {
+    overdueCount: number;
+    dueSoonCount: number;
+    today: string;
+    dueSoonThrough: string;
+  };
   upcomingActivities: AnnualWheelEventView[];
   recentDocuments: Array<{
     id: string;

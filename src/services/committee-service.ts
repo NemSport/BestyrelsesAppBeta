@@ -5,6 +5,7 @@ import {
   committeeTrashActionSchema,
   committeeUpdateSchema,
 } from "@/lib/validation";
+import { formatDanishDateKey } from "@/lib/date-format";
 import { NotFoundError } from "@/lib/errors";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
 import { CommitteeRepository } from "@/repositories/committee-repository";
@@ -60,11 +61,15 @@ export class CommitteeService {
       user.id,
     );
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
+    const today = formatDanishDateKey(now);
+    const dueSoonEnd = new Date(`${today}T00:00:00Z`);
+    dueSoonEnd.setUTCDate(dueSoonEnd.getUTCDate() + 7);
+    const dueSoonThrough = dueSoonEnd.toISOString().slice(0, 10);
     const [
       upcomingMeetings,
       recentMeetings,
       activeTasks,
+      deadlineCounts,
       recentTasks,
       recentDecisions,
       upcomingActivities,
@@ -78,6 +83,12 @@ export class CommitteeService {
       ),
       this.meetings.listRecentWorkspaceMeetings(organizationId, committeeId),
       this.tasks.listWorkspaceOpen(organizationId, committeeId),
+      this.tasks.countWorkspaceDeadlines(
+        organizationId,
+        committeeId,
+        today,
+        dueSoonThrough,
+      ),
       this.tasks.listWorkspaceRecent(organizationId, committeeId),
       this.decisions.listWorkspaceRecent(organizationId, committeeId),
       this.annualWheel.listWorkspaceUpcoming(
@@ -190,6 +201,7 @@ export class CommitteeService {
       }),
       nextMeeting: upcomingMeetings[0] ?? null,
       activeTasks,
+      taskDeadlines: { ...deadlineCounts, today, dueSoonThrough },
       upcomingActivities,
       recentDocuments: documentItems,
       recentActivity: activity,

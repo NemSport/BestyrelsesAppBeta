@@ -65,8 +65,8 @@ test("representative routes share calm surface and metadata patterns", () => {
   assert.match(meetingHeader, /text-muted/);
   assert.match(meetingPage, /metric-strip/);
   assert.match(committeePage, /aria-labelledby="attention-title"/);
-  assert.match(committeePage, /\{overdueTasks\.length\}/);
-  assert.match(committeePage, /\{dueSoonTasks\.length\}/);
+  assert.match(committeePage, /\{overdueCount\}/);
+  assert.match(committeePage, /\{dueSoonCount\}/);
   assert.match(taskRegister, /aria-live="polite"/);
   assert.match(taskRegister, /\{filteredTasks\.length\} af \{tasks\.length\} opgaver/);
   assert.match(decisionRegister, /entity-header/);

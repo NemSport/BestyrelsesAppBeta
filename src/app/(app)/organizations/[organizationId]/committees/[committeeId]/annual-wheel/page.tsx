@@ -8,13 +8,23 @@ export default async function CommitteeAnnualWheelPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string; committeeId: string }>;
-  searchParams: Promise<{ year?: string; create?: string }>;
+  searchParams: Promise<{ year?: string; create?: string; event?: string }>;
 }) {
   const { organizationId, committeeId } = await params;
   const query = await searchParams;
-  const data = await new AnnualWheelService(await createClient()).getOverview(
+  const annualWheel = new AnnualWheelService(await createClient());
+  const eventId = typeof query.event === "string" ? query.event : undefined;
+  const activityDate = eventId
+    ? await annualWheel.getCommitteeActivityStartDate(
+        organizationId,
+        committeeId,
+        eventId,
+      )
+    : null;
+  const year = activityDate?.slice(0, 4) ?? query.year;
+  const data = await annualWheel.getOverview(
     organizationId,
-    query.year ? Number(query.year) : undefined,
+    year ? Number(year) : undefined,
   );
 
   return (
@@ -27,7 +37,9 @@ export default async function CommitteeAnnualWheelPage({
       <AnnualWheel
         data={data}
         initialCommitteeId={committeeId}
-        openCreateOnLoad={query.create === "1"}
+        initialEventId={eventId}
+        key={eventId}
+        openCreateOnLoad={!eventId && query.create === "1"}
         organizationId={organizationId}
       />
     </div>

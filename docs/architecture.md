@@ -2100,8 +2100,11 @@ Annual Wheel routes are:
 - `/organizations/[organizationId]/committees/[committeeId]/annual-wheel`
 
 Both routes use the same RLS-scoped read model and calendar component. The
-committee route starts with its committee filter selected; neither route
-creates a parallel planning domain.
+committee route starts with its committee filter selected. With `?event=<id>`,
+it verifies committee access and resolves the visible occurrence's start date
+within the organization and committee. It loads that year, focuses the month
+and opens the existing activity read view. Missing activities show an inline
+message.
 
 The organization Job Card handbook is available at
 `/organizations/[organizationId]/job-cards`. It combines role maintenance,
@@ -2565,8 +2568,10 @@ queries til eksisterende repositories for møder, tasks, decisions, Annual
 Wheel events, Documents V2 og medlemmer. Hver workspace-query gentager
 `organization_id` og `committee_id` (eller dokumentets
 `primary_committee_id`), mens PostgreSQL RLS fortsat er den autoritative
-sikkerhedsgrænse. Counts og previews bygges kun af rækker, som den aktuelle
-RLS-session kan læse.
+sikkerhedsgrænse. Forfaldne opgaver og opgaver med frist i dag eller inden
+for syv dage tælles med særskilte, eksakte RLS-afgrænsede forespørgsler.
+Fristerne følger datoen i København, og visningen af opgaveeksempler er
+fortsat begrænset.
 
 Aktivitetslisten er en in-memory sammensortering af synlige timestamps fra
 meetings, tasks, decisions og documents. Den er read-only, henter små bounded

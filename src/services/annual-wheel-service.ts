@@ -13,6 +13,7 @@ import {
   annualWheelEventInputSchema,
   annualWheelTaskActivationSchema,
   annualWheelEventUpdateSchema,
+  uuidSchema,
 } from "@/lib/validation";
 import { AppError } from "@/lib/errors";
 import { AnnualWheelRepository } from "@/repositories/annual-wheel-repository";
@@ -44,6 +45,25 @@ export class AnnualWheelService {
     this.members = new OrganizationMemberRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
+  }
+
+  async getCommitteeActivityStartDate(
+    organizationId: string,
+    committeeId: string,
+    eventId: string,
+  ) {
+    if (!uuidSchema.safeParse(eventId).success) return null;
+    const user = await this.auth.requireUser();
+    await this.authorization.requireCommitteeMember(
+      organizationId,
+      committeeId,
+      user.id,
+    );
+    return this.events.findCommitteeActivityStartDate(
+      organizationId,
+      committeeId,
+      eventId,
+    );
   }
 
   async getOverview(organizationId: string, requestedYear?: number) {

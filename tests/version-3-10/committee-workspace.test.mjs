@@ -54,11 +54,9 @@ test("current focus uses explicit activity signals and has no synthetic empty pl
 });
 
 test("attention is summarized before at most two prioritized records", () => {
-  assert.match(page, /const overdueTasks = attentionTasks\.filter/);
-  assert.match(page, /const dueSoonTasks = attentionTasks\.filter/);
   assert.match(page, /data-attention-summary/);
-  assert.match(page, /\{overdueTasks\.length\}/);
-  assert.match(page, /\{dueSoonTasks\.length\}/);
+  assert.match(page, /\{overdueCount\}/);
+  assert.match(page, /\{dueSoonCount\}/);
   assert.match(page, /forsinket" : "forsinkede"/);
   assert.match(page, /med deadline snart/);
   assert.match(page, /attentionTasks\.slice\(0, 2\)/);

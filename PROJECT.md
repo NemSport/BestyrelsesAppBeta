@@ -788,6 +788,9 @@ Existing Annual Wheel activities open in a wide, read-first modal that
 summarizes status, period, ownership, key people, fixed tasks, and activated
 tasks before editing. `Rediger aktivitet` switches the same modal and draft
 into the existing edit flow; new activities still open directly in edit mode.
+Committee Workspace activity links open the same read view in the activity's
+year and month. Workspace deadline totals cover all visible open Committee
+tasks, while the lists show a short preview.
 The read view can export one authorized Annual Wheel activity as a branded PDF.
 The export uses the shared report foundation and includes public activity
 metadata, description, key people, fixed task templates, and activated tasks.

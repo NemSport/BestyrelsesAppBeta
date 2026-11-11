@@ -326,30 +326,47 @@ export function AnnualWheel({
   organizationId,
   data,
   initialCommitteeId = "",
+  initialEventId,
   openCreateOnLoad = false,
 }: {
   organizationId: string;
   data: AnnualWheelOverview;
   initialCommitteeId?: string;
+  initialEventId?: string;
   openCreateOnLoad?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const openedCreate = useRef(false);
+  const linkedEvent = initialEventId
+    ? data.events.find(
+        (event) =>
+          event.id === initialEventId && event.committee_id === initialCommitteeId,
+      )
+    : undefined;
+  const linkedMonth = linkedEvent
+    ? Number(linkedEvent.starts_on.slice(5, 7)) - 1
+    : undefined;
   const initialState = parseAnnualWheelState(
     new URLSearchParams(searchParams.toString()),
     initialCommitteeId,
   );
-  const [view, setView] = useState<AnnualWheelView>(initialState.view);
-  const [focusMonth, setFocusMonth] = useState(initialState.focusMonth);
+  const [view, setView] = useState<AnnualWheelView>(
+    linkedMonth === undefined ? initialState.view : "month",
+  );
+  const [focusMonth, setFocusMonth] = useState(
+    linkedMonth ?? initialState.focusMonth,
+  );
   const [committeeId, setCommitteeId] = useState(initialState.committeeId);
   const [responsibleId, setResponsibleId] = useState(
     initialState.responsibleId,
   );
   const [kind, setKind] = useState<AnnualWheelKind>(initialState.kind);
-  const [draft, setDraft] = useState<EventDraft | null>(null);
-  const [draftBaseline, setDraftBaseline] = useState<EventDraft | null>(null);
+  const [draft, setDraft] = useState<EventDraft | null>(() =>
+    linkedEvent ? draftFromEvent(linkedEvent) : null,
+  );
+  const [draftBaseline, setDraftBaseline] = useState(draft);
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -372,12 +389,12 @@ export function AnnualWheel({
       new URLSearchParams(searchParams.toString()),
       initialCommitteeId,
     );
-    setView(next.view);
-    setFocusMonth(next.focusMonth);
+    setView(linkedMonth === undefined ? next.view : "month");
+    setFocusMonth(linkedMonth ?? next.focusMonth);
     setCommitteeId(next.committeeId);
     setResponsibleId(next.responsibleId);
     setKind(next.kind);
-  }, [initialCommitteeId, searchParams]);
+  }, [initialCommitteeId, linkedMonth, searchParams]);
 
   const canCreate =
     data.canEditOrganization || data.editableCommitteeIds.length > 0;
@@ -489,6 +506,10 @@ export function AnnualWheel({
       nextState,
       initialCommitteeId,
     );
+    if (next.has("event")) {
+      next.delete("event");
+      next.set("year", String(data.year));
+    }
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
@@ -509,6 +530,7 @@ export function AnnualWheel({
       { view, focusMonth, committeeId, responsibleId, kind },
       initialCommitteeId,
     );
+    next.delete("event");
     next.set("year", String(year));
     return `${pathname}?${next.toString()}`;
   }
@@ -772,6 +794,7 @@ export function AnnualWheel({
     setDraftBaseline(null);
     setError(null);
     setFieldErrors({});
+    if (initialEventId) replaceAnnualWheelState({});
   }
 
   async function analyzeAnnualWheel() {
@@ -968,6 +991,11 @@ export function AnnualWheel({
 
   return (
     <div className="content-flow min-w-0">
+      {initialEventId && !linkedEvent ? (
+        <p className="alert-danger p-3 text-sm" role="status">
+          Aktiviteten blev ikke fundet i dette udvalg.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 border-b border-line pb-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <Link
