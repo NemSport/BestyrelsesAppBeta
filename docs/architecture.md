@@ -1724,6 +1724,13 @@ acceptance creates membership and marks the invitation accepted atomically.
 Existing active membership retains its role. No Committee membership is
 created.
 
+The password recovery form uses Supabase Auth's PKCE flow and preserves the
+invitation destination. The recovery callback requires a recovery code
+exchange before it grants a short-lived, user-bound reset form. The invitation
+destination stays in a same-browser cookie so each host needs only its exact
+`/auth/callback` URL in the Auth allowlist. Supabase Auth needs a configured
+SMTP sender to mail ordinary invitees.
+
 Membership administration follows these invariants:
 
 - Organization members may read the member directory.

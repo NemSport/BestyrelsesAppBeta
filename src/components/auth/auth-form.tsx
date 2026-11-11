@@ -58,8 +58,10 @@ export function AuthForm({
     setLoading(false);
     if (result.error) {
       setError(
-        result.error.message.toLowerCase().includes("invalid login")
-          ? "E-mail eller adgangskode er forkert."
+        result.error.code === "email_not_confirmed"
+          ? "Bekræft din e-mailadresse, før du logger ind."
+          : result.error.code === "invalid_credentials"
+            ? "E-mail eller adgangskode er forkert."
           : "Vi kunne ikke gennemføre handlingen. Kontrollér oplysningerne og prøv igen.",
       );
       return;
@@ -67,7 +69,10 @@ export function AuthForm({
 
     if (mode === "signup" && !result.data.session) {
       const login = new URL(authHref("/login", redirectTo), window.location.origin);
-      login.searchParams.set("message", "Bekræft din konto via e-mail, og log derefter ind her.");
+      login.searchParams.set(
+        "message",
+        "Hvis du fik en mail til at bekræfte kontoen, skal du åbne den først. Har du allerede en konto, kan du logge ind eller nulstille din adgangskode.",
+      );
       router.push(login.pathname + login.search);
       return;
     }

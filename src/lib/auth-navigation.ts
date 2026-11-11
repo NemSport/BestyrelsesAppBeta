@@ -1,3 +1,7 @@
+export const passwordRecoveryDestinationCookie = "bestyrelsesapp-recovery-next";
+export const passwordRecoveryCallback = "/auth/callback";
+export const passwordRecoveryCookie = "bestyrelsesapp-password-recovery";
+
 const localOrigin = "https://bestyrelsesapp.invalid";
 
 export function getAuthRedirect(next: unknown) {
@@ -20,7 +24,10 @@ export function getAuthRedirect(next: unknown) {
   return "/organizations";
 }
 
-export function authHref(path: "/login" | "/signup", next: string) {
+export function authHref(
+  path: "/login" | "/signup" | "/forgot-password" | "/reset-password",
+  next: string,
+) {
   return next === "/organizations"
     ? path
     : `${path}?${new URLSearchParams({ next })}`;

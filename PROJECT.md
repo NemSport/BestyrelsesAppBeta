@@ -54,6 +54,7 @@ Owners and administrators send Organization invitations through the existing
 email provider. A verified account with the invited address must explicitly
 accept within seven days. Acceptance adds Organization membership with the
 invited role. Committee assignments continue to be managed separately.
+Password recovery retains the invitation after the user sets a new password.
 
 ## Organization PDF Letterhead
 

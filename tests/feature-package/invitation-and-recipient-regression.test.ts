@@ -36,6 +36,11 @@ test("auth links retain the invitation and reject external redirects", () => {
   const next = `/invite/${randomUUID()}`;
   const url = new URL(authHref("/signup", next), "https://app.example.test");
   assert.equal(getAuthRedirect(url.searchParams.get("next")), next);
+  for (const path of ["/forgot-password", "/reset-password"] as const) {
+    const recovery = new URL(authHref(path, next), "https://app.example.test");
+    assert.equal(recovery.pathname, path);
+    assert.equal(getAuthRedirect(recovery.searchParams.get("next")), next);
+  }
   for (const external of [
     "https://elsewhere.test",
     "//elsewhere.test",

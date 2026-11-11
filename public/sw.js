@@ -63,6 +63,9 @@ self.addEventListener("fetch", (event) => {
     url.origin !== self.location.origin ||
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
+    url.pathname.startsWith("/invite/") ||
+    url.pathname === "/forgot-password" ||
+    url.pathname === "/reset-password" ||
     url.pathname === "/ux-review"
   ) {
     return;

@@ -22,6 +22,11 @@ export default async function LoginPage({
       <div className="mt-8">
         <AuthForm mode="login" redirectTo={redirectTo} />
       </div>
+      <p className="mt-4 text-center text-sm">
+        <Link className="font-semibold text-brand" href={authHref("/forgot-password", redirectTo)}>
+          Glemt adgangskode?
+        </Link>
+      </p>
       <p className="mt-6 text-center text-sm text-slate-600">
         Ny bruger?{" "}
         <Link className="font-semibold text-forest" href={authHref("/signup", redirectTo)}>
