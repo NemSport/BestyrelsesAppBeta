@@ -72,6 +72,20 @@ function shell({
   ].join("");
 }
 
+export function organizationInvitationEmailTemplate(
+  organizationName: string,
+  invitationUrl: string,
+) {
+  const subject = `Invitation til ${organizationName} i BestyrelsesApp`;
+  const intro = `Du er inviteret til ${organizationName} i BestyrelsesApp.`;
+  const instructions = "Log ind eller opret en konto med den e-mailadresse, invitationen er sendt til. Linket er gyldigt i syv dage.";
+  return {
+    subject,
+    text: `${intro}\n\n${instructions}\n\nÅbn invitationen: ${invitationUrl}`,
+    html: `<p>${escapeHtml(intro)}</p><p>${escapeHtml(instructions)}</p><p><a href="${escapeHtml(invitationUrl)}">Åbn invitationen</a></p>`,
+  };
+}
+
 export function meetingAgendaEmailTemplate({
   organizationName,
   committeeName,

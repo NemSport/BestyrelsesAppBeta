@@ -1730,6 +1730,19 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["organization_invitations"]["Row"];
       };
+      resend_organization_invitation: {
+        Args: { target_organization_id: string; target_invitation_id: string };
+        Returns: Database["public"]["Tables"]["organization_invitations"]["Row"];
+      };
+      respond_to_organization_invitation: {
+        Args: { target_invitation_id: string; accept_invitation: boolean };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          invited_role: Database["public"]["Enums"]["organization_role"];
+          invitation_status: Database["public"]["Enums"]["invitation_status"];
+        }[];
+      };
       update_organization_member_role: {
         Args: {
           target_organization_id: string;

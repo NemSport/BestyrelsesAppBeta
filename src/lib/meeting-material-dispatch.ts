@@ -23,6 +23,7 @@ export const meetingMaterialDispatchSchema = z
     documentIds: z.array(z.string().uuid()).max(10).default([]),
     recipientMode: z.enum(["participants", "selected"]),
     recipientUserIds: z.array(z.string().uuid()).max(250).default([]),
+    expectedRecipientEmails: z.array(z.string().trim().min(1).max(254)).max(1000).optional(),
     subject: z.string().trim().min(3, "Emne skal udfyldes").max(180),
     message: z.string().trim().max(2000).default(""),
   })
@@ -104,6 +105,15 @@ function uniqueRecipients(recipients: MeetingMaterialRecipientSnapshot[]) {
       ]),
     ).values(),
   ];
+}
+
+export function matchesMeetingMaterialRecipients(
+  recipients: Array<{ email: string }>,
+  expectedEmails: string[],
+) {
+  const expected = new Set(expectedEmails.map((email) => email.trim().toLowerCase()));
+  return expected.size === recipients.length &&
+    recipients.every(({ email }) => expected.has(email.trim().toLowerCase()));
 }
 
 export function resolveMeetingParticipantRecipients({

@@ -42,6 +42,19 @@ The A4.2 compatibility hotfix preserves existing task-to-meeting reads across
 older app deployments sharing the database. Task links keep their meeting/task
 uniqueness while using a separate primary key; no task records are moved.
 
+## Meeting material recipients and member invitations
+
+The dispatch preview names the actual recipients and shows their e-mail
+addresses before sending. When no participants are registered, the default
+option is labelled Active Committee Members. The server compares the previewed
+addresses with its current recipient resolution before generating or sending
+materials.
+
+Owners and administrators send Organization invitations through the existing
+email provider. A verified account with the invited address must explicitly
+accept within seven days. Acceptance adds Organization membership with the
+invited role. Committee assignments continue to be managed separately.
+
 ## Organization PDF Letterhead
 
 The Branding page now includes a document-template configurator. Organization

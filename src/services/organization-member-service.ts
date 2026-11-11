@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getEmailEnv } from "@/lib/email-env";
+import { organizationInvitationEmailTemplate } from "@/lib/email-templates";
 import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
 import { getMemberAccessCapabilities } from "@/lib/member-access-capabilities";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -8,11 +10,13 @@ import {
   organizationInvitationInputSchema,
   organizationMemberAccessUpdateSchema,
   organizationMemberRemoveSchema,
+  uuidSchema,
 } from "@/lib/validation";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { ManualMemberRepository } from "@/repositories/manual-member-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { OrganizationRepository } from "@/repositories/organization-repository";
+import { EmailService } from "@/services/email-service";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import type { Database } from "@/types/database";
@@ -28,6 +32,7 @@ const controlledDatabaseMessages = [
   "Det samme udvalg kan kun vælges én gang",
   "Brugeren er allerede medlem",
   "Der findes allerede en afventende invitation",
+  "Invitationen kan ikke sendes igen",
   "Indtast en gyldig e-mailadresse",
 ];
 
@@ -61,7 +66,7 @@ export class OrganizationMemberService {
   private readonly auth: AuthService;
   private readonly authorization: AuthorizationService;
 
-  constructor(db: SupabaseClient<Database>) {
+  constructor(private readonly db: SupabaseClient<Database>) {
     this.members = new OrganizationMemberRepository(db);
     this.organizations = new OrganizationRepository(db);
     this.committees = new CommitteeRepository(db);
@@ -212,7 +217,7 @@ export class OrganizationMemberService {
     }
   }
 
-  async invite(input: unknown) {
+  async invite(input: unknown, appOrigin: string) {
     const user = await this.auth.requireUser();
     const parsed = organizationInvitationInputSchema.parse(input);
     const context = await this.authorization.requireOrganizationAdmin(
@@ -222,15 +227,46 @@ export class OrganizationMemberService {
     if (parsed.role === "owner" && context.membership.role !== "owner") {
       throw new AuthorizationError("Kun en ejer kan invitere en ny ejer.");
     }
-    try {
-      return await this.members.invite(
-        parsed.organizationId,
-        parsed.email,
-        parsed.role,
-      );
-    } catch (error) {
-      membershipError(error);
-    }
+    const invitation = await this.members
+      .invite(parsed.organizationId, parsed.email, parsed.role)
+      .catch(membershipError);
+    return this.deliverInvitation(invitation, context.organization.name, appOrigin);
+  }
+
+  async resendInvitation(organizationId: string, invitationId: string, appOrigin: string) {
+    const user = await this.auth.requireUser();
+    const context = await this.authorization.requireOrganizationAdmin(
+      uuidSchema.parse(organizationId),
+      user.id,
+    );
+    const invitation = await this.members
+      .resend(organizationId, uuidSchema.parse(invitationId))
+      .catch(membershipError);
+    return this.deliverInvitation(invitation, context.organization.name, appOrigin);
+  }
+
+  private async deliverInvitation(
+    invitation: Awaited<ReturnType<OrganizationMemberRepository["invite"]>>,
+    organizationName: string,
+    appOrigin: string,
+  ) {
+    const template = organizationInvitationEmailTemplate(
+      organizationName,
+      new URL(`/invite/${invitation.id}`, appOrigin).href,
+    );
+    const delivery = await new EmailService(this.db).sendPrepared({
+      from: getEmailEnv().EMAIL_FROM,
+      to: [invitation.email],
+      ...template,
+    }).catch(() => null);
+
+    return {
+      ...invitation,
+      deliveryStatus: delivery?.status ?? "failed",
+      message: delivery?.sent
+        ? "Invitationen er sendt og afventer accept."
+        : "Invitationen er gemt, men e-mailen blev ikke sendt. Du kan prøve igen under Afventende invitationer.",
+    };
   }
 
   async updateAccess(input: unknown) {

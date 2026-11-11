@@ -48,6 +48,24 @@ export class OrganizationMemberRepository {
     return data;
   }
 
+  async resend(organizationId: string, invitationId: string) {
+    const { data, error } = await this.db.rpc("resend_organization_invitation", {
+      target_organization_id: organizationId,
+      target_invitation_id: invitationId,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async respondToInvitation(invitationId: string, accept: boolean) {
+    const { data, error } = await this.db.rpc("respond_to_organization_invitation", {
+      target_invitation_id: invitationId,
+      accept_invitation: accept,
+    }).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
   async updateAccess(
     organizationId: string,
     userId: string,

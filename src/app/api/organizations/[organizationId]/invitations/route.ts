@@ -11,17 +11,14 @@ export async function POST(
   try {
     const invitation = await new OrganizationMemberService(
       await createClient(),
-    ).invite({
-      ...(await request.json()),
-      organizationId: (await params).organizationId,
-    });
-    return NextResponse.json(
+    ).invite(
       {
-        ...invitation,
-        message: "Invitationen er gemt og afventer accept.",
+        ...(await request.json()),
+        organizationId: (await params).organizationId,
       },
-      { status: 201 },
+      new URL(request.url).origin,
     );
+    return NextResponse.json(invitation, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

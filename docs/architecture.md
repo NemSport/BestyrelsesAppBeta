@@ -1713,9 +1713,16 @@ Observatør.
 #### `organization_invitations`
 
 Stores pending invitations with organization, normalized e-mail address,
-intended role, inviter, status, and timestamps. Phase 1 stores invitations
-without sending e-mail. A later acceptance flow may add secure tokens and
-expiration.
+intended role, inviter, status, and timestamps. The invitation endpoint sends
+through EmailService and reports delivery separately from the persisted
+pending invitation. Resending uses the stored address and role and renews the
+seven-day acceptance window. The invitation link carries the record ID, which
+only identifies the invitation. The database checks the current authenticated
+account's confirmed address and the inviter's current authority. The
+`/invite/[invitationId]` page previews the Organization and role, and
+acceptance creates membership and marks the invitation accepted atomically.
+Existing active membership retains its role. No Committee membership is
+created.
 
 Membership administration follows these invariants:
 
@@ -2815,3 +2822,8 @@ session. It forwards bounded excerpts from approved minutes, document
 metadata, decisions, tasks, and annual wheel entries to the model. Citations
 are resolved against that request's authorized search results. Draft answers
 are text suggestions and never persist records.
+
+The dispatch form displays the names and e-mail addresses resolved by the same
+rules as dispatch. When participants have not been registered, it labels the
+default group as active Committee Members. The browser submits the previewed
+addresses so that the server can reject a stale recipient list before delivery.

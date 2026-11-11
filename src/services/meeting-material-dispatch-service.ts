@@ -8,6 +8,7 @@ import { AppError, NotFoundError } from "@/lib/errors";
 import {
   meetingMaterialContentLabels,
   meetingMaterialDispatchSchema,
+  matchesMeetingMaterialRecipients,
   resolveMeetingParticipantRecipients,
   resolveSelectedMeetingMaterialRecipients,
   tasksForRecipient,
@@ -175,6 +176,16 @@ export class MeetingMaterialDispatchService {
       parsed.recipientMode === "participants"
         ? participantResolution.recipients
         : selectedResolution.recipients;
+    if (
+      parsed.expectedRecipientEmails &&
+      !matchesMeetingMaterialRecipients(recipients, parsed.expectedRecipientEmails)
+    ) {
+      throw new AppError(
+        "Modtagerlisten er ændret. Genindlæs mødet, og kontrollér modtagerne, før du sender.",
+        409,
+        "DISPATCH_RECIPIENTS_CHANGED",
+      );
+    }
     if (!recipients.length) {
       throw new AppError(
         "Der blev ikke fundet nogen deltagere med en gyldig emailadresse.",

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button, Input } from "@/components/ui";
+import { authHref } from "@/lib/auth-navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({
@@ -65,7 +66,9 @@ export function AuthForm({
     }
 
     if (mode === "signup" && !result.data.session) {
-      router.push("/login?message=Tjek din e-mail for at bekræfte din konto.");
+      const login = new URL(authHref("/login", redirectTo), window.location.origin);
+      login.searchParams.set("message", "Bekræft din konto via e-mail, og log derefter ind her.");
+      router.push(login.pathname + login.search);
       return;
     }
 

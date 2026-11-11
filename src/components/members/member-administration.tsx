@@ -77,6 +77,7 @@ export function MemberAdministration({
     const result = (await response.json()) as {
       error?: string;
       message?: string;
+      deliveryStatus?: string;
     };
     if (!response.ok) {
       throw new Error(result.error || "Handlingen kunne ikke gennemføres.");
@@ -113,7 +114,7 @@ export function MemberAdministration({
       );
       setEmail("");
       setInvitationRole("member");
-      setMessage(result.message || "Invitationen er gemt.");
+      showInvitationDelivery(result);
       router.refresh();
     } catch (caughtError) {
       setError(
@@ -121,6 +122,33 @@ export function MemberAdministration({
           ? caughtError.message
           : "Invitationen kunne ikke gemmes.",
       );
+    } finally {
+      setLoadingKey(null);
+    }
+  }
+
+  function showInvitationDelivery(result: { message?: string; deliveryStatus?: string }) {
+    if (result.deliveryStatus === "sent") {
+      setMessage(result.message ?? "Invitationen er sendt.");
+    } else {
+      setError(result.message ?? "Invitationens e-mail blev ikke sendt.");
+    }
+  }
+
+  async function resendInvitation(invitation: OrganizationInvitation) {
+    setMessage(null);
+    setError(null);
+    setLoadingKey(invitation.id);
+    try {
+      const result = await readResponse(
+        await fetch(`/api/organizations/${organizationId}/invitations/${invitation.id}`, {
+          method: "POST",
+        }),
+      );
+      showInvitationDelivery(result);
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Invitationen kunne ikke sendes igen.");
     } finally {
       setLoadingKey(null);
     }
@@ -183,7 +211,7 @@ export function MemberAdministration({
         <section className="workflow-panel" id="invite-member">
           <h2 className="text-base font-semibold">Inviter medlem</h2>
           <p className="mt-2 text-sm text-muted">
-            Invitationen gemmes som afventende. Der sendes endnu ingen e-mail.
+            Medlemmet får et link, der kan bruges i syv dage. Adgangen aktiveres, når invitationen accepteres.
           </p>
           <form
             className="mt-5 grid gap-4 md:grid-cols-[1fr_220px_auto]"
@@ -228,10 +256,10 @@ export function MemberAdministration({
             </div>
             <Button
               className="self-end"
-              disabled={loadingKey === "invite"}
+              disabled={loadingKey !== null}
               type="submit"
             >
-              {loadingKey === "invite" ? "Gemmer..." : "Gem invitation"}
+              {loadingKey === "invite" ? "Sender…" : "Send invitation"}
             </Button>
           </form>
         </section>
@@ -413,7 +441,7 @@ export function MemberAdministration({
       </PageSection>
 
       <PageSection
-        description="Invitationerne bliver stående her, indtil et senere acceptflow tilføjes."
+        description="Invitationer vises her, indtil modtageren har accepteret."
         title="Afventende invitationer"
       >
         {invitations.length > 0 ? (
@@ -428,6 +456,7 @@ export function MemberAdministration({
                   <TableHeaderCell>E-mail</TableHeaderCell>
                   <TableHeaderCell>Rolle</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
+                  {canManage ? <TableHeaderCell>Handling</TableHeaderCell> : null}
                 </TableRow>
               </TableHead>
               <TableBody className="grid gap-3 md:table-row-group">
@@ -458,6 +487,22 @@ export function MemberAdministration({
                         {invitationStatusLabels[invitation.status]}
                       </StatusBadge>
                     </TableCell>
+                    {canManage ? (
+                      <TableCell className="block p-0 md:table-cell md:px-5 md:py-4">
+                        {invitation.role !== "owner" || currentUserRole === "owner" ? (
+                          <Button
+                            aria-label={`Send invitation igen til ${invitation.email}`}
+                            disabled={loadingKey !== null}
+                            onClick={() => void resendInvitation(invitation)}
+                            size="sm"
+                            type="button"
+                            variant="secondary"
+                          >
+                            {loadingKey === invitation.id ? "Sender…" : "Send igen"}
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

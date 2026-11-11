@@ -53,7 +53,7 @@ export function SendMeetingMaterialsModal({
   minutesAvailable: boolean;
   recipients: RecipientOption[];
   participantSummary: {
-    recipientCount: number;
+    recipients: Array<{ name: string; email: string }>;
     totalParticipantCount: number;
     participantsWithEmailCount: number;
     unavailableParticipants: UnavailableMeetingMaterialParticipant[];
@@ -62,7 +62,10 @@ export function SendMeetingMaterialsModal({
   relatedDocuments: RelatedDocumentView[];
   initialHistory: MeetingMaterialDispatchHistory[];
 }) {
-  const participantCount = participantSummary.recipientCount;
+  const participantCount = participantSummary.recipients.length;
+  const participantLabel = participantSummary.usedCommitteeFallback
+    ? "Aktive udvalgsmedlemmer"
+    : "Mødedeltagere";
   const defaultRecipientMode = participantCount > 0 ? "participants" : "selected";
   const [open, setOpen] = useState(false);
   const [contentTypes, setContentTypes] = useState<MeetingMaterialContentType[]>([
@@ -97,10 +100,10 @@ export function SendMeetingMaterialsModal({
     ],
     [relatedDocuments],
   );
-  const recipientPreviewCount =
-    recipientMode === "participants"
-      ? participantCount
-      : selectedRecipientIds.length;
+  const previewRecipients = recipientMode === "participants"
+    ? participantSummary.recipients
+    : recipients.filter((recipient) => selectedRecipientIds.includes(recipient.userId));
+  const recipientPreviewCount = previewRecipients.length;
 
   function toggleContent(type: MeetingMaterialContentType) {
     setContentTypes((current) =>
@@ -139,6 +142,7 @@ export function SendMeetingMaterialsModal({
           includeAttachments,
           documentIds: includeAttachments ? selectedDocumentIds : [],
           recipientMode,
+          expectedRecipientEmails: previewRecipients.map(({ email }) => email),
           recipientUserIds:
             recipientMode === "selected" ? selectedRecipientIds : [],
           subject,
@@ -190,7 +194,7 @@ export function SendMeetingMaterialsModal({
         Udsend
       </Button>
       <Modal
-        description="Vælg indhold, bilag og modtagere. Forhåndsvisningen ændrer eller kopierer ingen records."
+        description="Vælg indhold og bilag, og kontrollér modtagerne før afsendelse."
         maxWidth="3xl"
         onClose={() => setOpen(false)}
         open={open}
@@ -266,20 +270,20 @@ export function SendMeetingMaterialsModal({
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex min-h-12 items-start gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm">
                 <input checked={recipientMode === "participants"} disabled={!participantCount} name="dispatch-recipient-mode" onChange={() => setRecipientMode("participants")} type="radio" />
-                <span><span className="block font-semibold">Alle mødedeltagere</span><span className="block text-xs text-muted">{participantSummary.participantsWithEmailCount} af {participantSummary.totalParticipantCount} med email</span></span>
+                <span><span className="block font-semibold">{participantLabel}</span><span className="block text-xs text-muted">{participantSummary.participantsWithEmailCount} af {participantSummary.totalParticipantCount} med e-mail</span></span>
               </label>
               <label className="flex min-h-12 items-start gap-2 rounded-[var(--radius-control)] border border-line p-3 text-sm">
                 <input checked={recipientMode === "selected"} name="dispatch-recipient-mode" onChange={() => setRecipientMode("selected")} type="radio" />
-                <span><span className="block font-semibold">Udvalgte / andre modtagere</span><span className="block text-xs text-muted">Aktive medlemmer af organisationen</span></span>
+                <span><span className="block font-semibold">Vælg selv modtagere</span><span className="block text-xs text-muted">Aktive medlemmer af organisationen</span></span>
               </label>
             </div>
             {participantSummary.usedCommitteeFallback ? (
               <p className="text-xs text-muted">
-                Der er ikke registreret konkrete deltagere på mødet. Aktive
-                udvalgsmedlemmer bruges som eksisterende fallback.
+                Der er ingen registrerede mødedeltagere. Du kan sende til de
+                aktive udvalgsmedlemmer eller selv vælge modtagere.
               </p>
             ) : null}
-            {participantSummary.unavailableParticipants.length > 0 ? (
+            {recipientMode === "participants" && participantSummary.unavailableParticipants.length > 0 ? (
               <div className="rounded-[var(--radius-control)] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" role="note">
                 <p className="font-semibold">Kan ikke modtage udsendelsen:</p>
                 <ul className="mt-1 list-disc space-y-1 pl-4">
@@ -315,8 +319,22 @@ export function SendMeetingMaterialsModal({
               <li>{contentTypes.length ? contentTypes.map((type) => meetingMaterialContentLabels[type]).join(", ") : "Intet indhold valgt"}</li>
               {contentTypes.includes("tasks") ? <li>{taskListMode === "personal" ? "Personlig opgaveliste – indholdet varierer pr. modtager" : "Generel opgaveliste – samme indhold til alle"}</li> : null}
               <li>{includeAttachments ? `${selectedDocumentIds.length} valgte bilag` : "Ingen bilag"}</li>
-              <li>{recipientPreviewCount} modtagere</li>
             </ul>
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="text-sm font-semibold" id="dispatch-preview-recipients" aria-live="polite">
+                {recipientPreviewCount} {recipientPreviewCount === 1 ? "modtager" : "modtagere"}
+              </p>
+              {recipientPreviewCount > 0 ? (
+                <ul aria-labelledby="dispatch-preview-recipients" className="mt-2 max-h-48 space-y-2 overflow-y-auto text-sm">
+                  {previewRecipients.map(({ name, email }) => (
+                    <li className="break-words" key={email}>
+                      <span className="font-medium">{name}</span>
+                      {name !== email ? <span className="ml-2 text-muted">{email}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-1 text-sm text-muted">Ingen modtagere valgt.</p>}
+            </div>
           </section>
 
           {error ? <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm" role="alert">{error}</div> : null}
@@ -324,7 +342,7 @@ export function SendMeetingMaterialsModal({
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={() => setOpen(false)} type="button" variant="secondary">Luk</Button>
-            <Button disabled={sending || !contentTypes.length || !recipientPreviewCount || !subject.trim()} type="submit">{sending ? "Udsender…" : "Udsend nu"}</Button>
+            <Button disabled={sending || !contentTypes.length || !recipientPreviewCount || !subject.trim()} type="submit">{sending ? "Udsender…" : `Udsend til ${recipientPreviewCount} ${recipientPreviewCount === 1 ? "modtager" : "modtagere"}`}</Button>
           </div>
         </form>
 

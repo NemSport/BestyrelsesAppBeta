@@ -420,8 +420,7 @@ export default async function MeetingPage({
                 )}
                 organizationId={organizationId}
                 participantSummary={{
-                  recipientCount:
-                    participantRecipientResolution.recipients.length,
+                  recipients: participantRecipientResolution.recipients,
                   totalParticipantCount:
                     participantRecipientResolution.totalParticipantCount,
                   participantsWithEmailCount:

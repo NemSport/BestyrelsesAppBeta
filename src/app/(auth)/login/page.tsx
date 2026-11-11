@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AuthForm } from "@/components/auth/auth-form";
+import { authHref, getAuthRedirect } from "@/lib/auth-navigation";
 
 export default async function LoginPage({
   searchParams,
@@ -8,9 +9,7 @@ export default async function LoginPage({
   searchParams: Promise<{ message?: string; next?: string }>;
 }) {
   const { message, next } = await searchParams;
-  const redirectTo = next?.startsWith("/") && !next.startsWith("//")
-    ? next
-    : "/organizations";
+  const redirectTo = getAuthRedirect(next);
   return (
     <>
       <h1 className="text-3xl font-bold">Velkommen tilbage</h1>
@@ -25,7 +24,7 @@ export default async function LoginPage({
       </div>
       <p className="mt-6 text-center text-sm text-slate-600">
         Ny bruger?{" "}
-        <Link className="font-semibold text-forest" href="/signup">
+        <Link className="font-semibold text-forest" href={authHref("/signup", redirectTo)}>
           Opret en konto
         </Link>
       </p>
