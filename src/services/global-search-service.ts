@@ -63,6 +63,7 @@ export class GlobalSearchService {
     organizationId: string;
     query: string;
     category?: string | null;
+    categories?: readonly GlobalSearchCategory[];
   }) {
     const user = await this.auth.requireUser();
     await this.authorization.requireOrganizationMember(input.organizationId, user.id);
@@ -75,7 +76,8 @@ export class GlobalSearchService {
       return { query, groups: [] };
     }
 
-    const enabled = (value: GlobalSearchCategory) => category === "all" || category === value;
+    const enabled = (value: GlobalSearchCategory) =>
+      input.categories ? input.categories.includes(value) : category === "all" || category === value;
     const committees = await this.repository.committees(input.organizationId);
     const matchingCommitteeIds = committees
       .filter((committee) => committee.name.toLocaleLowerCase("da-DK").includes(query.toLocaleLowerCase("da-DK")))

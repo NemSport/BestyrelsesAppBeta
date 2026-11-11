@@ -2801,3 +2801,12 @@ ordered index og stabil list depth. `PdfReport.addProse` er den fælles layout-
 grænse og beregner markørbredde, niveauindryk, wrapping og sideskift, så
 listepunkter beholder bullet/nummer uden horisontal overflow. Agenda-, minutes-
 og Job Card-renderere fortsætter med at genbruge denne grænse.
+
+### Advisory AI preview
+
+The organization overview posts questions to the organization advisory route.
+The route verifies membership and searches with the requesting user's Supabase
+session. It forwards bounded excerpts from approved minutes, document
+metadata, decisions, tasks, and annual wheel entries to the model. Citations
+are resolved against that request's authorized search results. Draft answers
+are text suggestions and never persist records.

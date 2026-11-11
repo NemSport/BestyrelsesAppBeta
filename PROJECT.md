@@ -1819,3 +1819,9 @@ Den fælles PDF-proserenderer bevarer paragraphs, line breaks, bold, italic,
 unordered og ordered lists samt TipTap-listedybde. Derfor bruger dagsorden,
 referat, formål, baggrund og øvrige eksisterende rich-text PDF-felter samme
 wrapping- og sideskiftlogik.
+
+### Advisory AI preview
+
+The organization overview offers permission-scoped questions with citations
+and text drafts for meeting agendas. The preview searches approved minutes,
+document titles and descriptions, decisions, tasks, and annual wheel entries.

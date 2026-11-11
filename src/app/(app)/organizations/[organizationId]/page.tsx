@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdvisoryAi } from "@/components/dashboard/advisory-ai";
 import { OrganizationDashboardPriority } from "@/components/dashboard/organization-dashboard-priority";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
@@ -213,6 +214,9 @@ export default async function OrganizationPage({
     </section>
   );
 
+  const actions = [...actionCenter.inbox, ...actionCenter.mine];
+  const meeting = overview.upcomingMeetings[0];
+
   return (
     <div className="space-y-4 xl:space-y-2.5" data-organization-dashboard>
       <PageHeader
@@ -250,12 +254,35 @@ export default async function OrganizationPage({
         title="Overblik"
       />
 
+      <AdvisoryAi organizationId={organizationId} />
+
       <OrganizationDashboardPriority
-        actionCenter={actionCenter}
+        actionCount={actions.length}
+        actions={actions
+          .slice(0, 3)
+          .map(({ key, href, title, priority, description, context }) => ({
+            key,
+            href,
+            title,
+            priority,
+            description,
+            context,
+          }))}
+        committeeCount={overview.committees.length}
         committeeSection={committeeSection}
         organizationId={organizationId}
         organizationRole={context.membership.role}
-        overview={overview}
+        nextMeeting={
+          meeting
+            ? {
+                id: meeting.id,
+                committee_id: meeting.committee_id,
+                starts_at: meeting.starts_at,
+                title: meeting.title,
+                committeeName: meeting.committeeName,
+              }
+            : null
+        }
         recentMinutesSection={recentMinutesSection}
       />
 
