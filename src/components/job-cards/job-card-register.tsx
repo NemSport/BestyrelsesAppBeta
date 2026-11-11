@@ -667,35 +667,34 @@ export function JobCardRegister({
             <div className="space-y-4">
               {filteredRoles.map((role) => (
                 <article
-                  className="entity-record px-4 py-5 sm:px-5"
+                  className="entity-record px-4 py-3 sm:px-5"
                   id={`job-card-${role.id}`}
                   key={role.id}
                 >
                   <div className="entity-header">
                     <div className="min-w-0 flex-1">
-                      <div className="status-cluster">
-                        <p className="page-eyebrow">Jobkort</p>
-                        <StatusBadge
-                          tone={role.archived_at ? "neutral" : "success"}
-                        >
-                          {role.archived_at ? "Arkiveret" : "Aktiv"}
-                        </StatusBadge>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <h2 className="entity-title text-lg">{role.title}</h2>
+                        {role.archived_at ? (
+                          <StatusBadge>Arkiveret</StatusBadge>
+                        ) : null}
                       </div>
-                      <h2 className="entity-title mt-1 text-lg">
-                        {role.title}
-                      </h2>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {role.responsibilityAreas.map((area) => (
-                          <StatusBadge key={area.id} tone="info">
-                            {area.name}
-                          </StatusBadge>
-                        ))}
-                        {role.committees.map((committee) => (
-                          <StatusBadge key={committee.id} tone="neutral">
-                            {committee.name}
-                          </StatusBadge>
-                        ))}
-                      </div>
+                      <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                        <div className="min-w-0">
+                          <dt className="text-xs text-muted">Rolleholdere</dt>
+                          <dd className="break-words">
+                            {role.assignments.map(({ name }) => name).join(", ") ||
+                              "Ingen rolleholdere"}
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-xs text-muted">Udvalg</dt>
+                          <dd className="break-words">
+                            {role.committees.map(({ name }) => name).join(", ") ||
+                              "Ingen tilknyttede udvalg"}
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
                     <ActionMenu>
                       <button
@@ -731,72 +730,12 @@ export function JobCardRegister({
                       ) : null}
                     </ActionMenu>
                   </div>
-                  <div className="mt-5 grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-2 xl:grid-cols-4">
-                    <JobCardScanBlock
-                      index="1"
-                      title="Formål"
-                      value={role.purpose || role.description}
-                    />
-                    <JobCardScanBlock
-                      index="2"
-                      title="Ansvar"
-                      value={role.responsibilities}
-                    />
-                    <JobCardScanBlock
-                      index="3"
-                      title="Forventninger"
-                      value={
-                        role.meeting_expectations ||
-                        role.competencies ||
-                        role.collaboration
-                      }
-                    />
-                    <JobCardScanBlock
-                      index="4"
-                      title="Næste skridt"
-                      value={
-                        role.onboardingGuide?.first_30_days ||
-                        role.relatedTasks.find(
-                          (task) =>
-                            !task.archived_at &&
-                            !["completed", "cancelled"].includes(task.status),
-                        )?.title
-                      }
-                    />
-                  </div>
-
-                  <div className="mt-4 grid gap-4 border-y border-line py-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <CompactMetaList
-                      empty="Ingen er tilknyttet rollen."
-                      items={role.assignments.map((assignment) => ({
-                        id: assignment.id,
-                        label: assignment.name,
-                        detail: assignment.email,
-                      }))}
-                      title="Rolleholdere"
-                    />
-                    <CompactMetaList
-                      empty="Ingen udvalg er tilknyttet."
-                      items={role.committees.map((committee) => ({
-                        id: committee.id,
-                        label: committee.name,
-                      }))}
-                      title="Udvalg"
-                    />
-                    <CompactMetaList
-                      empty="Ingen ansvarsområder er angivet."
-                      items={role.responsibilityAreas.map((area) => ({
-                        id: area.id,
-                        label: area.name,
-                      }))}
-                      title="Ansvarsområder"
-                    />
-                  </div>
-                  <details className="mt-5 border-t border-line pt-4">
+                  <details className="mt-2 border-t border-line">
                     <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-brand hover:underline">
-                      Se hele jobkortet og onboarding
+                      Se hele jobkortet
                     </summary>
                     <div className="mt-4 grid gap-5 lg:grid-cols-2">
+                      <TextBlock title="Formål" value={role.purpose} />
                       <TextBlock
                         title="Kort rollebeskrivelse"
                         value={role.description}
@@ -833,6 +772,25 @@ export function JobCardRegister({
                       <TextBlock
                         title="Kontaktpersoner"
                         value={role.contact_people}
+                      />
+                    </div>
+                    <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                      <CompactMetaList
+                        empty="Ingen er tilknyttet rollen."
+                        items={role.assignments.map((assignment) => ({
+                          id: assignment.id,
+                          label: assignment.name,
+                          detail: assignment.email,
+                        }))}
+                        title="Rolleholdere"
+                      />
+                      <CompactMetaList
+                        empty="Ingen ansvarsområder er angivet."
+                        items={role.responsibilityAreas.map((area) => ({
+                          id: area.id,
+                          label: area.name,
+                        }))}
+                        title="Ansvarsområder"
                       />
                     </div>
                     <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -985,33 +943,6 @@ export function JobCardRegister({
         saving={saving}
       />
     </div>
-  );
-}
-
-function JobCardScanBlock({
-  index,
-  title,
-  value,
-}: {
-  index: string;
-  title: string;
-  value?: string | null;
-}) {
-  return (
-    <section className="min-w-0 bg-surface px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-        {index} · {title}
-      </p>
-      <RichTextContent
-        className="mt-2 line-clamp-4 break-words text-sm leading-6"
-        emptyText={
-          title === "Næste skridt"
-            ? "Ingen næste skridt er beskrevet endnu."
-            : `${title} er ikke beskrevet endnu.`
-        }
-        value={value}
-      />
-    </section>
   );
 }
 

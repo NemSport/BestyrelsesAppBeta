@@ -20,18 +20,24 @@ const [register, pdf, service, repository, policies, page] =
     ),
   ]);
 
-test("job cards expose the stable scan order before secondary detail", () => {
-  const purpose = register.indexOf('title="Formål"');
-  const responsibility = register.indexOf('title="Ansvar"');
-  const expectations = register.indexOf('title="Forventninger"');
-  const nextSteps = register.indexOf('title="Næste skridt"');
-
-  assert.ok(purpose > 0);
-  assert.ok(purpose < responsibility);
-  assert.ok(responsibility < expectations);
-  assert.ok(expectations < nextSteps);
-  assert.match(register, /Se hele jobkortet og onboarding/);
-  assert.match(register, /JobCardScanBlock/);
+test("job card overview shows role metadata and the disclosure contains the full text", () => {
+  const card = register.match(/filteredRoles\.map\(\(role\) => \([\s\S]*?<\/article>/)?.[0];
+  assert.ok(card);
+  const [overview, fullCard] = card.split("<details");
+  assert.match(overview, /\{role\.title\}/);
+  assert.match(overview, /Rolleholdere[\s\S]*role\.assignments/);
+  assert.match(overview, /Udvalg[\s\S]*role\.committees/);
+  assert.doesNotMatch(overview, /role\.(purpose|description|responsibilities|onboardingGuide)/);
+  assert.match(fullCard, /<summary[^>]*>\s*Se hele jobkortet\s*<\/summary>/);
+  for (const value of [
+    "role.purpose",
+    "role.description",
+    "role.responsibilities",
+    "role.meeting_expectations",
+    "role.onboardingGuide?.first_30_days",
+  ]) {
+    assert.ok(fullCard.includes(`value={${value}}`));
+  }
 });
 
 test("mobile layout wraps prose and links without fixed filter widths", () => {
