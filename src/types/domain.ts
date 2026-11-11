@@ -522,7 +522,7 @@ export type DecisionView = Decision & {
 export type DecisionRegisterData = {
   decisions: DecisionView[];
   committees: Committee[];
-  meetings: Meeting[];
+  meetings: MeetingWithAgendaPreview[];
   agendaItems: AgendaItem[];
   members: OrganizationMemberDirectoryEntry[];
   editableCommitteeIds: string[];
@@ -594,7 +594,7 @@ export type TaskRegisterData = {
   userId: string;
   tasks: TaskView[];
   committees: Committee[];
-  meetings: Meeting[];
+  meetings: MeetingWithAgendaPreview[];
   agendaItems: AgendaItem[];
   decisions: DecisionView[];
   members: OrganizationMemberDirectoryEntry[];

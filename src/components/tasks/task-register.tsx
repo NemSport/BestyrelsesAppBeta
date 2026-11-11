@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import {
+  agendaItemFitsMeeting,
+  formatAgendaMeetingLabel,
+  getAgendaItemOptions,
+} from "@/lib/agenda-item-options";
+
 import { AppIcon } from "@/components/icons/app-icon";
 import { TaskComments } from "@/components/tasks/task-comments";
 import { TaskRegisterDetail } from "@/components/tasks/task-register-detail";
@@ -417,8 +423,16 @@ export function TaskRegister({
   const meetingOptions = data.meetings.filter(
     (meeting) => meeting.committee_id === (draft?.committeeId ?? ""),
   );
-  const agendaItemOptions = data.agendaItems.filter(
-    (item) => item.committee_id === (draft?.committeeId ?? ""),
+  const agendaItemOptions = getAgendaItemOptions(
+    data.agendaItems.filter(
+      (item) => item.committee_id === (draft?.committeeId ?? ""),
+    ),
+    meetingOptions,
+    draft?.meetingId ?? "",
+    draft?.meetingId === draftBaseline?.meetingId &&
+      draft?.agendaItemId === draftBaseline?.agendaItemId
+      ? draftBaseline?.agendaItemId
+      : undefined,
   );
   const decisionOptions = data.decisions.filter(
     (decision) => decision.committee_id === (draft?.committeeId ?? ""),
@@ -539,6 +553,17 @@ export function TaskRegister({
             current.stakeholderContractId,
             data.stakeholderContracts,
           ),
+        };
+      }
+      if (key === "meetingId") {
+        const meetingId = String(value);
+        const meeting = meetingOptions.find((option) => option.id === meetingId);
+        return {
+          ...current,
+          meetingId,
+          agendaItemId: agendaItemFitsMeeting(current.agendaItemId, meeting)
+            ? current.agendaItemId
+            : "",
         };
       }
       return { ...current, [key]: value };
@@ -1644,7 +1669,7 @@ export function TaskRegister({
                       <option value="">Intet møde</option>
                       {meetingOptions.map((meeting) => (
                         <option key={meeting.id} value={meeting.id}>
-                          {meeting.title}
+                          {formatAgendaMeetingLabel(meeting)}
                         </option>
                       ))}
                     </Select>
@@ -1673,7 +1698,7 @@ export function TaskRegister({
                       <option value="">Intet dagsordenspunkt</option>
                       {agendaItemOptions.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.title}
+                          {item.label}
                         </option>
                       ))}
                     </Select>

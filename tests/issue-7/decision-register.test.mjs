@@ -113,7 +113,10 @@ test("creation is agenda-item first in register and agenda-item workspace", () =
     register,
     /Beslutningen gemmes som en del af dette punkts historik/,
   );
-  assert.match(register, /if \(!draft\.id && !draft\.agendaItemId\)/);
+  assert.match(
+    register,
+    /if \(\(!draft\.id \|\| draftBaseline\?\.agendaItemId\) && !draft\.agendaItemId\)/,
+  );
   assert.match(agendaPage, /DecisionCreateModal/);
   assert.match(agendaPage, /initialAgendaItemId=\{item\.id\}/);
   assert.match(agendaPage, /Opret beslutning fra dette punkt/);

@@ -19,6 +19,12 @@ import {
   useUnsavedChanges,
 } from "@/hooks/use-mutation-feedback";
 import {
+  agendaItemFitsMeeting,
+  formatAgendaMeetingLabel,
+  getAgendaItemOptions,
+  type AgendaMeetingOption,
+} from "@/lib/agenda-item-options";
+import {
   firstFieldError,
   MutationRequestError,
   readMutationResponse,
@@ -32,7 +38,6 @@ import { reconcileTaskStakeholderContract } from "@/lib/task-stakeholder-context
 import type {
   AgendaItem,
   DecisionView,
-  Meeting,
   TaskStakeholderContractOption,
   TaskStakeholderOption,
   TaskView,
@@ -67,7 +72,7 @@ export function TaskCreateModal({
   organizationId: string;
   committeeId: string;
   committeeOptions?: Array<{ id: string; name: string }>;
-  meetings?: Array<Pick<Meeting, "id" | "title" | "starts_at">>;
+  meetings?: AgendaMeetingOption[];
   agendaItems?: Array<Pick<AgendaItem, "id" | "title">>;
   decisions?: Array<Pick<DecisionView, "id" | "title">>;
   responsiblePeople: Array<{
@@ -95,6 +100,15 @@ export function TaskCreateModal({
 }) {
   const router = useRouter();
   const defaultCommitteeId = committeeId || committeeOptions[0]?.id || "";
+  const initialMeeting = meetings.find(
+    (meeting) => meeting.id === initialMeetingId,
+  );
+  const defaultMeetingId = agendaItemFitsMeeting(
+    initialAgendaItemId,
+    initialMeeting,
+  )
+    ? initialMeetingId
+    : "";
   const formId =
     instanceId || initialDecisionId || initialAgendaItemId || initialMeetingId;
   const [open, setOpen] = useState(false);
@@ -108,7 +122,7 @@ export function TaskCreateModal({
   const [reminderAt, setReminderAt] = useState("");
   const [category, setCategory] = useState(initialCategory);
   const [internalNote, setInternalNote] = useState("");
-  const [meetingId, setMeetingId] = useState(initialMeetingId);
+  const [meetingId, setMeetingId] = useState(defaultMeetingId);
   const [agendaItemId, setAgendaItemId] = useState(initialAgendaItemId);
   const [decisionId, setDecisionId] = useState(initialDecisionId);
   const [selectedCommitteeId, setSelectedCommitteeId] =
@@ -128,7 +142,7 @@ export function TaskCreateModal({
     reminderAt !== "" ||
     category !== initialCategory ||
     internalNote !== "" ||
-    meetingId !== initialMeetingId ||
+    meetingId !== defaultMeetingId ||
     agendaItemId !== initialAgendaItemId ||
     decisionId !== initialDecisionId ||
     selectedCommitteeId !== defaultCommitteeId ||
@@ -149,6 +163,15 @@ export function TaskCreateModal({
   const visibleContracts = stakeholderContracts.filter(
     (contract) => contract.stakeholder_id === stakeholderId,
   );
+  const agendaItemOptions = open
+    ? getAgendaItemOptions(agendaItems, meetings, meetingId)
+    : [];
+
+  function changeMeeting(nextMeetingId: string) {
+    const meeting = meetings.find((option) => option.id === nextMeetingId);
+    setMeetingId(nextMeetingId);
+    if (!agendaItemFitsMeeting(agendaItemId, meeting)) setAgendaItemId("");
+  }
 
   function showModal() {
     setTitle(initialTitle);
@@ -159,7 +182,7 @@ export function TaskCreateModal({
     setReminderAt("");
     setCategory(initialCategory);
     setInternalNote("");
-    setMeetingId(initialMeetingId);
+    setMeetingId(defaultMeetingId);
     setAgendaItemId(initialAgendaItemId);
     setDecisionId(initialDecisionId);
     setSelectedCommitteeId(defaultCommitteeId);
@@ -470,13 +493,13 @@ export function TaskCreateModal({
                 </label>
                 <Select
                   id={`task-meeting-${formId}`}
-                  onChange={(event) => setMeetingId(event.target.value)}
+                  onChange={(event) => changeMeeting(event.target.value)}
                   value={meetingId}
                 >
                   <option value="">Intet møde</option>
                   {meetings.map((meeting) => (
                     <option key={meeting.id} value={meeting.id}>
-                      {meeting.title}
+                      {formatAgendaMeetingLabel(meeting)}
                     </option>
                   ))}
                 </Select>
@@ -493,9 +516,9 @@ export function TaskCreateModal({
                   value={agendaItemId}
                 >
                   <option value="">Intet dagsordenspunkt</option>
-                  {agendaItems.map((item) => (
+                  {agendaItemOptions.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.title}
+                      {item.label}
                     </option>
                   ))}
                 </Select>

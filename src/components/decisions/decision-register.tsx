@@ -6,6 +6,11 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
+  agendaItemFitsMeeting,
+  getAgendaItemOptions,
+} from "@/lib/agenda-item-options";
+
+import {
   Button,
   EmptyState,
   FieldError,
@@ -339,8 +344,16 @@ export function DecisionRegister({
   const meetingOptions = data.meetings.filter(
     (meeting) => meeting.committee_id === selectedCommitteeId,
   );
-  const agendaItemOptions = data.agendaItems.filter(
-    (item) => item.committee_id === selectedCommitteeId,
+  const agendaItemOptions = getAgendaItemOptions(
+    data.agendaItems.filter(
+      (item) => item.committee_id === selectedCommitteeId,
+    ),
+    meetingOptions,
+    draft?.meetingId ?? "",
+    draft?.meetingId === draftBaseline?.meetingId &&
+      draft?.agendaItemId === draftBaseline?.agendaItemId
+      ? draftBaseline?.agendaItemId
+      : undefined,
   );
   const responsibleOptions = data.members.filter((member) =>
     member.committees.some((committee) => committee.id === selectedCommitteeId),
@@ -398,6 +411,17 @@ export function DecisionRegister({
           responsibleUserId: "",
         };
       }
+      if (key === "meetingId") {
+        const meetingId = String(value);
+        const meeting = meetingOptions.find((option) => option.id === meetingId);
+        return {
+          ...current,
+          meetingId,
+          agendaItemId: agendaItemFitsMeeting(current.agendaItemId, meeting)
+            ? current.agendaItemId
+            : "",
+        };
+      }
       return { ...current, [key]: value };
     });
   }
@@ -405,7 +429,7 @@ export function DecisionRegister({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
-    if (!draft.id && !draft.agendaItemId) {
+    if ((!draft.id || draftBaseline?.agendaItemId) && !draft.agendaItemId) {
       const nextFieldErrors = {
         agendaItemId: "Vælg det dagsordenspunkt, beslutningen hører til.",
       };
@@ -1287,7 +1311,7 @@ export function DecisionRegister({
                   <option value="">Vælg dagsordenspunkt</option>
                   {agendaItemOptions.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.title}
+                      {item.label}
                     </option>
                   ))}
                 </Select>

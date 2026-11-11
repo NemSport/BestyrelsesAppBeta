@@ -448,21 +448,17 @@ export function OrganizationBrandingForm({
               )}
             </div>
             <div className="border-t border-line p-4">
-              <p className="text-sm font-semibold text-ink">Primær handling</p>
-              <p className="mt-1 text-xs text-muted">
-                Preview af knap, accent og valgt font.
-              </p>
-              <button
-                className="ui-action mt-3 text-sm"
+              <p className="text-sm font-semibold text-ink">Knap og farver</p>
+              <span
+                className="mt-3 inline-flex px-3 py-2 text-sm font-medium"
                 style={{
                   backgroundColor: `${primary}1a`,
                   color: primary,
                   borderRadius: "0.375rem",
                 }}
-                type="button"
               >
-                Gem ændringer
-              </button>
+                Eksempel på knap
+              </span>
               <div className="mt-4 flex gap-2">
                 {[primary, secondary, accent].map((color) => (
                   <span
