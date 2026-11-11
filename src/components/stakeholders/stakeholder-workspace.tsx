@@ -594,23 +594,33 @@ export function StakeholderWorkspace({
                           <p className="mt-1 text-xs text-muted">
                             {entry.ownerName ?? "Ingen ansvarlig"}
                           </p>
-                          {entry.estimated_value !== null ? (
-                            <p className="mt-2 text-sm font-semibold">
-                              {formatStakeholderCurrency(
-                                Number(entry.estimated_value),
-                                entry.currency,
-                              )}
-                            </p>
+                          {entry.contractValue ||
+                          entry.estimated_value !== null ? (
+                            <dl className="mt-2">
+                              <dt className="text-xs text-muted">
+                                {entry.contractValue
+                                  ? "Samlet kontraktværdi"
+                                  : "Estimeret værdi"}
+                              </dt>
+                              <dd className="text-sm font-semibold">
+                                {formatStakeholderCurrency(
+                                  entry.contractValue?.amount ??
+                                    Number(entry.estimated_value),
+                                  entry.contractValue?.currency ?? entry.currency,
+                                )}
+                              </dd>
+                            </dl>
                           ) : null}
                           {entry.next_follow_up_at ? (
-                            <p
-                              className={
-                                new Date(entry.next_follow_up_at) < new Date()
-                                  ? "mt-2 text-xs font-medium text-danger"
-                                  : "mt-2 text-xs text-muted"
-                              }
-                            >
-                              Opfølgning {formatDate(entry.next_follow_up_at)}
+                            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                              <span>
+                                Opfølgning {formatDate(entry.next_follow_up_at)}
+                              </span>
+                              {entry.overdueFollowUp ? (
+                                <StatusBadge tone="danger">
+                                  Overskredet
+                                </StatusBadge>
+                              ) : null}
                             </p>
                           ) : (
                             <p className="mt-2 text-xs text-warning">
@@ -661,7 +671,7 @@ export function StakeholderWorkspace({
       <section aria-labelledby="upcoming-stakeholder-actions">
         <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-3 sm:p-4">
           <h2 className="section-title" id="upcoming-stakeholder-actions">
-            Kommende handlinger og deadlines
+            Handlinger og deadlines
           </h2>
           <div className="mt-3 divide-y divide-line">
             {data.upcomingActions.length ? (
@@ -674,20 +684,17 @@ export function StakeholderWorkspace({
                   <span className="min-w-0 break-words font-medium">
                     {action.title}
                   </span>
-                  <span
-                    className={
-                      action.overdue
-                        ? "shrink-0 text-danger"
-                        : "shrink-0 text-muted"
-                    }
-                  >
-                    {formatDate(action.date)}
+                  <span className="flex flex-wrap items-center gap-2 text-muted">
+                    <span>{formatDate(action.date)}</span>
+                    {action.overdue ? (
+                      <StatusBadge tone="danger">Overskredet</StatusBadge>
+                    ) : null}
                   </span>
                 </Link>
               ))
             ) : (
               <p className="py-4 text-sm text-muted">
-                Ingen kommende handlinger.
+                Ingen handlinger eller deadlines.
               </p>
             )}
           </div>

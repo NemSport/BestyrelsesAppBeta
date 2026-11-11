@@ -96,9 +96,6 @@ export class StakeholderService {
         member.full_name || member.email,
       ]),
     );
-    const stakeholderMap = new Map(
-      stakeholders.map((stakeholder) => [stakeholder.id, stakeholder]),
-    );
     const throughFollowUp = addDays(now, stakeholderFollowUpDays).getTime();
     const throughExpiry = localDate(
       addDays(now, stakeholderContractExpiryDays),
@@ -203,6 +200,7 @@ export class StakeholderService {
           .map((entry) => [entry.stakeholder_id, entry]),
       ).values(),
     ];
+    const itemsById = new Map(items.map((item) => [item.id, item]));
     const upcomingActions = items
       .flatMap((item) =>
         item.nextActionAt
@@ -226,12 +224,24 @@ export class StakeholderService {
     return {
       stakeholders: items,
       pipeline: boardPipeline.flatMap((entry) => {
-        const stakeholder = stakeholderMap.get(entry.stakeholder_id);
+        const stakeholder = itemsById.get(entry.stakeholder_id);
+        const contract = stakeholder?.activeContract;
         return stakeholder
           ? [
               {
                 ...entry,
-                stakeholder,
+                stakeholder: { name: stakeholder.name },
+                contractValue:
+                  contract && contract.contract_value !== null
+                    ? {
+                        amount: Number(contract.contract_value),
+                        currency: contract.currency,
+                      }
+                    : null,
+                overdueFollowUp: Boolean(
+                  entry.next_follow_up_at &&
+                    new Date(entry.next_follow_up_at).getTime() < now.getTime(),
+                ),
                 ownerName:
                   memberNames.get(
                     entry.internal_owner_user_id ??

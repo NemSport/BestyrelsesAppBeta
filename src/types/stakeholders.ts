@@ -63,8 +63,10 @@ export type StakeholderWorkspaceData = {
   stakeholders: StakeholderListItem[];
   pipeline: Array<
     StakeholderPipelineEntry & {
-      stakeholder: Stakeholder;
+      stakeholder: Pick<Stakeholder, "name">;
       ownerName: string | null;
+      contractValue: { amount: number; currency: string } | null;
+      overdueFollowUp: boolean;
     }
   >;
   kpis: StakeholderKpis;
