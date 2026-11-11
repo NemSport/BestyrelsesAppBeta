@@ -479,16 +479,16 @@ export default async function CommitteeWorkspacePage({
                   const secondaryMetadata = activitySecondaryMetadata(event);
                   return (
                     <Link
-                      className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 py-3 first:pt-0 hover:text-brand"
+                      className="grid min-w-0 grid-cols-[6.25rem_minmax(0,1fr)] gap-3 py-3 first:pt-0 hover:text-brand"
                       href={`${committeeRoot}/annual-wheel?event=${event.id}`}
                       key={event.id}
                     >
-                      <span className="text-xs font-semibold uppercase text-muted">
-                        {new Intl.DateTimeFormat("da-DK", {
-                          day: "2-digit",
-                          month: "short",
-                        }).format(new Date(`${event.starts_on}T12:00:00`))}
-                      </span>
+                      <time
+                        className="text-xs font-semibold tabular-nums text-muted"
+                        dateTime={event.starts_on}
+                      >
+                        {formatDate(event.starts_on)}
+                      </time>
                       <span className="min-w-0">
                         <span className="block break-words font-semibold leading-snug">
                           {event.title}
