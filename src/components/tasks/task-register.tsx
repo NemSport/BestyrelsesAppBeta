@@ -211,6 +211,7 @@ export function TaskRegister({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [statusErrorId, setStatusErrorId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const mutation = useMutationFeedback();
   const resetMutation = mutation.reset;
@@ -960,23 +961,27 @@ export function TaskRegister({
         </button>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         {summaryCards.map((card) => (
           <div
-            className="flex items-center gap-2 rounded-[var(--radius-panel)] border border-line bg-surface px-3 py-2"
+            className="flex items-center gap-2 rounded-[var(--radius-panel)] border border-line bg-surface px-2 py-2 sm:px-3"
             key={card.label}
           >
-            <AppIcon className={card.tone} name={card.icon} size={16} />
+            <AppIcon
+              className={`hidden sm:block ${card.tone}`}
+              name={card.icon}
+              size={16}
+            />
             <div className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold text-muted">
+              <span className="block text-xs font-semibold text-ink">
                 {card.label}
               </span>
-              <span className="mt-0.5 flex items-baseline gap-2">
+              <span className="mt-1 flex flex-col items-start gap-1 sm:mt-0.5 sm:flex-row sm:items-baseline sm:gap-2">
                 <span className="text-lg font-semibold leading-none tabular-nums text-ink">
                   {card.value}
                 </span>
                 {card.detail ? (
-                  <span className="truncate text-xs text-muted">
+                  <span className="text-xs text-muted sm:truncate">
                     {card.detail}
                   </span>
                 ) : null}
@@ -987,8 +992,26 @@ export function TaskRegister({
       </div>
 
       <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-2">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(8.5rem,0.8fr))_auto] xl:items-center">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 lg:flex lg:flex-col xl:flex-row xl:items-center">
+          <button
+            aria-controls="task-primary-filters task-more-filters"
+            aria-expanded={mobileFiltersOpen}
+            className="ui-action min-h-11 text-sm text-ink lg:hidden"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            type="button"
+          >
+            <AppIcon name="filter" size={14} />
+            Filtre
+            <AppIcon
+              className={mobileFiltersOpen ? "rotate-180" : undefined}
+              name="chevronDown"
+              size={14}
+            />
+          </button>
+          <div
+            className={`${mobileFiltersOpen ? "grid" : "hidden"} col-span-2 row-start-2 min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid lg:grid-cols-4 xl:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(8.5rem,0.8fr))_auto] xl:items-center`}
+            id="task-primary-filters"
+          >
             <div>
               <label className="sr-only" htmlFor="task-search">
                 Søg
@@ -1065,7 +1088,7 @@ export function TaskRegister({
             <button
               aria-controls="task-more-filters"
               aria-expanded={showMoreFilters}
-              className="ui-action text-xs text-muted"
+              className="ui-action hidden text-xs text-muted lg:inline-flex"
               onClick={() => setShowMoreFilters((open) => !open)}
               type="button"
             >
@@ -1073,7 +1096,7 @@ export function TaskRegister({
               Flere filtre
             </button>
           </div>
-          <div className="flex shrink-0 items-center justify-end gap-2">
+          <div className="col-start-2 row-start-1 flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
             {canCreate ? (
               <Button onClick={openCreate} size="sm">
                 <AppIcon name="taskAdd" size={16} />
@@ -1105,64 +1128,62 @@ export function TaskRegister({
           </div>
         </div>
 
-        {showMoreFilters ? (
-          <div
-            className="mt-2 grid gap-2 border-t border-line pt-2 sm:grid-cols-2 lg:grid-cols-3"
-            id="task-more-filters"
-          >
-            <div>
-              <label className="label" htmlFor="task-responsible-filter">
-                Ansvarlig
-              </label>
-              <Select
-                id="task-responsible-filter"
-                onChange={(event) =>
-                  updateFilter("responsibleUserId", event.target.value)
-                }
-                value={filters.responsibleUserId}
-              >
-                <option value="">Alle ansvarlige</option>
-                {responsibleFilterOptions.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="label" htmlFor="task-category-filter">
-                Kategori
-              </label>
-              <Select
-                id="task-category-filter"
-                onChange={(event) =>
-                  updateFilter("category", event.target.value)
-                }
-                value={filters.category}
-              >
-                <option value="">Alle kategorier</option>
-                {categoryOptions.map((category) => (
-                  <option
-                    key={normalizeTaskCategory(category)}
-                    value={category}
-                  >
-                    {category}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <label className="flex min-h-11 items-center gap-2 text-sm text-muted">
-              <input
-                checked={filters.showArchived}
-                onChange={(event) =>
-                  updateFilter("showArchived", event.target.checked)
-                }
-                type="checkbox"
-              />
-              Vis arkiverede opgaver
+        <div
+          className={`${mobileFiltersOpen ? "grid" : "hidden"} ${showMoreFilters ? "lg:grid" : "lg:hidden"} mt-2 gap-2 border-t border-line pt-2 sm:grid-cols-2 lg:grid-cols-3`}
+          id="task-more-filters"
+        >
+          <div>
+            <label className="label" htmlFor="task-responsible-filter">
+              Ansvarlig
             </label>
+            <Select
+              id="task-responsible-filter"
+              onChange={(event) =>
+                updateFilter("responsibleUserId", event.target.value)
+              }
+              value={filters.responsibleUserId}
+            >
+              <option value="">Alle ansvarlige</option>
+              {responsibleFilterOptions.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </Select>
           </div>
-        ) : null}
+          <div>
+            <label className="label" htmlFor="task-category-filter">
+              Kategori
+            </label>
+            <Select
+              id="task-category-filter"
+              onChange={(event) =>
+                updateFilter("category", event.target.value)
+              }
+              value={filters.category}
+            >
+              <option value="">Alle kategorier</option>
+              {categoryOptions.map((category) => (
+                <option
+                  key={normalizeTaskCategory(category)}
+                  value={category}
+                >
+                  {category}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <label className="flex min-h-11 items-center gap-2 text-sm text-muted">
+            <input
+              checked={filters.showArchived}
+              onChange={(event) =>
+                updateFilter("showArchived", event.target.checked)
+              }
+              type="checkbox"
+            />
+            Vis arkiverede opgaver
+          </label>
+        </div>
 
         <div
           aria-live="polite"
@@ -1228,10 +1249,10 @@ export function TaskRegister({
                 return (
                   <button
                     aria-pressed={active}
-                    className={`min-h-11 min-w-0 rounded-md px-1.5 py-2 text-xs font-medium leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                    className={`min-h-11 min-w-0 rounded-md px-1.5 py-2 text-xs font-semibold leading-4 text-ink transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                       active
-                        ? "bg-surface text-ink "
-                        : "text-muted hover:bg-surface/70 hover:text-ink"
+                        ? "bg-surface shadow-sm"
+                        : "hover:bg-surface/70"
                     }`}
                     key={status}
                     onClick={() => setMobileBoardStatus(status)}
@@ -1264,7 +1285,7 @@ export function TaskRegister({
                     key={status}
                   >
                     <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-                      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink">
+                      <h2 className="text-sm font-semibold text-ink">
                         {taskStatusLabels[status]}
                       </h2>
                       <StatusBadge tone={taskStatusTones[status]}>
@@ -1292,7 +1313,7 @@ export function TaskRegister({
 
             {completedTasks.length > 0 ? (
               <details className="group rounded-[var(--radius-panel)] border border-line bg-surface">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-ink hover:text-brand [&::-webkit-details-marker]:hidden">
                   <span className="inline-flex items-center gap-2">
                     <AppIcon
                       className="text-success"
@@ -1327,7 +1348,7 @@ export function TaskRegister({
           </div>
         ) : (
           <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm">
-            <div className="hidden border-b border-line bg-subtle/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(12rem,1fr)_minmax(7rem,0.75fr)_minmax(6rem,0.65fr)_7.5rem_7rem_auto] xl:grid-cols-[minmax(20rem,1fr)_minmax(9rem,12rem)_minmax(8rem,11rem)_8rem_7.5rem_auto]">
+            <div className="hidden border-b border-line bg-subtle/60 px-3 py-2 text-xs font-semibold text-ink md:grid md:grid-cols-[minmax(12rem,1fr)_minmax(7rem,0.75fr)_minmax(6rem,0.65fr)_7.5rem_7rem_auto] xl:grid-cols-[minmax(20rem,1fr)_minmax(9rem,12rem)_minmax(8rem,11rem)_8rem_7.5rem_auto]">
               <span>Titel</span>
               <span>Ansvarlig</span>
               <span>Udvalg</span>

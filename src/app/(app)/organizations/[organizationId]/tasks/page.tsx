@@ -24,7 +24,7 @@ export default async function TasksPage({
     <div className="page-flow w-full max-w-none" data-task-register-page>
       <PageHeader
         description="Få overblik over ansvar, deadlines og fremdrift på tværs af organisationen."
-        eyebrow="Handling og eksekvering"
+        eyebrow={<span className="text-ink">Handling og eksekvering</span>}
         title="Opgaver"
       />
       <TaskRegister

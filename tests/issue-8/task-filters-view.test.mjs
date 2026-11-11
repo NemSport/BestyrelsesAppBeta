@@ -190,6 +190,9 @@ test("primary and advanced filters expose results, active state, and reset", () 
   assert.match(register, /htmlFor="task-committee-filter"/);
   assert.match(register, /htmlFor="task-deadline-filter"/);
   assert.match(register, /Flere filtre/);
+  assert.match(register, /\[mobileFiltersOpen, setMobileFiltersOpen\] = useState\(false\)/);
+  assert.match(register, /aria-controls="task-primary-filters task-more-filters"/);
+  assert.match(register, /aria-expanded=\{mobileFiltersOpen\}/);
   assert.match(register, /activeFilterLabels\.map/);
   assert.match(register, /aria-label=\{`Fjern filter:/);
   assert.match(register, /Ryd alle filtre/);
