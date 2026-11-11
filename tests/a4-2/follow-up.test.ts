@@ -142,7 +142,11 @@ test("attention filters use Copenhagen date, include day 7 and exclude completed
     latest_note: null,
   };
   const now = new Date("2026-11-09T23:30:00Z");
-  assert.deepEqual(followUpReasons(sample, now), ["Snarlig"]);
+  assert.deepEqual(followUpReasons(sample, now), ["Forfalder snart"]);
+  assert.deepEqual(
+    followUpReasons({ ...sample, deadline: "2026-11-10" }, now),
+    ["I dag"],
+  );
   assert.deepEqual(
     followUpReasons(
       {

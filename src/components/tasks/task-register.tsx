@@ -47,6 +47,7 @@ import {
   normalizeTaskCategory,
   sortTasksByDeadline,
   taskBoardStatuses,
+  taskDeadlineLabels,
   taskStatusLabels,
   taskStatusOptions,
   taskStatusTones,
@@ -115,17 +116,15 @@ function isOpenTask(task: TaskView) {
   );
 }
 
-function deadlineLabel(task: TaskView) {
+function deadlineLabel(
+  task: TaskView,
+  state: ReturnType<typeof getTaskDeadlineState>,
+) {
   if (task.is_critical) return "Kritisk";
-  const state = getTaskDeadlineState(task);
-  if (state === "overdue") return "Overskredet";
-  if (state === "today") return "I dag";
-  if (state === "soon") return "Snart";
+  if (state === "overdue" || state === "today" || state === "soon") {
+    return taskDeadlineLabels[state];
+  }
   return null;
-}
-
-function boardStatusLabel(status: TaskStatus) {
-  return status === "not_started" ? "Ikke startet" : taskStatusLabels[status];
 }
 
 function isBoardTaskStatus(status: string): status is TaskStatus {
@@ -361,12 +360,7 @@ export function TaskRegister({
     filters.deadline
       ? {
           key: "deadline" as const,
-          label: {
-            overdue: "Overskredet",
-            soon: "Forfalder snart",
-            today: "I dag",
-            none: "Ingen deadline",
-          }[filters.deadline],
+          label: taskDeadlineLabels[filters.deadline],
         }
       : null,
     filters.showArchived
@@ -860,9 +854,7 @@ export function TaskRegister({
                 <StatusBadge
                   tone={deadlineState === "overdue" ? "danger" : "warning"}
                 >
-                  {deadlineLabel(task) === "Snart"
-                    ? "Forfalder snart"
-                    : deadlineLabel(task)}
+                  {deadlineLabel(task, deadlineState)}
                 </StatusBadge>
               </span>
             ) : null}
@@ -878,7 +870,7 @@ export function TaskRegister({
 
   function taskRow(task: TaskView) {
     const deadlineState = getTaskDeadlineState(task);
-    const label = deadlineLabel(task);
+    const label = deadlineLabel(task, deadlineState);
     return (
       <article
         className="grid scroll-mt-24 gap-2 border-b border-line bg-surface px-3 py-2.5 last:border-b-0 md:grid-cols-[minmax(12rem,1fr)_minmax(7rem,0.75fr)_minmax(6rem,0.65fr)_7.5rem_7rem_auto] md:items-center xl:grid-cols-[minmax(20rem,1fr)_minmax(9rem,12rem)_minmax(8rem,11rem)_8rem_7.5rem_auto]"
@@ -1045,10 +1037,11 @@ export function TaskRegister({
                 value={filters.deadline}
               >
                 <option value="">Alle deadlines</option>
-                <option value="overdue">Overskredet</option>
-                <option value="soon">Forfalder snart</option>
-                <option value="today">I dag</option>
-                <option value="none">Ingen deadline</option>
+                {Object.entries(taskDeadlineLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </Select>
             </div>
             <div>
@@ -1244,8 +1237,8 @@ export function TaskRegister({
                     onClick={() => setMobileBoardStatus(status)}
                     type="button"
                   >
-                    <span className="block truncate">
-                      {boardStatusLabel(status)}
+                    <span className="block">
+                      {taskStatusLabels[status]}
                     </span>
                     <span className="mt-0.5 block tabular-nums" aria-hidden="true">
                       {count}
@@ -1272,7 +1265,7 @@ export function TaskRegister({
                   >
                     <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
                       <h2 className="text-xs font-semibold uppercase tracking-wide text-ink">
-                        {boardStatusLabel(status)}
+                        {taskStatusLabels[status]}
                       </h2>
                       <StatusBadge tone={taskStatusTones[status]}>
                         {columnTasks.length}
@@ -1284,7 +1277,7 @@ export function TaskRegister({
                       ) : (
                         <div className="rounded-[var(--radius-control)] border border-dashed border-line px-3 py-4 text-center">
                           <p className="text-xs font-semibold text-ink">
-                            Ingen opgaver i {boardStatusLabel(status)}
+                            Ingen opgaver i {taskStatusLabels[status]}
                           </p>
                           <p className="mt-1 text-xs leading-5 text-muted">
                             Opgaver vises her, når de får denne status.

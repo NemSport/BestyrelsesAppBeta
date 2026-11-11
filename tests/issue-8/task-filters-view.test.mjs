@@ -261,6 +261,7 @@ test("Version 3.4 board contains three active columns and a collapsed completed 
   )?.[0];
   assert.ok(boardRenderer);
   assert.match(boardRenderer, /taskBoardStatuses\.map/);
+  assert.match(boardRenderer, /taskStatusLabels\[status\]/);
   assert.doesNotMatch(boardRenderer, /taskStatusOptions\.map/);
 });
 

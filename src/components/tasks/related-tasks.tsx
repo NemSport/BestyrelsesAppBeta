@@ -12,6 +12,7 @@ import {
 import { StatusBadge } from "@/components/ui";
 import {
   getTaskDeadlineState,
+  taskDeadlineLabels,
   taskStatusLabels,
   taskStatusTones,
 } from "@/lib/tasks";
@@ -137,7 +138,9 @@ export function RelatedTasks({
                   {task.deadline ? formatDate(task.deadline) : "Ingen deadline"}
                 </span>
                 {deadlineState === "overdue" ? (
-                  <StatusBadge tone="danger">Overskredet</StatusBadge>
+                  <StatusBadge tone="danger">
+                    {taskDeadlineLabels.overdue}
+                  </StatusBadge>
                 ) : task.status !== "not_started" &&
                   task.status !== "completed" ? (
                   <StatusBadge tone={taskStatusTones[task.status]}>
@@ -166,7 +169,9 @@ export function RelatedTasks({
               </div>
               <span className="flex shrink-0 flex-wrap gap-1.5">
                 {deadlineState === "overdue" ? (
-                  <StatusBadge tone="danger">Overskredet</StatusBadge>
+                  <StatusBadge tone="danger">
+                    {taskDeadlineLabels.overdue}
+                  </StatusBadge>
                 ) : null}
                 <StatusBadge tone={taskStatusTones[task.status]}>
                   {taskStatusLabels[task.status]}

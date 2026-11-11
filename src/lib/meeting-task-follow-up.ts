@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { formatDanishDateKey } from "./date-format";
+import { taskDeadlineLabels, taskStatusLabels } from "./tasks";
 
 export const beforeTaskFollowUpReviewEvent =
   "meeting-task-follow-up-before-review";
@@ -90,10 +91,13 @@ export function followUpReasons(task: FollowUpTask, now = new Date()) {
   through.setUTCDate(through.getUTCDate() + 7);
   const reasons: string[] = [];
   if (task.is_critical) reasons.push("Kritisk");
-  if (task.deadline && task.deadline < today) reasons.push("Overskredet");
+  if (task.deadline && task.deadline < today)
+    reasons.push(taskDeadlineLabels.overdue);
   else if (task.deadline && task.deadline <= formatDanishDateKey(through))
-    reasons.push("Snarlig");
-  if (task.status === "waiting") reasons.push("Afventer");
+    reasons.push(
+      task.deadline === today ? taskDeadlineLabels.today : taskDeadlineLabels.soon,
+    );
+  if (task.status === "waiting") reasons.push(taskStatusLabels.waiting);
   return reasons;
 }
 

@@ -41,6 +41,13 @@ export type TaskFilters = {
   showArchived: boolean;
 };
 
+export const taskDeadlineLabels = {
+  overdue: "Overskredet",
+  soon: "Forfalder snart",
+  today: "I dag",
+  none: "Ingen deadline",
+} satisfies Record<Exclude<TaskFilters["deadline"], "">, string>;
+
 export function normalizeTaskCategory(value: string | null | undefined) {
   return value?.trim().toLocaleLowerCase("da-DK") ?? "";
 }

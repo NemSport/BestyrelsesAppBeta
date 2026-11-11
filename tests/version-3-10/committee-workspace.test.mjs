@@ -57,7 +57,7 @@ test("attention is summarized before at most two prioritized records", () => {
   assert.match(page, /data-attention-summary/);
   assert.match(page, /\{overdueCount\}/);
   assert.match(page, /\{dueSoonCount\}/);
-  assert.match(page, /forsinket" : "forsinkede"/);
+  assert.match(page, /overskredet" : "overskredne"/);
   assert.match(page, /med deadline snart/);
   assert.match(page, /attentionTasks\.slice\(0, 2\)/);
   assert.match(page, /Ingen akutte punkter/);

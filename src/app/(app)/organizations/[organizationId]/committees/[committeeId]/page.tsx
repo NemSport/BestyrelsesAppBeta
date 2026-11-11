@@ -19,7 +19,11 @@ import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
 import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
 import { isOrganizationAdmin } from "@/lib/permissions";
 import { getTaskDetailPath } from "@/lib/task-register-state";
-import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
+import {
+  taskDeadlineLabels,
+  taskStatusLabels,
+  taskStatusTones,
+} from "@/lib/tasks";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -313,7 +317,7 @@ export default async function CommitteeWorkspacePage({
                     <strong className="font-semibold text-danger">
                       {overdueCount}
                     </strong>{" "}
-                    {overdueCount === 1 ? "forsinket" : "forsinkede"}
+                    {overdueCount === 1 ? "overskredet" : "overskredne"}
                   </span>
                   <span aria-hidden="true" className="text-line-strong">
                     ·
@@ -336,10 +340,10 @@ export default async function CommitteeWorkspacePage({
                       </Link>
                       <p className="mt-0.5 text-xs text-muted">
                         {task.deadline && task.deadline < today
-                          ? "Opgave overskredet"
+                          ? taskDeadlineLabels.overdue
                           : task.deadline === today
                             ? "Deadline i dag"
-                            : "Deadline denne uge"}
+                            : taskDeadlineLabels.soon}
                         {task.deadline
                           ? ` · ${formatDate(task.deadline)}`
                           : ""}
@@ -452,7 +456,7 @@ export default async function CommitteeWorkspacePage({
                     }
                   >
                     {task.deadline && task.deadline < today
-                      ? "Forsinket"
+                      ? taskDeadlineLabels.overdue
                       : taskStatusLabels[task.status]}
                   </StatusBadge>
                 </article>

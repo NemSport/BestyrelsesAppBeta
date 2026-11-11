@@ -24,14 +24,11 @@ import {
   type FollowUpState,
 } from "@/lib/meeting-task-follow-up";
 import { formatDate, formatDateTime } from "@/lib/localization";
-
-const statuses = {
-  not_started: "Ikke startet",
-  in_progress: "I gang",
-  waiting: "Afventer",
-  completed: "Afsluttet",
-  cancelled: "Annulleret",
-};
+import {
+  taskStatusLabels,
+  taskStatusOptions,
+  type TaskStatus,
+} from "@/lib/tasks";
 type State = FollowUpState & { canEdit: boolean; canLink: boolean };
 type Scope = { organizationId: string; committeeId: string; meetingId: string };
 const taskActionClass =
@@ -208,7 +205,7 @@ export function MeetingTaskFollowUp({
         </Button>
       </div>
       <p className="text-xs text-muted">
-        Snarlig = inden for 7 dage · Opdateres automatisk
+        Forfalder snart = inden for 7 dage · Opdateres automatisk
       </p>
       {!data.writable ? (
         <p className="text-sm">
@@ -282,7 +279,7 @@ export function MeetingTaskFollowUp({
                     {task.deadline
                       ? formatDate(task.deadline)
                       : "Ingen deadline"}
-                    <span>· {statuses[task.status]}</span>
+                    <span>· {taskStatusLabels[task.status]}</span>
                     {followUpReasons(task).map((reason) => (
                       <span
                         key={reason}
@@ -448,9 +445,9 @@ export function MeetingTaskFollowUp({
             {event.action === "update" ? (
               <p>
                 {event.before_state
-                  ? `${statuses[event.before_state.status]} → `
+                  ? `${taskStatusLabels[event.before_state.status]} → `
                   : ""}
-                {statuses[event.after_state.status]} · Deadline:{" "}
+                {taskStatusLabels[event.after_state.status]} · Deadline:{" "}
                 {event.before_state?.deadline ?? "Ingen"} →{" "}
                 {event.after_state.deadline ?? "Ingen"} · Ansvarlig:{" "}
                 {event.before_state?.responsible_name ?? "Ingen"} →{" "}
@@ -484,7 +481,7 @@ export function MeetingTaskFollowUp({
               {snapshot.task_snapshot.map((task) => (
                 <p className="py-1 text-sm" key={task.id}>
                   {task.title} ·{" "}
-                  {statuses[task.status as keyof typeof statuses] ??
+                  {taskStatusLabels[task.status as TaskStatus] ??
                     task.status}{" "}
                   · {task.deadline ?? "Ingen deadline"} ·{" "}
                   {task.responsible_name || "Ingen ansvarlig"}
@@ -561,7 +558,7 @@ function TaskEditor({
           value={status}
           onChange={(e) => setStatus(e.target.value as FollowUpTask["status"])}
         >
-          {Object.entries(statuses).map(([value, label]) => (
+          {taskStatusOptions.map(({ value, label }) => (
             <option value={value} key={value}>
               {label}
             </option>

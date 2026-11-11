@@ -20,6 +20,7 @@ import {
   type AnnualWheelView,
 } from "@/lib/annual-wheel-state";
 import { getTaskDetailPath } from "@/lib/task-register-state";
+import { taskDeadlineLabels, taskStatusLabels } from "@/lib/tasks";
 import {
   ActionMenu,
   Button,
@@ -126,16 +127,6 @@ const eventStatusLabels: Record<AnnualWheelEventView["status"], string> = {
   in_progress: "I gang",
   completed: "Gennemført",
   postponed: "Udsat",
-  cancelled: "Annulleret",
-};
-
-const taskStatusLabels: Record<string, string> = {
-  not_started: "Ikke startet",
-  todo: "Aktiv",
-  pending: "Aktiv",
-  in_progress: "I gang",
-  waiting: "Afventer",
-  completed: "Gennemført",
   cancelled: "Annulleret",
 };
 
@@ -627,7 +618,9 @@ export function AnnualWheel({
               {item.event && eventIsOverdue(item.event) ? (
                 <StatusBadge tone="danger">Forsinket</StatusBadge>
               ) : state === "overdue" ? (
-                <StatusBadge tone="danger">Forsinket</StatusBadge>
+                <StatusBadge tone="danger">
+                  {item.kind === "task" ? taskDeadlineLabels.overdue : "Forsinket"}
+                </StatusBadge>
               ) : state === "critical" ? (
                 <StatusBadge tone="warning">Kritisk</StatusBadge>
               ) : null}
@@ -2695,7 +2688,7 @@ function AnnualWheelActivatedTasks({
                 <StatusBadge
                   tone={task.status === "completed" ? "success" : "neutral"}
                 >
-                  {task.status === "completed" ? "Gennemført" : "Aktiv"}
+                  {taskStatusLabels[task.status]}
                 </StatusBadge>
               </span>
             </Link>
