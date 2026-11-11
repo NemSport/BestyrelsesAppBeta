@@ -17,6 +17,7 @@ import {
   TableRow,
   buttonClassName,
 } from "@/components/ui";
+import { formatDanishDateTime } from "@/lib/date-format";
 import type {
   OrganizationTrashData,
   OrganizationTrashItem,
@@ -29,20 +30,13 @@ const typeLabels: Record<OrganizationTrashItem["type"], string> = {
   agenda_item: "Dagsordenspunkt",
 };
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("da-DK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function statusLabel(item: OrganizationTrashItem) {
   if (item.status === "ready_for_permanent_delete") {
-    return "Klar til permanent sletning";
+    return "Frist passeret";
   }
   return item.daysLeft === 1
-    ? "Gendannelig · 1 dag tilbage"
-    : `Gendannelig · ${item.daysLeft} dage tilbage`;
+    ? "1 dag til fristen"
+    : `${item.daysLeft} dage til fristen`;
 }
 
 export function OrganizationTrash({
@@ -113,7 +107,6 @@ export function OrganizationTrash({
             Tilbage til overblik
           </Link>
         }
-        description="Der er intet at gendanne. Når et element flyttes hertil, bliver det vist i op til 30 dage."
         title="Papirkurven er tom"
       />
     );
@@ -129,14 +122,6 @@ export function OrganizationTrash({
           {error}
         </div>
       ) : null}
-      <div className="border-l-2 border-warning bg-warning-soft/45 px-4 py-3">
-        <p className="text-sm font-semibold">Gendannelige elementer</p>
-        <p className="mt-1 text-sm text-muted">
-          Papirkurven viser slettede elementer i 30 dage. Permanent sletning er
-          ikke implementeret endnu; udløbne elementer markeres kun som klar til
-          permanent sletning.
-        </p>
-      </div>
       <TableContainer>
         <Table>
           <TableHead>
@@ -146,7 +131,7 @@ export function OrganizationTrash({
               <TableHeaderCell>Tilknytning</TableHeaderCell>
               <TableHeaderCell>Slettet</TableHeaderCell>
               <TableHeaderCell>Slettet af</TableHeaderCell>
-              <TableHeaderCell>Udløber</TableHeaderCell>
+              <TableHeaderCell>30-dagesfrist</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell className="text-right">Handling</TableHeaderCell>
             </TableRow>
@@ -172,17 +157,23 @@ export function OrganizationTrash({
                     </span>
                   )}
                 </TableCell>
-                <TableCell>{formatDateTime(item.deletedAt)}</TableCell>
+                <TableCell>
+                  <time dateTime={item.deletedAt}>
+                    {formatDanishDateTime(item.deletedAt)}
+                  </time>
+                </TableCell>
                 <TableCell>{item.deletedByName || "Ukendt bruger"}</TableCell>
                 <TableCell>
-                  <span>{formatDateTime(item.deleteExpiresAt)}</span>
+                  <time dateTime={item.deleteExpiresAt}>
+                    {formatDanishDateTime(item.deleteExpiresAt)}
+                  </time>
                 </TableCell>
                 <TableCell>
                   <StatusBadge
                     tone={
                       item.status === "ready_for_permanent_delete"
                         ? "warning"
-                        : "success"
+                        : "neutral"
                     }
                   >
                     {statusLabel(item)}
