@@ -3,25 +3,25 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { AppIcon, organizationNavIconNames } from "@/components/icons/app-icon";
 import { useDialogFocus } from "@/hooks/use-dialog-focus";
 import {
   getActiveCommitteeId,
+  getVisibleOrganizationNavItems,
   isOrganizationNavItemActive,
-  organizationNavItems,
 } from "@/lib/organization-navigation";
 
 export function OrganizationNav({
-  canManageTrash = false,
+  canManageOrganization = false,
   committees = [],
   organizationId,
   organizationName,
   activeActionCount = 0,
 }: {
   logoUrl?: string | null;
-  canManageTrash?: boolean;
+  canManageOrganization?: boolean;
   committees?: Array<{ id: string; name: string }>;
   organizationId: string;
   organizationName?: string;
@@ -33,19 +33,11 @@ export function OrganizationNav({
   const drawerRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const root = `/organizations/${organizationId}`;
-  const items = useMemo(
-    () =>
-      organizationNavItems.filter(
-        (item) => item.suffix !== "/trash" || canManageTrash,
-      ),
-    [canManageTrash],
-  );
+  const items = getVisibleOrganizationNavItems(canManageOrganization);
   const activeItem = items.find((item) =>
     isOrganizationNavItemActive(pathname, root, item),
   );
-  const activeLabel =
-    activeItem?.label ??
-    (pathname === `${root}/edit` ? "Indstillinger" : "Organisation");
+  const activeLabel = activeItem?.label ?? "Organisation";
   const activeCommitteeId = getActiveCommitteeId(pathname, root);
   const activeCommittee = committees.find(
     (committee) => committee.id === activeCommitteeId,

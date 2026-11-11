@@ -134,6 +134,7 @@ export const organizationNavIconNames: Record<string, AppIconName> = {
   "/committees": "committees",
   "/decisions": "decisions",
   "/documents": "documents",
+  "/edit": "settings",
   "/job-cards": "jobCards",
   "/meetings": "calendar",
   "/members": "members",

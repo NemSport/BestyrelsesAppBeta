@@ -2,12 +2,11 @@ import { notFound } from "next/navigation";
 
 import { OrganizationWorkspace } from "@/components/layout/organization-workspace";
 import { createClient } from "@/lib/supabase/server";
-import { canManageOrganizationTrash } from "@/lib/trash-capabilities";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { OrganizationBrandingService } from "@/services/organization-branding-service";
 import { CommitteeService } from "@/services/committee-service";
-import { getMeetingCapabilities } from "@/lib/permissions";
+import { getMeetingCapabilities, isOrganizationAdmin } from "@/lib/permissions";
 import { ActionService } from "@/services/action-service";
 
 export default async function OrganizationLayout({
@@ -51,7 +50,7 @@ export default async function OrganizationLayout({
       activeActionCount={actionCenter.activeCount}
       nextActionRefreshAt={actionCenter.nextRefreshAt}
       branding={branding}
-      canManageTrash={canManageOrganizationTrash(context.membership.role)}
+      canManageOrganization={isOrganizationAdmin(context.membership.role)}
       committees={committeeOptions}
       organizationId={organizationId}
       organizationName={context.organization.name}

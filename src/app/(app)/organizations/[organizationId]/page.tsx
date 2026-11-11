@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AdvisoryAi } from "@/components/dashboard/advisory-ai";
 import { OrganizationDashboardPriority } from "@/components/dashboard/organization-dashboard-priority";
-import { TrashActionButton } from "@/components/trash/trash-action-button";
-import { ActionMenu, EmptyState, StatusBadge } from "@/components/ui";
+import { EmptyState, StatusBadge } from "@/components/ui";
 import { resolveOrganizationDashboardAudience } from "@/lib/dashboard-prioritization";
 import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
@@ -213,28 +212,7 @@ export default async function OrganizationPage({
 
   return (
     <div className="space-y-4 xl:space-y-2.5" data-organization-dashboard>
-      <AdvisoryAi
-        organizationId={organizationId}
-        settings={
-          canManage ? (
-            <ActionMenu label="Indstillinger">
-              <Link
-                className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
-                href={`${organizationRoot}/edit`}
-              >
-                Rediger organisation
-              </Link>
-              <TrashActionButton
-                confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
-                endpoint={`/api/organizations/${organizationId}`}
-                label="Flyt til papirkurv"
-                pendingLabel="Flytter..."
-                redirectTo={`${organizationRoot}/trash`}
-              />
-            </ActionMenu>
-          ) : null
-        }
-      />
+      <AdvisoryAi organizationId={organizationId} />
 
       <OrganizationDashboardPriority
         actionCount={actions.length}

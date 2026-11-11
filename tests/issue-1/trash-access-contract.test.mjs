@@ -21,8 +21,8 @@ const [navigation, page, errorBoundary, service, migration, trashClient] =
   ]);
 
 test("navigation hides trash without the owner/admin capability", () => {
-  assert.match(navigation, /canManageTrash = false/);
-  assert.match(navigation, /item\.suffix !== "\/trash" \|\| canManageTrash/);
+  assert.match(navigation, /canManageOrganization = false/);
+  assert.match(navigation, /getVisibleOrganizationNavItems\(canManageOrganization\)/);
 });
 
 test("direct page access returns controlled copy before querying trash", () => {

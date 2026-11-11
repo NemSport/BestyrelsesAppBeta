@@ -2,6 +2,7 @@ export type OrganizationNavItem = {
   label: string;
   suffix: string;
   match?: "exact";
+  adminOnly?: boolean;
 };
 
 export const organizationNavItems: readonly OrganizationNavItem[] = [
@@ -16,12 +17,13 @@ export const organizationNavItems: readonly OrganizationNavItem[] = [
   { label: "Årshjul", suffix: "/annual-wheel" },
   { label: "Jobkort", suffix: "/job-cards" },
   { label: "Medlemmer", suffix: "/members" },
-  { label: "Papirkurv", suffix: "/trash" },
+  { label: "Organisationsindstillinger", suffix: "/edit", adminOnly: true },
+  { label: "Papirkurv", suffix: "/trash", adminOnly: true },
 ];
 
-export function getVisibleOrganizationNavItems(canManageTrash: boolean) {
+export function getVisibleOrganizationNavItems(canManageOrganization: boolean) {
   return organizationNavItems.filter(
-    (item) => item.suffix !== "/trash" || canManageTrash,
+    (item) => !item.adminOnly || canManageOrganization,
   );
 }
 

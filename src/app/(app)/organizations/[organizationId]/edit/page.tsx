@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ResourceForm } from "@/components/forms/resource-form";
 import { OrganizationBrandingForm } from "@/components/organizations/organization-branding-form";
+import { TrashActionButton } from "@/components/trash/trash-action-button";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
@@ -54,6 +55,14 @@ export default async function EditOrganizationPage({
           branding={branding}
           organizationId={organizationId}
           organizationName={context.organization.name}
+        />
+      </div>
+      <div className="mt-8 border-t border-line py-5">
+        <TrashActionButton
+          confirmMessage="Er du sikker på, at du vil flytte organisationen til papirkurven? Den kan gendannes i 30 dage."
+          endpoint={`/api/organizations/${organizationId}`}
+          label="Flyt organisationen til papirkurven"
+          redirectTo={`/organizations/${organizationId}/trash`}
         />
       </div>
     </div>

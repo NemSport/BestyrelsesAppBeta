@@ -10,7 +10,7 @@ export function OrganizationWorkspace({
   organizationName,
   branding,
   committees = [],
-  canManageTrash = false,
+  canManageOrganization = false,
   activeActionCount = 0,
   nextActionRefreshAt = null,
 }: {
@@ -23,7 +23,7 @@ export function OrganizationWorkspace({
     name: string;
     capabilities: MeetingCapabilities;
   }>;
-  canManageTrash?: boolean;
+  canManageOrganization?: boolean;
   activeActionCount?: number;
   nextActionRefreshAt?: string | null;
 }) {
@@ -37,7 +37,7 @@ export function OrganizationWorkspace({
       />
       <OrganizationNav
         activeActionCount={activeActionCount}
-        canManageTrash={canManageTrash}
+        canManageOrganization={canManageOrganization}
         committees={committees}
         logoUrl={branding?.logoUrl ?? null}
         organizationId={organizationId}

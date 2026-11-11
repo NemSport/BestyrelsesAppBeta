@@ -37,17 +37,17 @@ test("active routes preserve organization and committee context", () => {
   assert.equal(getActiveCommitteeId(`${root}/committees/new`, root), null);
 });
 
-test("role-filtered destinations do not expose trash to ordinary roles", () => {
+test("organization settings and trash are only shown to owners and admins", () => {
+  const root = "/organizations/org-1";
   const ordinaryItems = getVisibleOrganizationNavItems(false);
   const adminItems = getVisibleOrganizationNavItems(true);
-  assert.equal(
-    ordinaryItems.some((item) => item.suffix === "/trash"),
-    false,
-  );
-  assert.equal(
-    adminItems.some((item) => item.suffix === "/trash"),
-    true,
-  );
+  for (const suffix of ["/edit", "/trash"]) {
+    assert.equal(ordinaryItems.some((item) => item.suffix === suffix), false);
+    const item = adminItems.find((item) => item.suffix === suffix);
+    assert.ok(item);
+    assert.equal(isOrganizationNavItemActive(`${root}${suffix}`, root, item), true);
+    assert.equal(isOrganizationNavItemActive(`${root}/tasks`, root, item), false);
+  }
 });
 
 test("task navigation is consolidated while the legacy personal route redirects", async () => {

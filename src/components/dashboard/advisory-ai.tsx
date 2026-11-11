@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 
 type Answer = {
   answer: string;
@@ -9,11 +9,9 @@ type Answer = {
 };
 export function AdvisoryAi({
   organizationId,
-  settings,
   summary = false,
 }: {
   organizationId: string;
-  settings?: ReactNode;
   summary?: boolean;
 }) {
   const [question, setQuestion] = useState("");
@@ -65,12 +63,9 @@ export function AdvisoryAi({
         </button>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 id="advisory-title" className="text-base font-semibold">
-              Bestie
-            </h1>
-            {settings}
-          </div>
+          <h1 id="advisory-title" className="text-base font-semibold">
+            Bestie
+          </h1>
           <form className="mt-2 flex flex-wrap gap-2" onSubmit={submit}>
             <label className="sr-only" htmlFor="advisory-question">
               Spørg Bestie
