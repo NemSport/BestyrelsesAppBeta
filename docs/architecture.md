@@ -46,6 +46,10 @@ in the same meeting; manager-only scheduling is rechecked in PostgreSQL. Archive
 tasks, closed/cancelled meetings and approved minutes reject new mutations.
 Trash restoration remains in the existing administrator workflow.
 
+The system point passes its occurrence id when opening the standalone agenda
+item. The page resolves it among that item's visible meeting occurrences and
+links back to the meeting's existing agenda-point anchor.
+
 The UI loads only the active agenda card, polls at 20 seconds and on focus,
 preserves editor drafts and refreshes after writes. Task View uses the same
 canonical rows and refreshes while not editing. Its captured edit timestamp and

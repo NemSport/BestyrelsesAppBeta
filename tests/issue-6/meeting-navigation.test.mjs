@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  getAgendaItemHref,
+  getMeetingAgendaPointHref,
+} from "../../src/lib/meeting-navigation.ts";
+import {
   richTextToPlainText,
   sanitizeRichText,
 } from "../../src/lib/rich-text.ts";
@@ -496,6 +500,37 @@ test("point responsibility, deadline, attachments, and status share one metadata
     /<details className="group border-t border-line\/70 bg-subtle\/20">/,
   );
   assert.match(card, /bg-warning-soft\/55/);
+});
+
+test("the task follow-up point links back to its meeting occurrence", async () => {
+  const context = { organizationId: "org", committeeId: "committee" };
+  const item = { ...context, agendaItemId: "item" };
+  const itemPath = "/organizations/org/committees/committee/agenda-items/item";
+  assert.equal(getAgendaItemHref(item), itemPath);
+  assert.equal(
+    getAgendaItemHref({ ...item, occurrenceId: "point" }),
+    `${itemPath}?occurrence=point`,
+  );
+  assert.equal(
+    getMeetingAgendaPointHref({
+      ...context,
+      meetingId: "meeting",
+      occurrenceId: "point",
+    }),
+    "/organizations/org/committees/committee/meetings/meeting#agenda-point-point",
+  );
+  const itemPage = await source(
+    "../../src/app/(app)/organizations/[organizationId]/committees/[committeeId]/agenda-items/[agendaItemId]/page.tsx",
+  );
+  assert.match(
+    minutes,
+    /item\.standard_key === "task_follow_up"\s*\? occurrence\.id/,
+  );
+  assert.match(
+    itemPage,
+    /occurrence\.id === requestedOccurrenceId && occurrence\.meetings/,
+  );
+  assert.match(itemPage, /occurrenceId: currentOccurrence\.id/);
 });
 
 test("workspace footer actions keep compact aligned bottom spacing", () => {

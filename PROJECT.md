@@ -16,6 +16,8 @@ New ordinary meetings include **Opgaver & opfølgning** as a fourth standard age
 before Eventuelt. Existing active meetings and Quick Action ad hoc meetings offer an explicit add button. The
 system item uses the existing agenda navigation, numbering, reorder and trash
 controls, preserving A4.1a/b. Removing it does not remove tasks or history.
+The system point's standalone page links back to the follow-up list on its
+meeting.
 
 The default **Kræver opfølgning** tab shows critical, overdue, due-within-seven-
 days and waiting tasks from this Committee. **Alle aktive** shows all open,

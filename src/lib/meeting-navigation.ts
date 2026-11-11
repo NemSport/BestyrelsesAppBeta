@@ -19,10 +19,15 @@ export function getAgendaItemHref({
   organizationId,
   committeeId,
   agendaItemId,
+  occurrenceId,
 }: {
   organizationId: string;
   committeeId: string;
   agendaItemId: string;
+  occurrenceId?: string;
 }) {
-  return `/organizations/${organizationId}/committees/${committeeId}/agenda-items/${agendaItemId}`;
+  const itemHref = `/organizations/${organizationId}/committees/${committeeId}/agenda-items/${agendaItemId}`;
+  return occurrenceId
+    ? `${itemHref}?${new URLSearchParams({ occurrence: occurrenceId })}`
+    : itemHref;
 }

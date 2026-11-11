@@ -1277,6 +1277,8 @@ function AgendaMinutesCard({
               organizationId,
               committeeId,
               agendaItemId: item.id,
+              occurrenceId:
+                item.standard_key === "task_follow_up" ? occurrence.id : undefined,
             })}
           >
             Åbn punkt

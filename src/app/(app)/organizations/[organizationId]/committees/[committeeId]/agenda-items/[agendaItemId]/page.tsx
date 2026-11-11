@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
@@ -20,11 +21,10 @@ import {
   PageHeader,
   PageSection,
   StatusBadge,
+  buttonClassName,
 } from "@/components/ui";
-import {
-  formatDate,
-  standardAgendaItemLabels,
-} from "@/lib/localization";
+import { formatDate, standardAgendaItemLabels } from "@/lib/localization";
+import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
 import { canEditAgendaItems } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { AgendaItemService } from "@/services/agenda-item-service";
@@ -35,14 +35,17 @@ import { TaskService } from "@/services/task-service";
 
 export default async function AgendaItemPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     organizationId: string;
     committeeId: string;
     agendaItemId: string;
   }>;
+  searchParams: Promise<{ occurrence?: string }>;
 }) {
   const { organizationId, committeeId, agendaItemId } = await params;
+  const { occurrence: requestedOccurrenceId } = await searchParams;
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
   const context = await new AuthorizationService(db).requireCommitteeMember(
@@ -76,7 +79,24 @@ export default async function AgendaItemPage({
     context.membership?.role ?? null,
   );
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
-  const meeting = item.agenda_item_occurrences[0]?.meetings ?? null;
+  const isTaskFollowUp = item.standard_key === "task_follow_up";
+  const occurrences = item.agenda_item_occurrences;
+  const currentOccurrence = isTaskFollowUp
+    ? (occurrences.find(
+        (occurrence) =>
+          occurrence.id === requestedOccurrenceId && occurrence.meetings,
+      ) ?? occurrences.find((occurrence) => occurrence.meetings))
+    : occurrences[0];
+  const meeting = currentOccurrence?.meetings ?? null;
+  const followUpHref =
+    isTaskFollowUp && currentOccurrence && meeting
+      ? getMeetingAgendaPointHref({
+          organizationId,
+          committeeId,
+          meetingId: meeting.id,
+          occurrenceId: currentOccurrence.id,
+        })
+      : null;
 
   return (
     <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[1fr_340px]">
@@ -102,6 +122,11 @@ export default async function AgendaItemPage({
         <PageHeader
           actions={
             <div className="flex flex-wrap gap-2">
+              {followUpHref ? (
+                <Link className={buttonClassName()} href={followUpHref}>
+                  Tilbage til mødets opfølgningsliste
+                </Link>
+              ) : null}
               {canEdit ? (
                 <DecisionCreateModal
                   agendaItems={[{ id: item.id, title: item.title }]}
@@ -110,10 +135,8 @@ export default async function AgendaItemPage({
                   initialAgendaItemId={item.id}
                   initialDescription={item.description}
                   initialTitle={item.title}
-                  meetingDate={
-                    item.agenda_item_occurrences[0]?.meetings?.starts_at
-                  }
-                  meetingId={item.agenda_item_occurrences[0]?.meetings?.id}
+                  meetingDate={meeting?.starts_at}
+                  meetingId={meeting?.id}
                   organizationId={organizationId}
                   responsiblePeople={taskContext.responsiblePeople}
                   sourceLabel="dagsordenspunktet"
@@ -127,9 +150,7 @@ export default async function AgendaItemPage({
                   committeeId={committeeId}
                   initialAgendaItemId={item.id}
                   initialDescription={item.description}
-                  initialMeetingId={
-                    item.agenda_item_occurrences[0]?.meetings?.id ?? ""
-                  }
+                  initialMeetingId={meeting?.id ?? ""}
                   initialTitle={item.title}
                   meetings={item.agenda_item_occurrences.flatMap(
                     (occurrence) =>
@@ -199,7 +220,7 @@ export default async function AgendaItemPage({
         <AgendaItemHistoryInline
           agendaItemId={agendaItemId}
           committeeId={committeeId}
-          currentOccurrenceId={item.agenda_item_occurrences[0]?.id ?? null}
+          currentOccurrenceId={currentOccurrence?.id ?? null}
           initialHistory={agendaItemHistory}
           organizationId={organizationId}
         />
