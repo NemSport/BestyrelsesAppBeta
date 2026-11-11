@@ -345,7 +345,7 @@ export function AgendaItemHistoryInline({
                   aria-controls={panelId}
                   aria-expanded={expanded}
                   aria-label={`${expanded ? "Luk" : "Åbn"} behandling fra ${formatHistoryDate(entry.meetingDate)}`}
-                  className="flex min-h-14 w-full min-w-0 items-start gap-3 px-3 py-3 text-left transition hover:bg-subtle/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset sm:px-4"
+                  className="ui-action ui-action-menu w-full min-w-0 items-start text-left sm:px-4"
                   onClick={() =>
                     setExpandedIds((current) => {
                       const next = new Set(current);

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 
 import { Button, type ButtonVariant } from "@/components/ui";
 
@@ -73,7 +74,9 @@ export function TrashActionButton({
         onClick={() => void runAction()}
         size={size}
         variant={variant}
+        className={variant === "menu" ? "!text-danger" : undefined}
       >
+        {variant === "menu" ? <Trash2 size={16} aria-hidden="true" /> : null}
         {isPending ? pendingLabel || "Flytter..." : label}
       </Button>
       {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}

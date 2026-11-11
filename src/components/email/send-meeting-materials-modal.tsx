@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { Send } from "lucide-react";
 
 import { Button, Input, Modal, StatusBadge, Textarea } from "@/components/ui";
 import {
@@ -183,7 +184,9 @@ export function SendMeetingMaterialsModal({
           setStatus(null);
         }}
         type="button"
+        variant="quiet"
       >
+        <Send size={16} aria-hidden="true" />
         Udsend
       </Button>
       <Modal

@@ -135,6 +135,63 @@ a {
 }
 
 @layer components {
+  /* Shared action language: quiet chrome, consistent targets and visible states. */
+  .ui-action,
+  .button-primary,
+  .button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 py-2 font-medium text-muted shadow-none transition;
+    line-height: 1.25rem;
+  }
+
+  .ui-action:hover:not(:disabled),
+  .button-secondary:hover:not(:disabled) {
+    @apply bg-subtle text-ink;
+  }
+
+  .ui-action-primary,
+  .button-primary {
+    @apply bg-brand/10 text-brand;
+  }
+
+  .ui-action-primary:hover:not(:disabled),
+  .button-primary:hover:not(:disabled) {
+    @apply bg-brand/[0.15] text-brand;
+  }
+
+  .ui-action-danger {
+    @apply text-danger;
+  }
+  .ui-action-danger:hover:not(:disabled) {
+    @apply bg-danger-soft text-danger;
+  }
+  .ui-action-menu {
+    @apply w-full justify-start gap-2.5 px-3 text-left text-sm text-ink;
+  }
+  .ui-action:disabled,
+  .button-primary:disabled,
+  .button-secondary:disabled {
+    @apply cursor-not-allowed opacity-45;
+  }
+  .ui-action:focus-visible,
+  .button-primary:focus-visible,
+  .button-secondary:focus-visible {
+    outline: 2px solid rgb(var(--brand-primary));
+    outline-offset: 2px;
+  }
+
+  input[type="file"]::file-selector-button {
+    @apply mr-3 cursor-pointer rounded-md border-0 bg-brand/10 px-3 py-2 text-sm font-medium text-brand;
+    font-family: inherit;
+  }
+
+  input[type="file"]::file-selector-button:hover {
+    @apply bg-brand/[0.15];
+  }
+
+  input[type="file"]:disabled::file-selector-button {
+    @apply cursor-not-allowed opacity-45;
+  }
+
   .panel {
     border-radius: var(--radius-card);
     border: 1px solid rgb(var(--brand-border));
@@ -203,12 +260,12 @@ a {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    border: 1px solid rgb(var(--brand-on-primary) / 0.2);
-    border-radius: var(--radius-control);
-    background: rgb(var(--brand-on-primary) / 0.1);
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
     color: rgb(var(--brand-on-primary-active));
     font-size: 0.78rem;
-    font-weight: 650;
+    font-weight: 500;
     transition:
       background-color 160ms ease,
       border-color 160ms ease;
@@ -371,32 +428,11 @@ a {
   }
 
   .button-primary {
-    @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
-    min-height: 2.625rem;
-    border-radius: var(--radius-control);
-    background: rgb(var(--brand-primary));
-    box-shadow:
-      0 1px 2px rgb(var(--brand-primary) / 0.18),
-      inset 0 1px 0 rgb(255 255 255 / 0.12);
-  }
-
-  .button-primary:hover {
-    background: rgb(var(--brand-primary-hover));
+    @apply text-sm;
   }
 
   .button-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
-    min-height: 2.625rem;
-    border-radius: var(--radius-control);
-    border: 1px solid rgb(var(--brand-border-strong));
-    background: rgb(var(--brand-surface));
-    color: rgb(var(--brand-text));
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.75);
-  }
-
-  .button-secondary:hover {
-    border-color: rgb(var(--brand-accent) / 0.55);
-    background: rgb(var(--brand-accent-soft) / 0.65);
+    @apply text-sm;
   }
 
   .page-shell {

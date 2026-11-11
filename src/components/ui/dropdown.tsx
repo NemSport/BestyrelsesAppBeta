@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
+import { buttonClassName } from "./button";
 
 import { AppIcon } from "@/components/icons/app-icon";
 import { useDismissibleDetails } from "@/hooks/use-dismissible-details";
@@ -15,6 +16,7 @@ export function Dropdown({
   onOpenChange,
   open: controlledOpen,
   panelId,
+  quiet = true,
 }: {
   label: ReactNode;
   children: ReactNode;
@@ -24,6 +26,7 @@ export function Dropdown({
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
   panelId?: string;
+  quiet?: boolean;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const [internalOpen, setInternalOpen] = useState(false);
@@ -43,7 +46,12 @@ export function Dropdown({
       <summary
         aria-controls={panelId}
         aria-expanded={open}
-        className="flex cursor-pointer list-none items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden"
+        className={clsx(
+          "cursor-pointer list-none [&::-webkit-details-marker]:hidden",
+          quiet
+            ? buttonClassName({ variant: "quiet" })
+            : "flex items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-muted transition hover:bg-subtle hover:text-ink",
+        )}
       >
         {label}
         {hideChevron ? null : (

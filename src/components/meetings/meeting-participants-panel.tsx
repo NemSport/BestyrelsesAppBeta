@@ -268,7 +268,7 @@ export function MeetingParticipantsPanel({
     <>
       {compact ? (
         <button
-          className="rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-semibold text-brand hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="ui-action text-xs text-brand"
           onClick={openModal}
           type="button"
         >

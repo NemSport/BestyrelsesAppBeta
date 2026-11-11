@@ -329,7 +329,7 @@ function ReferentRoleControl({
       {canEdit ? (
         isCurrentReferent ? (
           <button
-            className="rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-muted hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="ui-action text-xs text-muted"
             disabled={pendingAction !== null}
             onClick={() => void handleAction("release")}
             type="button"
@@ -338,7 +338,7 @@ function ReferentRoleControl({
           </button>
         ) : (
           <button
-            className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1 text-xs font-semibold text-ink hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+            className="ui-action text-xs text-ink"
             disabled={pendingAction !== null || Boolean(activeLock)}
             onClick={() => void handleAction("claim")}
             type="button"
@@ -1122,7 +1122,7 @@ function AgendaMinutesCard({
           </div>
           {incomingTransfer?.sourceMeeting ? (
             <button
-              className="mt-2 inline-flex min-h-8 items-center break-words rounded-[var(--radius-control)] border border-progress/25 bg-surface/75 px-2.5 py-1 text-xs font-semibold text-progress hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              className="ui-action mt-2 break-words text-xs text-progress hover:underline"
               onClick={() => setSourceModalOpen(true)}
               type="button"
             >
@@ -1134,7 +1134,7 @@ function AgendaMinutesCard({
           ) : null}
           {item.objective || item.description ? (
             <details className="group mt-1 text-xs text-muted">
-              <summary className="inline-flex cursor-pointer list-none font-medium hover:text-ink [&::-webkit-details-marker]:hidden">
+              <summary className="ui-action cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                 Punktbeskrivelse
               </summary>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-muted">
@@ -1227,7 +1227,7 @@ function AgendaMinutesCard({
           </div>
           {canEdit && completedStatus && !isCompletedAgendaStatus(status) ? (
             <button
-              className="col-span-2 inline-flex min-h-8 items-center justify-center gap-1.5 self-center rounded-[var(--radius-control)] border border-success/30 bg-surface px-2.5 py-1 text-xs font-semibold text-success transition hover:bg-success-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-wait disabled:opacity-60 sm:col-span-1"
+              className="ui-action col-span-2 self-center text-xs text-success sm:col-span-1"
               disabled={markingCompleted || autosave.status === "saving"}
               onClick={() => void markAgendaItemCompleted()}
               type="button"
@@ -1512,7 +1512,7 @@ function AgendaMinutesCard({
                 Rediger referat
               </Button>
               <details className="group relative" ref={moreActionsRef}>
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2 text-sm font-semibold text-muted transition hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden">
+                <summary className="ui-action cursor-pointer list-none text-sm text-muted [&::-webkit-details-marker]:hidden">
                   Flere handlinger
                 </summary>
                 <div className="absolute left-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-lg sm:left-auto sm:right-0">
@@ -1564,7 +1564,7 @@ function AgendaMinutesCard({
                       Referat, synspunkter og drøftelse
                     </label>
                     <details className="group relative text-xs text-muted">
-                      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded px-1.5 py-1 font-medium text-brand hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
+                      <summary className="ui-action cursor-pointer list-none text-brand [&::-webkit-details-marker]:hidden">
                         <AppIcon aria-hidden="true" name="edit" size={13} />
                         Skrivehjælp
                       </summary>
@@ -1687,7 +1687,7 @@ function AgendaMinutesCard({
                       sourceLabel="punktreferatet"
                       trigger={(open) => (
                         <button
-                          className="inline-flex min-h-8 items-center rounded-[var(--radius-control)] border border-brand/20 bg-surface px-2.5 py-1 text-xs font-semibold text-brand transition hover:border-brand/40 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+                          className="ui-action text-xs text-brand"
                           onClick={open}
                           type="button"
                         >
@@ -1704,14 +1704,14 @@ function AgendaMinutesCard({
                         : undefined
                     }
                     className={clsx(
-                      "min-h-8 rounded-[var(--radius-control)] border px-2.5 py-1 text-xs font-semibold transition",
+                      "min-h-11 rounded-md  px-2.5 py-1 text-xs font-medium transition",
                       activeActionPanel === "followUp"
-                        ? "border-brand bg-brand-soft text-brand"
+                        ? " bg-brand-soft text-brand"
                         : shouldHighlightFollowUp
-                          ? "border-brand bg-brand text-white shadow-sm ring-2 ring-brand/20 hover:bg-brand-hover"
+                          ? "bg-brand/10 text-brand ring-2 ring-brand/20 hover:bg-brand/15"
                           : shouldConfirmFollowUp
-                            ? "border-success/30 bg-success/10 text-success hover:bg-success/15"
-                            : "border-line bg-surface text-ink hover:bg-subtle",
+                            ? " bg-success/10 text-success hover:bg-success/15"
+                            : " bg-surface text-ink hover:bg-subtle",
                     )}
                     onClick={() => toggleActionPanel("followUp")}
                     type="button"
@@ -1726,10 +1726,10 @@ function AgendaMinutesCard({
                   <button
                     aria-expanded={activeActionPanel === "more"}
                     className={clsx(
-                      "min-h-8 rounded-[var(--radius-control)] border px-2.5 py-1 text-xs font-semibold transition",
+                      "min-h-11 rounded-md  px-2.5 py-1 text-xs font-medium transition",
                       activeActionPanel === "more"
-                        ? "border-brand bg-brand-soft text-brand"
-                        : "border-line bg-surface text-muted hover:bg-subtle hover:text-ink",
+                        ? " bg-brand-soft text-brand"
+                        : " bg-surface text-muted hover:bg-subtle hover:text-ink",
                     )}
                     onClick={() => toggleActionPanel("more")}
                     type="button"
@@ -1979,7 +1979,7 @@ function AgendaMinutesCard({
                           variant="secondary"
                         />
                         <button
-                          className="rounded-[var(--radius-control)] border border-danger/25 bg-surface px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-60"
+                          className="ui-action ui-action-danger text-sm text-danger"
                           disabled={deleting || autosave.status === "saving"}
                           onClick={removeAgendaItem}
                           type="button"
@@ -2145,7 +2145,7 @@ function AgendaMinutesCard({
                   sourceLabel="punktreferatet"
                   trigger={(open) => (
                     <button
-                      className="inline-flex min-h-8 items-center rounded-[var(--radius-control)] border border-brand/20 bg-surface px-2.5 py-1 text-xs font-semibold text-brand transition hover:border-brand/40 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+                      className="ui-action text-xs text-brand"
                       onClick={open}
                       type="button"
                     >
@@ -2216,7 +2216,7 @@ function AgendaMinutesCard({
                   sourceLabel="punktreferatet"
                   trigger={(open) => (
                     <button
-                      className="inline-flex min-h-8 items-center rounded-[var(--radius-control)] border border-brand/20 bg-surface px-2.5 py-1 text-xs font-semibold text-brand transition hover:border-brand/40 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+                      className="ui-action text-xs text-brand"
                       onClick={open}
                       type="button"
                     >
@@ -3398,27 +3398,29 @@ export function MeetingMinutesSection({
         <button
           aria-pressed={workspaceMode === "editing"}
           className={clsx(
-            "rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+            "ui-action text-xs",
             workspaceMode === "editing"
-              ? "bg-brand text-white shadow-sm"
+              ? "bg-brand/10 text-brand "
               : "text-muted hover:bg-surface hover:text-ink",
           )}
           onClick={() => setWorkspaceMode("editing")}
           type="button"
         >
+          <AppIcon name="edit" size={14} />
           Redigering
         </button>
         <button
           aria-pressed={workspaceMode === "review"}
           className={clsx(
-            "rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+            "ui-action text-xs",
             workspaceMode === "review"
-              ? "bg-brand text-white shadow-sm"
+              ? "bg-brand/10 text-brand "
               : "text-muted hover:bg-surface hover:text-ink",
           )}
           onClick={openReviewMode}
           type="button"
         >
+          <AppIcon name="documents" size={14} />
           Læsning/godkendelse
         </button>
       </div>
@@ -3459,7 +3461,7 @@ export function MeetingMinutesSection({
       meetingStatus === "approved" &&
       workspaceMode === "editing" ? (
       <button
-        className="rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-brand hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="ui-action text-xs text-brand"
         onClick={() => setIsEditingApproved((current) => !current)}
         type="button"
       >
@@ -3697,7 +3699,7 @@ export function MeetingMinutesSection({
                       <div className="col-span-2 grid grid-cols-2 gap-2 xl:col-span-1">
                         {activeIndex > 0 ? (
                           <Link
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-brand/35 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
+                            className="ui-action text-xs"
                             href={`#agenda-point-${occurrences[activeIndex - 1].id}`}
                             onClick={() =>
                               selectOccurrence(occurrences[activeIndex - 1].id)
@@ -3708,7 +3710,7 @@ export function MeetingMinutesSection({
                           </Link>
                         ) : (
                           <button
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-subtle/40 px-3 py-1.5 text-xs font-semibold text-muted opacity-55"
+                            className="ui-action text-xs text-muted opacity-55"
                             disabled
                             type="button"
                           >
@@ -3718,7 +3720,7 @@ export function MeetingMinutesSection({
                         )}
                         {activeIndex < occurrences.length - 1 ? (
                           <Link
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-brand bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                            className="ui-action ui-action-primary text-xs"
                             href={`#agenda-point-${occurrences[activeIndex + 1].id}`}
                             onClick={() =>
                               selectOccurrence(occurrences[activeIndex + 1].id)
@@ -3729,7 +3731,7 @@ export function MeetingMinutesSection({
                           </Link>
                         ) : (
                           <button
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-subtle/40 px-3 py-1.5 text-xs font-semibold text-muted opacity-55"
+                            className="ui-action text-xs text-muted opacity-55"
                             disabled
                             type="button"
                           >
@@ -3893,7 +3895,7 @@ export function MeetingMinutesSection({
                   documentContext.meetingDocuments.length >
                 0 ? (
                   <details className="group mt-2 text-sm">
-                    <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 font-semibold text-brand hover:underline [&::-webkit-details-marker]:hidden">
+                    <summary className="ui-action cursor-pointer list-none text-brand hover:underline [&::-webkit-details-marker]:hidden">
                       <AppIcon name="attachments" size={14} />
                       Mødebilag (
                       {meetingAttachments.length +

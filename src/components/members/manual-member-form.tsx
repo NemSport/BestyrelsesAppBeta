@@ -336,7 +336,7 @@ export function ManualMemberForm({
                     </select>
                   </div>
                   <button
-                    className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft"
+                    className="ui-action ui-action-danger text-sm text-danger"
                     onClick={() => removeCommittee(committee.id)}
                     type="button"
                   >

@@ -98,7 +98,7 @@ export function MeetingAgendaPreview({
             aria-controls={panelId}
             aria-expanded={expanded}
             aria-label={`${expanded ? "Skjul" : "Vis"} dagsorden for mødet`}
-            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-[var(--radius-control)] text-muted transition hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="ui-action min-w-10 text-muted"
             onClick={() => setExpanded((current) => !current)}
             title={expanded ? "Skjul dagsorden" : "Vis dagsorden"}
             type="button"

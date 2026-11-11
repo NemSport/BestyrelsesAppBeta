@@ -113,7 +113,7 @@ export function SendMeetingAgendaEmailModal({
         </Button>
       ) : (
         <button
-          className="block w-full rounded-[var(--radius-control)] px-3 py-2 text-left text-sm font-semibold text-ink transition hover:bg-subtle"
+          className="ui-action ui-action-menu w-full text-left text-sm text-ink"
           onClick={() => {
             setOpen(true);
             setStatus(null);

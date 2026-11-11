@@ -42,14 +42,14 @@ function ToolbarButton({
     <button
       aria-label={label}
       aria-pressed={active}
-      className={`inline-flex min-h-8 items-center justify-center rounded-md border px-1.5 text-[11px] font-semibold leading-none transition disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-7 ${
+      className={`inline-flex min-h-11 items-center justify-center rounded-md  px-1.5 text-[11px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-7 ${
         expanded
           ? "w-full justify-start gap-2 px-2 py-1.5 text-xs"
           : "min-w-8 sm:min-w-7"
       } ${
         active
-          ? "border-accent/40 bg-accent-soft text-forest"
-          : "border-transparent bg-transparent text-muted hover:border-line hover:bg-surface hover:text-ink"
+          ? " bg-accent-soft text-forest"
+          : " bg-transparent text-muted  hover:bg-surface hover:text-ink"
       } ${textClassName}`}
       disabled={disabled}
       onClick={onClick}
@@ -288,7 +288,7 @@ export function RichTextEditor({
             <Link2 aria-hidden="true" size={14} strokeWidth={2} />
           </ToolbarButton>
           <details className="group relative ml-auto">
-            <summary className="flex min-h-8 cursor-pointer list-none items-center gap-1 rounded-md border border-transparent px-2 text-[11px] font-semibold text-muted transition hover:border-line hover:bg-surface hover:text-ink sm:min-h-7 [&::-webkit-details-marker]:hidden">
+            <summary className="ui-action cursor-pointer list-none text-[11px] text-muted sm:min-h-7 [&::-webkit-details-marker]:hidden">
               Flere
               <span
                 aria-hidden="true"

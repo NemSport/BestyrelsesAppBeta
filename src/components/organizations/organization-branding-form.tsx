@@ -453,10 +453,11 @@ export function OrganizationBrandingForm({
                 Preview af knap, accent og valgt font.
               </p>
               <button
-                className="mt-3 inline-flex min-h-9 items-center px-3 text-sm font-semibold text-white"
+                className="ui-action mt-3 text-sm"
                 style={{
-                  backgroundColor: primary,
-                  borderRadius: "var(--radius-control)",
+                  backgroundColor: `${primary}1a`,
+                  color: primary,
+                  borderRadius: "0.375rem",
                 }}
                 type="button"
               >

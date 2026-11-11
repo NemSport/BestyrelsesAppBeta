@@ -150,10 +150,10 @@ export function AgendaItemHistoryLink({
     <>
       <button
         className={clsx(
-          "inline-flex items-center gap-2 rounded-[var(--radius-control)] text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+          "inline-flex items-center gap-2 rounded-md text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
           triggerVariant === "menu"
             ? "min-h-10 w-full px-3 py-2 text-left text-ink hover:bg-subtle"
-            : "min-h-8 px-2 py-1 text-xs text-muted hover:bg-brand-soft hover:text-brand",
+            : "min-h-11 px-2 py-1 text-xs text-muted hover:bg-brand-soft hover:text-brand",
         )}
         onClick={() => {
           setOpen(true);

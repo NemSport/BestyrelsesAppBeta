@@ -1,5 +1,15 @@
 # AI Committee Assistant
 
+## Shared action design
+
+Actions across the app use the same quiet, borderless visual language:
+medium-weight labels, small icons, modest corner radii and visible keyboard focus.
+Primary actions and selected views use a light brand tint; destructive actions
+use danger text. Menus use left-aligned rows rather than outlined buttons.
+The shared Button, Dropdown, ActionMenu and legacy button classes share these
+rules. Inputs remain recognisable as editable fields. Native task rows, calendar
+items and rich-text tools retain their layout and selected-state semantics.
+
 ## A4.2 — Interactive meeting task follow-up
 
 New ordinary meetings include **Opgaver & opfølgning** as a fourth standard agenda item,
@@ -27,6 +37,10 @@ minutes allow read-only follow-up. Dispatches including a task list retain a
 task metadata snapshot from the same read model used for the PDFs; this is not
 an archive of the original PDF bytes. See `docs/testing/a4-2.md` for rollout,
 acceptance tests and known limitations.
+
+The A4.2 compatibility hotfix preserves existing task-to-meeting reads across
+older app deployments sharing the database. Task links keep their meeting/task
+uniqueness while using a separate primary key; no task records are moved.
 
 ## Organization PDF Letterhead
 

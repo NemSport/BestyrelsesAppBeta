@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ListPlus,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionMenu } from "@/components/ui/action-menu";
 import {
   useMutationFeedback,
   useUnsavedChanges,
@@ -25,6 +34,10 @@ const statuses = {
 };
 type State = FollowUpState & { canEdit: boolean; canLink: boolean };
 type Scope = { organizationId: string; committeeId: string; meetingId: string };
+const taskActionClass =
+  "inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted transition hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40";
+const agendaChoiceClass =
+  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40";
 async function responseBody(response: Response) {
   const body = await response.json();
   if (!response.ok)
@@ -78,6 +91,7 @@ export function MeetingTaskFollowUp({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"attention" | "all">("attention");
   const [editing, setEditing] = useState<FollowUpTask | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const feedback = useMutationFeedback();
   const sequence = useRef(0);
   const retry = useRef<{ signature: string; requestId: string } | null>(null);
@@ -182,7 +196,7 @@ export function MeetingTaskFollowUp({
   const canEdit = data.canEdit && data.writable;
   return (
     <section
-      className="space-y-3 border-b border-line bg-surface p-3 sm:p-5"
+      className="space-y-2 border-b border-line bg-surface p-3 sm:p-4"
       aria-label="Opgaver og opfølgning"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -194,8 +208,7 @@ export function MeetingTaskFollowUp({
         </Button>
       </div>
       <p className="text-xs text-muted">
-        Aktuelle opgaver i udvalget · Snarlig: inden for 7 dage · Opdateres
-        hvert 20. sekund
+        Snarlig = inden for 7 dage · Opdateres automatisk
       </p>
       {!data.writable ? (
         <p className="text-sm">
@@ -205,22 +218,24 @@ export function MeetingTaskFollowUp({
       ) : null}
       {!occurrenceId ? (
         <div
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap gap-1 border-b border-line"
           role="tablist"
           aria-label="Opgavefilter"
         >
           <Button
             role="tab"
+            className="rounded-none border-b-2 border-transparent !bg-transparent !shadow-none aria-selected:border-brand aria-selected:!text-brand"
             aria-selected={tab === "attention"}
-            variant={tab === "attention" ? "primary" : "secondary"}
+            variant="ghost"
             onClick={() => setTab("attention")}
           >
             Kræver opfølgning ({activeFollowUpTasks(data.tasks, true).length})
           </Button>
           <Button
             role="tab"
+            className="rounded-none border-b-2 border-transparent !bg-transparent !shadow-none aria-selected:border-brand aria-selected:!text-brand"
             aria-selected={tab === "all"}
-            variant={tab === "all" ? "primary" : "secondary"}
+            variant="ghost"
             onClick={() => setTab("all")}
           >
             Alle aktive ({activeFollowUpTasks(data.tasks, false).length})
@@ -232,131 +247,186 @@ export function MeetingTaskFollowUp({
           {error} · Oversigten kan være forældet.
         </p>
       ) : null}
-      <p
-        role={feedback.feedback.status === "error" ? "alert" : "status"}
-        className="text-sm"
-      >
-        {feedback.feedback.message}
-      </p>
+      {feedback.feedback.message ? (
+        <p
+          role={feedback.feedback.status === "error" ? "alert" : "status"}
+          className="text-sm"
+        >
+          {feedback.feedback.message}
+        </p>
+      ) : null}
       {!tasks.length ? (
         <p className="text-sm text-muted">Ingen opgaver i denne visning.</p>
       ) : null}
-      {tasks.map((task) => {
-        const link = data.links.find((link) => link.task_id === task.id);
-        return (
-          <article
-            key={task.id}
-            className="space-y-2 rounded-lg border border-line p-3"
-          >
-            <div className="flex flex-wrap justify-between gap-2">
-              <h4 className="break-words font-semibold">{task.title}</h4>
-              <span className="text-sm">{statuses[task.status]}</span>
-            </div>
-            <p className="text-sm">
-              {task.responsible_name || "Ingen ansvarlig"} ·{" "}
-              {task.deadline ? formatDate(task.deadline) : "Ingen deadline"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {followUpReasons(task).map((reason) => (
-                <span
-                  key={reason}
-                  className="rounded bg-warning-soft px-2 py-1 text-xs font-semibold"
-                >
-                  {reason}
-                </span>
-              ))}
-            </div>
-            {task.latest_note ? (
-              <p className="whitespace-pre-wrap break-words text-sm text-muted">
-                {task.latest_note}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              {canEdit ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setEditing(task)}
-                    disabled={feedback.pending || Boolean(editing)}
-                  >
-                    Rediger / tilføj note
-                  </Button>
-                  {task.status !== "completed" ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={feedback.pending || Boolean(editing)}
-                      onClick={() =>
-                        mutate(task, { action: "update", status: "completed" })
-                      }
-                    >
-                      Afslut opgave
-                    </Button>
-                  ) : null}
-                </>
-              ) : null}
-              {link ? (
-                <a
-                  className="self-center text-sm font-semibold text-brand"
-                  href={`#agenda-point-${link.occurrence_id}`}
-                >
-                  Åbn dagsordenspunkt
-                </a>
-              ) : data.canLink && data.writable ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={feedback.pending || Boolean(editing)}
-                    onClick={() => mutate(task, { action: "link" })}
-                  >
-                    Opret særskilt punkt
-                  </Button>
-                  {data.occurrences.length ? (
-                    <label className="text-sm">
-                      Tilknyt eksisterende punkt
-                      <select
-                        className="field mt-1"
-                        value=""
-                        disabled={feedback.pending || Boolean(editing)}
-                        onChange={(event) => {
-                          if (event.target.value)
-                            void mutate(task, {
-                              action: "link",
-                              occurrenceId: event.target.value,
-                            });
-                        }}
+      <div className="divide-y divide-line">
+        {tasks.map((task) => {
+          const link = data.links.find((link) => link.task_id === task.id);
+          const expanded = expandedId === task.id || editing?.id === task.id;
+          const detailsId = `task-follow-up-${occurrenceId ?? meetingId}-${task.id}`;
+          return (
+            <article key={task.id} className="py-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                aria-expanded={expanded}
+                aria-controls={detailsId}
+                onClick={() => setExpandedId(expanded ? null : task.id)}
+                disabled={editing?.id === task.id}
+              >
+                <span className="min-w-0 flex-1 space-y-1">
+                  <span className="block break-words text-sm font-semibold">
+                    {task.title}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                    {task.responsible_name || "Ingen ansvarlig"} ·{" "}
+                    {task.deadline
+                      ? formatDate(task.deadline)
+                      : "Ingen deadline"}
+                    <span>· {statuses[task.status]}</span>
+                    {followUpReasons(task).map((reason) => (
+                      <span
+                        key={reason}
+                        className="rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-ink"
                       >
-                        <option value="">Vælg punkt…</option>
-                        {data.occurrences.map((item) => (
-                          <option value={item.id} key={item.id}>
-                            {item.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        {reason}
+                      </span>
+                    ))}
+                  </span>
+                </span>
+                {expanded ? (
+                  <ChevronUp
+                    className="h-4 w-4 shrink-0 text-muted"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 text-muted"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+              <div
+                id={detailsId}
+                hidden={!expanded}
+                className="space-y-3 px-2 pb-3 pt-2"
+              >
+                {task.latest_note ? (
+                  <p className="whitespace-pre-wrap break-words text-sm text-muted">
+                    {task.latest_note}
+                  </p>
+                ) : null}
+                <div className="-ml-2 flex flex-wrap items-center gap-x-1">
+                  {canEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        className={taskActionClass}
+                        title="Rediger opgaven eller tilføj en note"
+                        onClick={() => setEditing(task)}
+                        disabled={feedback.pending || Boolean(editing)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        Rediger
+                      </button>
+                      {task.status !== "completed" ? (
+                        <button
+                          type="button"
+                          className={taskActionClass}
+                          disabled={feedback.pending || Boolean(editing)}
+                          onClick={() =>
+                            mutate(task, {
+                              action: "update",
+                              status: "completed",
+                            })
+                          }
+                        >
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                          Afslut
+                        </button>
+                      ) : null}
+                    </>
                   ) : null}
-                </>
-              ) : null}
-            </div>
-            {editing?.id === task.id ? (
-              <TaskEditor
-                task={editing}
-                people={data.people}
-                pending={feedback.pending}
-                onCancel={() => setEditing(null)}
-                onSave={async (change) => {
-                  if (await mutate(editing, { action: "update", ...change }))
-                    setEditing(null);
-                }}
-              />
-            ) : null}
-          </article>
-        );
-      })}
-      <details className="rounded-lg border border-line p-3">
-        <summary className="cursor-pointer font-semibold">
+                  {link ? (
+                    <a
+                      className={taskActionClass}
+                      href={`#agenda-point-${link.occurrence_id}`}
+                    >
+                      <ListPlus className="h-4 w-4" aria-hidden="true" />
+                      Åbn punkt
+                    </a>
+                  ) : data.canLink && data.writable ? (
+                    <ActionMenu
+                      align="right"
+                      ariaLabel={`Dagsordenspunkt for ${task.title}`}
+                      label={
+                        <>
+                          <ListPlus
+                            className="mr-1.5 h-4 w-4"
+                            aria-hidden="true"
+                          />
+                          Dagsordenspunkt
+                        </>
+                      }
+                      triggerClassName="!rounded-md !border-0 !bg-transparent !px-2 !font-medium !text-muted hover:!bg-subtle hover:!text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                    >
+                      <button
+                        type="button"
+                        className={agendaChoiceClass}
+                        disabled={feedback.pending || Boolean(editing)}
+                        onClick={() => mutate(task, { action: "link" })}
+                      >
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        Opret nyt punkt
+                      </button>
+                      {data.occurrences.length ? (
+                        <div className="border-t border-line pt-1">
+                          <p className="px-3 py-2 text-xs text-muted">
+                            Tilknyt eksisterende punkt
+                          </p>
+                          <div className="max-h-60 max-w-72 overflow-y-auto">
+                            {data.occurrences.map((item) => (
+                              <button
+                                type="button"
+                                key={item.id}
+                                className={agendaChoiceClass}
+                                disabled={feedback.pending || Boolean(editing)}
+                                onClick={() =>
+                                  mutate(task, {
+                                    action: "link",
+                                    occurrenceId: item.id,
+                                  })
+                                }
+                              >
+                                {item.title}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </ActionMenu>
+                  ) : null}
+                </div>
+                {editing?.id === task.id ? (
+                  <TaskEditor
+                    task={editing}
+                    people={data.people}
+                    pending={feedback.pending}
+                    onCancel={() => setEditing(null)}
+                    onSave={async (change) => {
+                      if (
+                        await mutate(editing, { action: "update", ...change })
+                      )
+                        setEditing(null);
+                    }}
+                  />
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <details className="border-t border-line py-2 text-sm">
+        <summary className="cursor-pointer font-medium text-muted">
           Behandlet på mødet / historik ({events.length})
         </summary>
         <p className="my-2 text-xs text-muted">
@@ -395,8 +465,8 @@ export function MeetingTaskFollowUp({
         ))}
       </details>
       {!occurrenceId ? (
-        <details className="rounded-lg border border-line p-3">
-          <summary className="cursor-pointer font-semibold">
+        <details className="border-t border-line py-2 text-sm">
+          <summary className="cursor-pointer font-medium text-muted">
             Opgaver i udsendt materiale ({data.snapshots.length})
           </summary>
           {data.snapshots.length === 0 ? (
