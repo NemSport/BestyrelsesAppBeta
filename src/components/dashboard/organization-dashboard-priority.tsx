@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { useState, type ReactNode } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
 import { StatusBadge } from "@/components/ui";
@@ -10,7 +8,6 @@ import type { OrganizationRole } from "@/lib/meeting-capabilities";
 import type {
   ActionItem,
   OrganizationOverview,
-  TaskView,
 } from "@/types/domain";
 
 export function OrganizationDashboardPriority({
@@ -23,13 +20,10 @@ export function OrganizationDashboardPriority({
   nextMeeting,
   recentMinutesSection,
 }: {
-  actions: (Pick<
+  actions: Pick<
     ActionItem,
-    "key" | "href" | "title" | "priority" | "description" | "context" | "task"
-  > & {
-    canEditTask: boolean;
-    responsiblePeople: { id: string; name: string }[];
-  })[];
+    "key" | "href" | "title" | "priority" | "description" | "context"
+  >[];
   actionCount: number;
   committeeCount: number;
   committeeSection: ReactNode;
@@ -41,8 +35,6 @@ export function OrganizationDashboardPriority({
   > | null;
   recentMinutesSection: ReactNode;
 }) {
-  const router = useRouter();
-  const [activeTask, setActiveTask] = useState<TaskView | null>(null);
   const root = `/organizations/${organizationId}`;
   const [view, setView] = useState<"actions" | "news" | "committees">(
     "actions",
@@ -118,22 +110,12 @@ export function OrganizationDashboardPriority({
                   {action.description}{" "}
                   <span className="text-muted">{action.context}</span>
                 </p>
-                {action.task ? (
-                  <button
-                    type="button"
-                    className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
-                    onClick={() => setActiveTask(action.task ?? null)}
-                  >
-                    Åbn handling →
-                  </button>
-                ) : (
-                  <Link
-                    className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
-                    href={`${root}${action.href}`}
-                  >
-                    Åbn handling →
-                  </Link>
-                )}
+                <Link
+                  className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
+                  href={`${root}${action.href}`}
+                >
+                  Åbn handling →
+                </Link>
               </>
             ) : (
               <h2 className="text-xl font-semibold">
@@ -201,20 +183,6 @@ export function OrganizationDashboardPriority({
           Åbn kalender →
         </Link>
       </aside>
-      {activeTask && action?.task?.id === activeTask.id && (
-        <TaskDetailModal
-          open
-          task={activeTask}
-          organizationId={organizationId}
-          canEdit={action.canEditTask}
-          responsiblePeople={action.responsiblePeople}
-          onClose={() => setActiveTask(null)}
-          onUpdated={(updated) => {
-            setActiveTask(updated);
-            router.refresh();
-          }}
-        />
-      )}
     </div>
   );
 }

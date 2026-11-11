@@ -18,6 +18,7 @@ import {
 import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
 import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
 import { isOrganizationAdmin } from "@/lib/permissions";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
@@ -329,7 +330,7 @@ export default async function CommitteeWorkspacePage({
                     <article className="py-2.5" key={task.id}>
                       <Link
                         className="font-semibold hover:text-brand hover:underline"
-                        href={`${taskHref}&editTask=${task.id}#task-${task.id}`}
+                        href={`${root}${getTaskDetailPath(task.id, committeeId)}`}
                       >
                         {task.title}
                       </Link>
@@ -435,7 +436,7 @@ export default async function CommitteeWorkspacePage({
                 >
                   <Link
                     className="min-w-0 truncate font-semibold hover:text-brand hover:underline"
-                    href={`${taskHref}&editTask=${task.id}#task-${task.id}`}
+                    href={`${root}${getTaskDetailPath(task.id, committeeId)}`}
                   >
                     {task.title}
                   </Link>

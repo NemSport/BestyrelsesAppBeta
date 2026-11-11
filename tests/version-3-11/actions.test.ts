@@ -99,6 +99,7 @@ test("overdue assigned task is a critical action", () => {
   assert.equal(action.type, "task_overdue");
   assert.equal(action.priority, "critical");
   assert.equal(action.daysUntil, -1);
+  assert.equal(action.href, `/tasks?scope=all&task=${action.sourceId}`);
 });
 
 test("far-future task without a deadline trigger is excluded", () => {
@@ -371,7 +372,8 @@ test("dashboard, navigation and center share ActionService", async () => {
   ]);
   assert.match(page, /new ActionService\(db\)\.getCenter/);
   assert.match(layout, /activeActionCount=\{actionCenter\.activeCount\}/);
-  assert.match(dashboard, /actionCenter\.inbox/);
+  assert.match(page, /actionCenter\.inbox/);
+  assert.match(dashboard, /\$\{root\}\$\{action\.href\}/);
   assert.match(component, /grid min-w-0 gap-3 md:grid-cols/);
   assert.match(component, /requireAgendaItemEditor|editableCommitteeIds/);
   assert.match(component, /Påmindelse[\s\S]*formatDateTime/);

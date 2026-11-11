@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   emptyTaskFilters,
+  getTaskDetailPath,
   parseTaskRegisterState,
   taskRegisterSearchParams,
 } from "../../src/lib/task-register-state.ts";
@@ -103,6 +104,18 @@ test("serialization omits defaults and preserves unrelated deep-link state", () 
     view: "list",
   });
   assert.equal(allList.toString(), "editTask=task-1&view=list&scope=all");
+});
+
+test("task detail links support tasks outside the personal list", () => {
+  const [path, query] = getTaskDetailPath("task-1", "committee-1").split("?");
+  assert.equal(path, "/tasks");
+  const params = new URLSearchParams(query);
+  assert.equal(params.get("task"), "task-1");
+  assert.equal(params.has("editTask"), false);
+  const state = parseTaskRegisterState(params);
+  assert.equal(state.filters.mineOnly, false);
+  assert.equal(state.filters.committeeId, "committee-1");
+  assert.equal(taskRegisterSearchParams(params, state).get("task"), "task-1");
 });
 
 test("Mine and Alle scope only filter the already accessible task collection", () => {

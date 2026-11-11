@@ -663,6 +663,10 @@ RLS-visible task collection. The legacy `/tasks/my` URL redirects to
 valid without retaining a second task interface or permission path. The
 redirect includes the existing `mine=1` scope parameter explicitly.
 
+Overview, global search, and the Annual Wheel link directly to the task
+detail in the organization register. Readers can open visible tasks, and
+editors can open the editor from the detail panel.
+
 Phase 2B.5 adds a compact, append-only task comment thread for practical
 follow-up. Comments inherit the task's organization and committee scope,
 record their author and timestamp, and are shown in the existing task editor.

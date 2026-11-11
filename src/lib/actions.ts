@@ -15,6 +15,7 @@ import {
   stakeholderActionDays,
   stakeholderFollowUpDays,
 } from "@/lib/stakeholders";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 
 export const actionTypeValues = [
   "task_overdue",
@@ -102,7 +103,7 @@ function taskAction(task: TaskView, now: Date): ActionItem | null {
     title: task.title,
     description,
     context: task.committee?.name ?? "Opgave",
-    href: `/tasks#task-${task.id}`,
+    href: getTaskDetailPath(task.id),
     sourceType: "task",
     sourceId: task.id,
     responsibleUserId: task.responsible_user_id,

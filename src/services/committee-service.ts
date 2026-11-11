@@ -7,6 +7,7 @@ import {
 } from "@/lib/validation";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { NotFoundError } from "@/lib/errors";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 import { AgendaItemRepository } from "@/repositories/agenda-item-repository";
 import { CommitteeRepository } from "@/repositories/committee-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
@@ -149,7 +150,7 @@ export class CommitteeService {
             ? "Opgave gennemført"
             : "Opgave opdateret",
         occurredAt: task.updated_at,
-        href: `${root}/tasks?scope=all&committee=${committeeId}&editTask=${task.id}#task-${task.id}`,
+        href: `${root}${getTaskDetailPath(task.id, committeeId)}`,
       })),
       ...recentDecisions.map((decision) => ({
         id: `decision:${decision.id}`,

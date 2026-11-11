@@ -216,35 +216,16 @@ export default async function OrganizationPage({
 
       <OrganizationDashboardPriority
         actionCount={actions.length}
-        actions={actions
-          .slice(0, 3)
-          .map(
-            ({ key, href, title, priority, description, context, task }) => ({
-              key,
-              href,
-              title,
-              priority,
-              description,
-              context,
-              task,
-              canEditTask:
-                !!task &&
-                actionCenter.editableCommitteeIds.includes(task.committee_id),
-              responsiblePeople: task
-                ? actionCenter.delegationMembers
-                    .filter(
-                      (member) =>
-                        member.committees.some(
-                          ({ id }) => id === task.committee_id,
-                        ) || member.user_id === task.responsible_user_id,
-                    )
-                    .map((member) => ({
-                      id: member.user_id,
-                      name: member.full_name ?? "Medlem",
-                    }))
-                : [],
-            }),
-          )}
+        actions={actions.slice(0, 3).map(
+          ({ key, href, title, priority, description, context }) => ({
+            key,
+            href,
+            title,
+            priority,
+            description,
+            context,
+          }),
+        )}
         committeeCount={overview.committees.length}
         committeeSection={committeeSection}
         organizationId={organizationId}

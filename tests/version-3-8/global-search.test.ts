@@ -169,7 +169,7 @@ test("canonical result destinations preserve existing routes", () => {
   );
   assert.equal(
     globalSearchHref({ type: "task", organizationId: "org", taskId: "task" }),
-    "/organizations/org/tasks?scope=all&editTask=task#task-task",
+    "/organizations/org/tasks?scope=all&task=task",
   );
   assert.equal(
     globalSearchHref({

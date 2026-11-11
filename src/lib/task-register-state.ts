@@ -2,6 +2,12 @@ import type { TaskFilters, TaskStatus } from "@/lib/tasks";
 
 export type TaskRegisterView = "list" | "task";
 
+export function getTaskDetailPath(taskId: string, committeeId?: string) {
+  const params = new URLSearchParams({ scope: "all", task: taskId });
+  if (committeeId) params.set("committee", committeeId);
+  return `/tasks?${params.toString()}`;
+}
+
 export type TaskRegisterState = {
   filters: TaskFilters;
   view: TaskRegisterView;

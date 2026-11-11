@@ -275,7 +275,9 @@ export function TaskRegister({
     () => sortTasksByDeadline(filterTasks(tasks, filters, data.userId)),
     [data.userId, filters, tasks],
   );
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+  const linkedTaskId = searchParams.get("task");
+  const activeTaskId = linkedTaskId || selectedTaskId;
+  const selectedTask = tasks.find((task) => task.id === activeTaskId) ?? null;
   const activeBoardTasks = filteredTasks.filter((task) =>
     taskBoardStatuses.includes(task.status),
   );
@@ -744,9 +746,18 @@ export function TaskRegister({
     setSelectedTaskId(task.id);
   }
 
+  function closeDetail() {
+    setSelectedTaskId(null);
+    if (!linkedTaskId) return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("task");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   function editSelectedTask() {
     if (!selectedTask) return;
-    setSelectedTaskId(null);
+    closeDetail();
     openEdit(selectedTask);
   }
 
@@ -1193,6 +1204,15 @@ export function TaskRegister({
 
       {!draft ? <MutationFeedback feedback={mutation.feedback} /> : null}
 
+      {linkedTaskId && !selectedTask ? (
+        <div className="alert-danger flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-4 py-2 text-sm">
+          <p role="status">Opgaven findes ikke, eller du har ikke adgang til den.</p>
+          <Button onClick={closeDetail} size="sm" variant="secondary">
+            Luk
+          </Button>
+        </div>
+      ) : null}
+
       {error && !draft && !statusErrorId ? (
         <div className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm">
           {error}
@@ -1384,13 +1404,13 @@ export function TaskRegister({
           selectedTask &&
           data.editableCommitteeIds.includes(selectedTask.committee_id),
         )}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={closeDetail}
         onEdit={editSelectedTask}
         onStatusChange={(status) => {
           if (selectedTask) void changeStatus(selectedTask, status);
         }}
         organizationId={organizationId}
-        task={selectedTask}
+        task={draft ? null : selectedTask}
       />
 
       <Modal

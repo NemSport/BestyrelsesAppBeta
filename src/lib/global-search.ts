@@ -1,4 +1,5 @@
 import { getAgendaItemHref, getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 
 export const globalSearchCategories = [
   "all",
@@ -201,7 +202,7 @@ export function globalSearchHref(input:
       }
       return `/organizations/${input.organizationId}/decisions#decision-${input.decisionId}`;
     case "task":
-      return `/organizations/${input.organizationId}/tasks?scope=all&editTask=${input.taskId}#task-${input.taskId}`;
+      return `/organizations/${input.organizationId}${getTaskDetailPath(input.taskId)}`;
     case "document":
       return `/organizations/${input.organizationId}/documents/${input.documentId}`;
     case "stakeholder":

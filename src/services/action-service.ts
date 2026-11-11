@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { stakeholderFollowUpDays } from "@/lib/stakeholders";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 import { personalActionStateSchema } from "@/lib/validation";
 import { ActionRepository } from "@/repositories/action-repository";
 import { AnnualWheelRepository } from "@/repositories/annual-wheel-repository";
@@ -257,7 +258,7 @@ export class ActionService {
             ? "Du markerede handlingen som ikke relevant."
             : "Den underliggende opgave er afsluttet eller har ændret sig.",
         context: task.committee?.name ?? "Opgave",
-        href: `/tasks#task-${task.id}`,
+        href: getTaskDetailPath(task.id),
         sourceType: "task",
         sourceId: task.id,
         responsibleUserId: task.responsible_user_id,

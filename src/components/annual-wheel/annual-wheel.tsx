@@ -19,6 +19,7 @@ import {
   type AnnualWheelState,
   type AnnualWheelView,
 } from "@/lib/annual-wheel-state";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 import {
   ActionMenu,
   Button,
@@ -543,16 +544,6 @@ export function AnnualWheel({
     );
   }
 
-  function itemHref(item: AnnualWheelTimelineItem) {
-    if (item.kind === "task") {
-      const taskId = item.id.startsWith("task:") ? item.id.slice(5) : "";
-      return taskId
-        ? `/organizations/${organizationId}/tasks?editTask=${taskId}#task-${taskId}`
-        : item.href;
-    }
-    return item.href;
-  }
-
   function renderTimelineItem(
     item: AnnualWheelTimelineItem,
     variant: "card" | "detail" = "card",
@@ -687,7 +678,7 @@ export function AnnualWheel({
       );
     }
 
-    const href = itemHref(item);
+    const href = item.href;
     if (!href) {
       return (
         <div className={rowClass} key={item.id}>
@@ -2695,7 +2686,7 @@ function AnnualWheelActivatedTasks({
           {activatedTasks.map((task) => (
             <Link
               className="flex flex-wrap items-center justify-between gap-3 border border-line bg-surface px-3 py-2 text-sm hover:bg-subtle"
-              href={`/organizations/${organizationId}/tasks?editTask=${task.id}#task-${task.id}`}
+              href={`/organizations/${organizationId}${getTaskDetailPath(task.id)}`}
               key={task.id}
             >
               <span className="font-medium">{task.title}</span>

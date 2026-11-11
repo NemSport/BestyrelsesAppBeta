@@ -901,7 +901,7 @@ priority surface preserves the same content order at mobile widths.
 Dashboard UX V3.1 composes the same read model into a working dashboard rather
 than a reporting page. Deterministic presentation sorting places overdue tasks,
 today's deadlines, near deadlines, meeting preparation, and other active work
-in that order. Task rows link to their existing Task View anchors, decisions to
+in that order. Task rows link to the Task View detail panel, decisions to
 the decision register, and agenda actions to their durable Agenda Item. The
 Committee list is rendered once as navigation and is capped on the dashboard;
 the full list remains on the existing Committee route. "Continue where you
@@ -1491,6 +1491,11 @@ decision register. A task contains title, description, workflow status,
 optional responsible active committee member, deadline, category, internal
 note, completion timestamp, and archival timestamp. The service layer and RLS
 reuse the established committee editor permission model.
+
+The organization task register resolves `?task=<id>` against its RLS-scoped
+task collection and opens the existing detail panel. Overview, global search
+and the Annual Wheel share this link format. The existing `editTask`
+parameter continues to open the editor for users with edit access.
 
 Phase 2B.2 provides the first **Task View** without introducing configurable
 workflow columns. It groups the existing stable task statuses into compact

@@ -8,6 +8,7 @@ import {
 } from "@/lib/annual-wheel";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { NotFoundError } from "@/lib/errors";
+import { getTaskDetailPath } from "@/lib/task-register-state";
 import {
   annualWheelEventDeleteSchema,
   annualWheelEventInputSchema,
@@ -145,7 +146,7 @@ export class AnnualWheelService {
             responsibleUserId: task.responsible_user_id,
             priority: "high" as const,
             status: task.status,
-            href: `/organizations/${organizationId}/tasks#task-${task.id}`,
+            href: `/organizations/${organizationId}${getTaskDetailPath(task.id)}`,
           })),
         ...decisions
           .filter(
