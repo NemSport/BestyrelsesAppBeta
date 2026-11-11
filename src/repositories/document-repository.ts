@@ -243,7 +243,7 @@ export class DocumentRepository {
     ] = await Promise.all([
       this.lookup("committees", ids("committee_id")),
       this.lookup("meetings", ids("meeting_id"), "title"),
-      this.lookup("agenda_items", ids("agenda_item_id"), "title"),
+      this.lookupAgendaItems(ids("agenda_item_id")),
       this.lookup("tasks", ids("task_id"), "title"),
       this.lookup("annual_wheel_events", ids("annual_wheel_event_id"), "title"),
       this.lookup("stakeholders", ids("stakeholder_id")),
@@ -253,44 +253,70 @@ export class DocumentRepository {
         "title",
       ),
     ]);
-    const maps = [
+    const agendaItemsById = new Map(agendaItems.map((item) => [item.id, item]));
+    const [
+      committeeLabels,
+      meetingLabels,
+      taskLabels,
+      eventLabels,
+      stakeholderLabels,
+      contractLabels,
+    ] = [
       committees,
       meetings,
-      agendaItems,
       tasks,
       events,
       stakeholders,
       contracts,
     ].map((rows) => new Map(rows.map((row) => [row.id, row.label])));
     return relations.map((row) => {
+      const relatedAgendaItem =
+        row.relation_type === "agenda_item" && row.agenda_item_id
+          ? agendaItemsById.get(row.agenda_item_id)
+          : undefined;
+      const agendaItem =
+        relatedAgendaItem?.organization_id === row.organization_id
+          ? relatedAgendaItem
+          : undefined;
       const label =
         row.relation_type === "organization"
           ? "Organisationen"
           : row.relation_type === "committee"
-            ? maps[0].get(row.committee_id ?? "")
+            ? committeeLabels.get(row.committee_id ?? "")
             : row.relation_type === "meeting"
-              ? maps[1].get(row.meeting_id ?? "")
+              ? meetingLabels.get(row.meeting_id ?? "")
               : row.relation_type === "agenda_item"
-                ? maps[2].get(row.agenda_item_id ?? "")
+                ? agendaItem?.title
                 : row.relation_type === "task"
-                  ? maps[3].get(row.task_id ?? "")
+                  ? taskLabels.get(row.task_id ?? "")
                   : row.relation_type === "annual_wheel_event"
-                    ? maps[4].get(row.annual_wheel_event_id ?? "")
+                    ? eventLabels.get(row.annual_wheel_event_id ?? "")
                     : row.relation_type === "stakeholder"
-                      ? maps[5].get(row.stakeholder_id ?? "")
-                      : maps[6].get(row.stakeholder_contract_id ?? "");
+                      ? stakeholderLabels.get(row.stakeholder_id ?? "")
+                      : contractLabels.get(row.stakeholder_contract_id ?? "");
       return {
         ...row,
         label: label ?? "Relateret element",
+        agendaItemCommitteeId:
+          agendaItem && !agendaItem.deleted_at ? agendaItem.committee_id : null,
       } satisfies DocumentRelation;
     });
+  }
+
+  private async lookupAgendaItems(ids: string[]) {
+    if (!ids.length) return [];
+    const { data, error } = await this.db
+      .from("agenda_items")
+      .select("id, title, organization_id, committee_id, deleted_at")
+      .in("id", [...new Set(ids)]);
+    if (error) throw error;
+    return data;
   }
 
   private async lookup(
     table:
       | "committees"
       | "meetings"
-      | "agenda_items"
       | "tasks"
       | "annual_wheel_events"
       | "stakeholders"

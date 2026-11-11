@@ -3,7 +3,10 @@ import type { Database, TableRow } from "@/types/database";
 export type DocumentRelationType = Database["public"]["Enums"]["document_relation_type"];
 export type DocumentCategory = TableRow<"document_categories">;
 export type DocumentVersion = TableRow<"document_versions">;
-export type DocumentRelation = TableRow<"document_relations"> & { label: string };
+export type DocumentRelation = TableRow<"document_relations"> & {
+  label: string;
+  agendaItemCommitteeId: string | null;
+};
 
 export type DocumentListItem = TableRow<"documents"> & {
   categoryName: string | null;

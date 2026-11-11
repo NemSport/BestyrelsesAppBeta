@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
@@ -11,6 +12,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { getAgendaItemHref } from "@/lib/meeting-navigation";
 import type {
   DocumentDetail as DocumentDetailData,
   DocumentRegisterData,
@@ -192,7 +194,22 @@ export function DocumentDetail({
                   <p className="text-xs text-muted">
                     {relationLabels[relation.relation_type]}
                   </p>
-                  <p className="text-sm font-medium">{relation.label}</p>
+                  {relation.relation_type === "agenda_item" &&
+                  relation.agenda_item_id &&
+                  relation.agendaItemCommitteeId ? (
+                    <Link
+                      className="text-sm font-medium text-brand underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      href={getAgendaItemHref({
+                        organizationId: detail.organization_id,
+                        committeeId: relation.agendaItemCommitteeId,
+                        agendaItemId: relation.agenda_item_id,
+                      })}
+                    >
+                      {relation.label}
+                    </Link>
+                  ) : (
+                    <p className="text-sm font-medium">{relation.label}</p>
+                  )}
                 </div>
                 {detail.canEdit ? (
                   <Button
