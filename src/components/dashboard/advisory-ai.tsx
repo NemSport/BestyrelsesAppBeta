@@ -48,7 +48,11 @@ export function AdvisoryAi({
     <section
       aria-label={summary ? "Opsummering fra Bestie" : undefined}
       aria-labelledby={summary ? undefined : "advisory-title"}
-      className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-ink sm:p-5"
+      className={
+        summary
+          ? "my-2 text-ink"
+          : "rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-ink sm:p-5"
+      }
     >
       {summary ? (
         <button

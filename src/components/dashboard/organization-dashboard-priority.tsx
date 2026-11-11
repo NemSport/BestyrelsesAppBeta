@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { useState, type ReactNode } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
 import { StatusBadge } from "@/components/ui";
 import type { OrganizationRole } from "@/lib/meeting-capabilities";
-import type { ActionItem, OrganizationOverview } from "@/types/domain";
+import type {
+  ActionItem,
+  OrganizationOverview,
+  TaskView,
+} from "@/types/domain";
 
 export function OrganizationDashboardPriority({
   actions,
@@ -17,10 +23,13 @@ export function OrganizationDashboardPriority({
   nextMeeting,
   recentMinutesSection,
 }: {
-  actions: Pick<
+  actions: (Pick<
     ActionItem,
-    "key" | "href" | "title" | "priority" | "description" | "context"
-  >[];
+    "key" | "href" | "title" | "priority" | "description" | "context" | "task"
+  > & {
+    canEditTask: boolean;
+    responsiblePeople: { id: string; name: string }[];
+  })[];
   actionCount: number;
   committeeCount: number;
   committeeSection: ReactNode;
@@ -32,6 +41,8 @@ export function OrganizationDashboardPriority({
   > | null;
   recentMinutesSection: ReactNode;
 }) {
+  const router = useRouter();
+  const [activeTask, setActiveTask] = useState<TaskView | null>(null);
   const root = `/organizations/${organizationId}`;
   const [view, setView] = useState<"actions" | "news" | "committees">(
     "actions",
@@ -50,7 +61,7 @@ export function OrganizationDashboardPriority({
             [
               ["actions", `Handlinger · ${actionCount}`],
               ["news", "Seneste nyt"],
-              ["committees", `Udvalg · ${committeeCount}`],
+              ["committees", `Arbejdsrum · ${committeeCount}`],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -107,12 +118,22 @@ export function OrganizationDashboardPriority({
                   {action.description}{" "}
                   <span className="text-muted">{action.context}</span>
                 </p>
-                <Link
-                  className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
-                  href={`${root}${action.href}`}
-                >
-                  Åbn handling →
-                </Link>
+                {action.task ? (
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
+                    onClick={() => setActiveTask(action.task ?? null)}
+                  >
+                    Åbn handling →
+                  </button>
+                ) : (
+                  <Link
+                    className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
+                    href={`${root}${action.href}`}
+                  >
+                    Åbn handling →
+                  </Link>
+                )}
               </>
             ) : (
               <h2 className="text-xl font-semibold">
@@ -131,7 +152,7 @@ export function OrganizationDashboardPriority({
             </div>
           </div>
         ) : (
-          <div className="bg-canvas p-4 text-ink sm:p-6">
+          <div className="p-3 text-ink sm:p-4">
             {view === "news" ? recentMinutesSection : committeeSection}
           </div>
         )}
@@ -180,6 +201,20 @@ export function OrganizationDashboardPriority({
           Åbn kalender →
         </Link>
       </aside>
+      {activeTask && action?.task?.id === activeTask.id && (
+        <TaskDetailModal
+          open
+          task={activeTask}
+          organizationId={organizationId}
+          canEdit={action.canEditTask}
+          responsiblePeople={action.responsiblePeople}
+          onClose={() => setActiveTask(null)}
+          onUpdated={(updated) => {
+            setActiveTask(updated);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

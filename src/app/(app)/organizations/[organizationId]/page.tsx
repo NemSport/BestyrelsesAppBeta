@@ -4,12 +4,7 @@ import { notFound } from "next/navigation";
 import { AdvisoryAi } from "@/components/dashboard/advisory-ai";
 import { OrganizationDashboardPriority } from "@/components/dashboard/organization-dashboard-priority";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
-import {
-  ActionMenu,
-  EmptyState,
-  StatusBadge,
-  staticSurfaceClassName,
-} from "@/components/ui";
+import { ActionMenu, EmptyState, StatusBadge } from "@/components/ui";
 import { resolveOrganizationDashboardAudience } from "@/lib/dashboard-prioritization";
 import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
@@ -66,11 +61,8 @@ export default async function OrganizationPage({
     <section aria-labelledby="committees-title">
       <div className="mb-1.5 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Navigation
-          </p>
-          <h2 className="mt-0.5 text-xl font-semibold" id="committees-title">
-            Mine udvalg
+          <h2 className="text-lg font-semibold" id="committees-title">
+            Mine arbejdsrum
           </h2>
         </div>
         {overview.committees.length > committeeHighlights.length ? (
@@ -78,13 +70,13 @@ export default async function OrganizationPage({
             className="text-sm font-semibold text-brand hover:underline"
             href={`${organizationRoot}/committees`}
           >
-            Se alle udvalg
+            Se alle arbejdsrum
           </Link>
         ) : null}
       </div>
 
       {committeeHighlights.length ? (
-        <div className={staticSurfaceClassName("divide-y divide-line")}>
+        <div className={"grid gap-x-6 sm:grid-cols-2"}>
           {committeeHighlights.map((item) => {
             const attention =
               item.openTaskCount +
@@ -94,7 +86,7 @@ export default async function OrganizationPage({
             return (
               <article key={item.committee.id}>
                 <Link
-                  className="group grid min-h-11 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 px-3 py-1.5 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+                  className="group grid min-h-11 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 border-b border-line py-2 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
                   href={committeeRoot}
                 >
                   <span className="break-words text-sm font-semibold leading-5 text-ink group-hover:text-brand group-hover:underline">
@@ -111,20 +103,22 @@ export default async function OrganizationPage({
                       →
                     </span>
                   </span>
-                  <span className="col-span-2 text-xs leading-4 text-muted">
-                    <span className="font-semibold text-ink">
-                      {item.openTaskCount}
-                    </span>{" "}
-                    opgaver ·{" "}
-                    <span className="font-semibold text-ink">
-                      {item.activeDecisionCount}
-                    </span>{" "}
-                    beslutninger ·{" "}
-                    <span className="font-semibold text-ink">
-                      {item.upcomingMeetingCount}
-                    </span>{" "}
-                    møder
-                  </span>
+                  {attention || item.upcomingMeetingCount ? (
+                    <span className="col-span-2 text-xs leading-4 text-muted">
+                      <span className="font-semibold text-ink">
+                        {item.openTaskCount}
+                      </span>{" "}
+                      opgaver ·{" "}
+                      <span className="font-semibold text-ink">
+                        {item.activeDecisionCount}
+                      </span>{" "}
+                      beslutninger ·{" "}
+                      <span className="font-semibold text-ink">
+                        {item.upcomingMeetingCount}
+                      </span>{" "}
+                      møder
+                    </span>
+                  ) : null}
                   {item.nextMeeting ? (
                     <span className="col-span-2 text-xs leading-4 text-muted">
                       Næste møde: {formatDateTime(item.nextMeeting.starts_at)}
@@ -175,9 +169,7 @@ export default async function OrganizationPage({
           {recentActivity.slice(0, 3).map((minutes) => (
             <article key={minutes.id}>
               <Link
-                className={staticSurfaceClassName(
-                  "group flex h-full min-h-11 flex-col items-start gap-2 p-3 transition hover:border-brand/45 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
-                )}
+                className="group flex h-full min-h-11 flex-col items-start gap-2 border-b border-line py-3 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
               >
                 <span className="min-w-0">
@@ -248,14 +240,33 @@ export default async function OrganizationPage({
         actionCount={actions.length}
         actions={actions
           .slice(0, 3)
-          .map(({ key, href, title, priority, description, context }) => ({
-            key,
-            href,
-            title,
-            priority,
-            description,
-            context,
-          }))}
+          .map(
+            ({ key, href, title, priority, description, context, task }) => ({
+              key,
+              href,
+              title,
+              priority,
+              description,
+              context,
+              task,
+              canEditTask:
+                !!task &&
+                actionCenter.editableCommitteeIds.includes(task.committee_id),
+              responsiblePeople: task
+                ? actionCenter.delegationMembers
+                    .filter(
+                      (member) =>
+                        member.committees.some(
+                          ({ id }) => id === task.committee_id,
+                        ) || member.user_id === task.responsible_user_id,
+                    )
+                    .map((member) => ({
+                      id: member.user_id,
+                      name: member.full_name ?? "Medlem",
+                    }))
+                : [],
+            }),
+          )}
         committeeCount={overview.committees.length}
         committeeSection={committeeSection}
         organizationId={organizationId}
