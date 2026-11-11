@@ -8,7 +8,6 @@ import {
   EmptyState,
   PageHeader,
   StatusBadge,
-  buttonClassName,
   staticSurfaceClassName,
 } from "@/components/ui";
 import { resolveOrganizationDashboardAudience } from "@/lib/dashboard-prioritization";
@@ -41,9 +40,6 @@ export default async function OrganizationPage({
   const dashboardAudience = resolveOrganizationDashboardAudience(
     context.membership.role,
     overview.committees.map(({ capabilities }) => capabilities),
-  );
-  const meetingCommittee = overview.committees.find(
-    ({ capabilities }) => capabilities.createMeeting,
   );
   const committeeHighlights = [...overview.committees]
     .sort((left, right) => {
@@ -154,33 +150,30 @@ export default async function OrganizationPage({
   );
 
   const recentMinutesSection = (
-    <section
-      aria-labelledby="recent-minutes-title"
-      className="border-t border-line pt-2"
-    >
+    <section aria-labelledby="recent-minutes-title" className="min-w-0">
       <div className="mb-1.5 flex flex-wrap items-end justify-between gap-x-3 gap-y-0.5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Referater
-          </p>
-          <h2
-            className="mt-0.5 text-xl font-semibold"
-            id="recent-minutes-title"
-          >
-            Seneste referater
+          <h2 className="text-lg font-semibold" id="recent-minutes-title">
+            Hvad er der sket?
           </h2>
         </div>
-        <p className="text-sm text-muted">
-          Senest opdaterede referater, du har adgang til.
-        </p>
+        <Link
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-brand hover:underline"
+          href={`${organizationRoot}/meetings`}
+        >
+          Alle referater →
+        </Link>
       </div>
+      <p className="mb-2 text-xs text-muted">
+        Senest opdaterede referater · ikke filtreret efter dit sidste besøg.
+      </p>
       {recentActivity.length ? (
-        <div className="grid gap-1.5 sm:grid-cols-2">
-          {recentActivity.map((minutes) => (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {recentActivity.slice(0, 3).map((minutes) => (
             <article key={minutes.id}>
               <Link
                 className={staticSurfaceClassName(
-                  "group grid min-h-11 gap-x-2 gap-y-0.5 px-2.5 py-1.5 transition hover:border-brand/45 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+                  "group flex h-full min-h-11 flex-col items-start gap-2 p-3 transition hover:border-brand/45 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
                 )}
                 href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
               >
@@ -226,20 +219,6 @@ export default async function OrganizationPage({
         className="xl:gap-2 xl:pb-2 [&_.page-lead]:mt-1 [&_.page-title]:mt-1"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {meetingCommittee ? (
-              <Link
-                className={buttonClassName({ size: "sm" })}
-                href={`${organizationRoot}/committees/${meetingCommittee.committee.id}/meetings/new`}
-              >
-                Nyt møde
-              </Link>
-            ) : null}
-            <Link
-              className={buttonClassName({ size: "sm", variant: "secondary" })}
-              href={`${organizationRoot}/meetings`}
-            >
-              Åbn kalender
-            </Link>
             {canManage ? (
               <ActionMenu label="Indstillinger">
                 <Link
@@ -259,7 +238,7 @@ export default async function OrganizationPage({
             ) : null}
           </div>
         }
-        description="Få overblik over møder, opgaver og beslutninger"
+        description="Dit arbejde og det seneste fra dine udvalg."
         eyebrow={
           <Link
             className="text-muted transition hover:text-brand"
@@ -268,7 +247,7 @@ export default async function OrganizationPage({
             {context.organization.name}
           </Link>
         }
-        title="Dashboard"
+        title="Overblik"
       />
 
       <OrganizationDashboardPriority
