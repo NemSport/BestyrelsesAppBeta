@@ -44,17 +44,17 @@ export function AdvisoryAi({ organizationId }: { organizationId: string }) {
   return (
     <section
       aria-labelledby="advisory-title"
-      className="rounded-2xl border border-[#294057] bg-[radial-gradient(ellipse_at_top_right,#234c58,#122437_65%)] p-4 text-[#e7f0fa] sm:p-5"
+      className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-ink sm:p-5"
     >
-      <h2 id="advisory-title" className="text-lg font-semibold">
+      <h2 id="advisory-title" className="text-base font-semibold">
         Advisory AI
       </h2>
-      <form className="mt-3 flex flex-wrap gap-2" onSubmit={submit}>
+      <form className="mt-2 flex flex-wrap gap-2" onSubmit={submit}>
         <label className="sr-only" htmlFor="advisory-question">
           Spørg Advisory AI
         </label>
         <input
-          className="min-h-11 min-w-0 flex-[1_1_15rem] rounded-lg border border-[#45617b] bg-[#0c1b2b] px-3 text-sm placeholder:text-slate-400"
+          className="min-h-11 min-w-0 flex-[1_1_15rem] rounded-lg border border-line-strong bg-canvas px-3 text-sm text-ink placeholder:text-muted"
           id="advisory-question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
@@ -65,34 +65,36 @@ export function AdvisoryAi({ organizationId }: { organizationId: string }) {
           disabled={pending}
         />
         <button
-          className="min-h-11 rounded-lg bg-cyan-200 px-4 text-sm font-bold text-[#102536] disabled:opacity-60"
+          className="min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-white disabled:opacity-60"
           disabled={pending}
         >
           {pending ? "Søger …" : "Spørg →"}
         </button>
       </form>
       <div className="mt-2 flex flex-wrap gap-2">
-        {examples.map((example) => (
+        {examples.map((example, index) => (
           <button
             key={example}
             type="button"
             disabled={pending}
-            className="min-h-11 rounded-lg border border-[#45617b] px-3 text-left text-xs text-cyan-100 hover:bg-[#25455d]"
+            className="min-h-11 rounded-lg border border-line-strong px-3 text-left text-xs text-brand hover:bg-brand-soft"
             onClick={() => setQuestion(example)}
           >
-            {example}
+            {index === 0
+              ? "Find tidligere snak om spillertøj"
+              : "Lav udkast til stormødets dagsorden"}
           </button>
         ))}
       </div>
       <div aria-live="polite">
-        {error && <p className="mt-3 text-sm text-rose-200">{error}</p>}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         {answer && (
-          <div className="mt-4 border-t border-[#45617b] pt-3">
+          <div className="mt-4 border-t border-line-strong pt-3">
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
               {answer.answer}
             </p>
             {answer.sources.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm text-cyan-100">
+              <ul className="mt-3 space-y-1 text-sm text-brand">
                 {answer.sources.map((source) => (
                   <li key={source.id}>
                     <Link className="underline" href={source.href}>

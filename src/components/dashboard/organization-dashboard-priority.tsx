@@ -42,10 +42,10 @@ export function OrganizationDashboardPriority({
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
       <section
-        className="min-w-0 overflow-hidden rounded-2xl border border-[#233d55] bg-[#0c1b2b] text-[#e7f0fa] shadow-xl"
+        className="min-w-0 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface text-ink shadow-sm"
         aria-label="Fokus"
       >
-        <div className="flex flex-wrap items-center gap-1 border-b border-[#294057] bg-[#122437] p-2">
+        <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface p-2">
           {(
             [
               ["actions", `Handlinger · ${actionCount}`],
@@ -58,18 +58,18 @@ export function OrganizationDashboardPriority({
               type="button"
               aria-pressed={view === id}
               onClick={() => setView(id)}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${view === id ? "bg-[#25455d] text-cyan-100" : "text-slate-300 hover:bg-[#1c354a]"}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${view === id ? "bg-brand-soft text-brand" : "text-muted hover:bg-subtle"}`}
             >
               {label}
             </button>
           ))}
         </div>
         {view === "actions" ? (
-          <div className="bg-[radial-gradient(ellipse_at_top_right,#173b4b,transparent_70%)] p-4 sm:p-6">
+          <div className="bg-surface p-3 sm:p-4">
             {action ? (
               <>
                 <div
-                  className="mb-5 flex flex-wrap gap-2"
+                  className="mb-3 flex flex-wrap gap-2"
                   aria-label="Vælg handling"
                 >
                   {actions.map((item, index) => (
@@ -79,7 +79,7 @@ export function OrganizationDashboardPriority({
                       aria-label={item.title}
                       aria-pressed={item.key === action.key}
                       onClick={() => setSelected(item.key)}
-                      className={`flex min-h-10 min-w-10 items-center justify-center rounded-lg border font-mono text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${item.key === action.key ? "border-cyan-300 bg-cyan-200 text-[#102536]" : "border-[#45617b] text-slate-200 hover:bg-[#25455d]"}`}
+                      className={`flex min-h-10 min-w-10 items-center justify-center rounded-lg border font-mono text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${item.key === action.key ? "border-brand bg-brand-soft text-brand" : "border-line-strong text-ink hover:bg-brand-soft"}`}
                     >
                       {String(index + 1).padStart(2, "0")}
                     </button>
@@ -100,15 +100,15 @@ export function OrganizationDashboardPriority({
                       ? "Snart"
                       : "Opfølgning"}
                 </StatusBadge>
-                <h2 className="mt-3 max-w-xl break-words text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                <h2 className="mt-3 max-w-xl break-words text-xl font-semibold leading-snug tracking-tight">
                   {action.title}
                 </h2>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-sm text-muted">
                   {action.description}{" "}
-                  <span className="text-slate-400">{action.context}</span>
+                  <span className="text-muted">{action.context}</span>
                 </p>
                 <Link
-                  className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-cyan-200 px-4 text-sm font-bold text-[#102536] hover:bg-cyan-100"
+                  className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
                   href={`${root}${action.href}`}
                 >
                   Åbn handling →
@@ -119,7 +119,7 @@ export function OrganizationDashboardPriority({
                 Ingen aktuelle handlinger
               </h2>
             )}
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-[#365269] pt-3 text-sm text-cyan-100">
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-sm text-brand">
               <Link className="hover:underline" href={`${root}/actions`}>
                 Alle handlinger →
               </Link>
@@ -137,17 +137,17 @@ export function OrganizationDashboardPriority({
         )}
       </section>
       <aside
-        className="overflow-hidden rounded-2xl border border-[#294057] bg-[#122437] p-5 text-[#e7f0fa] shadow-lg"
+        className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-ink shadow-sm"
         aria-label="Næste møde"
       >
-        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-200">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
           <AppIcon name="calendar" size={16} /> Næste møde
         </div>
         {nextMeeting ? (
           <>
             <time
               dateTime={nextMeeting.starts_at}
-              className="mt-5 block font-mono text-xl text-cyan-100"
+              className="mt-3 block tabular-nums text-lg text-brand"
             >
               {new Intl.DateTimeFormat("da-DK", {
                 timeZone: "Europe/Copenhagen",
@@ -160,21 +160,21 @@ export function OrganizationDashboardPriority({
             <h2 className="mt-2 break-words text-2xl font-semibold tracking-tight">
               {nextMeeting.title}
             </h2>
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-sm text-muted">
               {nextMeeting.committeeName}
             </p>
             <Link
-              className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-[#52758b] px-3 text-sm font-semibold text-cyan-100 hover:bg-[#25455d]"
+              className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line-strong px-3 text-sm font-semibold text-brand hover:bg-brand-soft"
               href={`${root}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
             >
               Se dagsorden →
             </Link>
           </>
         ) : (
-          <p className="mt-4 text-sm text-slate-300">Ingen kommende møder</p>
+          <p className="mt-4 text-sm text-muted">Ingen kommende møder</p>
         )}
         <Link
-          className="mt-4 block w-fit text-sm text-slate-300 hover:underline"
+          className="mt-4 block w-fit text-sm text-muted hover:underline"
           href={`${root}/meetings`}
         >
           Åbn kalender →
