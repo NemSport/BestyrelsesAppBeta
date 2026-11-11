@@ -322,15 +322,22 @@ test("context actions remain capability-gated and private notes stay personal", 
   );
 });
 
-test("meeting header is compact and secondary actions share one dropdown", () => {
+test("compact meeting header exposes export and secondary action menus", () => {
   assert.match(header, /text-xl font-bold/);
   assert.match(header, /flex flex-wrap items-center gap-x-1\.5/);
   assert.equal(header.match(/\{meeting\.title\}/g)?.length, 1);
   assert.doesNotMatch(header, /meeting-metadata-grid/);
   assert.match(meetingPage, /<Dropdown/);
   assert.match(meetingPage, /panelId="meeting-secondary-actions"/);
-  assert.match(meetingPage, /panelId="meeting-export-actions"/);
-  assert.match(meetingPage, /label="Eksportér"/);
+  const exportPanel = meetingPage.indexOf('panelId="meeting-export-actions"');
+  assert.ok(exportPanel >= 0);
+  const exportMenu = meetingPage.slice(
+    meetingPage.lastIndexOf("<Dropdown", exportPanel),
+    meetingPage.indexOf("</Dropdown>", exportPanel),
+  );
+  assert.match(exportMenu, /label=\{[\s\S]*Eksportér/);
+  assert.match(exportMenu, /\/agenda\/pdf[\s\S]*Dagsorden · PDF/);
+  assert.match(exportMenu, /\/tasks\/pdf[\s\S]*Opgaveliste · PDF/);
   assert.match(meetingPage, /<AppIcon name="more"/);
   assert.match(meetingPage, /href=\{back\.href\}/);
   assert.match(meetingPage, /\{back\.label\}/);
@@ -440,10 +447,12 @@ test("workspace polish keeps notes personal and softens compact agenda chrome", 
 
 test("desktop width polish prioritizes the editor and aligns decision rows with tasks", () => {
   assert.match(globalStyles, /data-meeting-workspace[\s\S]*max-width: 108rem/);
-  assert.match(
-    relatedDecisions,
-    /flex min-h-11 w-full items-center rounded-\[var\(--radius-control\)\] px-1\.5 py-1\.5/,
-  );
+  for (const rows of [relatedDecisions, relatedTasks]) {
+    assert.match(
+      rows,
+      /flex min-h-11 w-full items-center [^"]*px-1\.5 py-1\.5/,
+    );
+  }
   assert.match(
     relatedDecisions,
     /flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1 sm:flex-nowrap/,
@@ -458,10 +467,24 @@ test("desktop width polish prioritizes the editor and aligns decision rows with 
   );
 });
 
-test("final visual polish uses signal colors, stronger CTAs, and wider workspace", () => {
+test("meeting actions distinguish the next point and the selected mode", () => {
   assert.match(minutes, /isCompleted[\s\S]*"text-success"/);
-  assert.match(minutes, /border-brand bg-brand[\s\S]*Næste punkt/);
-  assert.match(minutes, /bg-brand text-white shadow-sm/);
+  assert.match(
+    minutes,
+    /<Link\s+className="ui-action ui-action-primary text-xs"\s+href=\{[^\n]*activeIndex \+ 1[^\n]*\}[\s\S]*?Næste punkt\s*<AppIcon/,
+  );
+  assert.match(
+    globalStyles,
+    /\.ui-action-primary,\s*\.button-primary\s*\{\s*@apply bg-brand\/10 text-brand/,
+  );
+  for (const mode of ["editing", "review"]) {
+    assert.match(
+      minutes,
+      new RegExp(
+        `aria-pressed=\\{workspaceMode === "${mode}"\\}[\\s\\S]*?workspaceMode === "${mode}"\\s*\\? "bg-brand/10 text-brand`,
+      ),
+    );
+  }
   assert.match(relatedDecisions, /compact \? \(/);
   assert.match(relatedDecisions, /decision\.status === "completed"/);
   assert.match(aiAssistant, /border-brand\/20 bg-surface/);
@@ -642,11 +665,21 @@ test("official minutes editor stays compact, focusable, and naturally growing", 
   assert.match(minutes, /\{notesWordCount\} ord/);
 });
 
-test("autosave feedback is compact and includes saved time", () => {
-  assert.match(autosaveFeedback, /saved: "Autogemt"/);
-  assert.match(autosaveFeedback, /offline: "Offline – gemmes lokalt"/);
+test("autosave feedback distinguishes saved, offline and conflicting changes", () => {
+  assert.match(
+    autosaveFeedback,
+    /savedLabel = "Alle ændringer i feltet er gemt"/,
+  );
+  assert.match(autosaveFeedback, /offline: "Offline – afventer forbindelse"/);
   assert.match(autosaveFeedback, /conflict: "Konflikt kræver handling"/);
-  assert.match(autosaveFeedback, /lastSavedAt\?/);
+  assert.match(
+    autosaveFeedback,
+    /status === "saved" && lastSavedAt[\s\S]*?hour: "2-digit", minute: "2-digit"/,
+  );
+  assert.match(
+    autosaveFeedback,
+    /\{status === "saved" \? savedLabel : statusLabels\[status\]\}\s*\{savedAtLabel\}/,
+  );
   assert.match(autosaveFeedback, /aria-live="polite"/);
   assert.match(minutes, /lastSavedAt=\{autosave\.lastSavedAt\}/);
 });
@@ -690,13 +723,24 @@ test("point navigation flushes the active draft and exposes boundary states", ()
   );
 });
 
-test("existing point statuses power the explicit completed action", () => {
+test("point completion names the outcome and uses the existing save workflow", () => {
   assert.match(minutes, /function completedAgendaStatusForType/);
   assert.match(minutes, /information: "information_oriented"/);
   assert.match(minutes, /discussion: "discussion_completed"/);
   assert.match(minutes, /decision: "decision_approved"/);
   assert.match(minutes, /follow_up: "follow_up_completed"/);
-  assert.match(minutes, /Markér som behandlet/);
+  const completionAction = minutes.match(
+    /onClick=\{\(\) => void markAgendaItemCompleted\(\)\}[\s\S]*?<\/button>/,
+  )?.[0];
+  assert.ok(completionAction);
+  assert.match(
+    completionAction,
+    /itemType === "decision"\s*\? "Godkend beslutning"\s*: "Afslut punkt"/,
+  );
+  assert.match(
+    minutes,
+    /await autosave\.saveNow\(\{\s*\.\.\.draftData,\s*status: completedStatus/,
+  );
   assert.match(
     minutes,
     /onStatusChange\?\.\(item\.id, result\.minutes\.status\)/,
