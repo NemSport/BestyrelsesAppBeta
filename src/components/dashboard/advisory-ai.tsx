@@ -1,25 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
 type Answer = {
   answer: string;
   sources: { id: number; title: string; href: string }[];
 };
-const examples = [
-  "Har vi tidligere talt om spillertøj? Henvis til relevante møder.",
-  "Lav et udkast til dagsordenen for stormødet den 19.11.",
-];
-
-export function AdvisoryAi({ organizationId }: { organizationId: string }) {
+export function AdvisoryAi({
+  organizationId,
+  settings,
+  summary = false,
+}: {
+  organizationId: string;
+  settings?: ReactNode;
+  summary?: boolean;
+}) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setPending(true);
     setAnswer(null);
     setError("");
@@ -29,13 +32,13 @@ export function AdvisoryAi({ organizationId }: { organizationId: string }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
+          body: JSON.stringify(summary ? { mode: "recent" } : { question }),
         },
       );
       if (!response.ok) throw new Error();
       setAnswer((await response.json()) as Answer);
     } catch {
-      setError("Advisory AI kunne ikke svare lige nu. Prøv igen.");
+      setError("Bestie kunne ikke svare lige nu. Prøv igen.");
     } finally {
       setPending(false);
     }
@@ -43,49 +46,51 @@ export function AdvisoryAi({ organizationId }: { organizationId: string }) {
 
   return (
     <section
-      aria-labelledby="advisory-title"
+      aria-label={summary ? "Opsummering fra Bestie" : undefined}
+      aria-labelledby={summary ? undefined : "advisory-title"}
       className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-ink sm:p-5"
     >
-      <h2 id="advisory-title" className="text-base font-semibold">
-        Advisory AI
-      </h2>
-      <form className="mt-2 flex flex-wrap gap-2" onSubmit={submit}>
-        <label className="sr-only" htmlFor="advisory-question">
-          Spørg Advisory AI
-        </label>
-        <input
-          className="min-h-11 min-w-0 flex-[1_1_15rem] rounded-lg border border-line-strong bg-canvas px-3 text-sm text-ink placeholder:text-muted"
-          id="advisory-question"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Spørg om tidligere møder, eller bed om et udkast …"
-          required
-          minLength={5}
-          maxLength={1000}
-          disabled={pending}
-        />
+      {summary ? (
         <button
-          className="min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-white disabled:opacity-60"
+          type="button"
+          className="min-h-11 rounded-lg bg-brand-soft px-3 text-sm font-semibold text-brand disabled:opacity-60"
           disabled={pending}
+          onClick={() => void submit()}
         >
-          {pending ? "Søger …" : "Spørg →"}
+          {pending ? "Bestie læser referaterne …" : "Lad Bestie opsummere"}
         </button>
-      </form>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {examples.map((example, index) => (
-          <button
-            key={example}
-            type="button"
-            disabled={pending}
-            className="min-h-11 rounded-lg border border-line-strong px-3 text-left text-xs text-brand hover:bg-brand-soft"
-            onClick={() => setQuestion(example)}
-          >
-            {index === 0
-              ? "Find tidligere snak om spillertøj"
-              : "Lav udkast til stormødets dagsorden"}
-          </button>
-        ))}
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h1 id="advisory-title" className="text-base font-semibold">
+              Bestie
+            </h1>
+            {settings}
+          </div>
+          <form className="mt-2 flex flex-wrap gap-2" onSubmit={submit}>
+            <label className="sr-only" htmlFor="advisory-question">
+              Spørg Bestie
+            </label>
+            <input
+              className="min-h-11 min-w-0 flex-[1_1_15rem] rounded-lg border border-line-strong bg-canvas px-3 text-sm text-ink placeholder:text-muted"
+              id="advisory-question"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Spørg om tidligere møder, eller bed om et udkast …"
+              required
+              minLength={5}
+              maxLength={1000}
+              disabled={pending}
+            />
+            <button
+              className="min-h-11 rounded-lg bg-brand px-4 text-sm font-bold text-white disabled:opacity-60"
+              disabled={pending}
+            >
+              {pending ? "Søger …" : "Spørg →"}
+            </button>
+          </form>
+        </>
+      )}
       <div aria-live="polite">
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         {answer && (

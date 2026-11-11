@@ -7,7 +7,6 @@ import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
   ActionMenu,
   EmptyState,
-  PageHeader,
   StatusBadge,
   staticSurfaceClassName,
 } from "@/components/ui";
@@ -168,6 +167,9 @@ export default async function OrganizationPage({
       <p className="mb-2 text-xs text-muted">
         Senest opdaterede referater · ikke filtreret efter dit sidste besøg.
       </p>
+      {recentActivity.length > 0 && (
+        <AdvisoryAi organizationId={organizationId} summary />
+      )}
       {recentActivity.length ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {recentActivity.slice(0, 3).map((minutes) => (
@@ -219,42 +221,28 @@ export default async function OrganizationPage({
 
   return (
     <div className="space-y-4 xl:space-y-2.5" data-organization-dashboard>
-      <PageHeader
-        className="xl:gap-2 xl:pb-2 [&_.page-lead]:mt-1 [&_.page-title]:mt-1"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {canManage ? (
-              <ActionMenu label="Indstillinger">
-                <Link
-                  className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
-                  href={`${organizationRoot}/edit`}
-                >
-                  Rediger organisation
-                </Link>
-                <TrashActionButton
-                  confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
-                  endpoint={`/api/organizations/${organizationId}`}
-                  label="Flyt til papirkurv"
-                  pendingLabel="Flytter..."
-                  redirectTo={`${organizationRoot}/trash`}
-                />
-              </ActionMenu>
-            ) : null}
-          </div>
+      <AdvisoryAi
+        organizationId={organizationId}
+        settings={
+          canManage ? (
+            <ActionMenu label="Indstillinger">
+              <Link
+                className="block px-3 py-2 text-sm font-semibold text-ink transition hover:bg-background"
+                href={`${organizationRoot}/edit`}
+              >
+                Rediger organisation
+              </Link>
+              <TrashActionButton
+                confirmMessage="Er du sikker på, at du vil flytte dette til papirkurven? Elementet kan gendannes i 30 dage."
+                endpoint={`/api/organizations/${organizationId}`}
+                label="Flyt til papirkurv"
+                pendingLabel="Flytter..."
+                redirectTo={`${organizationRoot}/trash`}
+              />
+            </ActionMenu>
+          ) : null
         }
-        description="Dit arbejde og det seneste fra dine udvalg."
-        eyebrow={
-          <Link
-            className="text-muted transition hover:text-brand"
-            href="/organizations"
-          >
-            {context.organization.name}
-          </Link>
-        }
-        title="Overblik"
       />
-
-      <AdvisoryAi organizationId={organizationId} />
 
       <OrganizationDashboardPriority
         actionCount={actions.length}
