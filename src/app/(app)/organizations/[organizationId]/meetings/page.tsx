@@ -8,6 +8,7 @@ import { MeetingOverviewContext } from "@/components/meetings/meeting-overview-c
 import { EmptyState, PageHeader, buttonClassName } from "@/components/ui";
 import {
   filterMeetingList,
+  getMeetingListHref,
   groupMeetingList,
   parseMeetingListFilters,
   sortMeetingList,
@@ -102,6 +103,10 @@ export default async function OrganizationMeetingsPage({
   );
   const organizationRoot = `/organizations/${organizationId}`;
   const meetingsRoot = `${organizationRoot}/meetings`;
+  const returnTo = getMeetingListHref(meetingsRoot, {
+    ...safeFilters,
+    period: requestedFilters.period ? safeFilters.period : "",
+  });
   const selectedLabel =
     safeFilters.period === "previous" ? "Afholdte møder" : "Kommende møder";
 
@@ -177,6 +182,7 @@ export default async function OrganizationMeetingsPage({
                 meetings={selectedMeetings}
                 now={now}
                 organizationId={organizationId}
+                returnTo={returnTo}
               />
             ) : (
               <EmptyState
@@ -224,6 +230,7 @@ export default async function OrganizationMeetingsPage({
           organizationId={organizationId}
           pendingApprovalCount={overview.pendingMinutesApprovals.length}
           recentMinutes={overview.recentMinutes[0] ?? null}
+          returnTo={returnTo}
         />
       </div>
     </div>

@@ -266,6 +266,9 @@ Wheel, Job Cards, history, members, and settings.
 
 ### Meetings
 
+Meeting links from Overblik, the meeting lists and Annual Wheel return to the
+originating view, including the selected list or calendar filters.
+
 Time-bound working sessions that schedule agenda items. Meetings provide
 attendance, ordering, timing, meeting-specific outcomes, and one approval flow
 for meeting minutes.

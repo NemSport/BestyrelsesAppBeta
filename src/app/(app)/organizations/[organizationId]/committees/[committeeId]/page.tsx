@@ -16,7 +16,10 @@ import {
   formatDateTime,
 } from "@/lib/localization";
 import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
-import { getMeetingAgendaPointHref } from "@/lib/meeting-navigation";
+import {
+  getMeetingAgendaPointHref,
+  withMeetingReturnTo,
+} from "@/lib/meeting-navigation";
 import { isOrganizationAdmin } from "@/lib/permissions";
 import { getTaskDetailPath } from "@/lib/task-register-state";
 import {
@@ -154,13 +157,16 @@ export default async function CommitteeWorkspacePage({
     workspace.upcomingActivities.find((event) => event.priority === "high") ??
     null;
   const nextMeetingAgendaHref = workspace.nextMeeting
-    ? getMeetingAgendaPointHref({
-        organizationId,
-        committeeId,
-        meetingId: workspace.nextMeeting.id,
-        occurrenceId:
-          workspace.nextMeeting.agenda_item_occurrences[0]?.id ?? null,
-      })
+    ? withMeetingReturnTo(
+        getMeetingAgendaPointHref({
+          organizationId,
+          committeeId,
+          meetingId: workspace.nextMeeting.id,
+          occurrenceId:
+            workspace.nextMeeting.agenda_item_occurrences[0]?.id ?? null,
+        }),
+        committeeRoot,
+      )
     : committeeRoot;
 
   return (
@@ -385,7 +391,10 @@ export default async function CommitteeWorkspacePage({
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
                     className={buttonClassName({ size: "sm" })}
-                    href={`${committeeRoot}/meetings/${workspace.nextMeeting.id}`}
+                    href={withMeetingReturnTo(
+                      `${committeeRoot}/meetings/${workspace.nextMeeting.id}`,
+                      committeeRoot,
+                    )}
                   >
                     Åbn møde
                   </Link>
@@ -588,7 +597,11 @@ export default async function CommitteeWorkspacePage({
                     <div>
                       <Link
                         className="font-semibold hover:text-brand hover:underline"
-                        href={item.href}
+                        href={
+                          item.kind === "meeting"
+                            ? withMeetingReturnTo(item.href, committeeRoot)
+                            : item.href
+                        }
                       >
                         {activitySentence(item)}
                       </Link>

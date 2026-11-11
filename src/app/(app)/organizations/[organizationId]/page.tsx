@@ -6,6 +6,7 @@ import { OrganizationDashboardPriority } from "@/components/dashboard/organizati
 import { EmptyState, StatusBadge } from "@/components/ui";
 import { resolveOrganizationDashboardAudience } from "@/lib/dashboard-prioritization";
 import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
@@ -169,7 +170,10 @@ export default async function OrganizationPage({
             <article key={minutes.id}>
               <Link
                 className="group flex h-full min-h-11 flex-col items-start gap-2 border-b border-line py-3 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                href={`${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`}
+                href={withMeetingReturnTo(
+                  `${organizationRoot}/committees/${minutes.committeeId}/meetings/${minutes.meetingId}`,
+                  organizationRoot,
+                )}
               >
                 <span className="min-w-0">
                   <span className="block text-xs leading-4 text-muted">
@@ -217,9 +221,12 @@ export default async function OrganizationPage({
       <OrganizationDashboardPriority
         actionCount={actions.length}
         actions={actions.slice(0, 3).map(
-          ({ key, href, title, priority, description, context }) => ({
+          ({ key, href, title, priority, description, context, sourceType }) => ({
             key,
-            href,
+            href:
+              sourceType === "meeting_minutes"
+                ? withMeetingReturnTo(href, organizationRoot)
+                : href,
             title,
             priority,
             description,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppIcon } from "@/components/icons/app-icon";
 import { StatusBadge } from "@/components/ui";
 import { formatDateTime, meetingMinutesStatusLabels } from "@/lib/localization";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import type { MeetingListEntry } from "@/components/meetings/meeting-list";
 import type { OrganizationOverview } from "@/types/domain";
 
@@ -15,6 +16,7 @@ export function MeetingOverviewContext({
   pendingApprovalCount,
   followUpCount,
   organizationId,
+  returnTo,
 }: {
   nextMeeting: MeetingListEntry | null;
   recentMinutes: RecentMinutes | null;
@@ -22,6 +24,7 @@ export function MeetingOverviewContext({
   pendingApprovalCount: number;
   followUpCount: number;
   organizationId: string;
+  returnTo: string;
 }) {
   const organizationRoot = `/organizations/${organizationId}`;
   const actionCount = myOpenTaskCount + pendingApprovalCount + followUpCount;
@@ -49,7 +52,10 @@ export function MeetingOverviewContext({
             </p>
             <Link
               className="mt-1 inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              href={`${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
+              href={withMeetingReturnTo(
+                `${organizationRoot}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`,
+                returnTo,
+              )}
             >
               Gå til møde
               <AppIcon name="arrowRight" size={14} />
@@ -122,7 +128,10 @@ export function MeetingOverviewContext({
           {recentMinutes ? (
             <Link
               className="block min-w-0 py-1.5 text-xs hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              href={`${organizationRoot}/committees/${recentMinutes.committeeId}/meetings/${recentMinutes.meetingId}#general-minutes-heading`}
+              href={withMeetingReturnTo(
+                `${organizationRoot}/committees/${recentMinutes.committeeId}/meetings/${recentMinutes.meetingId}#general-minutes-heading`,
+                returnTo,
+              )}
             >
               <span className="block break-words font-semibold text-ink">
                 Seneste referat

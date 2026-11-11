@@ -53,6 +53,16 @@ export function parseMeetingListFilters(input: {
   return { committeeId, date, period, status };
 }
 
+export function getMeetingListHref(pathname: string, filters: MeetingListFilters) {
+  const params = new URLSearchParams();
+  if (filters.period) params.set("period", filters.period);
+  if (filters.committeeId) params.set("committee", filters.committeeId);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.date) params.set("date", filters.date);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 export function getMeetingListPeriod(
   meeting: Pick<MeetingWithAgendaPreview, "starts_at" | "status">,
   now: number,

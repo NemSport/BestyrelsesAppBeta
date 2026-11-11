@@ -27,6 +27,7 @@ import {
   resolveSelectedMeetingMaterialRecipients,
 } from "@/lib/meeting-material-dispatch";
 import { getMeetingCapabilities } from "@/lib/permissions";
+import { getMeetingReturnLink } from "@/lib/meeting-navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
@@ -220,14 +221,21 @@ void IncomingTransferredItems;
 
 export default async function MeetingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     organizationId: string;
     committeeId: string;
     meetingId: string;
   }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
   const { organizationId, committeeId, meetingId } = await params;
+  const back = getMeetingReturnLink(
+    organizationId,
+    committeeId,
+    (await searchParams).returnTo,
+  );
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
   const context = await new AuthorizationService(db).requireCommitteeMember(
@@ -498,10 +506,10 @@ export default async function MeetingPage({
         backLink={
           <Link
             className="inline-flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            href={`${root}/meetings`}
+            href={back.href}
           >
             <AppIcon name="arrowLeft" size={14} />
-            Tilbage til møder
+            {back.label}
           </Link>
         }
         committeeName={context.committee.name}

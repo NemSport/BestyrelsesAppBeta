@@ -5,6 +5,7 @@ import { MeetingListFilters } from "@/components/meetings/meeting-list-filters";
 import { EmptyState, PageSection, buttonClassName } from "@/components/ui";
 import {
   filterMeetingList,
+  getMeetingListHref,
   groupMeetingList,
   parseMeetingListFilters,
   sortMeetingList,
@@ -111,6 +112,10 @@ export default async function MeetingsPage({
               meetings={selectedMeetings}
               now={now}
               organizationId={organizationId}
+              returnTo={getMeetingListHref(meetingsRoot, {
+                ...filters,
+                period: requestedFilters.period ? filters.period : "",
+              })}
               showCommittee={false}
             />
           ) : (

@@ -5,7 +5,13 @@ import test from "node:test";
 import {
   getAgendaItemHref,
   getMeetingAgendaPointHref,
+  getMeetingReturnLink,
+  withMeetingReturnTo,
 } from "../../src/lib/meeting-navigation.ts";
+import {
+  getMeetingListHref,
+  parseMeetingListFilters,
+} from "../../src/lib/meeting-list.ts";
 import {
   richTextToPlainText,
   sanitizeRichText,
@@ -326,7 +332,8 @@ test("meeting header is compact and secondary actions share one dropdown", () =>
   assert.match(meetingPage, /panelId="meeting-export-actions"/);
   assert.match(meetingPage, /label="Eksportér"/);
   assert.match(meetingPage, /<AppIcon name="more"/);
-  assert.match(meetingPage, /Tilbage til møder/);
+  assert.match(meetingPage, /href=\{back\.href\}/);
+  assert.match(meetingPage, /\{back\.label\}/);
   assert.match(
     meetingPage,
     /<MeetingAiOverview[\s\S]*<Dropdown|<Dropdown[\s\S]*<MeetingAiOverview/,
@@ -531,6 +538,47 @@ test("the task follow-up point links back to its meeting occurrence", async () =
     /occurrence\.id === requestedOccurrenceId && occurrence\.meetings/,
   );
   assert.match(itemPage, /occurrenceId: currentOccurrence\.id/);
+});
+
+test("meeting return links retain the original view and reject other destinations", () => {
+  const org = "/organizations/org";
+  const committee = `${org}/committees/committee`;
+  const meeting = `${committee}/meetings/meeting`;
+  const overview = getMeetingReturnLink("org", "committee", org);
+  assert.deepEqual(overview, { href: org, label: "Tilbage til Overblik" });
+
+  const source = getMeetingListHref(
+    `${org}/meetings`,
+    parseMeetingListFilters({
+      period: "previous",
+      committee: "committee",
+      status: "completed",
+    }),
+  );
+  const link = new URL(
+    withMeetingReturnTo(`${meeting}#agenda-point-occurrence`, source),
+    "https://example.test",
+  );
+  assert.equal(link.hash, "#agenda-point-occurrence");
+  assert.equal(
+    source,
+    `${org}/meetings?period=previous&committee=committee&status=completed`,
+  );
+  assert.equal(
+    getMeetingReturnLink("org", "committee", link.searchParams.get("returnTo")).href,
+    source,
+  );
+  const fallback = { href: `${committee}/meetings`, label: "Tilbage til møder" };
+  for (const value of [
+    undefined,
+    [org, committee],
+    "https://external.test",
+    "//external.test",
+    "/organizations/another/meetings",
+    `${org}/../another/meetings`,
+  ]) {
+    assert.deepEqual(getMeetingReturnLink("org", "committee", value), fallback);
+  }
 });
 
 test("workspace footer actions keep compact aligned bottom spacing", () => {

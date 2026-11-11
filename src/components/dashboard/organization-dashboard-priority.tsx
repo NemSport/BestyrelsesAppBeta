@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
 import { StatusBadge } from "@/components/ui";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import type { OrganizationRole } from "@/lib/meeting-capabilities";
 import type {
   ActionItem,
@@ -168,7 +169,10 @@ export function OrganizationDashboardPriority({
             </p>
             <Link
               className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line-strong px-3 text-sm font-semibold text-brand hover:bg-brand-soft"
-              href={`${root}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`}
+              href={withMeetingReturnTo(
+                `${root}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`,
+                root,
+              )}
             >
               Se dagsorden →
             </Link>

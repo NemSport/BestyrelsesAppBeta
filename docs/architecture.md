@@ -1096,6 +1096,10 @@ records owned by decisions, tasks, minutes, attachments, notes, or AI.
 
 ### Meeting
 
+Meeting links from Overblik, meeting lists and Annual Wheel carry a
+`returnTo` path. The meeting workspace accepts only known views within the
+current organization and uses the committee meeting list for other links.
+
 A meeting is a time-bound container. It schedules agenda items through meeting
 occurrences and stores attendance, order, allocated time, and
 meeting-specific outcomes.

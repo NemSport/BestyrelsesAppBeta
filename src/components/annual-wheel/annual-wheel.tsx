@@ -20,6 +20,7 @@ import {
   type AnnualWheelView,
 } from "@/lib/annual-wheel-state";
 import { getTaskDetailPath } from "@/lib/task-register-state";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import { taskDeadlineLabels, taskStatusLabels } from "@/lib/tasks";
 import {
   ActionMenu,
@@ -681,7 +682,18 @@ export function AnnualWheel({
     }
 
     return (
-      <Link className={rowClass} href={href} key={item.id}>
+      <Link
+        className={rowClass}
+        href={
+          item.kind === "meeting"
+            ? withMeetingReturnTo(
+                href,
+                searchParams.size ? `${pathname}?${searchParams}` : pathname,
+              )
+            : href
+        }
+        key={item.id}
+      >
         {content}
       </Link>
     );

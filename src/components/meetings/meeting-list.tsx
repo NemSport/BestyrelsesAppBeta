@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import type { MeetingCapabilities } from "@/lib/meeting-capabilities";
 import { getMeetingListAction, getMeetingListPeriod } from "@/lib/meeting-list";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import type { Database } from "@/types/database";
 import type { MeetingWithAgendaPreview } from "@/types/domain";
 
@@ -81,14 +82,17 @@ export function MeetingListRow({
   meeting,
   now,
   organizationId,
+  returnTo,
   showCommittee = true,
 }: {
   meeting: MeetingListEntry;
   now: number;
   organizationId: string;
+  returnTo: string;
   showCommittee?: boolean;
 }) {
-  const meetingHref = `/organizations/${organizationId}/committees/${meeting.committee_id}/meetings/${meeting.id}`;
+  const meetingPath = `/organizations/${organizationId}/committees/${meeting.committee_id}/meetings/${meeting.id}`;
+  const meetingHref = withMeetingReturnTo(meetingPath, returnTo);
   const action = getMeetingListAction(
     meeting.status,
     meeting.capabilities,
@@ -111,7 +115,7 @@ export function MeetingListRow({
     >
       <Link
         className="flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-2 text-sm font-semibold text-ink hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        href={`${meetingHref}/edit`}
+        href={`${meetingPath}/edit`}
       >
         <AppIcon name="edit" size={15} />
         Redigér møde
@@ -205,11 +209,13 @@ export function MeetingList({
   meetings,
   now,
   organizationId,
+  returnTo,
   showCommittee = true,
 }: {
   meetings: MeetingListEntry[];
   now: number;
   organizationId: string;
+  returnTo: string;
   showCommittee?: boolean;
 }) {
   return (
@@ -224,6 +230,7 @@ export function MeetingList({
           meeting={meeting}
           now={now}
           organizationId={organizationId}
+          returnTo={returnTo}
           showCommittee={showCommittee}
         />
       ))}

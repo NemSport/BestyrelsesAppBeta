@@ -4,20 +4,7 @@ import clsx from "clsx";
 import { AppIcon } from "@/components/icons/app-icon";
 import { buttonClassName } from "@/components/ui";
 import { meetingStatusLabels } from "@/lib/localization";
-import type { MeetingListFilters, MeetingListPeriod } from "@/lib/meeting-list";
-
-function periodHref(
-  resetHref: string,
-  filters: MeetingListFilters,
-  period: Extract<MeetingListPeriod, "upcoming" | "previous">,
-) {
-  const params = new URLSearchParams();
-  params.set("period", period);
-  if (filters.committeeId) params.set("committee", filters.committeeId);
-  if (filters.status) params.set("status", filters.status);
-  if (filters.date) params.set("date", filters.date);
-  return `${resetHref}?${params.toString()}`;
-}
+import { getMeetingListHref, type MeetingListFilters } from "@/lib/meeting-list";
 
 export function MeetingListFilters({
   filters,
@@ -58,7 +45,7 @@ export function MeetingListFilters({
                   ? "bg-brand text-white shadow-sm"
                   : "text-muted hover:bg-surface hover:text-ink",
               )}
-              href={periodHref(resetHref, filters, period)}
+              href={getMeetingListHref(resetHref, { ...filters, period })}
               key={period}
             >
               {label}
