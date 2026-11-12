@@ -29,6 +29,9 @@ const requiredName = (label: string, max: number) =>
     .min(2, `${label} skal være mindst 2 tegn`)
     .max(max, `${label} må højst være ${max} tegn`);
 
+const optionalText = (max: number, message: string) =>
+  z.string().trim().max(max, message).nullish().transform((value) => value ?? "");
+
 export const organizationInputSchema = z.object({
   name: requiredName("Organisationsnavn", 120),
 });
@@ -36,11 +39,7 @@ export const organizationInputSchema = z.object({
 export const committeeInputSchema = z.object({
   organizationId: uuidSchema,
   name: requiredName("Udvalgsnavn", 120),
-  description: z
-    .string()
-    .trim()
-    .max(2000, "Beskrivelsen må højst være 2.000 tegn")
-    .default(""),
+  description: optionalText(2000, "Beskrivelsen må højst være 2.000 tegn"),
 });
 
 export const meetingInputSchema = z
@@ -122,16 +121,8 @@ const agendaItemContentSchema = z.object({
   organizationId: uuidSchema,
   committeeId: uuidSchema,
   title: requiredName("Titel", 200),
-  description: z
-    .string()
-    .trim()
-    .max(10000, "Baggrunden må højst være 10.000 tegn")
-    .default(""),
-  objective: z
-    .string()
-    .trim()
-    .max(4000, "Formålet må højst være 4.000 tegn")
-    .default(""),
+  description: optionalText(10000, "Baggrunden må højst være 10.000 tegn"),
+  objective: optionalText(4000, "Formålet må højst være 4.000 tegn"),
   itemType: z.enum(["information", "discussion", "decision", "follow_up"], {
     required_error: "Type skal vælges",
     invalid_type_error: "Type skal vælges",

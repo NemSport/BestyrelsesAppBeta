@@ -28,12 +28,14 @@ function getAgendaItemCreateFields(
       name: "objective",
       label: "Formål med beslutning eller drøftelse",
       type: "textarea",
+      helpText: "Valgfrit",
       aiSuggestion: { endpoint: assistantEndpoint },
     },
     {
       name: "description",
       label: "Baggrund",
       type: "textarea",
+      helpText: "Valgfrit",
       aiSuggestion: { endpoint: assistantEndpoint },
     },
     {
