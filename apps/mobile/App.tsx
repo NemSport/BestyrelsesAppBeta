@@ -131,7 +131,7 @@ export default function App() {
   }, []);
 
   if (loadingSession) {
-    return <Loading text="Starter BestyrelsesApp..." />;
+    return <Loading text="Starter BestyrelsesMate..." />;
   }
 
   if (missingConfig().length > 0) {
@@ -168,7 +168,7 @@ function LoginScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.loginCard}>
-        <Text style={styles.eyebrow}>BestyrelsesApp mobil</Text>
+        <Text style={styles.eyebrow}>BestyrelsesMate mobil</Text>
         <Text style={styles.title}>Log ind</Text>
         <Text style={styles.muted}>
           Mobil companion til møder, referater og opgaver.
@@ -480,7 +480,7 @@ function MobileShell({ session }: { session: Session }) {
         <View style={styles.headerText}>
           <Text style={styles.eyebrow}>Bestyrelses Companion</Text>
           <Text style={styles.headerTitle}>
-            {organization?.name ?? "BestyrelsesApp"}
+            {organization?.name ?? "BestyrelsesMate"}
           </Text>
         </View>
         <View style={styles.headerActions}>
@@ -685,7 +685,7 @@ function NoOrganizationScreen({ onLogout }: { onLogout: () => void }) {
       <SectionCard title="Næste skridt">
         <Text style={styles.muted}>
           Bed en administrator om at invitere dig til en organisation i
-          BestyrelsesApp.
+          BestyrelsesMate.
         </Text>
       </SectionCard>
       <Pressable onPress={onLogout} style={styles.logoutButton}>

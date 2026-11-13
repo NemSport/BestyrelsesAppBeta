@@ -39,7 +39,7 @@ export function AppShell({
             </span>
             <span className="min-w-0">
               <span className="app-header-title block truncate text-sm font-semibold sm:text-base">
-                BestyrelsesApp
+                BestyrelsesMate
               </span>
               <span className="app-header-subtitle hidden truncate text-xs font-medium xl:block">
                 Hold overblik over bestyrelsesarbejdet

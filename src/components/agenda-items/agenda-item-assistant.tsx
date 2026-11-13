@@ -59,10 +59,12 @@ export function AgendaItemAssistant({
   organizationId,
   committeeId,
   agendaItemId,
+  nextMeeting,
 }: {
   organizationId: string;
   committeeId: string;
   agendaItemId: string;
+  nextMeeting: { title: string; startsAt: string; href: string } | null;
 }) {
   const [result, setResult] = useState<AssistantResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -109,8 +111,18 @@ export function AgendaItemAssistant({
         <div>
           <p className="page-eyebrow">AI-assistent</p>
           <h2 className="mt-1 text-lg font-semibold">
-            Bestyrelseshukommelse og mødeforberedelse
+            {nextMeeting
+              ? "Forbered punktet til næste møde"
+              : "Bestyrelseshukommelse"}
           </h2>
+          {nextMeeting ? (
+            <Link
+              className="mt-1 inline-block text-sm font-semibold text-brand hover:underline"
+              href={nextMeeting.href}
+            >
+              {nextMeeting.title} · {formatDate(nextMeeting.startsAt)}
+            </Link>
+          ) : null}
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Samler tidligere behandling, beslutninger og åbne opgaver og
             foreslår, hvad udvalget bør drøfte.
@@ -121,7 +133,9 @@ export function AgendaItemAssistant({
             ? "Forbereder punktet..."
             : result
               ? "Opdater forberedelse"
-              : "Forbered punktet med AI"}
+              : nextMeeting
+                ? "Forbered punktet med AI"
+                : "Gennemgå punktet med AI"}
         </Button>
       </div>
 
@@ -146,12 +160,40 @@ export function AgendaItemAssistant({
         ) : null}
         {!loading && !result && !error ? (
           <p className="text-sm text-muted">
-            Start assistenten for at samle punktets historik og få
-            kildebaserede forslag til dagens drøftelse.
+            Start assistenten for at samle punktets historik og få kildebaserede
+            forslag til næste drøftelse.
           </p>
         ) : null}
         {result ? (
           <div className="space-y-6">
+            <section className="border-b border-line pb-5">
+              <h3 className="font-semibold">Forslag til næste drøftelse</h3>
+              {result.discussionSuggestions.length ? (
+                <ol className="mt-3 space-y-3">
+                  {result.discussionSuggestions.map((suggestion, index) => (
+                    <li
+                      className="rounded-[var(--radius-control)] bg-subtle/45 p-3"
+                      key={`${suggestion.text}-${index}`}
+                    >
+                      <p className="font-medium">{suggestion.text}</p>
+                      <p className="mt-1 text-sm text-muted">
+                        {suggestion.reason}
+                      </p>
+                      <SourceLinks
+                        sourceIds={suggestion.sourceIds}
+                        sources={sourcesById}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <EmptyState
+                  compact
+                  title="Der er ikke nok historik til konkrete forslag endnu."
+                />
+              )}
+            </section>
+
             <div className="grid gap-5 md:grid-cols-3">
               <section>
                 <h3 className="text-sm font-semibold">Sidst diskuteret</h3>
@@ -247,36 +289,6 @@ export function AgendaItemAssistant({
                 )}
               </section>
             </div>
-
-            <section className="border-t border-line pt-5">
-              <h3 className="font-semibold">
-                Forslag til dagens drøftelse
-              </h3>
-              {result.discussionSuggestions.length ? (
-                <ol className="mt-3 space-y-3">
-                  {result.discussionSuggestions.map((suggestion, index) => (
-                    <li
-                      className="rounded-[var(--radius-control)] bg-subtle/45 p-3"
-                      key={`${suggestion.text}-${index}`}
-                    >
-                      <p className="font-medium">{suggestion.text}</p>
-                      <p className="mt-1 text-sm text-muted">
-                        {suggestion.reason}
-                      </p>
-                      <SourceLinks
-                        sourceIds={suggestion.sourceIds}
-                        sources={sourcesById}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <EmptyState
-                  compact
-                  title="Der er ikke nok historik til konkrete forslag endnu."
-                />
-              )}
-            </section>
 
             {result.agendaSuggestions.length ? (
               <details className="group border-t border-line pt-4">

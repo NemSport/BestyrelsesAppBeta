@@ -9,7 +9,7 @@ export default function AuthLayout({
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="hidden bg-brand p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Link className="text-lg font-semibold tracking-tight" href="/">
-          BestyrelsesApp
+          BestyrelsesMate
         </Link>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">

@@ -88,6 +88,17 @@ export default async function AgendaItemPage({
       ) ?? occurrences.find((occurrence) => occurrence.meetings))
     : occurrences[0];
   const meeting = currentOccurrence?.meetings ?? null;
+  const now = Date.now();
+  const upcomingOccurrence = occurrences
+    .flatMap((occurrence) => {
+      const upcomingMeeting = occurrence.meetings;
+      return upcomingMeeting &&
+        Date.parse(upcomingMeeting.starts_at) >= now &&
+        ["draft", "scheduled"].includes(upcomingMeeting.status)
+        ? [{ id: occurrence.id, meeting: upcomingMeeting }]
+        : [];
+    })
+    .sort((a, b) => Date.parse(a.meeting.starts_at) - Date.parse(b.meeting.starts_at))[0];
   const followUpHref =
     isTaskFollowUp && currentOccurrence && meeting
       ? getMeetingAgendaPointHref({
@@ -215,6 +226,20 @@ export default async function AgendaItemPage({
           agendaItemId={agendaItemId}
           committeeId={committeeId}
           organizationId={organizationId}
+          nextMeeting={
+            upcomingOccurrence
+              ? {
+                  title: upcomingOccurrence.meeting.title,
+                  startsAt: upcomingOccurrence.meeting.starts_at,
+                  href: getMeetingAgendaPointHref({
+                    organizationId,
+                    committeeId,
+                    meetingId: upcomingOccurrence.meeting.id,
+                    occurrenceId: upcomingOccurrence.id,
+                  }),
+                }
+              : null
+          }
         />
 
         <AgendaItemHistoryInline

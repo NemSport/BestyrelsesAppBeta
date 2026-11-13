@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AppIcon, type AppIconName } from "@/components/icons/app-icon";
+import { MeetingAgendaPreview } from "@/components/meetings/meeting-agenda-preview";
 import { TrashActionButton } from "@/components/trash/trash-action-button";
 import {
   ActionMenu,
@@ -370,7 +371,7 @@ export default async function CommitteeWorkspacePage({
           aria-labelledby="next-meeting-title"
         >
           <div>
-            <SectionHeading title="Næste møde" titleId="next-meeting-title" />
+            <SectionHeading title="Forbered næste møde" titleId="next-meeting-title" />
             {workspace.nextMeeting ? (
               <div>
                 <h3 className="text-lg font-semibold">
@@ -382,12 +383,13 @@ export default async function CommitteeWorkspacePage({
                     ? ` · ${workspace.nextMeeting.location}`
                     : ""}
                 </p>
-                <p className="mt-2 text-sm">
-                  {workspace.nextMeeting.agenda_item_occurrences.length}{" "}
-                  {workspace.nextMeeting.agenda_item_occurrences.length === 1
-                    ? "dagsordenspunkt"
-                    : "dagsordenspunkter"}
-                </p>
+                <MeetingAgendaPreview
+                  meetingHref={withMeetingReturnTo(
+                    `${committeeRoot}/meetings/${workspace.nextMeeting.id}`,
+                    committeeRoot,
+                  )}
+                  occurrences={workspace.nextMeeting.agenda_item_occurrences}
+                />
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
                     className={buttonClassName({ size: "sm" })}

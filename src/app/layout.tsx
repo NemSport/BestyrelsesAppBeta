@@ -4,10 +4,10 @@ import "@/app/globals.css";
 import { ServiceWorkerRegistration } from "@/components/offline/service-worker-registration";
 
 export const metadata: Metadata = {
-  applicationName: "BestyrelsesApp",
+  applicationName: "BestyrelsesMate",
   title: {
-    default: "BestyrelsesApp",
-    template: "%s | BestyrelsesApp",
+    default: "BestyrelsesMate",
+    template: "%s | BestyrelsesMate",
   },
   description:
     "Hjælper udvalg med at huske beslutninger og føre handlinger ud i livet.",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BestyrelsesApp",
+    title: "BestyrelsesMate",
   },
   formatDetection: {
     telephone: false,

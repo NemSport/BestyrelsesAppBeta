@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-[var(--space-page-x)] py-20">
       <div className="max-w-3xl">
-        <p className="page-eyebrow mb-4">BestyrelsesApp</p>
+        <p className="page-eyebrow mb-4">BestyrelsesMate</p>
         <h1 className="text-5xl font-semibold leading-[1.05] tracking-[-0.04em] md:text-7xl">
           Husk beslutninger. Få handlingerne udført.
         </h1>

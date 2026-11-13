@@ -67,7 +67,7 @@ function shell({
     `</div>`,
     content,
     `<hr style="border:none;border-top:1px solid #ded8ce;margin:24px 0" />`,
-    `<p style="font-size:12px;color:#657282">Sendt fra BestyrelsesApp. Dette er en manuel udsendelse fra appen.</p>`,
+    `<p style="font-size:12px;color:#657282">Sendt fra BestyrelsesMate. Dette er en manuel udsendelse fra appen.</p>`,
     `</div>`,
   ].join("");
 }
@@ -76,8 +76,8 @@ export function organizationInvitationEmailTemplate(
   organizationName: string,
   invitationUrl: string,
 ) {
-  const subject = `Invitation til ${organizationName} i BestyrelsesApp`;
-  const intro = `Du er inviteret til ${organizationName} i BestyrelsesApp.`;
+  const subject = `Invitation til ${organizationName} i BestyrelsesMate`;
+  const intro = `Du er inviteret til ${organizationName} i BestyrelsesMate.`;
   const instructions = "Log ind eller opret en konto med den e-mailadresse, invitationen er sendt til. Linket er gyldigt i syv dage.";
   return {
     subject,
@@ -164,7 +164,7 @@ export function meetingAgendaEmailTemplate({
       "",
       `Åbn møde: ${meetingUrl}`,
       "",
-      "Sendt fra BestyrelsesApp.",
+      "Sendt fra BestyrelsesMate.",
     ].join("\n"),
     html: shell({
       title: subject,
@@ -177,7 +177,7 @@ export function meetingAgendaEmailTemplate({
         `<strong>Dato:</strong> ${escapeHtml(formatDateTime(meeting.starts_at, "full"))}</p>`,
         `<h2 style="font-size:17px;margin-top:22px">Dagsorden</h2>`,
         htmlItems,
-        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn møde i BestyrelsesApp</a></p>`,
+        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn møde i BestyrelsesMate</a></p>`,
       ].join(""),
     }),
   };
@@ -239,7 +239,7 @@ export function meetingMaterialsEmailTemplate({
       "",
       `Åbn møde: ${meetingUrl}`,
       "",
-      "Sendt fra BestyrelsesApp.",
+      "Sendt fra BestyrelsesMate.",
     ]
       .filter((line, index, values) => line || values[index - 1] !== "")
       .join("\n"),
@@ -256,7 +256,7 @@ export function meetingMaterialsEmailTemplate({
         `<p><strong>Møde:</strong> ${escapeHtml(meetingTitle)}<br /><strong>Dato:</strong> ${escapeHtml(meetingDate)}</p>`,
         `<h2 style="font-size:17px;margin-top:22px">Vedhæftet</h2>`,
         `<ul>${attachmentLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
-        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn mødet i BestyrelsesApp</a></p>`,
+        `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn mødet i BestyrelsesMate</a></p>`,
       ].join(""),
     }),
   };
@@ -277,10 +277,10 @@ export function approvedMinutesEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
     subject: `Godkendt referat: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nReferatet er godkendt.\n\nÅbn referat: ${url}\n\nSendt fra BestyrelsesApp.`,
+    text: `${organizationName} · ${committeeName}\n\nReferatet er godkendt.\n\nÅbn referat: ${url}\n\nSendt fra BestyrelsesMate.`,
     html: shell({
       title: `Godkendt referat: ${title}`,
-      intro: "Referatet er godkendt og kan læses i BestyrelsesApp.",
+      intro: "Referatet er godkendt og kan læses i BestyrelsesMate.",
       organizationName,
       committeeName,
       branding,
@@ -372,7 +372,7 @@ export function meetingMinutesApprovalEmailTemplate({
       "Opgaver uden ansvarlig",
       unassignedText,
       "",
-      "Sendt fra BestyrelsesApp.",
+      "Sendt fra BestyrelsesMate.",
     ].join("\n"),
     html: shell({
       title: `Referat klar til godkendelse`,
@@ -410,7 +410,7 @@ export function taskReminderEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
     subject: `Påmindelse: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nOpgave: ${title}\nDeadline: ${deadline || "Ingen deadline"}\n\nÅbn opgave: ${url}\n\nSendt fra BestyrelsesApp.`,
+    text: `${organizationName} · ${committeeName}\n\nOpgave: ${title}\nDeadline: ${deadline || "Ingen deadline"}\n\nÅbn opgave: ${url}\n\nSendt fra BestyrelsesMate.`,
     html: shell({
       title: `Påmindelse: ${title}`,
       intro: "Der er en opgave, som kræver opmærksomhed.",
@@ -437,10 +437,10 @@ export function decisionsOverviewEmailTemplate({
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   return {
     subject: `Beslutningsoversigt: ${title}`,
-    text: `${organizationName} · ${committeeName}\n\nBeslutningsoversigten kan læses i BestyrelsesApp.\n\nÅbn oversigt: ${url}\n\nSendt fra BestyrelsesApp.`,
+    text: `${organizationName} · ${committeeName}\n\nBeslutningsoversigten kan læses i BestyrelsesMate.\n\nÅbn oversigt: ${url}\n\nSendt fra BestyrelsesMate.`,
     html: shell({
       title: `Beslutningsoversigt: ${title}`,
-      intro: "Beslutningsoversigten kan læses i BestyrelsesApp.",
+      intro: "Beslutningsoversigten kan læses i BestyrelsesMate.",
       organizationName,
       committeeName,
       branding,

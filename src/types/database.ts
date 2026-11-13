@@ -6,12 +6,51 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+type BestieThreadRow = {
+  id: string;
+  organization_id: string;
+  committee_id: string | null;
+  user_id: string;
+  task_id: string | null;
+  event_id: string | null;
+  activity_start: string | null;
+  title: string;
+  dedup_key: string;
+  messages: Json;
+  pending_action: Json;
+  follow_up_on: string | null;
+  last_read_at: string | null;
+  push_sent_at: string | null;
+  push_claimed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type BestieSubscriptionRow = {
+  endpoint: string;
+  user_id: string;
+  keys: Json;
+  created_at: string;
+};
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12";
   };
   public: {
     Tables: {
+      bestie_threads: {
+        Row: BestieThreadRow;
+        Insert: Partial<BestieThreadRow>;
+        Update: Partial<BestieThreadRow>;
+        Relationships: [];
+      };
+      bestie_push_subscriptions: {
+        Row: BestieSubscriptionRow;
+        Insert: Omit<BestieSubscriptionRow, "created_at">;
+        Update: Partial<BestieSubscriptionRow>;
+        Relationships: [];
+      };
       action_user_states: {
         Row: {
           id: string;
@@ -1603,6 +1642,26 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      bestie_generate_messages: { Args: never; Returns: number };
+      bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
+      bestie_apply_reply: {
+        Args: {
+          target_id: string;
+          actor_id: string;
+          expected_version: string;
+          expected_task_version: string | null;
+          reply_id: string;
+          user_body: string;
+          assistant_body: string;
+          next_action: Json;
+          note_body: string | null;
+          new_deadline: string | null;
+          complete_task: boolean;
+          reminder_date: string | null;
+          ai_metadata: Json;
+        };
+        Returns: BestieThreadRow;
+      };
       read_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: Json };
       ensure_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: string };
       mutate_meeting_task_follow_up: { Args: { target_meeting_id: string; target_task_id: string; request_id: string; expected_version: string; mutation: Json }; Returns: undefined };

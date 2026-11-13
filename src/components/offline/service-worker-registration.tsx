@@ -16,7 +16,9 @@ export function ServiceWorkerRegistration() {
                 registration.active?.postMessage({
                   type: "CLEAR_OFFLINE_CACHE",
                 });
-                return registration.unregister();
+                return registration.pushManager.getSubscription().then((subscription) =>
+                subscription ? false : registration.unregister(),
+              );
               }),
             ),
           ),
