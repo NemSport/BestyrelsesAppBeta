@@ -14,6 +14,7 @@ export const bestieActionSchema = z.object({
 
 export const bestiePendingActionSchema = bestieActionSchema.extend({
   taskVersion: z.string().nullable(),
+  statusNote: z.string().trim().min(1).max(1500).nullable().optional(),
 });
 export type BestieAction = z.infer<typeof bestieActionSchema>;
 export type BestiePendingAction = z.infer<typeof bestiePendingActionSchema>;
@@ -57,8 +58,9 @@ export function validBestieDate(value: string | null, earliest: string) {
     : null;
 }
 
-export function describeBestieAction(action: BestieAction) {
+export function describeBestieAction(action: BestiePendingAction) {
   const changes = [];
+  if (action.statusNote) changes.push(`gemme status “${action.statusNote}” på opgaven`);
   if (action.complete) changes.push("markere opgaven som færdig");
   if (action.deadline)
     changes.push(`flytte fristen til ${bestieDate(action.deadline)}`);

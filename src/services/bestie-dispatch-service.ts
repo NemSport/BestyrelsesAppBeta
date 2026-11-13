@@ -47,7 +47,9 @@ export class BestieDispatchService {
       .eq("user_id", row.user_id);
     if (error) throw error;
     const payload = {
-      body: "Du har en ny besked fra Bestie.",
+      body: row.event_id && row.task_id
+        ? "Du har en opfølgning på en opgave fra årshjulet."
+        : "Du har en ny besked fra Bestie.",
       path: bestiePath(row.organization_id, row.id),
       api: `/api/organizations/${row.organization_id}/bestie/${row.id}`,
       tag: row.id,
