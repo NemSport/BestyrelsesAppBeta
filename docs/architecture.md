@@ -2915,3 +2915,17 @@ where the user can create meetings. Poll forms submit member IDs and external
 email addresses. The service resolves active committee members against the
 current directory and deduplicates their addresses with the external list
 before calling the poll creation function.
+
+## Bestie agenda suggestions
+
+The meeting preparation route allows users with the agenda scheduling
+capability to request up to five suggestions for the committee's next
+scheduled meeting. The endpoint reads open tasks, unfinished decisions and
+existing agenda titles in the authenticated organization and committee scope.
+Structured model output is validated against those source records. Draft
+suggestions live in the review UI. Model, prompt version, usage and source
+references are recorded in the existing AI activity log.
+
+Approval rechecks the meeting, permissions, source and duplicates under the
+same lock as agenda scheduling. The RPC uses normal agenda creation and stores
+the approved source reference with the agenda item in the same transaction.

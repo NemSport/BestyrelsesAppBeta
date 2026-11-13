@@ -183,6 +183,11 @@ retain all related notes, analyses, decisions, tasks, and historical context.
 3. Generate an AI preparation brief.
 4. Identify missing information and decisions required.
 
+On the next scheduled meeting's preparation page, committee managers can ask
+Bestie for agenda suggestions based on open tasks and unfinished decisions in
+that committee. Each suggestion shows its source and can be added to the
+agenda individually after review.
+
 ### During a Meeting
 
 1. Capture notes against the active agenda item.
