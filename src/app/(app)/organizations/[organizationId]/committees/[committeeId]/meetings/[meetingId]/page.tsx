@@ -40,6 +40,7 @@ import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 import { meetingResponseLabel } from "@/lib/meeting-scheduling";
 import { MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
 import { MeetingMaterialDispatchService } from "@/services/meeting-material-dispatch-service";
+import { BestieAgendaRepository } from "@/repositories/bestie-agenda-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { MeetingService } from "@/services/meeting-service";
 import { TaskService } from "@/services/task-service";
@@ -274,6 +275,9 @@ export default async function MeetingPage({
         ? new MeetingRepository(db).listWorkspaceMeetings(organizationId, committeeId, now)
         : [],
     ]);
+    const agendaSuggestions = upcoming[0]?.id === meetingId && minutes.meetingMinutes?.status !== "approved"
+      ? await new BestieAgendaRepository(db).listDrafts(meetingId)
+      : null;
     return (
       <MeetingPreparation
         meeting={meeting}
@@ -285,7 +289,7 @@ export default async function MeetingPage({
         attachments={[...minutes.meetingAttachments, ...minutes.agendaItemAttachments]}
         documents={documents}
         tasks={tasks}
-        canSuggestAgenda={upcoming[0]?.id === meetingId && minutes.meetingMinutes?.status !== "approved"}
+        agendaSuggestions={agendaSuggestions}
       />
     );
   }

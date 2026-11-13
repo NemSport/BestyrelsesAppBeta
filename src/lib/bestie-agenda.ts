@@ -6,11 +6,12 @@ export const bestieAgendaContent = z.object({
   objective: z.string().trim().min(1).max(400),
 });
 
-export const bestieAgendaSuggestion = bestieAgendaContent.extend({
+export const bestieAgendaSource = z.object({
   sourceKind: z.enum(["task", "decision"]),
   sourceId: z.string().uuid(),
 });
 
-export type BestieAgendaSuggestion = z.infer<typeof bestieAgendaSuggestion> & {
-  sourceTitle: string;
-};
+export type BestieAgendaSuggestion = z.infer<typeof bestieAgendaContent> &
+  z.infer<typeof bestieAgendaSource> & {
+    sourceTitle: string;
+  };

@@ -15,9 +15,9 @@ export function BestieAgendaSuggestions({
   organizationId,
   committeeId,
   meetingId,
-}: Scope) {
+  suggestions,
+}: Scope & { suggestions: BestieAgendaSuggestion[] }) {
   const router = useRouter();
-  const [suggestions, setSuggestions] = useState<BestieAgendaSuggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -35,22 +35,21 @@ export function BestieAgendaSuggestions({
           organizationId,
           committeeId,
           action: suggestion ? "approve" : "suggest",
-          suggestion,
+          suggestion: suggestion && {
+            sourceKind: suggestion.sourceKind,
+            sourceId: suggestion.sourceId,
+          },
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? result.error);
       if (suggestion) {
-        setSuggestions((current) =>
-          current.filter((item) => item !== suggestion),
-        );
         setNotice(`“${suggestion.title}” er tilføjet til dagsordenen.`);
-        router.refresh();
       } else {
-        setSuggestions(result.suggestions);
-        if (!result.suggestions.length)
+        if (!result.added)
           setNotice("Bestie fandt ingen nye forslag til dagsordenen.");
       }
+      router.refresh();
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message

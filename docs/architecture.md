@@ -2922,10 +2922,11 @@ The meeting preparation route allows users with the agenda scheduling
 capability to request up to five suggestions for the committee's next
 scheduled meeting. The endpoint reads open tasks, unfinished decisions and
 existing agenda titles in the authenticated organization and committee scope.
-Structured model output is validated against those source records. Draft
-suggestions live in the review UI. Model, prompt version, usage and source
+Structured model output is validated against those source records. Draft suggestions are stored per meeting and source and loaded with meeting
+preparation. New generations append eligible suggestions. Model, prompt version, usage and source
 references are recorded in the existing AI activity log.
 
 Approval rechecks the meeting, permissions, source and duplicates under the
 same lock as agenda scheduling. The RPC uses normal agenda creation and stores
-the approved source reference with the agenda item in the same transaction.
+the approved source reference with the agenda item and removes only the
+approved draft in the same transaction.

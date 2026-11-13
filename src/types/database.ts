@@ -68,6 +68,12 @@ export type Database = {
   };
   public: {
     Tables: {
+      bestie_agenda_drafts: {
+        Row: BestieAgendaDraftRow;
+        Insert: Omit<BestieAgendaDraftRow, "created_at"> & { created_at?: string };
+        Update: Partial<BestieAgendaDraftRow>;
+        Relationships: [];
+      };
       bestie_agenda_sources: {
         Row: { meeting_id: string; source_kind: string; source_id: string; agenda_item_id: string };
         Insert: { meeting_id: string; source_kind: string; source_id: string; agenda_item_id: string };
@@ -1726,6 +1732,14 @@ export type Database = {
         Args: { invitation_token: string; answer: string };
         Returns: boolean;
       };
+      save_bestie_agenda_drafts: {
+        Args: { target_meeting: string; drafts: Json };
+        Returns: number;
+      };
+      approve_bestie_agenda_draft: {
+        Args: { target_meeting: string; target_org: string; target_committee: string; draft_kind: string; draft_source: string; rich_description: string; rich_objective: string };
+        Returns: boolean;
+      };
       approve_bestie_agenda_suggestion: {
         Args: {
           target_meeting: string;
@@ -2167,3 +2181,14 @@ export type TableInsert<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Insert"];
 export type TableUpdate<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Update"];
+
+export type BestieAgendaDraftRow = {
+  meeting_id: string;
+  source_kind: "task" | "decision";
+  source_id: string;
+  source_title: string;
+  title: string;
+  description: string;
+  objective: string;
+  created_at: string;
+};
