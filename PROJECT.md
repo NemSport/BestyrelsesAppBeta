@@ -187,7 +187,8 @@ On the next scheduled meeting's preparation page, committee managers can ask
 Bestie for agenda suggestions based on open tasks and unfinished decisions in
 that committee. Each suggestion shows its source and can be added to the
 agenda individually after review. Remaining suggestions stay on the meeting
-for later review.
+for later review. Reviewers can edit the title, background and purpose before
+approval, or dismiss a suggestion for the current meeting.
 
 ### During a Meeting
 

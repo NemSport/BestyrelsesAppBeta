@@ -2930,3 +2930,8 @@ Approval rechecks the meeting, permissions, source and duplicates under the
 same lock as agenda scheduling. The RPC uses normal agenda creation and stores
 the approved source reference with the agenda item and removes only the
 approved draft in the same transaction.
+
+Reviewers can change the title, background and purpose before approving.
+Dismissal retains the meeting and source key so concurrent or subsequent
+generations cannot recreate the dismissed draft for the same meeting. The
+review transaction uses the agenda lock and rejects already reviewed drafts.

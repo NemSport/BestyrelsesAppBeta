@@ -79,6 +79,10 @@ before(async () => {
     await readMigration("202611140001_persist_bestie_agenda_drafts.sql"),
   );
 
+  await db.exec(
+    await readMigration("202611140002_review_bestie_agenda_drafts.sql"),
+  );
+
   organization = await insert("insert into organizations default values");
   committee = await insert(
     "insert into committees (organization_id) values ($1)",
@@ -222,4 +226,83 @@ test("saving and approving drafts preserves the other suggestions on the meeting
     [first],
   );
   assert.deepEqual(agenda.rows, [{ title: "Vælg skilte" }]);
+});
+
+test("review approves the edited text and remembers a dismissal only for its meeting", async () => {
+  const editSource = await insert(
+    "insert into tasks (organization_id, committee_id) values ($1, $2)",
+    [organization, committee],
+  );
+  const dismissSource = await insert(
+    "insert into decisions (organization_id, committee_id) values ($1, $2)",
+    [organization, committee],
+  );
+  const suggestions = [
+    {
+      source_kind: "task",
+      source_id: editSource,
+      title: "Original titel",
+      description: "",
+      objective: "Originalt formål",
+    },
+    {
+      source_kind: "decision",
+      source_id: dismissSource,
+      title: "Afvis dette punkt",
+      description: "",
+      objective: "Drøft næste skridt",
+    },
+  ];
+  async function save(meeting, drafts) {
+    return (
+      await db.query("select save_bestie_agenda_drafts($1, $2) as saved", [
+        meeting,
+        JSON.stringify(drafts),
+      ])
+    ).rows[0].saved;
+  }
+  async function review(kind, source, dismiss) {
+    return (
+      await db.query(
+        "select review_bestie_agenda_draft($1, $2, $3, $4, $5, $6, 'Rettet titel', '<p>Rettet baggrund</p>', '<p>Rettet formål</p>') as reviewed",
+        [next, organization, committee, kind, source, dismiss],
+      )
+    ).rows[0].reviewed;
+  }
+
+  assert.equal(await save(next, suggestions), 2);
+  assert.equal(await review("task", editSource, false), true);
+  assert.equal(await review("decision", dismissSource, true), true);
+  assert.equal(await review("decision", dismissSource, false), false);
+  assert.equal(
+    await save(next, [{ ...suggestions[1], title: "Forsøg med ny titel" }]),
+    0,
+  );
+
+  const edited = await db.query(
+    "select title, description, objective from agenda_items join bestie_agenda_sources on agenda_items.id = bestie_agenda_sources.agenda_item_id where source_id = $1",
+    [editSource],
+  );
+  assert.deepEqual(edited.rows, [
+    {
+      title: "Rettet titel",
+      description: "<p>Rettet baggrund</p>",
+      objective: "<p>Rettet formål</p>",
+    },
+  ]);
+  const dismissed = await db.query(
+    "select dismissed_at is not null as dismissed from bestie_agenda_drafts where meeting_id = $1 and source_id = $2",
+    [next, dismissSource],
+  );
+  assert.deepEqual(dismissed.rows, [{ dismissed: true }]);
+  const agenda = await db.query(
+    "select 1 from bestie_agenda_sources where source_id = $1",
+    [dismissSource],
+  );
+  assert.equal(agenda.rows.length, 0);
+
+  await db.query("update meetings set status = 'cancelled' where id = $1", [
+    next,
+  ]);
+  assert.equal(await save(later, [suggestions[1]]), 1);
 });
