@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
-import { Button } from "@/components/ui";
 
 function applicationServerKey(value: string) {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -111,8 +110,8 @@ export function BestiePushToggle() {
       aria-labelledby="bestie-push-title"
       className="rounded-xl border border-brand/25 bg-brand-soft p-4 sm:p-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2
             id="bestie-push-title"
             className="flex items-center gap-2 font-semibold"
@@ -129,15 +128,24 @@ export function BestiePushToggle() {
           </p>
         </div>
         {enabled !== null && (publicKey || enabled) ? (
-          <Button
+          <button
             type="button"
-            variant={enabled ? "secondary" : "primary"}
-            className="min-h-11 w-full justify-center sm:w-auto"
+            role="switch"
+            aria-checked={enabled}
+            aria-labelledby="bestie-push-title"
+            className="group grid min-h-11 shrink-0 place-items-center rounded-full px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
             disabled={busy}
             onClick={() => void toggle()}
           >
-            {enabled ? "Slå push fra" : "Slå push til"}
-          </Button>
+            <span
+              aria-hidden="true"
+              className={`relative block h-8 w-14 rounded-full border transition-colors ${enabled ? "border-brand bg-brand" : "border-line-strong bg-canvas"}`}
+            >
+              <span
+                className={`absolute left-0.5 top-0.5 size-[26px] rounded-full shadow-sm transition-transform ${enabled ? "translate-x-6 bg-white" : "bg-muted"}`}
+              />
+            </span>
+          </button>
         ) : null}
       </div>
       {feedback ? (
