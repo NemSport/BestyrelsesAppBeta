@@ -40,6 +40,7 @@ import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 import { meetingResponseLabel } from "@/lib/meeting-scheduling";
 import { MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
 import { MeetingMaterialDispatchService } from "@/services/meeting-material-dispatch-service";
+import { MeetingRepository } from "@/repositories/meeting-repository";
 import { MeetingService } from "@/services/meeting-service";
 import { TaskService } from "@/services/task-service";
 import { TransferredAgendaItemService } from "@/services/transferred-agenda-item-service";
@@ -255,7 +256,12 @@ export default async function MeetingPage({
 
   const minutesService = new MeetingMinutesService(db);
   if (view === "preparation") {
-    const [minutes, documents, { tasks }] = await Promise.all([
+    const canSchedule = getMeetingCapabilities(
+      context.organizationMembership.role,
+      context.membership?.role ?? null,
+    ).scheduleAgendaItem;
+    const now = new Date().toISOString();
+    const [minutes, documents, { tasks }, upcoming] = await Promise.all([
       minutesService.get(organizationId, committeeId, meetingId),
       new DocumentService(db).getMeetingDocumentContext({
         organizationId,
@@ -264,6 +270,9 @@ export default async function MeetingPage({
         agendaItemIds: meeting.agenda_item_occurrences.map(({ agenda_item_id }) => agenda_item_id),
       }),
       new TaskService(db).getMeetingReviewTasks(organizationId, committeeId, meetingId, { preparation: true }),
+      canSchedule && meeting.status === "scheduled" && meeting.starts_at > now
+        ? new MeetingRepository(db).listWorkspaceMeetings(organizationId, committeeId, now)
+        : [],
     ]);
     return (
       <MeetingPreparation
@@ -276,6 +285,7 @@ export default async function MeetingPage({
         attachments={[...minutes.meetingAttachments, ...minutes.agendaItemAttachments]}
         documents={documents}
         tasks={tasks}
+        canSuggestAgenda={upcoming[0]?.id === meetingId && minutes.meetingMinutes?.status !== "approved"}
       />
     );
   }

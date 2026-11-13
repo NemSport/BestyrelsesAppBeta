@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BestieAgendaSuggestions } from "@/components/meetings/bestie-agenda-suggestions";
 import { MinuteAttachments } from "@/components/meetings/minutes-governance";
 import { PageHeader, buttonClassName } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/localization";
@@ -15,12 +16,14 @@ export function MeetingPreparation({
   attachments,
   documents,
   tasks,
+  canSuggestAgenda,
 }: {
   meeting: MeetingWithAgenda;
   back: { href: string; label: string };
   meetingHref: string;
   attachments: MinuteAttachmentView[];
   documents: MeetingDocumentContext;
+  canSuggestAgenda: boolean;
   tasks: Awaited<ReturnType<TaskService["getMeetingReviewTasks"]>>["tasks"];
 }) {
   const {
@@ -68,6 +71,7 @@ export function MeetingPreparation({
           </Link>
         }
       />
+      {canSuggestAgenda ? <BestieAgendaSuggestions {...scope} /> : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section className="panel p-4" aria-labelledby="preparation-agenda">
           <h2 className="font-semibold" id="preparation-agenda">

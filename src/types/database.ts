@@ -68,6 +68,12 @@ export type Database = {
   };
   public: {
     Tables: {
+      bestie_agenda_sources: {
+        Row: { meeting_id: string; source_kind: string; source_id: string; agenda_item_id: string };
+        Insert: { meeting_id: string; source_kind: string; source_id: string; agenda_item_id: string };
+        Update: { meeting_id?: string; source_kind?: string; source_id?: string; agenda_item_id?: string };
+        Relationships: [];
+      };
       meeting_date_polls: {
         Row: MeetingDatePollRow;
         Insert: Pick<MeetingDatePollRow, "organization_id" | "committee_id" | "title" | "options"> & Partial<MeetingDatePollRow>;
@@ -1718,6 +1724,19 @@ export type Database = {
       };
       submit_meeting_invitation_response: {
         Args: { invitation_token: string; answer: string };
+        Returns: boolean;
+      };
+      approve_bestie_agenda_suggestion: {
+        Args: {
+          target_meeting: string;
+          target_org: string;
+          target_committee: string;
+          item_source_kind: string;
+          item_source_id: string;
+          item_title: string;
+          item_description: string;
+          item_objective: string;
+        };
         Returns: boolean;
       };
       email_push_subscriptions: {
