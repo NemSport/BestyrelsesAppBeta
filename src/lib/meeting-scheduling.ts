@@ -31,9 +31,25 @@ export const meetingDatePollInput = meetingSchedulingScope.extend({
     .max(50)
     .transform((values) => [...new Set(values)]),
 });
-export const meetingVoteInput = z
-  .array(z.number().int().min(1).max(12))
-  .max(12);
+export const meetingVoteAnswers = {
+  yes: "Ja",
+  maybe: "Måske",
+  no: "Nej",
+} as const;
+
+export const meetingVoteInput = z.object({
+  answers: z.array(z.enum(["yes", "maybe", "no"])).min(1).max(12),
+  comment: z.string().trim().max(500),
+});
+
+export function meetingVoteAnswer(
+  voter: { choices: number[] | null; maybe_choices: number[] },
+  option: number,
+) {
+  if (voter.choices === null) return null;
+  if (voter.choices.includes(option)) return "yes";
+  return voter.maybe_choices.includes(option) ? "maybe" : "no";
+}
 export const meetingResponseInput = z.enum(["accepted", "declined"]);
 
 export function meetingCanReceiveResponses(meeting: {

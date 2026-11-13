@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ManageMeetingPoll } from "@/components/meetings/meeting-poll-controls";
+import { MeetingPollResults } from "@/components/meetings/meeting-poll-results";
 import { PageHeader, buttonClassName } from "@/components/ui";
 import { formatDateTime } from "@/lib/localization";
 import { createClient } from "@/lib/supabase/server";
@@ -55,62 +56,27 @@ export default async function MeetingPollPage({
           meetingsRoot={meetingsRoot}
         />
       )}
-      <section className="panel p-4">
-        <h2 className="mb-3 font-semibold">Tilgængelighed</h2>
-        <ul className="divide-y divide-line">
-          {poll.options.map((date, index) => {
-            const available = voters.filter((voter) =>
-              voter.choices?.includes(index + 1),
-            );
-            return (
-              <li className="py-3" key={date}>
-                <p className="font-medium">
-                  {formatDateTime(date)}{" "}
-                  <span className="ml-2 text-sm text-muted">
-                    {available.length} kan deltage
-                  </span>
-                </p>
-                {available.length ? (
-                  <p className="break-words text-sm text-muted">
-                    {available.map((voter) => voter.email).join(", ")}
-                  </p>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-      <section className="panel p-4">
-        <h2 className="mb-3 font-semibold">Deltagere</h2>
-        <ul className="divide-y divide-line">
-          {voters.map((voter) => (
-            <li
-              className="flex flex-wrap justify-between gap-2 py-3"
-              key={voter.email}
-            >
-              <div className="min-w-0 break-words">
-                {voter.email}{" "}
-                <span className="ml-2 text-sm text-muted">
-                  {voter.choices === null
-                    ? "Afventer svar"
-                    : voter.choices.length
-                      ? "Har svaret"
-                      : "Ingen tider passer"}
-                </span>
-              </div>
-              {!poll.meeting_id ? (
-                <Link
-                  className="text-sm text-brand underline"
-                  href={`/meeting-vote/${voter.token}`}
-                >
+      <MeetingPollResults
+        options={poll.options}
+        voters={voters}
+        labels={voters.map(({ email }) => email)}
+      />
+      {!poll.meeting_id ? (
+        <section className="panel p-4">
+          <h2 className="mb-3 font-semibold">Personlige svarlinks</h2>
+          <ul className="divide-y divide-line">
+            {voters.map(({ email, token }) => (
+              <li className="flex flex-wrap justify-between gap-2 py-3" key={email}>
+                <span className="min-w-0 break-words">{email}</span>
+                <Link className="text-sm text-brand underline" href={`/meeting-vote/${token}`}>
                   Personligt link
-                  <span className="sr-only"> til {voter.email}</span>
+                  <span className="sr-only"> til {email}</span>
                 </Link>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

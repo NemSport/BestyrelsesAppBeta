@@ -58,6 +58,40 @@ before(async () => {
     ),
   );
 });
+test("upgraded ballots keep old votes and save yes, maybe, no and a comment", async () => {
+  await db.exec("set test.manager='yes'");
+  const poll = await scalar(
+    `select create_meeting_date_poll($1,$2,'Test af svar',
+      array[now() + interval '1 day', now() + interval '2 days', now() + interval '3 days'],
+      array['legacy@example.test','new@example.test'])`,
+    [org, committee],
+  );
+  const { rows: [legacy, pending] } = await db.query(
+    "select token from meeting_date_poll_voters where poll_id=$1 order by email",
+    [poll],
+  );
+  assert.equal(await scalar("select submit_meeting_date_vote($1,array[1])", [legacy.token]), true);
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/202611130004_meeting_date_poll_answers.sql", import.meta.url,
+  ), "utf8"));
+  const result = async (token) => (await db.query(
+    "select choices,maybe_choices,comment from meeting_date_poll_voters where token=$1",
+    [token],
+  )).rows[0];
+  assert.deepEqual(await result(legacy.token), { choices: [1], maybe_choices: [], comment: null });
+  assert.deepEqual(await result(pending.token), { choices: null, maybe_choices: [], comment: null });
+  const submit = (yes, maybe, no, comment) => scalar(
+    "select submit_meeting_date_vote_details($1,$2,$3,$4,$5)",
+    [pending.token, yes, maybe, no, comment],
+  );
+  assert.equal(await submit([1], [1], [3], "Overlap"), false);
+  assert.equal(await submit([1], [], [3], "Incomplete"), false);
+  assert.equal(await submit([1], [2], [3], " Efter kl. 17 "), true);
+  assert.deepEqual(await result(pending.token), { choices: [1], maybe_choices: [2], comment: "Efter kl. 17" });
+  assert.equal(await submit([], [], [1, 2, 3], ""), true);
+  assert.deepEqual(await result(pending.token), { choices: [], maybe_choices: [], comment: null });
+});
+
 after(async () => db.close());
 
 async function scalar(sql, values) {
