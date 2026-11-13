@@ -186,7 +186,8 @@ retain all related notes, analyses, decisions, tasks, and historical context.
 On the next scheduled meeting's preparation page, committee managers can ask
 Bestie for agenda suggestions based on open tasks and unfinished decisions in
 that committee. Each suggestion shows its source and can be added to the
-agenda individually after review.
+agenda individually after review. Remaining suggestions stay on the meeting
+for later review.
 
 ### During a Meeting
 

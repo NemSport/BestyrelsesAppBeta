@@ -5,13 +5,11 @@ import { z } from "zod";
 
 import { getAiEnv } from "@/lib/ai-env";
 import { apiError } from "@/lib/api";
-import {
-  bestieAgendaContent,
-  bestieAgendaSuggestion,
-} from "@/lib/bestie-agenda";
+import { bestieAgendaContent, bestieAgendaSource } from "@/lib/bestie-agenda";
 import { AppError } from "@/lib/errors";
 import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
 import { createClient } from "@/lib/supabase/server";
+import { BestieAgendaRepository } from "@/repositories/bestie-agenda-repository";
 import { DecisionRepository } from "@/repositories/decision-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { TaskRepository } from "@/repositories/task-repository";
@@ -27,7 +25,7 @@ const requestSchema = z.discriminatedUnion("action", [
   scope.extend({ action: z.literal("suggest") }),
   scope.extend({
     action: z.literal("approve"),
-    suggestion: bestieAgendaSuggestion,
+    suggestion: bestieAgendaSource,
   }),
 ]);
 const modelOutput = z.object({
@@ -73,22 +71,29 @@ export async function POST(
       );
     }
 
+    const repository = new BestieAgendaRepository(db);
+    const drafts = await repository.listDrafts(meetingId);
     if (input.action === "approve") {
-      const item = input.suggestion;
-      const { data, error } = await db.rpc("approve_bestie_agenda_suggestion", {
+      const item = drafts.find(
+        ({ sourceKind, sourceId }) =>
+          sourceKind === input.suggestion.sourceKind &&
+          sourceId === input.suggestion.sourceId,
+      );
+      if (!item)
+        throw new AppError("Forslaget er ikke længere tilgængeligt.", 409);
+      const { data, error } = await db.rpc("approve_bestie_agenda_draft", {
         target_meeting: meetingId,
         target_org: organizationId,
         target_committee: committeeId,
-        item_source_kind: item.sourceKind,
-        item_source_id: item.sourceId,
-        item_title: item.title,
-        item_description: plainTextToRichText(item.description),
-        item_objective: plainTextToRichText(item.objective),
+        draft_kind: item.sourceKind,
+        draft_source: item.sourceId,
+        rich_description: plainTextToRichText(item.description),
+        rich_objective: plainTextToRichText(item.objective),
       });
       if (error) throw error;
       if (!data)
         throw new AppError(
-          "Punktet er allerede på dagsordenen, eller mødet eller kilden er ændret. Hent nye forslag.",
+          "Forslaget kan ikke tilføjes. Det kan allerede være på dagsordenen, eller mødet eller kilden kan være ændret.",
           409,
         );
       return NextResponse.json({ approved: true });
@@ -108,6 +113,9 @@ export async function POST(
         ({ source_kind, source_id }) => `${source_kind}:${source_id}`,
       ),
     );
+    for (const { sourceKind, sourceId } of drafts) {
+      added.add(`${sourceKind}:${sourceId}`);
+    }
     const agendaIds = new Set(
       next.agenda_item_occurrences.map(({ agenda_items }) => agenda_items?.id),
     );
@@ -117,6 +125,7 @@ export async function POST(
         agenda_items ? [titleKey(agenda_items.title)] : [],
       ),
     );
+    for (const { title } of drafts) titles.add(titleKey(title));
     const candidates = (["task", "decision"] as const).flatMap((sourceKind) =>
       (sourceKind === "task" ? tasks : decisions)
         .filter(
@@ -141,7 +150,7 @@ export async function POST(
           status: item.status,
         })),
     );
-    if (!candidates.length) return NextResponse.json({ suggestions: [] });
+    if (!candidates.length) return NextResponse.json({ added: 0 });
 
     const env = getAiEnv();
     const response = await new OpenAI({
@@ -233,7 +242,20 @@ export async function POST(
         suggestionCount: suggestions.length,
       },
     });
-    return NextResponse.json({ suggestions });
+    if (!suggestions.length) return NextResponse.json({ added: 0 });
+
+    const { data: saved, error } = await db.rpc("save_bestie_agenda_drafts", {
+      target_meeting: meetingId,
+      drafts: suggestions.map(({ sourceKind, sourceId, ...content }) => ({
+        title: content.title,
+        description: content.description,
+        objective: content.objective,
+        source_kind: sourceKind,
+        source_id: sourceId,
+      })),
+    });
+    if (error) throw error;
+    return NextResponse.json({ added: saved });
   } catch (error) {
     return apiError(error, {
       fallbackMessage: "Besties dagsordensforslag kunne ikke behandles.",

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BestieAgendaSuggestions } from "@/components/meetings/bestie-agenda-suggestions";
 import { MinuteAttachments } from "@/components/meetings/minutes-governance";
 import { PageHeader, buttonClassName } from "@/components/ui";
+import type { BestieAgendaSuggestion } from "@/lib/bestie-agenda";
 import { formatDate, formatDateTime } from "@/lib/localization";
 import { getTaskDetailPath } from "@/lib/task-register-state";
 import type { TaskService } from "@/services/task-service";
@@ -16,14 +17,14 @@ export function MeetingPreparation({
   attachments,
   documents,
   tasks,
-  canSuggestAgenda,
+  agendaSuggestions,
 }: {
   meeting: MeetingWithAgenda;
   back: { href: string; label: string };
   meetingHref: string;
   attachments: MinuteAttachmentView[];
   documents: MeetingDocumentContext;
-  canSuggestAgenda: boolean;
+  agendaSuggestions: BestieAgendaSuggestion[] | null;
   tasks: Awaited<ReturnType<TaskService["getMeetingReviewTasks"]>>["tasks"];
 }) {
   const {
@@ -71,7 +72,7 @@ export function MeetingPreparation({
           </Link>
         }
       />
-      {canSuggestAgenda ? <BestieAgendaSuggestions {...scope} /> : null}
+      {agendaSuggestions ? <BestieAgendaSuggestions {...scope} suggestions={agendaSuggestions} /> : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section className="panel p-4" aria-labelledby="preparation-agenda">
           <h2 className="font-semibold" id="preparation-agenda">
