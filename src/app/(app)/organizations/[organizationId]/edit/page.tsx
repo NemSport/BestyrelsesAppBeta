@@ -59,10 +59,10 @@ export default async function EditOrganizationPage({
       </div>
       <div className="mt-8 border-t border-line py-5">
         <TrashActionButton
-          confirmMessage="Er du sikker på, at du vil flytte organisationen til papirkurven? Den kan gendannes i 30 dage."
+          confirmMessage="Er du sikker på, at du vil flytte organisationen til papirkurven? Den kan gendannes fra Papirkurven."
           endpoint={`/api/organizations/${organizationId}`}
           label="Flyt organisationen til papirkurven"
-          redirectTo={`/organizations/${organizationId}/trash`}
+          redirectTo="/organizations/trash"
         />
       </div>
     </div>

@@ -1593,7 +1593,8 @@ Organizations are root-level trash records. Moving an organization to trash
 hides it from normal organization lists and blocks ordinary organization
 flows, but it does not hard-delete or cascade-delete committees, meetings,
 decisions, tasks, minutes, Annual Wheel records, Job Cards, or history.
-Owners and administrators can restore the organization through the trash flow.
+Owners and administrators can restore deleted organizations from Papirkurv
+on the organization selector, including when they have no active workspace.
 The organization trash destination and restore actions are available only to
 organization owners and administrators. Other organization members do not see
 the navigation destination, and direct route access returns a controlled

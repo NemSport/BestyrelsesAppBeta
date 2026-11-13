@@ -2369,6 +2369,13 @@ roles. The organization trash page can show the deleted organization itself
 with the same retention status as other trash items. No permanent deletion,
 bulk operation, expiry worker, or child-data cleanup is introduced.
 
+After deleting an organization, the settings page redirects to
+`/organizations/trash`, which also has an entry point on the organization
+selector. The page lives outside the active-workspace layout and lists only
+deleted organizations for which the current user has active owner or admin
+membership. The existing database row policies and restore endpoint continue
+to enforce the same authorization.
+
 ## AI Architecture
 
 ### Principle

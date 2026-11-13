@@ -46,7 +46,7 @@ export default async function OrganizationTrashPage({
           Permanent sletning er endnu ikke tilgængelig.
         </p>
       </section>
-      <OrganizationTrash data={data} organizationId={organizationId} />
+      <OrganizationTrash data={data} overviewHref={`/organizations/${organizationId}`} />
     </>
   );
 }

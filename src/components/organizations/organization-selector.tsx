@@ -7,6 +7,7 @@ import { ResourceForm } from "@/components/forms/resource-form";
 import { AppIcon } from "@/components/icons/app-icon";
 import {
   Button,
+  buttonClassName,
   EmptyState,
   Modal,
   PageHeader,
@@ -47,14 +48,18 @@ export function OrganizationSelector({
     <div className="page-flow" data-organization-selector>
       <PageHeader
         actions={
-          <Button
-            className="w-full sm:w-auto"
-            onClick={() => setCreateOpen(true)}
-            variant="secondary"
-          >
-            <span aria-hidden="true">+</span>
-            Opret organisation
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/organizations/trash"
+            >
+              Papirkurv
+            </Link>
+            <Button onClick={() => setCreateOpen(true)} variant="secondary">
+              <span aria-hidden="true">+</span>
+              Opret organisation
+            </Button>
+          </div>
         }
         description="Fortsæt til det arbejdsrum, du vil arbejde i."
         eyebrow="Organisationer"

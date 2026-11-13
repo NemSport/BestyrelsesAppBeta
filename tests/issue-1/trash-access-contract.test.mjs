@@ -83,3 +83,18 @@ test("existing administrator restore client remains connected", () => {
   assert.match(trashClient, /Gendan/);
   assert.match(trashClient, /Papirkurven er tom/);
 });
+
+test("deleted organizations have a recoverable destination outside the active workspace", async () => {
+  const [settings, rootTrash, selector, repository] = await Promise.all([
+    source("../../src/app/(app)/organizations/[organizationId]/edit/page.tsx"),
+    source("../../src/app/(app)/organizations/trash/page.tsx"),
+    source("../../src/components/organizations/organization-selector.tsx"),
+    source("../../src/repositories/trash-repository.ts"),
+  ]);
+  assert.match(settings, /redirectTo="\/organizations\/trash"/);
+  assert.match(selector, /href="\/organizations\/trash"/);
+  assert.match(rootTrash, /getDeletedOrganizations\(\)/);
+  assert.match(service, /requireUser\(\)[\s\S]*listDeletedOrganizationsForAdmin\(user.id\)/);
+  assert.match(repository, /\.eq\("user_id", userId\)\s*\.eq\("status", "active"\)\s*\.in\("role", \["owner", "admin"\]\)\s*\.not\("organizations.deleted_at", "is", null\)/);
+  assert.match(trashClient, /\/api\/organizations\/\$\{item.organizationId\}\/trash/);
+});

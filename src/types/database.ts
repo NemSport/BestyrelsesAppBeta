@@ -330,7 +330,15 @@ export type Database = {
           role?: Database["public"]["Enums"]["organization_role"];
           status?: Database["public"]["Enums"]["membership_status"];
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       ux_review_rate_limits: {
         Row: {

@@ -8,7 +8,10 @@ import { AuthorizationService } from "@/services/authorization-service";
 import { CommitteeService } from "@/services/committee-service";
 import { MeetingService } from "@/services/meeting-service";
 import { OrganizationService } from "@/services/organization-service";
-import { TrashRepository } from "@/repositories/trash-repository";
+import {
+  TrashRepository,
+  type TrashedOrganizationRow,
+} from "@/repositories/trash-repository";
 import type { Database } from "@/types/database";
 import type {
   OrganizationTrashData,
@@ -24,6 +27,19 @@ export class TrashService {
     this.trash = new TrashRepository(db);
     this.auth = new AuthService(db);
     this.authorization = new AuthorizationService(db);
+  }
+
+  async getDeletedOrganizations(): Promise<OrganizationTrashData> {
+    const user = await this.auth.requireUser();
+    const organizations = await this.trash.listDeletedOrganizationsForAdmin(user.id);
+    const profiles = await this.trash.listDeletedByProfiles(
+      organizations.flatMap(({ deleted_by }) => (deleted_by ? [deleted_by] : [])),
+    );
+    const now = new Date();
+    const items = organizations
+      .map((organization) => this.organizationItem(organization, profiles, now))
+      .sort((left, right) => right.deletedAt.localeCompare(left.deletedAt));
+    return { items };
   }
 
   async getOrganizationTrash(
@@ -54,27 +70,7 @@ export class TrashService {
     const now = new Date();
     const items: OrganizationTrashItem[] = [
       ...(organization
-        ? [
-            this.item({
-              id: organization.id,
-              type: "organization",
-              title: organization.name,
-              organizationId: organization.id,
-              committeeId: null,
-              committeeName: null,
-              meetingId: null,
-              meetingTitle: null,
-              deletedAt: organization.deleted_at!,
-              deletedBy: organization.deleted_by,
-              deletedByName: this.profileName(
-                profiles,
-                organization.deleted_by,
-              ),
-              deleteExpiresAt: organization.delete_expires_at!,
-              parentDeleted: false,
-              now,
-            }),
-          ]
+        ? [this.organizationItem(organization, profiles, now)]
         : []),
       ...committees.map((committee) =>
         this.item({
@@ -180,6 +176,29 @@ export class TrashService {
       organizationId: parsed.organizationId,
       committeeId: parsed.committeeId,
       agendaItemId: parsed.id,
+    });
+  }
+
+  private organizationItem(
+    organization: TrashedOrganizationRow,
+    profiles: Map<string, { full_name: string | null }>,
+    now: Date,
+  ) {
+    return this.item({
+      id: organization.id,
+      type: "organization",
+      title: organization.name,
+      organizationId: organization.id,
+      committeeId: null,
+      committeeName: null,
+      meetingId: null,
+      meetingTitle: null,
+      deletedAt: organization.deleted_at!,
+      deletedBy: organization.deleted_by,
+      deletedByName: this.profileName(profiles, organization.deleted_by),
+      deleteExpiresAt: organization.delete_expires_at!,
+      parentDeleted: false,
+      now,
     });
   }
 

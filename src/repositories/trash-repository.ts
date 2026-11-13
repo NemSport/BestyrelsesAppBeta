@@ -29,6 +29,18 @@ export type TrashedAgendaItemRow = TableRow<"agenda_items"> & {
 export class TrashRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
+  async listDeletedOrganizationsForAdmin(userId: string) {
+    const { data, error } = await this.db
+      .from("organization_members")
+      .select("organizations!inner(*)")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .in("role", ["owner", "admin"])
+      .not("organizations.deleted_at", "is", null);
+    if (error) throw error;
+    return data.map(({ organizations }) => organizations);
+  }
+
   async findDeletedOrganization(organizationId: string) {
     const { data, error } = await this.db
       .from("organizations")

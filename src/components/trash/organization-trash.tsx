@@ -40,15 +40,16 @@ function statusLabel(item: OrganizationTrashItem) {
 }
 
 export function OrganizationTrash({
-  organizationId,
+  overviewHref,
   data,
 }: {
-  organizationId: string;
+  overviewHref: string;
   data: OrganizationTrashData;
 }) {
   const router = useRouter();
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [items, setItems] = useState(data.items);
+  const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function restore(item: OrganizationTrashItem) {
@@ -61,14 +62,14 @@ export function OrganizationTrash({
     }
     setRestoringId(item.id);
     setError(null);
+    setSuccess(null);
     try {
       const response = await fetch(
-        `/api/organizations/${organizationId}/trash`,
+        `/api/organizations/${item.organizationId}/trash`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            organizationId,
             type: item.type,
             id: item.id,
             committeeId: item.committeeId,
@@ -88,6 +89,7 @@ export function OrganizationTrash({
             candidate.id !== item.id || candidate.type !== item.type,
         ),
       );
+      setSuccess(`${item.title} er gendannet.`);
       router.refresh();
     } catch {
       setError("Forbindelsen til serveren mislykkedes. Prøv igen.");
@@ -98,22 +100,26 @@ export function OrganizationTrash({
 
   if (!items.length) {
     return (
-      <EmptyState
-        action={
-          <Link
-            className={buttonClassName({ variant: "secondary" })}
-            href={`/organizations/${organizationId}`}
-          >
-            Tilbage til overblik
-          </Link>
-        }
-        title="Papirkurven er tom"
-      />
+      <>
+        {success ? <p role="status">{success}</p> : null}
+        <EmptyState
+          action={
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href={overviewHref}
+            >
+              Tilbage til overblik
+            </Link>
+          }
+          title="Papirkurven er tom"
+        />
+      </>
     );
   }
 
   return (
     <div className="space-y-4">
+      {success ? <p role="status">{success}</p> : null}
       {error ? (
         <div
           className="alert-danger rounded-[var(--radius-control)] px-4 py-3 text-sm"
