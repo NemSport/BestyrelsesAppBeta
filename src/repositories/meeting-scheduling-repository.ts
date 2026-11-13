@@ -33,7 +33,7 @@ export class MeetingSchedulingRepository {
   async voters(pollId: string) {
     const { data, error } = await this.admin
       .from("meeting_date_poll_voters")
-      .select("email,choices,maybe_choices,comment,token")
+      .select("email,choices,maybe_choices,comment,option_comments,token")
       .eq("poll_id", pollId)
       .order("email");
     if (error) throw error;
@@ -43,7 +43,7 @@ export class MeetingSchedulingRepository {
   async voter(token: string) {
     const { data, error } = await this.admin
       .from("meeting_date_poll_voters")
-      .select("poll_id,choices,maybe_choices,comment")
+      .select("poll_id,choices,maybe_choices,option_comments")
       .eq("token", token)
       .maybeSingle();
     if (error) throw error;
@@ -55,17 +55,21 @@ export class MeetingSchedulingRepository {
       .single();
     if (pollError) throw pollError;
     return (await this.activeScope(poll.organization_id, poll.committee_id))
-      ? { poll, choices: data.choices, maybe_choices: data.maybe_choices, comment: data.comment }
+      ? { poll, choices: data.choices, maybe_choices: data.maybe_choices, option_comments: data.option_comments }
       : null;
   }
 
-  async vote(token: string, answers: { yes: number[]; maybe: number[]; no: number[] }, comment: string) {
-    const { data, error } = await this.admin.rpc("submit_meeting_date_vote_details", {
+  async vote(
+    token: string,
+    answers: { yes: number[]; maybe: number[]; no: number[] },
+    comments: Record<string, string>,
+  ) {
+    const { data, error } = await this.admin.rpc("submit_meeting_date_vote_with_comments", {
       voter_token: token,
       yes_options: answers.yes,
       maybe_options: answers.maybe,
       no_options: answers.no,
-      voter_comment: comment,
+      time_comments: comments,
     });
     if (error) throw error;
     return data;

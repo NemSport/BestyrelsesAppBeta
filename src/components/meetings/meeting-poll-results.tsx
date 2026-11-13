@@ -3,6 +3,7 @@ import { meetingVoteAnswer, meetingVoteAnswers } from "@/lib/meeting-scheduling"
 
 type Voter = Parameters<typeof meetingVoteAnswer>[0] & {
   comment: string | null;
+  option_comments: Record<string, string>;
 };
 
 export function MeetingPollResults({
@@ -29,7 +30,7 @@ export function MeetingPollResults({
                 </th>
               ))}
               {showComments ? (
-                <th scope="col" className="min-w-36 p-3">Kommentar</th>
+                <th scope="col" className="min-w-36 p-3">Generel kommentar</th>
               ) : null}
             </tr>
           </thead>
@@ -38,10 +39,17 @@ export function MeetingPollResults({
               <tr key={labels[index]}>
                 <th scope="row" className="break-words p-3 font-medium">{labels[index]}</th>
                 {options.map((date, option) => {
-                  const answer = meetingVoteAnswer(voter, option + 1);
+                  const position = option + 1;
+                  const answer = meetingVoteAnswer(voter, position);
+                  const comment = voter.option_comments[position];
                   return (
-                    <td className="p-3" key={date}>
+                    <td className="p-3 align-top" key={date}>
                       {answer ? meetingVoteAnswers[answer] : null}
+                      {comment ? (
+                        <p className="mt-1 min-w-36 whitespace-pre-wrap break-words text-muted">
+                          {comment}
+                        </p>
+                      ) : null}
                     </td>
                   );
                 })}
