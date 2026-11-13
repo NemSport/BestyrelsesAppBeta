@@ -33,7 +33,7 @@ export function CreateMeetingPoll({
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const dates = options.map((value) => new Date(value));
+    const dates = form.getAll("options").map((value) => new Date(String(value)));
     if (
       dates.some(
         (value) =>
@@ -91,6 +91,7 @@ export function CreateMeetingPoll({
               <Input
                 className="mt-1 w-full"
                 type="datetime-local"
+                name="options"
                 required
                 value={value}
                 onChange={(event) =>
