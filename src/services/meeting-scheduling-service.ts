@@ -120,6 +120,10 @@ export class MeetingSchedulingService {
       voters.map((voter) => ({
         from,
         to: [voter.email],
+        push: {
+          path: `/meeting-vote/${voter.token}`,
+          body: "Du har fået en datoafstemning.",
+        },
         ...meetingDatePollEmailTemplate(
           poll.title,
           new URL(`/meeting-vote/${voter.token}`, origin).href,

@@ -1720,6 +1720,10 @@ export type Database = {
         Args: { invitation_token: string; answer: string };
         Returns: boolean;
       };
+      email_push_subscriptions: {
+        Args: { recipient_emails: string[] };
+        Returns: { email: string; user_id: string; endpoint: string; keys: Json }[];
+      };
       bestie_generate_messages: { Args: never; Returns: number };
       bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
       bestie_apply_reply: {

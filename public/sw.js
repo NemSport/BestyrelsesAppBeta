@@ -119,9 +119,26 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
+function emailNotificationPath(path) {
+  return typeof path === "string" && (
+    /^\/(meeting-vote|meeting-response|invite)\/[\da-f-]{36}$/i.test(path) ||
+    /^\/organizations\/[\da-f-]{36}\/committees\/[\da-f-]{36}\/meetings\/[\da-f-]{36}$/i.test(path)
+  );
+}
+
 self.addEventListener("push", (event) => {
   const data = event.data?.json();
   if (!data?.path || !data?.tag) return;
+  if (data.kind === "email") {
+    if (!emailNotificationPath(data.path)) return;
+    event.waitUntil(self.registration.showNotification("BestyrelsesMate", {
+      body: data.body,
+      icon: "/icons/app-icon-192.png",
+      tag: data.tag,
+      data,
+    }));
+    return;
+  }
   event.waitUntil(
     self.registration.showNotification("Bestie", {
       body: data.body,
@@ -137,11 +154,13 @@ self.addEventListener("push", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
-  const { path, api, version } = event.notification.data ?? {};
+  const { path, api, version, kind } = event.notification.data ?? {};
   event.notification.close();
-  if (typeof path !== "string" || !/^\/organizations\/[\da-f-]+\/bestie\?samtale=[\da-f-]+$/i.test(path)) return;
+  const email = kind === "email";
+  if (email ? !emailNotificationPath(path) :
+    typeof path !== "string" || !/^\/organizations\/[\da-f-]+\/bestie\?samtale=[\da-f-]+$/i.test(path)) return;
   event.waitUntil((async () => {
-    if (event.action === "reply" && typeof event.reply === "string" && event.reply.trim() &&
+    if (!email && event.action === "reply" && typeof event.reply === "string" && event.reply.trim() &&
         typeof api === "string" && /^\/api\/organizations\/[\da-f-]+\/bestie\/[\da-f-]+$/i.test(api)) {
       const replyId = crypto.randomUUID();
       try {

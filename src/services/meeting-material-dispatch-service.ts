@@ -328,6 +328,7 @@ export class MeetingMaterialDispatchService {
             content: asBase64(pdf),
           });
         }
+        const responseUrl = responseLinks.get(recipient.email.trim().toLowerCase());
         const template = meetingMaterialsEmailTemplate({
           organizationName: organizationContext.organization.name,
           committeeName: committeeContext.committee.name,
@@ -344,12 +345,16 @@ export class MeetingMaterialDispatchService {
           documentNames: documents.map((document) => document.snapshot.name),
           personalTaskList: parsed.taskListMode === "personal",
           meetingUrl,
-          invitationResponseUrl: responseLinks.get(recipient.email.trim().toLowerCase()),
+          invitationResponseUrl: responseUrl,
           branding: emailBranding,
         });
         return emailService.sendPrepared({
           from: getEmailEnv().EMAIL_FROM,
           to: [recipient.email],
+          push: {
+            path: new URL(responseUrl ?? meetingUrl).pathname,
+            body: responseUrl ? "Du har fået en mødeindkaldelse." : "Du har fået nyt mødemateriale.",
+          },
           ...template,
           attachments,
         });
