@@ -70,7 +70,7 @@ export type Database = {
     Tables: {
       bestie_agenda_drafts: {
         Row: BestieAgendaDraftRow;
-        Insert: Omit<BestieAgendaDraftRow, "created_at"> & { created_at?: string };
+        Insert: Omit<BestieAgendaDraftRow, "created_at" | "dismissed_at"> & { created_at?: string; dismissed_at?: string | null };
         Update: Partial<BestieAgendaDraftRow>;
         Relationships: [];
       };
@@ -1736,6 +1736,20 @@ export type Database = {
         Args: { target_meeting: string; drafts: Json };
         Returns: number;
       };
+      review_bestie_agenda_draft: {
+        Args: {
+          target_meeting: string;
+          target_org: string;
+          target_committee: string;
+          draft_kind: string;
+          draft_source: string;
+          dismiss: boolean;
+          edited_title: string | null;
+          rich_description: string | null;
+          rich_objective: string | null;
+        };
+        Returns: boolean;
+      };
       approve_bestie_agenda_draft: {
         Args: { target_meeting: string; target_org: string; target_committee: string; draft_kind: string; draft_source: string; rich_description: string; rich_objective: string };
         Returns: boolean;
@@ -2191,4 +2205,5 @@ export type BestieAgendaDraftRow = {
   description: string;
   objective: string;
   created_at: string;
+  dismissed_at: string | null;
 };

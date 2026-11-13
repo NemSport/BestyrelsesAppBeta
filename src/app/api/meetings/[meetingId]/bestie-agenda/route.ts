@@ -26,6 +26,11 @@ const requestSchema = z.discriminatedUnion("action", [
   scope.extend({
     action: z.literal("approve"),
     suggestion: bestieAgendaSource,
+    changes: bestieAgendaContent.optional(),
+  }),
+  scope.extend({
+    action: z.literal("dismiss"),
+    suggestion: bestieAgendaSource,
   }),
 ]);
 const modelOutput = z.object({
@@ -73,7 +78,7 @@ export async function POST(
 
     const repository = new BestieAgendaRepository(db);
     const drafts = await repository.listDrafts(meetingId);
-    if (input.action === "approve") {
+    if (input.action !== "suggest") {
       const item = drafts.find(
         ({ sourceKind, sourceId }) =>
           sourceKind === input.suggestion.sourceKind &&
@@ -81,35 +86,43 @@ export async function POST(
       );
       if (!item)
         throw new AppError("Forslaget er ikke længere tilgængeligt.", 409);
-      const { data, error } = await db.rpc("approve_bestie_agenda_draft", {
+      const dismiss = input.action === "dismiss";
+      const content =
+        input.action === "approve" ? (input.changes ?? item) : null;
+      const { data, error } = await db.rpc("review_bestie_agenda_draft", {
         target_meeting: meetingId,
         target_org: organizationId,
         target_committee: committeeId,
         draft_kind: item.sourceKind,
         draft_source: item.sourceId,
-        rich_description: plainTextToRichText(item.description),
-        rich_objective: plainTextToRichText(item.objective),
+        dismiss,
+        edited_title: content?.title ?? null,
+        rich_description: content && plainTextToRichText(content.description),
+        rich_objective: content && plainTextToRichText(content.objective),
       });
       if (error) throw error;
       if (!data)
         throw new AppError(
-          "Forslaget kan ikke tilføjes. Det kan allerede være på dagsordenen, eller mødet eller kilden kan være ændret.",
+          dismiss
+            ? "Forslaget kunne ikke afvises. Genindlæs siden og prøv igen."
+            : "Forslaget kan ikke tilføjes. Det kan allerede være på dagsordenen, eller mødet eller kilden kan være ændret.",
           409,
         );
-      return NextResponse.json({ approved: true });
+      return NextResponse.json({ reviewed: true });
     }
 
-    const [tasks, decisions, approved] = await Promise.all([
+    const [tasks, decisions, approved, dismissed] = await Promise.all([
       new TaskRepository(db).listByCommittee(committeeId),
       new DecisionRepository(db).listByCommittee(organizationId, committeeId),
       db
         .from("bestie_agenda_sources")
         .select("source_kind,source_id")
         .eq("meeting_id", meetingId),
+      repository.listDismissed(meetingId),
     ]);
     if (approved.error) throw approved.error;
     const added = new Set(
-      approved.data.map(
+      [...approved.data, ...dismissed].map(
         ({ source_kind, source_id }) => `${source_kind}:${source_id}`,
       ),
     );
@@ -125,7 +138,8 @@ export async function POST(
         agenda_items ? [titleKey(agenda_items.title)] : [],
       ),
     );
-    for (const { title } of drafts) titles.add(titleKey(title));
+    for (const { title } of [...drafts, ...dismissed])
+      titles.add(titleKey(title));
     const candidates = (["task", "decision"] as const).flatMap((sourceKind) =>
       (sourceKind === "task" ? tasks : decisions)
         .filter(
