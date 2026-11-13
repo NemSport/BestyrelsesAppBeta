@@ -2935,3 +2935,12 @@ Reviewers can change the title, background and purpose before approving.
 Dismissal retains the meeting and source key so concurrent or subsequent
 generations cannot recreate the dismissed draft for the same meeting. The
 review transaction uses the agenda lock and rejects already reviewed drafts.
+
+The scheduled Bestie job selects the next meeting per active committee in the
+final 72 hours. A meeting can opt in by selecting an active reviewer with
+agenda scheduling access. The database verifies that access when assigning the
+reviewer, claiming the reminder and storing generated drafts. The manual and
+scheduled flows use the same source filtering and structured generation. A
+service-only reminder stores the claim, generation audit metadata, and push
+delivery state per meeting and reviewer. Push opens the authenticated meeting
+preparation page at the proposals; all agenda changes require review there.

@@ -272,7 +272,7 @@ export const committeeUpdateSchema = committeeInputSchema.extend({
 });
 
 export const meetingUpdateSchema = meetingInputSchema.and(
-  z.object({ meetingId: uuidSchema }),
+  z.object({ meetingId: uuidSchema, responsibleUserId: z.union([uuidSchema, z.literal(""), z.null()]).optional() }),
 );
 
 export const agendaItemUpdateSchema = agendaItemContentSchema.extend({

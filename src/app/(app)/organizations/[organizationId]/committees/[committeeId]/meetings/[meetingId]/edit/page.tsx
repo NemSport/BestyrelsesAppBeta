@@ -1,8 +1,10 @@
+import { meetingResponsibleOptions } from "@/lib/meeting-responsible";
 import { notFound } from "next/navigation";
 
 import { MeetingEditForm } from "@/components/meetings/meeting-edit-form";
 import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
+import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { MeetingService } from "@/services/meeting-service";
@@ -27,6 +29,7 @@ export default async function EditMeetingPage({
     .get(organizationId, committeeId, meetingId)
     .catch(() => null);
   if (!meeting) notFound();
+  const members = await new OrganizationMemberRepository(db).listMembers(organizationId);
   const root = `/organizations/${organizationId}/committees/${committeeId}`;
 
   return (
@@ -41,6 +44,7 @@ export default async function EditMeetingPage({
         <MeetingEditForm
           committeeId={committeeId}
           meeting={meeting}
+          responsibleOptions={meetingResponsibleOptions(members, committeeId)}
           organizationId={organizationId}
           successPath={`${root}/meetings/${meetingId}`}
         />
