@@ -115,5 +115,10 @@ test("email push opens a personal meeting response without sending a Bestie repl
   assert.equal(shown[0].details.actions, undefined);
   await dispatch("notificationclick", click("Svar", { ...data, api }));
   await dispatch("notificationclick", click(undefined, { ...data, path: "//other.example" }));
-  assert.deepEqual(urls, [`https://example.com${responsePath}`]);
+  const approvalPath = `/organizations/${org}/committees/${org}/meetings/${thread}#minutes-approval`;
+  await dispatch("notificationclick", click(undefined, { ...data, path: approvalPath }));
+  assert.deepEqual(urls, [
+    `https://example.com${responsePath}`,
+    `https://example.com${approvalPath}`,
+  ]);
 });

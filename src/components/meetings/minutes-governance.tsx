@@ -601,6 +601,7 @@ export function MinutesApprovalPanel({
   canEdit,
   canApprove,
   attachmentCount = 0,
+  hasSavedAgendaMinutes = false,
   className,
   compact = false,
 }: {
@@ -620,6 +621,7 @@ export function MinutesApprovalPanel({
   canEdit: boolean;
   canApprove: boolean;
   attachmentCount?: number;
+  hasSavedAgendaMinutes?: boolean;
   className?: string;
   compact?: boolean;
 }) {
@@ -819,7 +821,7 @@ export function MinutesApprovalPanel({
   const hasApprovalRound =
     minutes?.status === "ready_for_approval" || minutes?.status === "approved";
   const canSendForApproval =
-    canEdit && Boolean(minutes) && approvalRecipientInfo.eligibleCount > 0;
+    canEdit && (Boolean(minutes) || hasSavedAgendaMinutes) && approvalRecipientInfo.eligibleCount > 0;
   const canStartApproval = canEdit;
   const approvalRecipientHelp =
     approvalRecipientInfo.mode === "participants"

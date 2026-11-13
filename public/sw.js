@@ -122,7 +122,7 @@ self.addEventListener("fetch", (event) => {
 function emailNotificationPath(path) {
   return typeof path === "string" && (
     /^\/(meeting-vote|meeting-response|invite)\/[\da-f-]{36}$/i.test(path) ||
-    /^\/organizations\/[\da-f-]{36}\/committees\/[\da-f-]{36}\/meetings\/[\da-f-]{36}$/i.test(path)
+    /^\/organizations\/[\da-f-]{36}\/committees\/[\da-f-]{36}\/meetings\/[\da-f-]{36}(?:#minutes-approval)?$/i.test(path)
   );
 }
 

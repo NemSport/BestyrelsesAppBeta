@@ -3198,6 +3198,9 @@ export function MeetingMinutesSection({
 
   useEffect(() => {
     function syncSelectionFromHash() {
+      if (window.location.hash === "#minutes-approval") {
+        setWorkspaceMode("review");
+      }
       const nextId = occurrenceIdFromHash(window.location.hash, occurrences);
       if (
         activeOccurrenceIdRef.current &&
@@ -3223,6 +3226,12 @@ export function MeetingMinutesSection({
     return () =>
       window.removeEventListener("hashchange", syncSelectionFromHash);
   }, [occurrences]);
+
+  useEffect(() => {
+    if (workspaceMode === "review" && window.location.hash === "#minutes-approval") {
+      document.getElementById("minutes-approval")?.scrollIntoView();
+    }
+  }, [workspaceMode]);
 
   const activeIndex = Math.max(
     0,
@@ -4112,6 +4121,11 @@ export function MeetingMinutesSection({
                 className="min-w-0"
                 committeeId={committeeId}
                 compact
+                hasSavedAgendaMinutes={initialAgendaItemMinutes.some((entry) =>
+                  [entry.notes, entry.decision, entry.follow_up].some((text) =>
+                    Boolean(richTextToPlainText(text).trim()),
+                  ),
+                )}
                 meetingId={meetingId}
                 minutes={minutes ?? initialMeetingMinutes}
                 organizationId={organizationId}
