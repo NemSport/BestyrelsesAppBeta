@@ -18,6 +18,7 @@ export const meetingDatePollInput = meetingSchedulingScope.extend({
         values.length >= 2 &&
         values.every((value) => Date.parse(value) > Date.now()),
     ),
+  memberIds: z.array(z.string().uuid()).max(500).default([]),
   emails: z
     .array(
       z
@@ -27,7 +28,6 @@ export const meetingDatePollInput = meetingSchedulingScope.extend({
         .email()
         .transform((value) => value.toLowerCase()),
     )
-    .min(1)
     .max(50)
     .transform((values) => [...new Set(values)]),
 });

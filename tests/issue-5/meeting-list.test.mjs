@@ -21,7 +21,6 @@ const [
   meetingList,
   agendaPreview,
   filters,
-  overviewContext,
   repository,
 ] = await Promise.all([
   source(
@@ -33,7 +32,6 @@ const [
   source("../../src/components/meetings/meeting-list.tsx"),
   source("../../src/components/meetings/meeting-agenda-preview.tsx"),
   source("../../src/components/meetings/meeting-list-filters.tsx"),
-  source("../../src/components/meetings/meeting-overview-context.tsx"),
   source("../../src/repositories/meeting-repository.ts"),
 ]);
 
@@ -251,17 +249,13 @@ test("agenda preview is accessible, linked, and limited to four rows", () => {
   );
 });
 
-test("organization overview uses the existing shell and a full-width list with expandable context", () => {
+test("organization overview separates upcoming and past meetings above the filters", () => {
   assert.match(organizationPage, /title="Mødeoversigt"/);
-  assert.match(organizationPage, /data-meeting-overview/);
-  assert.doesNotMatch(organizationPage, /79fr.*21fr/);
-  assert.match(organizationPage, /meetings\/polls[`][\s\S]*Datoafstemning/);
-  assert.match(overviewContext, /<details[\s\S]*Genveje og opfølgning/);
-  assert.match(organizationPage, /<MeetingOverviewContext/);
-  assert.match(overviewContext, /Næste møde/);
-  assert.match(overviewContext, /Kræver handling/);
-  assert.match(overviewContext, /Hurtig adgang/);
-  assert.doesNotMatch(organizationPage, /AppShell|OrganizationNav|Topbar/);
+  assert.match(organizationPage, /meetingsRoot}\/polls/);
+  assert.match(organizationPage, /<nav aria-label="Mødeperiode"/);
+  assert.match(organizationPage, /"previous", "Afholdte møder"/);
+  assert.match(organizationPage, /showPeriod=\{false\}/);
+  assert.doesNotMatch(organizationPage, /MeetingOverviewContext/);
 });
 
 test("create meeting remains capability-gated", () => {

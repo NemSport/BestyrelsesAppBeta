@@ -20,20 +20,29 @@ export function CreateMeetingPoll({
   organizationId,
   committeeId,
   root,
+  members,
 }: {
   organizationId: string;
   committeeId: string;
   root: string;
+  members: { id: string; name: string; email: string | null }[];
 }) {
   const router = useRouter();
   const [options, setOptions] = useState(["", ""]);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const selectable = members.filter(({ email }) => email).map(({ id }) => id);
+  const allSelected =
+    selectable.length > 0 &&
+    selectable.every((id) => selectedMembers.includes(id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const dates = form.getAll("options").map((value) => new Date(String(value)));
+    const dates = form
+      .getAll("options")
+      .map((value) => new Date(String(value)));
     if (
       dates.some(
         (value) =>
@@ -52,6 +61,7 @@ export function CreateMeetingPoll({
         organizationId,
         title: form.get("title"),
         options: dates.map((date) => date.toISOString()),
+        memberIds: selectedMembers,
         emails: String(form.get("emails"))
           .split(/[\s,;]+/)
           .filter(Boolean),
@@ -126,12 +136,58 @@ export function CreateMeetingPoll({
           Tilføj tidspunkt
         </Button>
       </fieldset>
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-sm font-semibold">
+          Medlemmer af udvalget
+        </legend>
+        {selectable.length ? (
+          <label className="flex min-h-10 items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => setSelectedMembers(allSelected ? [] : selectable)}
+            />
+            Vælg alle medlemmer med mailadresse
+          </label>
+        ) : null}
+        {members.length ? (
+          <div className="max-h-56 divide-y divide-line overflow-y-auto rounded-lg border border-line px-3">
+            {members.map(({ id, name, email }) => (
+              <label
+                key={id}
+                className="flex min-h-10 items-center gap-2 py-1 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedMembers.includes(id)}
+                  disabled={!email}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setSelectedMembers((current) =>
+                      checked
+                        ? [...current, id]
+                        : current.filter((value) => value !== id),
+                    );
+                  }}
+                />
+                <span className="break-words">
+                  {name}
+                  {!email ? " · Mangler mailadresse" : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">
+            Udvalget har ingen aktive medlemmer.
+          </p>
+        )}
+      </fieldset>
       <label className="block text-sm font-medium">
-        Deltagernes mailadresser
+        Eksterne deltagere
         <textarea
           name="emails"
-          rows={4}
-          required
+          rows={3}
           className="mt-1 w-full rounded-lg border border-line bg-canvas p-3"
           placeholder="Én adresse pr. linje"
           aria-describedby="poll-email-help"

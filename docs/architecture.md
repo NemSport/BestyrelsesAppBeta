@@ -2908,3 +2908,10 @@ tokens from referrers, search indexing, and the offline cache. Committee
 manager checks protect the administration views. The token-bearing tables
 and public-response database functions are accessible only through the server
 with the service role.
+
+The organization meeting overview keeps upcoming and past meetings in separate
+views. Its date poll link opens a committee picker restricted to committees
+where the user can create meetings. Poll forms submit member IDs and external
+email addresses. The service resolves active committee members against the
+current directory and deduplicates their addresses with the external list
+before calling the poll creation function.

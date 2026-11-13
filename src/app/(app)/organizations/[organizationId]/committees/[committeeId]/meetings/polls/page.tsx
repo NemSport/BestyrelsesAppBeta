@@ -13,17 +13,30 @@ export default async function MeetingPollsPage({
 }) {
   const scope = await params;
   const root = `/organizations/${scope.organizationId}/committees/${scope.committeeId}/meetings/polls`;
-  const polls = await new MeetingSchedulingService(await createClient())
-    .list(scope)
-    .catch((error: unknown) => {
-      if (error instanceof AppError && [403, 404].includes(error.statusCode))
-        notFound();
-      throw error;
-    });
+  const service = new MeetingSchedulingService(await createClient());
+  const [polls, { committeeName, members }] = await Promise.all([
+    service.list(scope),
+    service.committeeRecipients(scope),
+  ]).catch((error: unknown) => {
+    if (error instanceof AppError && [403, 404].includes(error.statusCode))
+      notFound();
+    throw error;
+  });
   return (
     <div className="section-stack">
-      <PageHeader title="Datoafstemninger" />
-      <CreateMeetingPoll {...scope} root={root} />
+      <PageHeader
+        title="Datoafstemninger"
+        description={committeeName}
+        actions={
+          <Link
+            className="text-sm font-semibold text-brand underline"
+            href={`/organizations/${scope.organizationId}/meetings/polls`}
+          >
+            Skift udvalg
+          </Link>
+        }
+      />
+      <CreateMeetingPoll {...scope} root={root} members={members} />
       {polls.length ? (
         <section className="panel max-w-2xl p-5">
           <h2 className="font-semibold">Oprettede afstemninger</h2>
