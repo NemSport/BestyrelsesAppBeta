@@ -1,3 +1,4 @@
+import { meetingResponsibleOptions } from "@/lib/meeting-responsible";
 import { EnableMeetingTaskFollowUp } from "@/components/meetings/meeting-task-follow-up";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -530,6 +531,7 @@ export default async function MeetingPage({
                 </div>
                 {meetingCapabilities.updateMeeting ? (
                   <EditMeetingModal
+                    responsibleOptions={meetingResponsibleOptions(memberDirectory, committeeId)}
                     committeeId={committeeId}
                     meeting={meeting}
                     organizationId={organizationId}

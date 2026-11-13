@@ -8,6 +8,7 @@ export function MeetingEditForm({
   organizationId,
   committeeId,
   meeting,
+  responsibleOptions,
   successPath,
   onSuccess,
   onCancel,
@@ -15,6 +16,7 @@ export function MeetingEditForm({
   organizationId: string;
   committeeId: string;
   meeting: Meeting;
+  responsibleOptions: Array<{ value: string; label: string }>;
   successPath?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -54,6 +56,19 @@ export function MeetingEditForm({
           name: "location",
           label: "Sted",
           defaultValue: meeting.location,
+        },
+        {
+          name: "responsibleUserId",
+          label: "Mødeansvarlig",
+          type: "select",
+          defaultValue: responsibleOptions.some(
+            ({ value }) => value === meeting.responsible_user_id,
+          )
+            ? meeting.responsible_user_id
+            : "",
+          options: [{ value: "", label: "Ingen valgt" }, ...responsibleOptions],
+          helpText:
+            "Bestie sender forslag til den mødeansvarlige, når mødet nærmer sig.",
         },
       ]}
       hidden={{ organizationId, committeeId }}

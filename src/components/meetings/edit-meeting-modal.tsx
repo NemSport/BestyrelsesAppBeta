@@ -12,10 +12,12 @@ export function EditMeetingModal({
   organizationId,
   committeeId,
   meeting,
+  responsibleOptions,
 }: {
   organizationId: string;
   committeeId: string;
   meeting: Meeting;
+  responsibleOptions: Array<{ value: string; label: string }>;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -42,6 +44,7 @@ export function EditMeetingModal({
         <MeetingEditForm
           committeeId={committeeId}
           meeting={meeting}
+          responsibleOptions={responsibleOptions}
           onCancel={close}
           onSuccess={updated}
           organizationId={organizationId}

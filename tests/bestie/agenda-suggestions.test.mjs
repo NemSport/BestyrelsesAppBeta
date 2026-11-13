@@ -21,9 +21,14 @@ async function approve(meeting, kind, source, title) {
 
 before(async () => {
   await db.exec(`
-    create role anon; create role authenticated;
+    create role anon; create role authenticated; create role service_role;
     create schema auth;
-    create function auth.uid() returns uuid language sql as $$ select gen_random_uuid() $$;
+    create function auth.uid() returns uuid language sql as
+      $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), '')::uuid, gen_random_uuid()) $$;
+    create table profiles(id uuid primary key default gen_random_uuid());
+    create table organization_members(organization_id uuid, user_id uuid, status text, role text);
+    create table committee_members(organization_id uuid, committee_id uuid, user_id uuid, status text, role text);
+    create table bestie_push_subscriptions(user_id uuid);
     create function public.can_manage_committee(uuid) returns boolean language sql as
       $$ select $1::text = current_setting('test.committee', true) $$;
     create function public.can_edit_agenda_item(uuid) returns boolean language sql as
@@ -81,6 +86,10 @@ before(async () => {
 
   await db.exec(
     await readMigration("202611140002_review_bestie_agenda_drafts.sql"),
+  );
+
+  await db.exec(
+    await readMigration("202611140003_proactive_bestie_agenda.sql"),
   );
 
   organization = await insert("insert into organizations default values");
@@ -305,4 +314,97 @@ test("review approves the edited text and remembers a dismissal only for its mee
     next,
   ]);
   assert.equal(await save(later, [suggestions[1]]), 1);
+});
+
+test("scheduled suggestions claim only the eligible assigned reviewer and preserve delivery state", async () => {
+  const reviewer = await insert("insert into profiles default values");
+  const other = await insert("insert into profiles default values");
+  const newCommittee = await insert(
+    "insert into committees (organization_id) values ($1)",
+    [organization],
+  );
+  await db.query(
+    "insert into organization_members values ($1, $2, 'active', 'member'), ($1, $3, 'active', 'member')",
+    [organization, reviewer, other],
+  );
+  await db.query(
+    "insert into committee_members values ($1, $2, $3, 'active', 'chair')",
+    [organization, newCommittee, reviewer],
+  );
+  const due = await insert(
+    "insert into meetings (organization_id, committee_id, starts_at) values ($1, $2, now() + interval '1 day')",
+    [organization, newCommittee],
+  );
+  await insert(
+    "insert into meetings (organization_id, committee_id, starts_at, responsible_user_id) values ($1, $2, now() + interval '2 days', $3)",
+    [organization, newCommittee, reviewer],
+  );
+
+  const assign = (user) =>
+    db.query("update meetings set responsible_user_id = $1 where id = $2", [
+      user,
+      due,
+    ]);
+  const claim = () => db.query("select * from claim_bestie_agendas()");
+  assert.equal((await claim()).rows.length, 0);
+  await assert.rejects(assign(other), { code: "23514" });
+  await assign(reviewer);
+  const [claimed] = (await claim()).rows;
+  assert.equal(claimed.meeting_id, due);
+  assert.equal(claimed.user_id, reviewer);
+  assert.equal((await claim()).rows.length, 0);
+
+  const source = await insert(
+    "insert into tasks (organization_id, committee_id) values ($1, $2)",
+    [organization, newCommittee],
+  );
+  await db.query("select set_config('test.committee', $1, false)", [
+    newCommittee,
+  ]);
+  const drafts = JSON.stringify([
+    {
+      source_kind: "task",
+      source_id: source,
+      title: "Gennemgå budget",
+      description: "",
+      objective: "Drøft næste skridt",
+    },
+  ]);
+  const prepare = () =>
+    db.query(
+      "select save_proactive_bestie_agenda_drafts($1, $2, $3, $4, null) as prepared",
+      [due, reviewer, claimed.claimed_at, drafts],
+    );
+  assert.deepEqual((await prepare()).rows, [{ prepared: true }]);
+  assert.deepEqual((await prepare()).rows, [{ prepared: false }]);
+  assert.deepEqual(
+    (
+      await db.query(
+        "select title from bestie_agenda_drafts where meeting_id = $1",
+        [due],
+      )
+    ).rows,
+    [{ title: "Gennemgå budget" }],
+  );
+  await db.query(
+    "update bestie_agenda_reminders set claimed_at = now() - interval '11 minutes' where meeting_id = $1",
+    [due],
+  );
+  assert.equal((await claim()).rows.length, 0);
+  await db.query("insert into bestie_push_subscriptions values ($1)", [
+    reviewer,
+  ]);
+  assert.ok((await claim()).rows[0].prepared_at);
+  await db.query(
+    "update organization_members set status = 'inactive' where user_id = $1",
+    [reviewer],
+  );
+  assert.equal(
+    (
+      await db.query("select * from bestie_due_agendas where meeting_id = $1", [
+        due,
+      ])
+    ).rows.length,
+    0,
+  );
 });

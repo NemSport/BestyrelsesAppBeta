@@ -122,3 +122,21 @@ test("email push opens a personal meeting response without sending a Bestie repl
     `https://example.com${approvalPath}`,
   ]);
 });
+
+test("agenda push opens meeting preparation at the saved drafts", async () => {
+  const shown = [];
+  const urls = [];
+  const dispatch = serviceWorker({
+    showNotification: async (title, details) => shown.push({ title, details }),
+    fetch: async () => assert.fail("Review requires the meeting page."),
+    openWindow: async (url) => urls.push(url),
+  });
+  const path = `/organizations/${org}/committees/${org}/meetings/${thread}?view=preparation#bestie-agenda-heading`;
+  const data = { kind: "agenda", path, tag: thread, body: "Forslag klar" };
+  await dispatch("push", { data: { json: () => data } });
+  assert.equal(shown[0].title, "Bestie");
+  assert.equal(shown[0].details.actions, undefined);
+  await dispatch("notificationclick", click("Svar", data));
+  await dispatch("notificationclick", click(undefined, { ...data, path: "//other.example" }));
+  assert.deepEqual(urls, [`https://example.com${path}`]);
+});

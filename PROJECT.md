@@ -188,7 +188,10 @@ Bestie for agenda suggestions based on open tasks and unfinished decisions in
 that committee. Each suggestion shows its source and can be added to the
 agenda individually after review. Remaining suggestions stay on the meeting
 for later review. Reviewers can edit the title, background and purpose before
-approval, or dismiss a suggestion for the current meeting.
+approval, or dismiss a suggestion for the current meeting. Managers can select
+a meeting reviewer under Edit Meeting. The daily Bestie job prepares suggestions
+in the final 72 hours before the next scheduled meeting and sends that reviewer
+a push when drafts are ready.
 
 ### During a Meeting
 

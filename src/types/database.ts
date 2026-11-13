@@ -68,6 +68,12 @@ export type Database = {
   };
   public: {
     Tables: {
+      bestie_agenda_reminders: {
+        Row: { meeting_id: string; user_id: string; claimed_at: string; prepared_at: string | null; finished_at: string | null; push_sent_at: string | null; generation: Json };
+        Insert: never;
+        Update: { finished_at?: string; push_sent_at?: string | null };
+        Relationships: [];
+      };
       bestie_agenda_drafts: {
         Row: BestieAgendaDraftRow;
         Insert: Omit<BestieAgendaDraftRow, "created_at" | "dismissed_at"> & { created_at?: string; dismissed_at?: string | null };
@@ -617,6 +623,7 @@ export type Database = {
           starts_at: string;
           ends_at: string | null;
           location: string | null;
+          responsible_user_id: string | null;
           created_by: string;
           deleted_at: string | null;
           deleted_by: string | null;
@@ -634,6 +641,7 @@ export type Database = {
           starts_at: string;
           ends_at?: string | null;
           location?: string | null;
+          responsible_user_id?: string | null;
           deleted_at?: string | null;
           deleted_by?: string | null;
           delete_expires_at?: string | null;
@@ -646,6 +654,7 @@ export type Database = {
           starts_at?: string;
           ends_at?: string | null;
           location?: string | null;
+          responsible_user_id?: string | null;
           deleted_at?: string | null;
           deleted_by?: string | null;
           delete_expires_at?: string | null;
@@ -1700,8 +1709,21 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      bestie_due_agendas: {
+        Row: { meeting_id: string; organization_id: string; committee_id: string; user_id: string; starts_at: string };
+        Relationships: [];
+      };
+    };
     Functions: {
+      claim_bestie_agendas: {
+        Args: Record<PropertyKey, never>;
+        Returns: BestieAgendaClaim[];
+      };
+      save_proactive_bestie_agenda_drafts: {
+        Args: { target_meeting: string; reviewer: string; claim_time: string; drafts: Json; generation_log: Json };
+        Returns: boolean;
+      };
       create_meeting_date_poll: {
         Args: { target_organization: string; target_committee: string; poll_title: string; poll_options: string[]; voter_emails: string[] };
         Returns: string;
@@ -2206,4 +2228,13 @@ export type BestieAgendaDraftRow = {
   objective: string;
   created_at: string;
   dismissed_at: string | null;
+};
+
+export type BestieAgendaClaim = {
+  meeting_id: string;
+  user_id: string;
+  organization_id: string;
+  committee_id: string;
+  claimed_at: string;
+  prepared_at: string | null;
 };

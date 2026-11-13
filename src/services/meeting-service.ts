@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { NotFoundError } from "@/lib/errors";
+import { AppError, NotFoundError } from "@/lib/errors";
+import { meetingResponsibleOptions } from "@/lib/meeting-responsible";
 import { normalizeExternalAttendeeForPersistence } from "@/lib/meeting-participants";
 import { sanitizeRichText } from "@/lib/rich-text";
 import {
@@ -228,12 +229,21 @@ export class MeetingService {
     ) {
       throw new NotFoundError("Mødet");
     }
+    if (parsed.responsibleUserId) {
+      const members = await this.members.listMembers(parsed.organizationId);
+      if (!meetingResponsibleOptions(members, parsed.committeeId).some(
+        ({ value }) => value === parsed.responsibleUserId,
+      )) {
+        throw new AppError("Vælg en mødeansvarlig, der kan godkende dagsordenspunkter.", 422);
+      }
+    }
     return this.meetings.update(parsed.meetingId, {
       title: parsed.title,
       description: parsed.description,
       starts_at: parsed.startsAt,
       ends_at: parsed.endsAt ?? null,
       location: parsed.location ?? null,
+      responsible_user_id: parsed.responsibleUserId === undefined ? undefined : parsed.responsibleUserId || null,
     });
   }
 

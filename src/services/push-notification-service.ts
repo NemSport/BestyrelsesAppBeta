@@ -19,7 +19,7 @@ export type EmailPush = {
 export async function sendDevicePush(
   db: ReturnType<typeof createAdminClient>,
   { endpoint, keys, user_id }: Subscription,
-  payload: EmailPush & { tag: string },
+  payload: EmailPush & { tag: string; kind?: "email" | "agenda" },
   config: PushConfig,
 ) {
   if (
@@ -78,8 +78,7 @@ export async function sendEmailPushes(
   await Promise.all(data.map((subscription) => {
     const push = byEmail.get(subscription.email);
     if (push) {
-      const payload = { ...push, tag, kind: "email" };
-      return sendDevicePush(db, subscription, payload, config);
+      return sendDevicePush(db, subscription, { ...push, tag, kind: "email" }, config);
     }
   }));
 }
