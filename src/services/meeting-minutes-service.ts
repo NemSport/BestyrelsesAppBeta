@@ -1392,8 +1392,8 @@ export class MeetingMinutesService {
             committeeName: data.committee.name,
             meetingTitle: data.meeting.title,
             meetingDate: formatDanishDateTime(data.meeting.starts_at, "full"),
-            approvalUrl: meetingUrl,
-            pushPath: `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`,
+            approvalUrl: `${meetingUrl}#minutes-approval`,
+            pushPath: `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}#minutes-approval`,
             personalTasks: data.tasks
               .filter((task) => task.responsible_user_id === approval.user_id)
               .map((task) =>
