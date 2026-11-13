@@ -4,15 +4,20 @@ import clsx from "clsx";
 import { AppIcon } from "@/components/icons/app-icon";
 import { buttonClassName } from "@/components/ui";
 import { meetingStatusLabels } from "@/lib/localization";
-import { getMeetingListHref, type MeetingListFilters } from "@/lib/meeting-list";
+import {
+  getMeetingListHref,
+  type MeetingListFilters,
+} from "@/lib/meeting-list";
 
 export function MeetingListFilters({
   filters,
   resetHref,
   committees = [],
+  showPeriod = true,
 }: {
   filters: MeetingListFilters;
   resetHref: string;
+  showPeriod?: boolean;
   committees?: Array<{ id: string; name: string }>;
 }) {
   const active = Boolean(filters.committeeId || filters.date || filters.status);
@@ -26,32 +31,34 @@ export function MeetingListFilters({
       id="meeting-filters"
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end">
-        <div
-          aria-label="Mødeperiode"
-          className="inline-flex w-fit shrink-0 rounded-[var(--radius-control)] bg-subtle p-0.5"
-          role="group"
-        >
-          {(
-            [
-              ["upcoming", "Kommende"],
-              ["previous", "Afholdte"],
-            ] as const
-          ).map(([period, label]) => (
-            <Link
-              aria-current={selectedPeriod === period ? "page" : undefined}
-              className={clsx(
-                "rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-semibold leading-5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
-                selectedPeriod === period
-                  ? "bg-brand text-white shadow-sm"
-                  : "text-muted hover:bg-surface hover:text-ink",
-              )}
-              href={getMeetingListHref(resetHref, { ...filters, period })}
-              key={period}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
+        {showPeriod ? (
+          <div
+            aria-label="Mødeperiode"
+            className="inline-flex w-fit shrink-0 rounded-[var(--radius-control)] bg-subtle p-0.5"
+            role="group"
+          >
+            {(
+              [
+                ["upcoming", "Kommende"],
+                ["previous", "Afholdte"],
+              ] as const
+            ).map(([period, label]) => (
+              <Link
+                aria-current={selectedPeriod === period ? "page" : undefined}
+                className={clsx(
+                  "rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-semibold leading-5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+                  selectedPeriod === period
+                    ? "bg-brand text-white shadow-sm"
+                    : "text-muted hover:bg-surface hover:text-ink",
+                )}
+                href={getMeetingListHref(resetHref, { ...filters, period })}
+                key={period}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        ) : null}
         <h2 className="sr-only" id="meeting-list-filter-heading">
           Filtrér møder
         </h2>

@@ -7,6 +7,7 @@ import {
   finalizeDatePoll,
   MeetingSchedulingRepository,
 } from "@/repositories/meeting-scheduling-repository";
+import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
 import { AuthorizationService } from "@/services/authorization-service";
 import { EmailService } from "@/services/email-service";
@@ -46,11 +47,58 @@ export class MeetingSchedulingService {
     return { poll, voters: await repository.voters(poll.id) };
   }
 
+  async committeeRecipients(scope: Scope) {
+    const { committee } = await this.requireManager(scope);
+    const members = await new OrganizationMemberRepository(this.db).listMembers(
+      scope.organizationId,
+    );
+    return {
+      committeeName: committee.name,
+      members: members
+        .filter(
+          (member) =>
+            member.status === "active" &&
+            member.committees.some(
+              (membership) => membership.id === scope.committeeId,
+            ),
+        )
+        .map((member) => ({
+          id: member.user_id,
+          name: member.full_name || member.email || "Medlem",
+          email: member.email?.trim() || null,
+        })),
+    };
+  }
+
   async create(
-    input: Scope & { title: string; options: string[]; emails: string[] },
+    input: Scope & {
+      title: string;
+      options: string[];
+      emails: string[];
+      memberIds: string[];
+    },
   ) {
-    await this.requireManager(input);
-    return createDatePoll(this.db, input);
+    const { members } = await this.committeeRecipients(input);
+    const emailsById = new Map(members.map(({ id, email }) => [id, email]));
+    const selectedEmails = input.memberIds.map((id) => emailsById.get(id));
+    if (selectedEmails.some((email) => !email)) {
+      throw new AppError(
+        "Et valgt medlem mangler en mailadresse eller er ikke længere i udvalget. Genindlæs siden.",
+        422,
+      );
+    }
+    const emails = [
+      ...new Set([
+        ...input.emails,
+        ...selectedEmails.flatMap((email) =>
+          email ? [email.toLowerCase()] : [],
+        ),
+      ]),
+    ];
+    if (!emails.length || emails.length > 50) {
+      throw new AppError("Vælg mellem 1 og 50 modtagere med mailadresse.", 422);
+    }
+    return createDatePoll(this.db, { ...input, emails });
   }
 
   async finalize(input: Scope & { pollId: string; optionIndex: number }) {

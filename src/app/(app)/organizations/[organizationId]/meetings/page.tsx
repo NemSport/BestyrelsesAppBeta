@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { AppIcon } from "@/components/icons/app-icon";
 import { MeetingList } from "@/components/meetings/meeting-list";
 import { MeetingListFilters } from "@/components/meetings/meeting-list-filters";
-import { MeetingOverviewContext } from "@/components/meetings/meeting-overview-context";
 import { EmptyState, PageHeader, buttonClassName } from "@/components/ui";
 import {
   filterMeetingList,
@@ -86,7 +85,6 @@ export default async function OrganizationMeetingsPage({
       : "",
   };
   const now = Date.now();
-  const grouped = groupMeetingList(meetingEntries, now);
   const filteredGrouped = groupMeetingList(
     filterMeetingList(meetingEntries, { ...safeFilters, period: "" }, now),
     now,
@@ -119,7 +117,7 @@ export default async function OrganizationMeetingsPage({
               <>
                 <Link
                   className={buttonClassName({ size: "sm" })}
-                  href={`${organizationRoot}/committees/${meetingCommittee.committee.id}/meetings/polls`}
+                  href={`${meetingsRoot}/polls`}
                 >
                   <AppIcon aria-hidden="true" name="calendar" size={15} />
                   Datoafstemning
@@ -139,12 +137,38 @@ export default async function OrganizationMeetingsPage({
         title="Mødeoversigt"
       />
 
+      <nav
+        aria-label="Mødeperiode"
+        className="flex flex-wrap gap-1 border-b border-line"
+      >
+        {(
+          [
+            ["upcoming", "Kommende møder"],
+            ["previous", "Afholdte møder"],
+          ] as const
+        ).map(([period, label]) => (
+          <Link
+            key={period}
+            aria-current={safeFilters.period === period ? "page" : undefined}
+            className={`inline-flex min-h-11 items-center border-b-2 px-3 text-sm font-semibold ${safeFilters.period === period ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`}
+            href={getMeetingListHref(meetingsRoot, {
+              committeeId: safeFilters.committeeId,
+              period,
+              date: "",
+              status: "",
+            })}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
       <MeetingListFilters
         committees={overview.committees.map(({ committee }) => ({
           id: committee.id,
           name: committee.name,
         }))}
         filters={safeFilters}
+        showPeriod={false}
         resetHref={meetingsRoot}
       />
 
@@ -200,16 +224,6 @@ export default async function OrganizationMeetingsPage({
           />
         )}
       </section>
-
-      <MeetingOverviewContext
-        followUpCount={overview.metrics.openFollowUpCount}
-        myOpenTaskCount={overview.metrics.myOpenTaskCount}
-        nextMeeting={grouped.upcoming[0] ?? null}
-        organizationId={organizationId}
-        pendingApprovalCount={overview.pendingMinutesApprovals.length}
-        recentMinutes={overview.recentMinutes[0] ?? null}
-        returnTo={returnTo}
-      />
     </div>
   );
 }
