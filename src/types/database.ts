@@ -48,6 +48,8 @@ type MeetingDatePollVoterRow = {
   poll_id: string;
   email: string;
   choices: number[] | null;
+  maybe_choices: number[];
+  comment: string | null;
 };
 type MeetingInvitationResponseRow = {
   token: string;
@@ -1694,6 +1696,10 @@ export type Database = {
       finalize_meeting_date_poll: {
         Args: { target_organization: string; target_committee: string; target_poll: string; option_index: number };
         Returns: string;
+      };
+      submit_meeting_date_vote_details: {
+        Args: { voter_token: string; yes_options: number[]; maybe_options: number[]; no_options: number[]; voter_comment: string };
+        Returns: boolean;
       };
       submit_meeting_date_vote: {
         Args: { voter_token: string; selected_options: number[] };
