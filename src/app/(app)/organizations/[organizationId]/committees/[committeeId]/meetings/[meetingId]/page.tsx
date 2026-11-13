@@ -36,6 +36,8 @@ import { AuthorizationService } from "@/services/authorization-service";
 import { DecisionService } from "@/services/decision-service";
 import { DocumentService } from "@/services/document-service";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
+import { meetingResponseLabel } from "@/lib/meeting-scheduling";
+import { MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
 import { MeetingMaterialDispatchService } from "@/services/meeting-material-dispatch-service";
 import { MeetingService } from "@/services/meeting-service";
 import { TaskService } from "@/services/task-service";
@@ -315,6 +317,9 @@ export default async function MeetingPage({
     organizationRole,
     committeeRole,
   );
+  const invitations = meetingCapabilities.manageParticipants
+    ? (await new MeetingSchedulingRepository().invitations(meeting.id, meeting.starts_at)).filter(({ sent_at, response }) => sent_at || response)
+    : [];
   const canEditDecisions =
     meetingCapabilities.editDecisions && decisionContext.canEdit;
   const canEditTasks = meetingCapabilities.editTasks && taskContext.canEdit;
@@ -409,7 +414,7 @@ export default async function MeetingPage({
           )
           .map((recipient) => recipient.name);
   return (
-    <div data-meeting-workspace>
+    <div data-meeting-workspace id="meeting-invitation">
       <MeetingDocumentHeader
         actions={
           <>
@@ -535,6 +540,29 @@ export default async function MeetingPage({
         }}
         transferredItemCount={activeTransfers}
       />
+
+      {invitations.length ? (
+        <details className="panel my-3 px-4 py-3">
+          <summary className="cursor-pointer font-semibold">
+            Svar på mødeindkaldelsen
+            <span className="ml-2 text-sm font-normal text-muted">
+              {invitations.filter(({ response }) => response === "accepted").length} deltager ·{" "}
+              {invitations.filter(({ response }) => response === "declined").length} afbud ·{" "}
+              {invitations.filter(({ response }) => response === null).length} afventer
+            </span>
+          </summary>
+          <ul className="mt-3 divide-y divide-line">
+            {invitations.map(({ email, name, response }) => (
+              <li className="flex flex-wrap justify-between gap-2 py-2 text-sm" key={email}>
+                <span className="min-w-0 break-words">{name}</span>
+                <StatusBadge tone={response === "accepted" ? "success" : response === "declined" ? "warning" : "neutral"}>
+                  {meetingResponseLabel(response)}
+                </StatusBadge>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
 
       <section aria-label="Referat workspace" className="mt-1">
         {meetingCapabilities.manageTransferredAgendaItems &&

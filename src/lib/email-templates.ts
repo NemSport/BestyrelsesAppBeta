@@ -86,6 +86,28 @@ export function organizationInvitationEmailTemplate(
   };
 }
 
+export function meetingDatePollEmailTemplate(title: string, url: string): TemplateResult {
+  const subject = `Hvornår kan du deltage i ${title}?`;
+  const intro = "Vælg alle tidspunkter, hvor du kan deltage.";
+  return {
+    subject,
+    text: `${intro}\n\nSvar på datoafstemningen: ${url}`,
+    html: `<h1>${escapeHtml(subject)}</h1><p>${intro}</p><p><a href="${escapeHtml(url)}">Svar på datoafstemningen</a></p>`,
+  };
+}
+
+function invitationResponseContent(url?: string) {
+  if (!url) return { text: [], html: "" };
+  const yes = `${url}?answer=accepted`;
+  const no = `${url}?answer=declined`;
+  const link = (href: string, label: string) =>
+    `<a href="${escapeHtml(href)}" style="display:inline-block;padding:10px 14px;margin:4px 8px 4px 0;border:1px solid #12313e;border-radius:6px;color:#12313e;font-weight:700">${label}</a>`;
+  return {
+    text: ["Svar på mødeindkaldelsen", `Deltager: ${yes}`, `Deltager ikke: ${no}`, ""],
+    html: `<p><strong>Svar på mødeindkaldelsen</strong><br>${link(yes, "Deltager")}${link(no, "Deltager ikke")}</p>`,
+  };
+}
+
 export function meetingAgendaEmailTemplate({
   organizationName,
   committeeName,
@@ -94,6 +116,7 @@ export function meetingAgendaEmailTemplate({
   subject,
   message,
   meetingUrl,
+  invitationResponseUrl,
   branding,
 }: {
   organizationName: string;
@@ -105,7 +128,9 @@ export function meetingAgendaEmailTemplate({
   subject: string;
   message: string;
   meetingUrl: string;
+  invitationResponseUrl?: string;
 } & BrandingInput): TemplateResult {
+  const response = invitationResponseContent(invitationResponseUrl);
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   const agendaText = agendaItems.length
     ? agendaItems
@@ -162,6 +187,7 @@ export function meetingAgendaEmailTemplate({
       "Dagsorden:",
       agendaText,
       "",
+      ...response.text,
       `Åbn møde: ${meetingUrl}`,
       "",
       "Sendt fra BestyrelsesMate.",
@@ -175,6 +201,7 @@ export function meetingAgendaEmailTemplate({
       content: [
         `<p><strong>Møde:</strong> ${escapeHtml(meeting.title)}<br />`,
         `<strong>Dato:</strong> ${escapeHtml(formatDateTime(meeting.starts_at, "full"))}</p>`,
+        response.html,
         `<h2 style="font-size:17px;margin-top:22px">Dagsorden</h2>`,
         htmlItems,
         `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn møde i BestyrelsesMate</a></p>`,
@@ -195,6 +222,7 @@ export function meetingMaterialsEmailTemplate({
   documentNames,
   personalTaskList,
   meetingUrl,
+  invitationResponseUrl,
   branding,
 }: {
   organizationName: string;
@@ -208,7 +236,9 @@ export function meetingMaterialsEmailTemplate({
   documentNames: string[];
   personalTaskList: boolean;
   meetingUrl: string;
+  invitationResponseUrl?: string;
 } & BrandingInput): TemplateResult {
+  const response = invitationResponseContent(invitationResponseUrl);
   const linkColor = branding?.primaryColor ?? "#0f4c81";
   const intro =
     message ||
@@ -237,6 +267,7 @@ export function meetingMaterialsEmailTemplate({
       "Vedhæftet:",
       ...attachmentLines.map((line) => `- ${line}`),
       "",
+      ...response.text,
       `Åbn møde: ${meetingUrl}`,
       "",
       "Sendt fra BestyrelsesMate.",
@@ -254,6 +285,7 @@ export function meetingMaterialsEmailTemplate({
           ? `<p style="padding:10px 12px;background:#f2f5f4;border-left:3px solid ${escapeHtml(linkColor)}">${escapeHtml(personalNote)}</p>`
           : "",
         `<p><strong>Møde:</strong> ${escapeHtml(meetingTitle)}<br /><strong>Dato:</strong> ${escapeHtml(meetingDate)}</p>`,
+        response.html,
         `<h2 style="font-size:17px;margin-top:22px">Vedhæftet</h2>`,
         `<ul>${attachmentLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
         `<p style="margin-top:20px"><a href="${escapeHtml(meetingUrl)}" style="color:${escapeHtml(linkColor)};font-weight:700">Åbn mødet i BestyrelsesMate</a></p>`,

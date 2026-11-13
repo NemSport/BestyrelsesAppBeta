@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 
@@ -62,6 +63,7 @@ export function SendMeetingMaterialsModal({
   relatedDocuments: RelatedDocumentView[];
   initialHistory: MeetingMaterialDispatchHistory[];
 }) {
+  const router = useRouter();
   const participantCount = participantSummary.recipients.length;
   const participantLabel = participantSummary.usedCommitteeFallback
     ? "Aktive udvalgsmedlemmer"
@@ -160,6 +162,7 @@ export function SendMeetingMaterialsModal({
         setError(result.error || "Mødematerialet kunne ikke udsendes.");
         return;
       }
+      router.refresh();
       if (result.history) setHistory((current) => [result.history!, ...current]);
       if (result.status === "sent") {
         setStatus(`Mødematerialet blev sendt til ${result.recipientCount ?? 0} modtagere.`);
@@ -204,7 +207,7 @@ export function SendMeetingMaterialsModal({
           <section className="space-y-3" aria-labelledby="dispatch-content-heading">
             <div>
               <h3 className="text-sm font-semibold" id="dispatch-content-heading">Indhold</h3>
-              <p className="text-xs text-muted">Vælg én eller flere PDF-filer.</p>
+              <p className="text-xs text-muted">Dagsordenen til et kommende møde sendes med personlige svarlinks.</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               {(["agenda", "tasks", "minutes"] as const).map((type) => {

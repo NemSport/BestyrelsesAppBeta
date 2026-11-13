@@ -2888,3 +2888,23 @@ and set `BESTIE_VAPID_PUBLIC_KEY`, `BESTIE_VAPID_PRIVATE_KEY` and
 Browsers subscribe per device. Push payloads link to the authorized conversation
 and show generic text on the lock screen. The inbox is excluded from offline
 page caching.
+
+## Meeting scheduling
+
+`meeting_date_polls` and its recipient rows belong to the organization and
+committee. A recipient receives a random personal link. A null ballot is
+unanswered and an empty ballot means none of the options work. Only the
+recipient's choices and the poll options are presented on the public page.
+The ballot update and meeting creation lock the poll. Finalization uses the
+existing standard meeting creation function, copies the recipients, and closes
+the poll in one transaction.
+
+Both agenda email paths attach a personal response link per recipient for
+upcoming meetings. Responses are keyed by meeting, start time, and email.
+Changing the meeting time makes the previous links unavailable while a new
+dispatch starts with fresh responses. Response confirmation uses POST to
+prevent mail link scanners from recording an answer. Public pages exclude
+tokens from referrers, search indexing, and the offline cache. Committee
+manager checks protect the administration views. The token-bearing tables
+and public-response database functions are accessible only through the server
+with the service role.

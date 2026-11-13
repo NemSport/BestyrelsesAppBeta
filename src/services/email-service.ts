@@ -8,6 +8,7 @@ import {
 } from "@/lib/email-templates";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { sendMeetingAgendaEmailSchema } from "@/lib/validation";
+import { meetingInvitationLinks, MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
 import { MeetingRepository } from "@/repositories/meeting-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
@@ -127,22 +128,56 @@ export class EmailService {
       parsed.organizationId,
       organizationContext.organization.name,
     );
-    const template = meetingAgendaEmailTemplate({
-      organizationName: organizationContext.organization.name,
-      committeeName: committeeContext.committee.name,
+    const responseLinks = await meetingInvitationLinks(
       meeting,
-      agendaItems,
-      subject: parsed.subject,
-      message: parsed.message,
-      meetingUrl: `${root}/organizations/${parsed.organizationId}/committees/${parsed.committeeId}/meetings/${parsed.meetingId}`,
-      branding,
-    });
-
-    const delivery = await this.deliver({
+      recipients.map((recipient) => ({ name: recipient.full_name || recipient.email, email: recipient.email })),
+      root,
+    );
+    const messages = recipients.map((recipient) => ({
       from: getEmailEnv().EMAIL_FROM,
-      to: recipients.map((recipient) => recipient.email),
-      ...template,
-    });
+      to: [recipient.email],
+      ...meetingAgendaEmailTemplate({
+        organizationName: organizationContext.organization.name,
+        committeeName: committeeContext.committee.name,
+        meeting,
+        agendaItems,
+        subject: parsed.subject,
+        message: parsed.message,
+        meetingUrl: `${root}/organizations/${parsed.organizationId}/committees/${parsed.committeeId}/meetings/${parsed.meetingId}`,
+        branding,
+        invitationResponseUrl: responseLinks.get(recipient.email.trim().toLowerCase()),
+      }),
+    }));
+    let delivery: EmailDeliveryResult;
+    if (responseLinks.size) {
+      const repository = new MeetingSchedulingRepository();
+      let successfulCount = 0;
+      let lastDelivery: EmailDeliveryResult | undefined;
+      for (let index = 0; index < messages.length; index += 100) {
+        const batch = messages.slice(index, index + 100);
+        try {
+          lastDelivery = await this.sendPreparedBatch(batch);
+        } catch (error) {
+          if (!lastDelivery) throw error;
+          break;
+        }
+        if (!lastDelivery.sent) break;
+        successfulCount += batch.length;
+        await repository.recordSent(meeting.id, meeting.starts_at, batch.flatMap(({ to }) => to));
+      }
+      if (!lastDelivery) throw new AppError("Udsendelsen mislykkedes.", 502);
+      const failedCount = lastDelivery.sent ? messages.length - successfulCount : 0;
+      delivery = {
+        ...lastDelivery,
+        recipientCount: messages.length,
+        successfulCount,
+        failedCount,
+        sent: successfulCount === messages.length,
+        error: failedCount ? `${failedCount} modtagere fik ikke deres indkaldelse.` : lastDelivery.error,
+      };
+    } else {
+      delivery = await this.deliver({ ...messages[0], to: recipients.map(({ email }) => email) });
+    }
 
     return {
       ...delivery,
@@ -200,6 +235,10 @@ export class EmailService {
     return this.deliver(payload);
   }
 
+  async sendPreparedBatch(messages: Omit<EmailPayload, "attachments">[]) {
+    return this.deliver(messages);
+  }
+
   private resolveCommitteeRecipients({
     members,
     committeeId,
@@ -224,9 +263,12 @@ export class EmailService {
     return [...unique.values()];
   }
 
-  private async deliver(payload: EmailPayload): Promise<EmailDeliveryResult> {
+  private async deliver(payload: EmailPayload | Omit<EmailPayload, "attachments">[]): Promise<EmailDeliveryResult> {
     const env = getEmailEnv();
-    const recipientCount = payload.to.length;
+    const batch = Array.isArray(payload);
+    const recipientCount = batch ? payload.reduce((count, mail) => count + mail.to.length, 0) : payload.to.length;
+    const subject = batch ? payload[0]?.subject : payload.subject;
+    const attachmentCount = batch ? 0 : payload.attachments?.length ?? 0;
     if (env.EMAIL_DELIVERY_MODE_REQUESTED === "resend") {
       const missingConfig = [
         !env.RESEND_API_KEY_CONFIGURED ? "RESEND_API_KEY" : null,
@@ -236,8 +278,8 @@ export class EmailService {
         console.warn("[email] Resend email skipped: missing config", {
           missingConfig,
           toCount: recipientCount,
-          subject: payload.subject,
-          attachmentCount: payload.attachments?.length ?? 0,
+          subject,
+          attachmentCount,
         });
         return {
           status: "skipped_missing_config",
@@ -254,8 +296,8 @@ export class EmailService {
     if (env.EMAIL_DELIVERY_MODE !== "resend") {
       console.info("[email] Stub email prepared", {
         toCount: recipientCount,
-        subject: payload.subject,
-        attachmentCount: payload.attachments?.length ?? 0,
+        subject,
+        attachmentCount,
       });
       return {
         status: "stubbed",
@@ -267,7 +309,10 @@ export class EmailService {
       };
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
+    if (batch && payload.length > 100) {
+      throw new AppError("Udsendelsen kan højst indeholde 100 personlige mails.", 422);
+    }
+    const response = await fetch(batch ? "https://api.resend.com/emails/batch" : "https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
@@ -281,7 +326,7 @@ export class EmailService {
         status: response.status,
         detail: detail.slice(0, 500),
         toCount: recipientCount,
-        subject: payload.subject,
+        subject,
       });
       throw new AppError(
         "Emailen kunne ikke sendes lige nu. Prøv igen senere.",
