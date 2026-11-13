@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { BestiePushToggle } from "@/components/bestie/bestie-push-toggle";
 import { OrganizationSelector } from "@/components/organizations/organization-selector";
 import { Button, staticSurfaceClassName } from "@/components/ui";
 import { organizationRoleLabels } from "@/lib/localization";
@@ -42,6 +43,7 @@ export default async function OrganizationsPage({
       hasInvitations={Boolean(invitations?.length)}
       organizations={organizations}
     >
+      <BestiePushToggle />
       {params.invitation === "error" ? (
         <p className="text-sm text-danger" role="alert">
           Invitationen kunne ikke accepteres. Prøv igen, eller bed organisationen
