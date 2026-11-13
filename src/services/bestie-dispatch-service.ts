@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import webPush from "web-push";
 
 import { bestiePath } from "@/lib/bestie";
-import { bestiePushConfig, bestiePushEndpoint } from "@/lib/bestie-push";
+import { bestiePushConfig } from "@/lib/bestie-push";
+import { sendDevicePush } from "@/services/push-notification-service";
 import type { Database, TableRow } from "@/types/database";
 
 export class BestieDispatchService {
@@ -46,48 +46,17 @@ export class BestieDispatchService {
       .select("endpoint, keys")
       .eq("user_id", row.user_id);
     if (error) throw error;
-    const data = JSON.stringify({
+    const payload = {
       body: "Du har en ny besked fra Bestie.",
       path: bestiePath(row.organization_id, row.id),
       api: `/api/organizations/${row.organization_id}/bestie/${row.id}`,
       tag: row.id,
       version: row.updated_at,
-    });
+    };
     const sent = await Promise.all(
-      subscriptions.map(async ({ endpoint, keys }) => {
-        if (
-          !bestiePushEndpoint(endpoint) ||
-          !keys ||
-          typeof keys !== "object" ||
-          Array.isArray(keys) ||
-          typeof keys.p256dh !== "string" ||
-          typeof keys.auth !== "string"
-        )
-          return false;
-        try {
-          await webPush.sendNotification(
-            { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } },
-            data,
-            {
-              TTL: 86400,
-              timeout: 4000,
-              vapidDetails: config,
-              topic: row.id.replaceAll("-", ""),
-            },
-          );
-          return true;
-        } catch (error) {
-          const status = (error as { statusCode?: number })?.statusCode;
-          if (status === 404 || status === 410) {
-            await this.db
-              .from("bestie_push_subscriptions")
-              .delete()
-              .eq("endpoint", endpoint)
-              .eq("user_id", row.user_id);
-          }
-          return false;
-        }
-      }),
+      subscriptions.map((subscription) =>
+        sendDevicePush(this.db, { ...subscription, user_id: row.user_id }, payload, config),
+      ),
     );
     if (!sent.includes(true)) return false;
 

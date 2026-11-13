@@ -257,6 +257,10 @@ export class OrganizationMemberService {
     const delivery = await new EmailService(this.db).sendPrepared({
       from: getEmailEnv().EMAIL_FROM,
       to: [invitation.email],
+      push: {
+        path: `/invite/${invitation.id}`,
+        body: "Du er inviteret til et arbejdsrum.",
+      },
       ...template,
     }).catch(() => null);
 

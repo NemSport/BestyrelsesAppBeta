@@ -233,3 +233,34 @@ test("invitation replies can change and old links stop accepting answers after r
     await db.exec("reset role");
   }
 });
+
+test("email push resolves only subscribed accounts with a verified matching address", async () => {
+  const unverified = "00000000-0000-4000-8000-000000000005";
+  await db.exec(`
+    create table bestie_push_subscriptions (user_id uuid, endpoint text, keys jsonb);
+    insert into bestie_push_subscriptions values
+      ('${member}', 'member-device', '{}'),
+      ('${unverified}', 'unverified-device', '{}');
+    insert into auth.users values ('${unverified}', 'unverified@example.test', null);
+  `);
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/202611130006_email_push_subscriptions.sql", import.meta.url,
+  ), "utf8"));
+  const lookup = () => db.query("select email,endpoint from email_push_subscriptions($1)", [
+    ["member@example.test", "unverified@example.test", "external@example.test"],
+  ]);
+  await db.exec("set role authenticated");
+  try {
+    await assert.rejects(lookup(), { code: "42501" });
+  } finally {
+    await db.exec("reset role");
+  }
+  await db.exec("set role service_role");
+  try {
+    assert.deepEqual((await lookup()).rows, [
+      { email: "member@example.test", endpoint: "member-device" },
+    ]);
+  } finally {
+    await db.exec("reset role");
+  }
+});
