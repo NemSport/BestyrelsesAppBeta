@@ -33,12 +33,57 @@ type BestieSubscriptionRow = {
   created_at: string;
 };
 
+type MeetingDatePollRow = {
+  id: string;
+  organization_id: string;
+  committee_id: string;
+  title: string;
+  options: string[];
+  created_at: string;
+  meeting_id: string | null;
+  selected_at: string | null;
+};
+type MeetingDatePollVoterRow = {
+  token: string;
+  poll_id: string;
+  email: string;
+  choices: number[] | null;
+};
+type MeetingInvitationResponseRow = {
+  token: string;
+  meeting_id: string;
+  starts_at: string;
+  email: string;
+  name: string;
+  sent_at: string | null;
+  response: "accepted" | "declined" | null;
+};
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12";
   };
   public: {
     Tables: {
+      meeting_date_polls: {
+        Row: MeetingDatePollRow;
+        Insert: Pick<MeetingDatePollRow, "organization_id" | "committee_id" | "title" | "options"> & Partial<MeetingDatePollRow>;
+        Update: Partial<MeetingDatePollRow>;
+        Relationships: [];
+      };
+      meeting_date_poll_voters: {
+        Row: MeetingDatePollVoterRow;
+        Insert: Pick<MeetingDatePollVoterRow, "poll_id" | "email"> & Partial<MeetingDatePollVoterRow>;
+        Update: Partial<MeetingDatePollVoterRow>;
+        Relationships: [];
+      };
+      meeting_invitation_responses: {
+        Row: MeetingInvitationResponseRow;
+        Insert: Pick<MeetingInvitationResponseRow, "meeting_id" | "starts_at" | "email" | "name"> & Partial<MeetingInvitationResponseRow>;
+        Update: Partial<MeetingInvitationResponseRow>;
+        Relationships: [];
+      };
+
       bestie_threads: {
         Row: BestieThreadRow;
         Insert: Partial<BestieThreadRow>;
@@ -1642,6 +1687,22 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      create_meeting_date_poll: {
+        Args: { target_organization: string; target_committee: string; poll_title: string; poll_options: string[]; voter_emails: string[] };
+        Returns: string;
+      };
+      finalize_meeting_date_poll: {
+        Args: { target_organization: string; target_committee: string; target_poll: string; option_index: number };
+        Returns: string;
+      };
+      submit_meeting_date_vote: {
+        Args: { voter_token: string; selected_options: number[] };
+        Returns: boolean;
+      };
+      submit_meeting_invitation_response: {
+        Args: { invitation_token: string; answer: string };
+        Returns: boolean;
+      };
       bestie_generate_messages: { Args: never; Returns: number };
       bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
       bestie_apply_reply: {

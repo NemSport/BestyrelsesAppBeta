@@ -16,6 +16,7 @@ import {
 import { generateMeetingTasklistPdf } from "@/lib/meeting-tasklist-pdf";
 import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import { formatDateTime } from "@/lib/localization";
+import { meetingInvitationLinks, MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
 import { MeetingMaterialDispatchRepository } from "@/repositories/meeting-material-dispatch-repository";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
@@ -309,6 +310,7 @@ export class MeetingMaterialDispatchService {
 
     const root = appUrl.replace(/\/$/, "");
     const meetingUrl = `${root}/organizations/${parsed.organizationId}/committees/${parsed.committeeId}/meetings/${parsed.meetingId}`;
+    const responseLinks = needsAgenda ? await meetingInvitationLinks(meeting, recipients, root) : new Map<string, string>();
     const emailService = new EmailService(this.db);
     const deliveries = await Promise.allSettled(
       recipients.map(async (recipient) => {
@@ -342,6 +344,7 @@ export class MeetingMaterialDispatchService {
           documentNames: documents.map((document) => document.snapshot.name),
           personalTaskList: parsed.taskListMode === "personal",
           meetingUrl,
+          invitationResponseUrl: responseLinks.get(recipient.email.trim().toLowerCase()),
           branding: emailBranding,
         });
         return emailService.sendPrepared({
@@ -352,6 +355,14 @@ export class MeetingMaterialDispatchService {
         });
       }),
     );
+
+    if (responseLinks.size) {
+      const delivered = recipients.flatMap(({ email }, index) => {
+        const delivery = deliveries[index];
+        return delivery.status === "fulfilled" && delivery.value.sent ? [email] : [];
+      });
+      await new MeetingSchedulingRepository().recordSent(meeting.id, meeting.starts_at, delivered);
+    }
 
     const summary = deliverySummary(deliveries);
     const sender = membersById.get(user.id);

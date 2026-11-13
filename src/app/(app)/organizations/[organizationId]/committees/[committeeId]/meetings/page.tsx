@@ -72,9 +72,14 @@ export default async function MeetingsPage({
     <PageSection
       actions={
         capabilities.createMeeting ? (
-          <Link className={buttonClassName()} href={`${meetingsRoot}/new`}>
-            Nyt møde
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link className={buttonClassName({ variant: "secondary" })} href={`${meetingsRoot}/polls`}>
+              Datoafstemninger
+            </Link>
+            <Link className={buttonClassName()} href={`${meetingsRoot}/new`}>
+              Nyt møde
+            </Link>
+          </div>
         ) : null
       }
       description="Planlæg, afhold og følg op på udvalgets møder."

@@ -1869,3 +1869,17 @@ task and task-comment records. An Annual Wheel activity with a linked task can
 use the same flow. A standalone activity supports private replies and reminders.
 Web Push is optional per device. Reply inline where the browser supports it,
 or open the conversation from the notification and type a reply there.
+
+## Meeting date polls and invitation responses
+
+Committee managers create date polls from the meeting list and invite
+participants by email or share their personal links. Each invitee can select
+multiple times, indicate that none work, and change their answer until a time
+is chosen. Choosing a time creates one meeting with the normal agenda and
+carries the invitees over to its participant list. The organizer sends the
+meeting invitation from the meeting page.
+
+Agenda emails for an upcoming meeting contain personal links for attending or
+declining. Recipients confirm their choice without signing in. The organizer
+sees all invitation replies, including those still pending, on the meeting
+page. Invitation replies are independent of attendance recorded at the meeting.

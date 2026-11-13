@@ -1,4 +1,4 @@
-const CACHE_NAME = "bestyrelsesapp-v4";
+const CACHE_NAME = "bestyrelsesapp-v5";
 const APP_ASSETS = [
   "/manifest.webmanifest",
   "/icons/app-icon-192.png",
@@ -6,6 +6,10 @@ const APP_ASSETS = [
   "/icons/maskable-icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
+
+function isPersonalMeetingPage(url) {
+  return url.pathname.startsWith("/meeting-vote/") || url.pathname.startsWith("/meeting-response/");
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -43,7 +47,10 @@ self.addEventListener("message", (event) => {
           urls.map(async (url) => {
             try {
               const response = await fetch(url, { credentials: "include" });
-              if (response.ok && !new URL(url).pathname.endsWith("/bestie")) await cache.put(url, response);
+              const page = new URL(url, self.location.origin);
+              if (response.ok && !page.pathname.endsWith("/bestie") && !isPersonalMeetingPage(page)) {
+                await cache.put(url, response);
+              }
             } catch {
               // Existing cached resources remain available while offline.
             }
@@ -64,6 +71,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
     url.pathname.startsWith("/invite/") ||
+    isPersonalMeetingPage(url) ||
     url.pathname === "/forgot-password" ||
     url.pathname === "/reset-password" ||
     url.pathname === "/ux-review"
