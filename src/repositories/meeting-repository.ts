@@ -138,9 +138,10 @@ export class MeetingRepository {
       .eq("organization_id", organizationId)
       .eq("committee_id", committeeId)
       .is("deleted_at", null)
-      .neq("status", "cancelled")
+      .eq("status", "scheduled")
       .gte("starts_at", now)
       .order("starts_at", { ascending: true })
+      .order("id")
       .limit(6);
     if (error) throw error;
     return this.activePreviews(data as unknown as MeetingWithAgendaPreview[]);

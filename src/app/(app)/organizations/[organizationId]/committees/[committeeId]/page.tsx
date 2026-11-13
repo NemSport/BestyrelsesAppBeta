@@ -17,10 +17,7 @@ import {
   formatDateTime,
 } from "@/lib/localization";
 import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
-import {
-  getMeetingAgendaPointHref,
-  withMeetingReturnTo,
-} from "@/lib/meeting-navigation";
+import { withMeetingReturnTo } from "@/lib/meeting-navigation";
 import { isOrganizationAdmin } from "@/lib/permissions";
 import { getTaskDetailPath } from "@/lib/task-register-state";
 import {
@@ -157,18 +154,6 @@ export default async function CommitteeWorkspacePage({
     ) ??
     workspace.upcomingActivities.find((event) => event.priority === "high") ??
     null;
-  const nextMeetingAgendaHref = workspace.nextMeeting
-    ? withMeetingReturnTo(
-        getMeetingAgendaPointHref({
-          organizationId,
-          committeeId,
-          meetingId: workspace.nextMeeting.id,
-          occurrenceId:
-            workspace.nextMeeting.agenda_item_occurrences[0]?.id ?? null,
-        }),
-        committeeRoot,
-      )
-    : committeeRoot;
 
   return (
     <div className="section-stack w-full max-w-none" data-committee-workspace>
@@ -302,7 +287,7 @@ export default async function CommitteeWorkspacePage({
         </section>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+      <div className={workspace.nextMeeting ? "grid gap-5 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]" : ""}>
         <section
           className="self-start rounded-[var(--radius-panel)] border border-line bg-surface p-5"
           aria-labelledby="attention-title"
@@ -366,69 +351,35 @@ export default async function CommitteeWorkspacePage({
             )}
           </div>
         </section>
-        <section
-          className="rounded-[var(--radius-panel)] border border-brand/20 bg-surface p-5 sm:p-6"
-          aria-labelledby="next-meeting-title"
-        >
-          <div>
+        {workspace.nextMeeting ? (
+          <section
+            className="rounded-[var(--radius-panel)] border border-brand/20 bg-surface p-5 sm:p-6"
+            aria-labelledby="next-meeting-title"
+          >
             <SectionHeading title="Forbered næste møde" titleId="next-meeting-title" />
-            {workspace.nextMeeting ? (
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {workspace.nextMeeting.title}
-                </h3>
-                <p className="mt-1 text-sm text-muted">
-                  {formatDateTime(workspace.nextMeeting.starts_at)}
-                  {workspace.nextMeeting.location
-                    ? ` · ${workspace.nextMeeting.location}`
-                    : ""}
-                </p>
-                <MeetingAgendaPreview
-                  meetingHref={withMeetingReturnTo(
-                    `${committeeRoot}/meetings/${workspace.nextMeeting.id}`,
-                    committeeRoot,
-                  )}
-                  occurrences={workspace.nextMeeting.agenda_item_occurrences}
-                />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    className={buttonClassName({ size: "sm" })}
-                    href={withMeetingReturnTo(
-                      `${committeeRoot}/meetings/${workspace.nextMeeting.id}`,
-                      committeeRoot,
-                    )}
-                  >
-                    Åbn møde
-                  </Link>
-                  <Link
-                    className={buttonClassName({
-                      variant: "secondary",
-                      size: "sm",
-                    })}
-                    href={nextMeetingAgendaHref}
-                  >
-                    Se dagsorden
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                action={
-                  capabilities.createMeeting ? (
-                    <Link
-                      className={buttonClassName({ size: "sm" })}
-                      href={`${committeeRoot}/meetings/new`}
-                    >
-                      Opret møde
-                    </Link>
-                  ) : undefined
-                }
-                title="Intet kommende møde planlagt"
-              />
-            )}
-          </div>
-        </section>
+            <h3 className="text-lg font-semibold">{workspace.nextMeeting.title}</h3>
+            <p className="mt-1 text-sm text-muted">
+              {formatDateTime(workspace.nextMeeting.starts_at)}
+              {workspace.nextMeeting.location ? ` · ${workspace.nextMeeting.location}` : ""}
+            </p>
+            <MeetingAgendaPreview
+              meetingHref={withMeetingReturnTo(
+                `${committeeRoot}/meetings/${workspace.nextMeeting.id}`,
+                committeeRoot,
+              )}
+              occurrences={workspace.nextMeeting.agenda_item_occurrences}
+            />
+            <Link
+              className={`mt-4 ${buttonClassName({ size: "sm" })}`}
+              href={withMeetingReturnTo(
+                `${committeeRoot}/meetings/${workspace.nextMeeting.id}?view=preparation`,
+                committeeRoot,
+              )}
+            >
+              Mødeforberedelse
+            </Link>
+          </section>
+        ) : null}
       </div>
 
       <section

@@ -156,7 +156,7 @@ export class OrganizationService {
     const upcomingMeetings = meetings
       .filter(
         (meeting) =>
-          meeting.status !== "cancelled" &&
+          meeting.status === "scheduled" &&
           new Date(meeting.starts_at).getTime() >= now,
       )
       .sort(
