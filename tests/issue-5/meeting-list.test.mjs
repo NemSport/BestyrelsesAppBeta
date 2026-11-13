@@ -251,10 +251,12 @@ test("agenda preview is accessible, linked, and limited to four rows", () => {
   );
 });
 
-test("organization overview uses the existing shell and a secondary context column", () => {
+test("organization overview uses the existing shell and a full-width list with expandable context", () => {
   assert.match(organizationPage, /title="Mødeoversigt"/);
   assert.match(organizationPage, /data-meeting-overview/);
-  assert.match(organizationPage, /79fr.*21fr/);
+  assert.doesNotMatch(organizationPage, /79fr.*21fr/);
+  assert.match(organizationPage, /meetings\/polls[`][\s\S]*Datoafstemning/);
+  assert.match(overviewContext, /<details[\s\S]*Genveje og opfølgning/);
   assert.match(organizationPage, /<MeetingOverviewContext/);
   assert.match(overviewContext, /Næste møde/);
   assert.match(overviewContext, /Kræver handling/);
