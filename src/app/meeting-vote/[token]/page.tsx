@@ -95,7 +95,7 @@ export default async function MeetingVotePage({
                 ))}
               </div>
               <label className="mt-3 block text-sm">
-                Kommentar til tidspunktet (valgfri)
+                Evt. kommentar til datoen
                 <textarea
                   name={`comment-${position}`}
                   rows={2}
