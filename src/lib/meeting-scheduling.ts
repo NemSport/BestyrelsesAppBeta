@@ -38,8 +38,10 @@ export const meetingVoteAnswers = {
 } as const;
 
 export const meetingVoteInput = z.object({
-  answers: z.array(z.enum(["yes", "maybe", "no"])).min(1).max(12),
-  comment: z.string().trim().max(500),
+  answers: z.array(z.object({
+    choice: z.enum(["yes", "maybe", "no"]),
+    comment: z.string().trim().max(500),
+  })).min(1).max(12),
 });
 
 export function meetingVoteAnswer(

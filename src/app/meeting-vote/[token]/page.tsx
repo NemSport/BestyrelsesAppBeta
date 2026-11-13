@@ -38,18 +38,23 @@ export default async function MeetingVotePage({
   async function submit(form: FormData) {
     "use server";
     const selected = meetingVoteInput.safeParse({
-      answers: openOptions.map(({ position }) => form.get(`answer-${position}`)),
-      comment: form.get("comment"),
+      answers: openOptions.map(({ position }) => ({
+        choice: form.get(`answer-${position}`),
+        comment: form.get(`comment-${position}`),
+      })),
     });
     let saved = false;
     if (selected.success) {
       const answers: { yes: number[]; maybe: number[]; no: number[] } = {
         yes: [], maybe: [], no: [],
       };
-      selected.data.answers.forEach((answer, index) => {
-        answers[answer].push(openOptions[index].position);
+      const comments: Record<string, string> = {};
+      selected.data.answers.forEach(({ choice, comment }, index) => {
+        const { position } = openOptions[index];
+        answers[choice].push(position);
+        if (comment) comments[position] = comment;
       });
-      saved = await new MeetingSchedulingRepository().vote(token, answers, selected.data.comment);
+      saved = await new MeetingSchedulingRepository().vote(token, answers, comments);
     }
     redirect(`/meeting-vote/${token}?result=${saved ? "saved" : "closed"}`);
   }
@@ -69,6 +74,9 @@ export default async function MeetingVotePage({
       ) : null}
       {open ? (
         <form action={submit} className="mt-5 space-y-4">
+          <p className="text-sm text-muted" id="vote-comment-help">
+            De andre deltagere kan se dine kommentarer sammen med dine svar.
+          </p>
           {openOptions.map(({ date, position }) => (
             <fieldset className="rounded-lg border border-line px-3 pb-3" key={date}>
               <legend className="px-1 font-medium">{formatDateTime(date, "full")}</legend>
@@ -86,22 +94,19 @@ export default async function MeetingVotePage({
                   </label>
                 ))}
               </div>
+              <label className="mt-3 block text-sm">
+                Kommentar til tidspunktet (valgfri)
+                <textarea
+                  name={`comment-${position}`}
+                  rows={2}
+                  maxLength={500}
+                  defaultValue={voter.option_comments[position] ?? ""}
+                  className="mt-1 block w-full rounded-lg border border-line bg-canvas p-2"
+                  aria-describedby="vote-comment-help"
+                />
+              </label>
             </fieldset>
           ))}
-          <label className="block">
-            Kommentar (valgfri)
-            <textarea
-              name="comment"
-              rows={3}
-              maxLength={500}
-              defaultValue={voter.comment ?? ""}
-              className="mt-1 block w-full rounded-lg border border-line bg-canvas p-3"
-              aria-describedby="vote-comment-help"
-            />
-          </label>
-          <p className="text-sm text-muted" id="vote-comment-help">
-            De andre deltagere kan se din kommentar sammen med dit svar.
-          </p>
           <Button type="submit">Gem mit svar</Button>
         </form>
       ) : (

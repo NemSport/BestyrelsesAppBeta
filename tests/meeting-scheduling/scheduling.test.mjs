@@ -90,6 +90,30 @@ test("upgraded ballots keep old votes and save yes, maybe, no and a comment", as
   assert.deepEqual(await result(pending.token), { choices: [1], maybe_choices: [2], comment: "Efter kl. 17" });
   assert.equal(await submit([], [], [1, 2, 3], ""), true);
   assert.deepEqual(await result(pending.token), { choices: [], maybe_choices: [], comment: null });
+  assert.equal(await scalar(
+    "select submit_meeting_date_vote_details($1,array[1],array[2],array[3],'Generel kommentar')",
+    [legacy.token],
+  ), true);
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/202611130005_meeting_date_poll_time_comments.sql", import.meta.url,
+  ), "utf8"));
+  const timeComments = (token) => scalar(
+    "select option_comments from meeting_date_poll_voters where token=$1",
+    [token],
+  );
+  const submitWithComments = (comments) => scalar(
+    "select submit_meeting_date_vote_with_comments($1,array[1],array[2],array[3],$2)",
+    [legacy.token, JSON.stringify(comments)],
+  );
+  assert.equal(await submitWithComments({ 4: "Ukendt tidspunkt" }), false);
+  assert.equal(await submitWithComments({ 2: " ".repeat(501) }), false);
+  assert.deepEqual(await timeComments(legacy.token), {});
+  assert.equal(await submitWithComments({ 1: "Passer fint", 2: " Hvis vi rykker til 17.30 " }), true);
+  assert.deepEqual(await timeComments(legacy.token), { 1: "Passer fint", 2: "Hvis vi rykker til 17.30" });
+  assert.equal(await submitWithComments({ 2: "Hvis vi rykker til 17.30" }), true);
+  assert.deepEqual(await timeComments(legacy.token), { 2: "Hvis vi rykker til 17.30" });
+  assert.deepEqual(await result(legacy.token), { choices: [1], maybe_choices: [2], comment: "Generel kommentar" });
+
 });
 
 after(async () => db.close());
