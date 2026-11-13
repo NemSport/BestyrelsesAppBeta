@@ -199,8 +199,8 @@ async function createLandscapeDocument(input: AnnualWheelOverviewPdfInput) {
   const { regular, bold, drawText } = await embedPdfFonts(document);
   document.setCreationDate(input.exportedAt);
   document.setModificationDate(input.exportedAt);
-  document.setCreator("BestyrelsesApp");
-  document.setProducer("BestyrelsesApp PDF export");
+  document.setCreator("BestyrelsesMate");
+  document.setProducer("BestyrelsesMate PDF export");
   const template = await preparePdfTemplate(
     document,
     input.branding,

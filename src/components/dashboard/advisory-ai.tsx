@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { bestiePath } from "@/lib/bestie";
 
 type Answer = {
   answer: string;
@@ -63,9 +64,12 @@ export function AdvisoryAi({
         </button>
       ) : (
         <>
-          <h1 id="advisory-title" className="text-base font-semibold">
-            Bestie
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h1 id="advisory-title" className="text-base font-semibold">Bestie</h1>
+            <Link href={bestiePath(organizationId)} className="text-sm font-semibold text-brand underline">
+              Mine beskeder
+            </Link>
+          </div>
           <form className="mt-2 flex flex-wrap gap-2" onSubmit={submit}>
             <label className="sr-only" htmlFor="advisory-question">
               Spørg Bestie

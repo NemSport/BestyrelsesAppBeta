@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const emailEnvSchema = z.object({
   EMAIL_DELIVERY_MODE: z.enum(["stub", "resend"]).default("stub"),
-  EMAIL_FROM: z.string().min(3).default("BestyrelsesApp <noreply@example.com>"),
+  EMAIL_FROM: z.string().min(3).default("BestyrelsesMate <noreply@mail.bestyrelsesmate.dk>"),
   RESEND_API_KEY: z.string().min(1).optional(),
 });
 

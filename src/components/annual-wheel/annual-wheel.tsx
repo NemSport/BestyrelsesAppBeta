@@ -335,7 +335,8 @@ export function AnnualWheel({
   const linkedEvent = initialEventId
     ? data.events.find(
         (event) =>
-          event.id === initialEventId && event.committee_id === initialCommitteeId,
+          event.id === initialEventId &&
+          (!initialCommitteeId || event.committee_id === initialCommitteeId),
       )
     : undefined;
   const linkedMonth = linkedEvent

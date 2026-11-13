@@ -1,4 +1,4 @@
-const CACHE_NAME = "bestyrelsesapp-v3";
+const CACHE_NAME = "bestyrelsesapp-v4";
 const APP_ASSETS = [
   "/manifest.webmanifest",
   "/icons/app-icon-192.png",
@@ -43,7 +43,7 @@ self.addEventListener("message", (event) => {
           urls.map(async (url) => {
             try {
               const response = await fetch(url, { credentials: "include" });
-              if (response.ok) await cache.put(url, response);
+              if (response.ok && !new URL(url).pathname.endsWith("/bestie")) await cache.put(url, response);
             } catch {
               // Existing cached resources remain available while offline.
             }
@@ -70,6 +70,8 @@ self.addEventListener("fetch", (event) => {
   ) {
     return;
   }
+
+  if (request.mode === "navigate" && url.pathname.endsWith("/bestie")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -107,4 +109,57 @@ self.addEventListener("fetch", (event) => {
         }),
     );
   }
+});
+
+self.addEventListener("push", (event) => {
+  const data = event.data?.json();
+  if (!data?.path || !data?.tag) return;
+  event.waitUntil(
+    self.registration.showNotification("Bestie", {
+      body: data.body,
+      icon: "/icons/app-icon-192.png",
+      tag: data.tag,
+      data,
+      actions: [{ action: "reply", title: "Svar", type: "text", placeholder: "Svar til Bestie" }],
+    }).catch(() => self.registration.showNotification("Bestie", {
+      body: data.body, icon: "/icons/app-icon-192.png", tag: data.tag, data,
+      actions: [{ action: "reply", title: "Svar" }],
+    })),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  const { path, api, version } = event.notification.data ?? {};
+  event.notification.close();
+  if (typeof path !== "string" || !/^\/organizations\/[\da-f-]+\/bestie\?samtale=[\da-f-]+$/i.test(path)) return;
+  event.waitUntil((async () => {
+    if (event.action === "reply" && typeof event.reply === "string" && event.reply.trim() &&
+        typeof api === "string" && /^\/api\/organizations\/[\da-f-]+\/bestie\/[\da-f-]+$/i.test(api)) {
+      const replyId = crypto.randomUUID();
+      try {
+        const response = await fetch(api, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ replyId, message: event.reply.trim(), version }),
+        });
+        if (response.ok) {
+          const { thread } = await response.json();
+          await self.registration.showNotification("Bestie", {
+            body: thread.pending ? "Dit svar er gemt. Åbn Bestie for at se og godkende forslaget." : "Dit svar er gemt i Bestie.",
+            icon: "/icons/app-icon-192.png",
+            tag: event.notification.tag,
+            data: { path, api, version: thread.version },
+          });
+          return;
+        }
+      } catch {
+        // Open the composer if the inline reply cannot be saved.
+      }
+    }
+    const destination = new URL(path, self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: "window" });
+    const existing = windows.find((client) => client.url === destination);
+    if (existing) await existing.focus();
+    else await self.clients.openWindow(destination);
+  })());
 });

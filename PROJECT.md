@@ -1854,3 +1854,18 @@ wrapping- og sideskiftlogik.
 The organization overview offers permission-scoped questions with citations
 and text drafts for meeting agendas. The preview searches approved minutes,
 document titles and descriptions, decisions, tasks, and annual wheel entries.
+
+## Bestie proactive follow-up
+
+Bestie has a private inbox per Organization. It prompts the responsible person
+three days before a task deadline and the day after it is missed, and prompts
+the responsible person 14 days before an Annual Wheel activity. When the same
+task already triggers a reminder, Bestie sends a single prompt. Follow-ups use
+Europe/Copenhagen dates and stop when the work is closed or access is removed.
+
+A reply can log a shared task status. Bestie proposes a new deadline, completion,
+or a personal reminder in the conversation. Confirmed changes use the existing
+task and task-comment records. An Annual Wheel activity with a linked task can
+use the same flow. A standalone activity supports private replies and reminders.
+Web Push is optional per device. Reply inline where the browser supports it,
+or open the conversation from the notification and type a reply there.

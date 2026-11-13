@@ -194,8 +194,8 @@ export async function createPdfReport(options: PdfReportOptions) {
   const generatedAt = options.generatedAt ?? new Date();
   document.setCreationDate(generatedAt);
   document.setModificationDate(generatedAt);
-  document.setCreator("BestyrelsesApp");
-  document.setProducer("BestyrelsesApp PDF export");
+  document.setCreator("BestyrelsesMate");
+  document.setProducer("BestyrelsesMate PDF export");
   document.setTitle(safePdfText(options.title));
   const reportPalette = resolvePdfTheme(options.branding);
   let logoImage: PDFImage | null = null;

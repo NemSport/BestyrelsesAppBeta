@@ -829,6 +829,8 @@ provider delivery. Resend is the prepared provider, but `EMAIL_DELIVERY_MODE`
 defaults to `stub`; in stub mode the application prepares the message and logs
 only operational metadata, not message bodies. Real delivery requires
 `EMAIL_DELIVERY_MODE=resend`, `RESEND_API_KEY`, and `EMAIL_FROM`.
+Set `EMAIL_FROM` to `BestyrelsesMate <noreply@mail.bestyrelsesmate.dk>` after
+Resend verifies the sending domain `mail.bestyrelsesmate.dk`.
 Email delivery results are explicit: `sent` means Resend accepted delivery,
 `stubbed` means the message was prepared in test mode, `skipped_missing_config`
 means real delivery was requested but required Resend configuration is missing,
@@ -2862,3 +2864,27 @@ The dispatch form displays the names and e-mail addresses resolved by the same
 rules as dispatch. When participants have not been registered, it labels the
 default group as active Committee Members. The browser submits the previewed
 addresses so that the server can reject a stale recipient list before delivery.
+
+## Bestie proactive follow-up
+
+The daily Bestie job runs at 07:00 UTC from Vercel and uses Copenhagen calendar
+dates. `/api/cron/bestie` requires `CRON_SECRET`. The service role invokes the
+message-generation and push-claim functions. The database deduplicates initial
+prompts and locks due follow-ups and claimed notifications. The private thread
+read policy checks the current assignment and organization and committee access.
+
+The reply route authenticates the user and reads the scoped thread before asking
+the existing OpenAI integration to interpret the reply. Only a short conversation
+and the relevant task/activity fields are sent. The structured output is bounded
+to task notes, deadline, completion and follow-up. The reply transaction checks
+the actor and scope again, rejects stale versions, and atomically saves the
+conversation, task changes and audit comments. The model, prompt version,
+source IDs and token counts are kept with the reply.
+
+Enable the inbox by applying migration `202611130001_bestie_follow_up.sql`.
+For Web Push, generate a VAPID pair with `npx web-push generate-vapid-keys`
+and set `BESTIE_VAPID_PUBLIC_KEY`, `BESTIE_VAPID_PRIVATE_KEY` and
+`BESTIE_VAPID_SUBJECT` (a contact URI such as `mailto:…`) in the deployment.
+Browsers subscribe per device. Push payloads link to the authorized conversation
+and show generic text on the lock screen. The inbox is excluded from offline
+page caching.

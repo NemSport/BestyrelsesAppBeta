@@ -168,7 +168,7 @@ test("global topbar reuses memberships, capabilities, and existing create flows"
     source("../../src/app/globals.css"),
   ]);
 
-  assert.match(shell, /BestyrelsesApp/);
+  assert.match(shell, /BestyrelsesMate/);
   assert.match(shell, /Hold overblik over bestyrelsesarbejdet/);
   assert.match(shell, /app-header-search-reserve/);
   assert.match(

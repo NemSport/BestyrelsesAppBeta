@@ -21,6 +21,24 @@ export function SignOutButton({ className }: { className?: string }) {
         navigator.serviceWorker?.controller?.postMessage({
           type: "CLEAR_OFFLINE_CACHE",
         });
+        if (localStorage.getItem("bestie-push-account")) {
+          try {
+            const registration = await navigator.serviceWorker?.getRegistration();
+            const subscription = await registration?.pushManager.getSubscription();
+            if (subscription) {
+              await fetch("/api/bestie/push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled: false, endpoint: subscription.endpoint }),
+                signal: AbortSignal.timeout(2000),
+              }).catch(() => {});
+              await subscription.unsubscribe();
+            }
+          } catch {
+            // Signing out remains possible when the browser's push service is unavailable.
+          }
+          localStorage.removeItem("bestie-push-account");
+        }
         await createClient().auth.signOut();
         router.push("/login");
         router.refresh();
