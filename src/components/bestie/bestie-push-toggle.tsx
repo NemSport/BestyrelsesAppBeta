@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppIcon } from "@/components/icons/app-icon";
 import { Button } from "@/components/ui";
 
 function applicationServerKey(value: string) {
@@ -106,25 +107,44 @@ export function BestiePushToggle() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {enabled !== null && (publicKey || enabled) ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={busy}
-          onClick={() => void toggle()}
-        >
-          {enabled
-            ? "Slå push fra på denne enhed"
-            : "Slå push til på denne enhed"}
-        </Button>
-      ) : null}
+    <section
+      aria-labelledby="bestie-push-title"
+      className="rounded-xl border border-brand/25 bg-brand-soft p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2
+            id="bestie-push-title"
+            className="flex items-center gap-2 font-semibold"
+          >
+            <AppIcon name="actions" size={19} aria-hidden="true" />
+            Pushnotifikationer
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            {enabled === null
+              ? "Få besked på denne enhed, når Bestie skriver."
+              : enabled
+                ? "Slået til på denne enhed."
+                : "Slået fra på denne enhed."}
+          </p>
+        </div>
+        {enabled !== null && (publicKey || enabled) ? (
+          <Button
+            type="button"
+            variant={enabled ? "secondary" : "primary"}
+            className="min-h-11 w-full justify-center sm:w-auto"
+            disabled={busy}
+            onClick={() => void toggle()}
+          >
+            {enabled ? "Slå push fra" : "Slå push til"}
+          </Button>
+        ) : null}
+      </div>
       {feedback ? (
-        <p className="text-sm text-muted" role="status">
+        <p className="mt-2 text-sm text-muted" role="status">
           {feedback}
         </p>
       ) : null}
-    </div>
+    </section>
   );
 }
