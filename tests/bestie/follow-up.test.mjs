@@ -13,7 +13,7 @@ before(async () => {
     create role anon; create role authenticated; create role service_role;
     create schema auth;
     create function auth.uid() returns uuid language sql as
-      $$ select nullif(current_setting('test.user_id', true), '')::uuid $$;
+      $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), nullif(current_setting('test.user_id', true), ''))::uuid $$;
     create table profiles(id uuid primary key);
     create table organizations(id uuid primary key, deleted_at timestamptz);
     create table committees(id uuid primary key, organization_id uuid, deleted_at timestamptz);
@@ -30,12 +30,32 @@ before(async () => {
       id uuid primary key, organization_id uuid, committee_id uuid, title text, responsible_user_id uuid,
       task_id uuid, starts_on date, status text default 'planned', deleted_at timestamptz, updated_by uuid
     );
-    create table task_comments(task_id uuid, organization_id uuid, committee_id uuid, body text, created_by uuid);
+    create function stamp_task_actor() returns trigger language plpgsql as $$
+      begin
+        new.updated_by := auth.uid();
+        if new.updated_by is null then raise exception 'Missing task author'; end if;
+        return new;
+      end $$;
+    create trigger task_actor before update on tasks for each row
+      when (new.updated_by is not null) execute function stamp_task_actor();
+    create table task_comments(task_id uuid, organization_id uuid, committee_id uuid, body text, created_by uuid not null);
+    create function stamp_comment_actor() returns trigger language plpgsql as $$
+      begin new.created_by := auth.uid(); return new; end $$;
+    create trigger comment_actor before insert on task_comments for each row execute function stamp_comment_actor();
   `);
   await db.exec(
     await readFile(
       new URL(
         "../../supabase/migrations/202611130001_bestie_follow_up.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130002_bestie_task_audit_actor.sql",
         import.meta.url,
       ),
       "utf8",

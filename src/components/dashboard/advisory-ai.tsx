@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { AppIcon } from "@/components/icons/app-icon";
+import { buttonClassName } from "@/components/ui";
 import { bestiePath } from "@/lib/bestie";
 
 type Answer = {
@@ -65,8 +67,16 @@ export function AdvisoryAi({
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 id="advisory-title" className="text-base font-semibold">Bestie</h1>
-            <Link href={bestiePath(organizationId)} className="text-sm font-semibold text-brand underline">
+            <h1 id="advisory-title" className="text-base font-semibold">
+              Bestie
+            </h1>
+            <Link
+              href={bestiePath(organizationId)}
+              className={buttonClassName({
+                className: "w-full justify-center sm:w-auto",
+              })}
+            >
+              <AppIcon name="actions" size={18} aria-hidden="true" />
               Mine beskeder
             </Link>
           </div>
