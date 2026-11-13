@@ -3138,8 +3138,11 @@ export function MeetingMinutesSection({
   const [reviewAgendaDrafts, setReviewAgendaDrafts] = useState<
     Record<string, AgendaMinutesDraft>
   >({});
+  const hasPendingApproval = canApprove && approvals.some(
+    (approval) => approval.user_id === userId && approval.status === "pending",
+  );
   const [workspaceMode, setWorkspaceMode] = useState<"editing" | "review">(
-    "editing",
+    hasPendingApproval ? "review" : "editing",
   );
   const [headerModeSlot, setHeaderModeSlot] = useState<HTMLElement | null>(
     null,
@@ -3228,10 +3231,10 @@ export function MeetingMinutesSection({
   }, [occurrences]);
 
   useEffect(() => {
-    if (workspaceMode === "review" && window.location.hash === "#minutes-approval") {
+    if (workspaceMode === "review" && (hasPendingApproval || window.location.hash === "#minutes-approval")) {
       document.getElementById("minutes-approval")?.scrollIntoView();
     }
-  }, [workspaceMode]);
+  }, [hasPendingApproval, workspaceMode]);
 
   const activeIndex = Math.max(
     0,
