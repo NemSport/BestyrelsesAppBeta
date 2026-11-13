@@ -61,6 +61,10 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(await readFile(
+    new URL("../../supabase/migrations/202611130007_bestie_annual_wheel_tasks.sql", import.meta.url),
+    "utf8",
+  ));
 });
 
 after(async () => db.close());
@@ -142,12 +146,52 @@ test("creates proactive task and annual-wheel threads once and consolidates link
   assert.equal(await generate(), 2);
   assert.equal(await generate(), 0);
   const row = await taskThread();
-  assert.equal(row.event_id, null);
+  assert.equal(row.event_id, event);
   assert.match(row.messages[0].body, /Ring til Peter/);
   const { rows } = await db.query(
     "select * from bestie_threads where task_id is null",
   );
   assert.match(rows[0].messages[0].body, /Årsberetning/);
+});
+
+test("each approaching annual-wheel task alerts its own assignee even without an activity owner", async () => {
+  await db.exec(`
+    update annual_wheel_events set responsible_user_id = null where id = '${event}';
+    update tasks set deadline = (now() at time zone 'Europe/Copenhagen')::date + 7
+      where id = '${task}';
+    insert into committee_members values ('${committee}', '${outsider}', 'member', 'active');
+    update tasks set annual_wheel_event_id = '${event}', responsible_user_id = '${outsider}'
+      where id = '${nextTask}';
+    insert into bestie_push_subscriptions(endpoint, user_id, keys)
+      values ('https://example.com', '${outsider}', '{}');
+  `);
+  assert.equal(await generate(), 3);
+  assert.equal(await generate(), 0);
+  const { rows } = await db.query(
+    "select task_id,user_id,messages from public.bestie_claim_pushes()",
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].task_id, nextTask);
+  assert.equal(rows[0].user_id, outsider);
+  assert.match(rows[0].messages[0].body, /Generalforsamling.*Senere opgave/);
+});
+
+test("a proposed status and follow-up are stored together only when approved", async () => {
+  await generate();
+  const row = await taskThread();
+  const { rows: [dates] } = await db.query(
+    "select deadline::text, (deadline + 11)::text as reminder from tasks where id = $1",
+    [task],
+  );
+  const proposal = { statusNote: "Jeg har ringet.", reminder: dates.reminder };
+  const pending = await reply(row, { pending: JSON.stringify(proposal), note: null });
+  assert.equal((await db.query("select * from task_comments")).rows.length, 0);
+  assert.equal(pending.follow_up_on, null);
+  await reply(pending, { replyId: id(101), body: "Godkend", note: proposal.statusNote, reminder: dates.reminder });
+  assert.equal((await taskThread()).pending_action, null);
+  assert.equal((await db.query("select follow_up_on::text from bestie_threads where id = $1", [row.id])).rows[0].follow_up_on, dates.reminder);
+  assert.equal((await db.query("select body from task_comments")).rows[0].body, proposal.statusNote);
+  assert.equal((await db.query("select deadline::text from tasks where id = $1", [task])).rows[0].deadline, dates.deadline);
 });
 
 test("messages and task writes are restricted to the assigned user and current roles", async () => {
