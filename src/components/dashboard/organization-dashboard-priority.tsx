@@ -170,11 +170,11 @@ export function OrganizationDashboardPriority({
             <Link
               className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line-strong px-3 text-sm font-semibold text-brand hover:bg-brand-soft"
               href={withMeetingReturnTo(
-                `${root}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}`,
+                `${root}/committees/${nextMeeting.committee_id}/meetings/${nextMeeting.id}?view=preparation`,
                 root,
               )}
             >
-              Se dagsorden →
+              Mødeforberedelse →
             </Link>
           </>
         ) : (

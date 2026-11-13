@@ -185,6 +185,7 @@ export class TaskService {
     organizationId: string,
     committeeId: string,
     meetingId: string,
+    { preparation = false } = {},
   ) {
     const user = await this.auth.requireUser();
     await this.authorization.requireCommitteeMember(
@@ -234,6 +235,7 @@ export class TaskService {
     const recentlyCompletedAfter = new Date();
     recentlyCompletedAfter.setDate(recentlyCompletedAfter.getDate() - 14);
 
+    const meetingDate = this.localDate(new Date(meeting.starts_at));
     const relevantTasks = committeeTasks.filter((task) => {
       if (
         task.organization_id !== organizationId ||
@@ -251,6 +253,12 @@ export class TaskService {
         (task.decision_id ? decisionIds.has(task.decision_id) : false);
       const isClosed =
         task.status === "completed" || task.status === "cancelled";
+      if (preparation) {
+        const unlinked = !task.meeting_id && !task.agenda_item_id && !task.decision_id;
+        return !isClosed && (directlyLinked || Boolean(
+          unlinked && task.deadline && task.deadline <= meetingDate,
+        ));
+      }
       if (!isClosed) return true;
       if (
         !directlyLinked ||
@@ -262,7 +270,7 @@ export class TaskService {
       return new Date(task.completed_at) >= recentlyCompletedAfter;
     });
 
-    const latestComments = await this.comments.listLatestByTasks(
+    const latestComments = preparation ? null : await this.comments.listLatestByTasks(
       relevantTasks.map((task) => task.id),
     );
 
@@ -277,7 +285,7 @@ export class TaskService {
             agendaItemTitles,
             decisionTitles,
           ),
-          latestComment: latestComments.get(task.id) ?? null,
+          latestComment: latestComments?.get(task.id) ?? null,
         })),
       ),
     };

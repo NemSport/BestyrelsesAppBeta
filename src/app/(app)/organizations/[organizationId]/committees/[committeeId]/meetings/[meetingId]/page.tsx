@@ -9,6 +9,7 @@ import { EditMeetingModal } from "@/components/meetings/edit-meeting-modal";
 import { MeetingAiOverview } from "@/components/meetings/meeting-ai-overview";
 import { MeetingDocumentHeader } from "@/components/meetings/meeting-document-header";
 import { MeetingMinutesSection } from "@/components/meetings/meeting-minutes-section";
+import { MeetingPreparation } from "@/components/meetings/meeting-preparation";
 import { MeetingParticipantsPanel } from "@/components/meetings/meeting-participants-panel";
 import { TransferredAgendaItemsSection } from "@/components/meetings/transferred-agenda-items-section";
 import { ContinueAgendaItemsButton } from "@/components/meetings/continue-agenda-items-button";
@@ -27,7 +28,7 @@ import {
   resolveSelectedMeetingMaterialRecipients,
 } from "@/lib/meeting-material-dispatch";
 import { getMeetingCapabilities } from "@/lib/permissions";
-import { getMeetingReturnLink } from "@/lib/meeting-navigation";
+import { getMeetingReturnLink, withMeetingReturnTo } from "@/lib/meeting-navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
@@ -230,13 +231,14 @@ export default async function MeetingPage({
     committeeId: string;
     meetingId: string;
   }>;
-  searchParams: Promise<{ returnTo?: string | string[] }>;
+  searchParams: Promise<{ returnTo?: string | string[]; view?: string }>;
 }) {
   const { organizationId, committeeId, meetingId } = await params;
+  const { returnTo, view } = await searchParams;
   const back = getMeetingReturnLink(
     organizationId,
     committeeId,
-    (await searchParams).returnTo,
+    returnTo,
   );
   const db = await createClient();
   const user = await new AuthService(db).requireUser();
@@ -252,6 +254,32 @@ export default async function MeetingPage({
   if (!meeting) notFound();
 
   const minutesService = new MeetingMinutesService(db);
+  if (view === "preparation") {
+    const [minutes, documents, { tasks }] = await Promise.all([
+      minutesService.get(organizationId, committeeId, meetingId),
+      new DocumentService(db).getMeetingDocumentContext({
+        organizationId,
+        committeeId,
+        meetingId,
+        agendaItemIds: meeting.agenda_item_occurrences.map(({ agenda_item_id }) => agenda_item_id),
+      }),
+      new TaskService(db).getMeetingReviewTasks(organizationId, committeeId, meetingId, { preparation: true }),
+    ]);
+    return (
+      <MeetingPreparation
+        meeting={meeting}
+        back={back}
+        meetingHref={withMeetingReturnTo(
+          `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`,
+          back.href,
+        )}
+        attachments={[...minutes.meetingAttachments, ...minutes.agendaItemAttachments]}
+        documents={documents}
+        tasks={tasks}
+      />
+    );
+  }
+
   const [
     minutes,
     previousMeetingMinutes,
