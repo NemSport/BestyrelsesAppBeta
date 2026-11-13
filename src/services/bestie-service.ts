@@ -14,6 +14,7 @@ import {
   type BestiePendingAction,
   type BestieThread,
 } from "@/lib/bestie";
+import { explicitBestieFollowUpDate } from "@/lib/bestie-follow-up-date";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { getTaskDetailPath } from "@/lib/task-register-state";
@@ -177,6 +178,9 @@ export class BestieService {
     } else if (thread.pending && reject.test(input.message)) {
       answer = "Jeg har afvist forslaget. Hvad vil du gerne gøre herfra?";
     } else {
+      const explicitReminder = canRemind
+        ? explicitBestieFollowUpDate(input.message, today)
+        : null;
       const env = getAiEnv();
       const model = env.OPENAI_MEETING_OVERVIEW_MODEL;
       const response = await new OpenAI({
@@ -198,6 +202,7 @@ export class BestieService {
                 "Udfyld kun statusNote ved en faktisk status om denne opgave, som brugeren lige har oplyst og må dele. Brug et ordret uddrag fra svaret. Udelad følsomme eller private oplysninger og rene instruktioner.",
                 "Foreslå kun completion (complete), deadline og reminder, hvis brugeren beder om det eller svaret klart indebærer det. Returnér datoer som YYYY-MM-DD beregnet fra today i Europe/Copenhagen.",
                 "Et forventet svar fra en tredjepart er ikke en ny opgavefrist. Hvis brugeren fx siger at Peter vender tilbage om 14 dage, så foreslå en opfølgning på den dato og sæt deadline til null. Sæt kun followUpAmbiguous=true, hvis tidspunktet eller den ønskede handling faktisk er uklar.",
+                "Når samme svar indeholder en status og en entydig dato for opfølgning, udfyld både statusNote og reminder i samme forslag, sæt followUpAmbiguous=false og question=null. En dato i question er aldrig et forslag, der kan godkendes.",
                 "Hvis brugeren svarer opfølgning, frist eller begge dele på dit foregående spørgsmål, brug datoen fra det spørgsmål og foreslå de valgte handlinger. Angiv datoen som et konkret forslag.",
                 "Foreslå aldrig både afslutning og en ny frist eller påmindelse. Brug canEdit og canRemind. Stil højst ét kort konkret spørgsmål uden at påstå at noget er ændret. Et årshjulspunkt uden en opgave kan få en personlig påmindelse.",
               ].join("\n"),
@@ -208,6 +213,7 @@ export class BestieService {
                 today,
                 canEdit,
                 canRemind,
+                explicitReminder,
                 task: task
                   ? {
                       title: task.title,
@@ -246,8 +252,11 @@ export class BestieService {
           ? validBestieDate(result.deadline, today)
           : null;
       const reminder =
-        canRemind && !complete && !result.followUpAmbiguous
-          ? validBestieDate(result.reminder, nextDay)
+        canRemind && !complete
+          ? validBestieDate(
+              explicitReminder ?? (result.followUpAmbiguous ? null : result.reminder),
+              nextDay,
+            )
           : null;
       if (complete || deadline || reminder || proposedNote)
         pending = {
@@ -257,16 +266,13 @@ export class BestieService {
           taskVersion: task?.updated_at ?? null,
           statusNote: proposedNote,
         };
-      answer = [
-        pending ? `Skal jeg ${describeBestieAction(pending)}?` : null,
-        result.question?.trim().slice(0, 350),
-        !pending && !result.question?.trim() ? "Jeg har gemt dit svar i samtalen." : null,
-      ]
-        .filter(Boolean)
-        .join(" ");
+      const question = result.question?.trim().slice(0, 350);
+      answer = pending
+        ? `Skal jeg ${describeBestieAction(pending)}?`
+        : question || "Jeg har gemt dit svar i samtalen.";
       aiMetadata = {
         model,
-        promptVersion: "bestie-follow-up-2",
+        promptVersion: "bestie-follow-up-3",
         inputTokens: response.usage?.input_tokens ?? null,
         outputTokens: response.usage?.output_tokens ?? null,
         sourceIds: [row.task_id, row.event_id].filter(Boolean),
