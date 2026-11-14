@@ -3015,3 +3015,21 @@ preview at confirmation and verifies the preview revision. A security-invoker
 RPC saves the selection in one transaction with RLS, per-organization
 serialization of imports, and version checks on updates. The workbook and the
 preview are transient. No external model receives spreadsheet data.
+
+## Sponsor contract import
+
+The contract import page uses the organization-scoped
+`POST /api/organizations/[organizationId]/stakeholders/contract-import`
+endpoint. It checks the same member capability as contract editing. A PDF of up
+to 4 MB is passed to the configured OpenAI model with structured output and
+response storage disabled. Only the PDF is sent to the provider. Bestie treats
+PDF text as data, returns source pages for extracted fields and leaves uncertain
+values blank. The app does not retain the PDF. AI activity records capture the
+model, prompt version, file hash, token usage and processing status.
+
+Sponsor matching uses the local stakeholder register and the Excel import's
+match rules. Only the confirming user in the same organization can submit the
+completed preview. The security-invoker RPC uses RLS and the Excel import lock
+to save the sponsor, contact, draft and deliverables together. A per-organization
+PDF hash prevents saving the same file twice, and archived sponsors cannot be
+selected for new contracts.

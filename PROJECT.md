@@ -1928,3 +1928,13 @@ The stakeholder register has an Excel import page for members with write access.
 Bestie suggests new sponsors and updates, and leaves ambiguous matches for
 manual review. The user approves the selected rows together. Contract and
 payment fields are available in the preview for reference.
+
+## Sponsor contract import
+
+From the stakeholder register, members with write access can select a sponsor
+contract in PDF format. Bestie proposes a sponsor match and displays editable
+details, source pages and missing fields. On approval the app saves a draft
+contract and its deliverables on the selected sponsor, or creates a new sponsor
+if explicitly selected. Existing sponsor values are preserved and empty fields
+can be filled. The uploaded PDF is used for extraction and is not attached to
+the draft.

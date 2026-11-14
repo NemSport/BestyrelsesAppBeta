@@ -349,10 +349,24 @@ export function StakeholderWorkspace({
           {data.capabilities.createStakeholders ? (
             <div className="flex flex-wrap gap-2">
               <Link
-                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                className={buttonClassName({
+                  size: "sm",
+                  variant: "secondary",
+                })}
                 href={`/organizations/${organizationId}/stakeholders/import`}
               >
                 Importér Excel
+              </Link>
+              <Link
+                className={buttonClassName({
+                  size: "sm",
+                  variant: "secondary",
+                  className:
+                    "!border !border-line-strong !bg-surface !text-brand",
+                })}
+                href={`/organizations/${organizationId}/stakeholders/contract-import`}
+              >
+                Importér kontrakt
               </Link>
               <Button size="sm" onClick={() => setCreateOpen(true)}>
                 <AppIcon name="taskAdd" size={16} /> Ny interessent
