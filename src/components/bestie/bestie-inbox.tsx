@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { BestieInboxRow } from "@/components/bestie/bestie-inbox-row";
 import { BestiePushToggle } from "@/components/bestie/bestie-push-toggle";
-import { Button, EmptyState, StatusBadge } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import { bestieDate, bestiePath, type BestieThread } from "@/lib/bestie";
 
 export function BestieInbox({
@@ -16,6 +18,11 @@ export function BestieInbox({
   organizationId: string;
   selected: string | null;
 }) {
+  const router = useRouter();
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const dismissed = useRef(new Map<string, string>());
   const [threads, setThreads] = useState(initialThreads);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,14 +55,18 @@ export function BestieInbox({
         if (active)
           setThreads((previous) => {
             const byId = new Map(previous.map((thread) => [thread.id, thread]));
-            return result.threads.map((thread) => {
-              const local = byId.get(thread.id);
-              return local &&
-                (Date.parse(local.version) > Date.parse(thread.version) ||
-                  (local.version === thread.version && !local.unread))
-                ? local
-                : thread;
-            });
+            return result.threads
+              .filter(
+                (thread) => dismissed.current.get(thread.id) !== thread.version,
+              )
+              .map((thread) => {
+                const local = byId.get(thread.id);
+                return local &&
+                  (Date.parse(local.version) > Date.parse(thread.version) ||
+                    (local.version === thread.version && !local.unread))
+                  ? local
+                  : thread;
+              });
           });
       } catch {
         // Keep the last available conversations on a temporary network error.
@@ -140,6 +151,40 @@ export function BestieInbox({
     }
   }
 
+  async function dismissThread(thread: BestieThread) {
+    if (deleting || (thread.id === selected && busy)) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const query = new URLSearchParams({ version: thread.version });
+      const response = await fetch(`${endpoint}/${thread.id}?${query}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(
+          result?.error ?? "Beskeden kunne ikke slettes. Prøv igen.",
+        );
+      }
+      dismissed.current.set(thread.id, thread.version);
+      setThreads((previous) =>
+        previous.filter(
+          (item) => item.id !== thread.id || item.version !== thread.version,
+        ),
+      );
+      setRevealed(null);
+      if (thread.id === selected)
+        router.replace(bestiePath(organizationId), { scroll: false });
+      router.refresh();
+    } catch (cause) {
+      setDeleteError(
+        cause instanceof Error ? cause.message : "Beskeden kunne ikke slettes.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void reply(message);
@@ -153,24 +198,24 @@ export function BestieInbox({
           <h2 className="border-b border-line px-4 py-3 text-base font-semibold">
             Beskeder
           </h2>
+          {deleteError ? (
+            <p className="px-4 py-2 text-sm text-danger" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
           {threads.length ? (
             <ul className="divide-y divide-line">
               {threads.map((thread) => (
-                <li key={thread.id}>
-                  <Link
-                    aria-current={thread.id === selected ? "page" : undefined}
-                    className={`block break-words px-4 py-3 hover:bg-subtle ${thread.id === selected ? "bg-brand-soft" : ""}`}
-                    href={bestiePath(organizationId, thread.id)}
-                  >
-                    <span className="block font-semibold">{thread.title}</span>
-                    {thread.unread ? (
-                      <StatusBadge tone="info">Ny besked</StatusBadge>
-                    ) : null}
-                    <span className="mt-1 block line-clamp-2 text-sm text-muted">
-                      {thread.messages.at(-1)?.body}
-                    </span>
-                  </Link>
-                </li>
+                <BestieInboxRow
+                  key={thread.id}
+                  thread={thread}
+                  href={bestiePath(organizationId, thread.id)}
+                  current={thread.id === selected}
+                  revealed={thread.id === revealed}
+                  busy={deleting || (thread.id === selected && busy)}
+                  onReveal={(open) => setRevealed(open ? thread.id : null)}
+                  onDelete={() => void dismissThread(thread)}
+                />
               ))}
             </ul>
           ) : (

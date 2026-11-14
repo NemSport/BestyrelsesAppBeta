@@ -24,7 +24,7 @@ export default async function BestiePage({
         if (error instanceof NotFoundError) return null;
         throw error;
       });
-    if (thread) threads.push(bestieThread(thread));
+    if (thread && !thread.dismissed_at) threads.push(bestieThread(thread));
   }
 
   return (

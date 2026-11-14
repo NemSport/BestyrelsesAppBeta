@@ -22,6 +22,7 @@ type BestieThreadRow = {
   pending_action: Json;
   follow_up_on: string | null;
   last_read_at: string | null;
+  dismissed_at: string | null;
   push_sent_at: string | null;
   push_claimed_at: string | null;
   created_at: string;

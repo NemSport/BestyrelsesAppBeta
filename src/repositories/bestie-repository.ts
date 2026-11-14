@@ -12,6 +12,7 @@ export class BestieRepository {
       .select("*")
       .eq("organization_id", organizationId)
       .eq("user_id", userId)
+      .is("dismissed_at", null)
       .order("updated_at", { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -28,6 +29,20 @@ export class BestieRepository {
       .maybeSingle();
     if (error) throw error;
     return data;
+  }
+
+  async dismiss(thread: TableRow<"bestie_threads">, version: string) {
+    const { data, error } = await this.db
+      .from("bestie_threads")
+      .update({ dismissed_at: new Date().toISOString() })
+      .eq("id", thread.id)
+      .eq("user_id", thread.user_id)
+      .eq("organization_id", thread.organization_id)
+      .eq("updated_at", version)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
   }
 
   async markRead(thread: TableRow<"bestie_threads">) {

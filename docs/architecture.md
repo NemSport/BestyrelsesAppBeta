@@ -2999,3 +2999,8 @@ The compact month calendar on Overblik uses active committee memberships and
 the signed-in client’s RLS. Month links request only the selected month.
 Meeting timestamps use Europe/Copenhagen dates and Annual Wheel activities
 appear on each date in their recorded range.
+
+Removing a Bestie inbox row marks only that user's thread as dismissed. The
+thread API verifies ownership and the viewed version before updating it.
+Overblik and the inbox exclude dismissed threads. A database trigger restores
+visibility when a new message changes the conversation.

@@ -36,6 +36,30 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ organizationId: string; threadId: string }> },
+) {
+  try {
+    const version = z
+      .string()
+      .datetime({ offset: true })
+      .parse(new URL(request.url).searchParams.get("version"));
+    const { thread, writer } = await load(params);
+    if (!(await writer.dismiss(thread, version))) {
+      throw new AppError(
+        "Der er kommet en ny besked i samtalen. Åbn den, og prøv igen.",
+        409,
+      );
+    }
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return apiError(error, {
+      fallbackMessage: "Beskeden kunne ikke slettes. Prøv igen.",
+    });
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ organizationId: string; threadId: string }> },
