@@ -10,6 +10,13 @@ The shared Button, Dropdown, ActionMenu and legacy button classes share these
 rules. Inputs remain recognisable as editable fields. Native task rows, calendar
 items and rich-text tools retain their layout and selected-state semantics.
 
+## Bestie after a meeting
+
+Final minutes approval creates a private, replyable Bestie summary for eligible
+participants and members with relevant responsibilities. It contains their open
+meeting tasks, deadlines and relevant decision titles. The push opens the
+summary conversation. Replies in that conversation are stored with the summary.
+
 ## A4.2 — Interactive meeting task follow-up
 
 New ordinary meetings include **Opgaver & opfølgning** as a fourth standard agenda item,

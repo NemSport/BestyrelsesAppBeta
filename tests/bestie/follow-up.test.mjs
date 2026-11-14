@@ -16,7 +16,15 @@ before(async () => {
       $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), nullif(current_setting('test.user_id', true), ''))::uuid $$;
     create table profiles(id uuid primary key);
     create table organizations(id uuid primary key, deleted_at timestamptz);
-    create table committees(id uuid primary key, organization_id uuid, deleted_at timestamptz);
+    create table committees(id uuid primary key, organization_id uuid, deleted_at timestamptz, archived_at timestamptz);
+    create table meetings(id uuid primary key, organization_id uuid, committee_id uuid, title text, status text default 'completed', deleted_at timestamptz);
+    create table meeting_minutes(id uuid primary key, meeting_id uuid, organization_id uuid, committee_id uuid, status text);
+    create table meeting_attendees(meeting_id uuid, user_id uuid, attendance_status text);
+    create table meeting_minute_approvals(meeting_minutes_id uuid, user_id uuid, status text);
+    create table agenda_items(id uuid primary key, title text, deleted_at timestamptz);
+    create table agenda_item_occurrences(id uuid primary key, meeting_id uuid, agenda_item_id uuid, deleted_at timestamptz);
+    create table meeting_task_links(meeting_id uuid, task_id uuid, occurrence_id uuid);
+    create table decisions(id uuid primary key, organization_id uuid, committee_id uuid, meeting_id uuid, agenda_item_id uuid, responsible_user_id uuid, title text, archived_at timestamptz, status text);
     create table organization_members(organization_id uuid, user_id uuid, role text, status text);
     create table committee_members(committee_id uuid, user_id uuid, role text, status text);
     create type task_status as enum ('waiting', 'completed', 'cancelled');
@@ -24,7 +32,7 @@ before(async () => {
       id uuid primary key, organization_id uuid, committee_id uuid, title text,
       responsible_user_id uuid, deadline date, status task_status default 'waiting',
       archived_at timestamptz, completed_at timestamptz, updated_by uuid, updated_at timestamptz default now(),
-      annual_wheel_event_id uuid, annual_wheel_activation_year int
+      annual_wheel_event_id uuid, annual_wheel_activation_year int, meeting_id uuid, agenda_item_id uuid, decision_id uuid
     );
     create table annual_wheel_events(
       id uuid primary key, organization_id uuid, committee_id uuid, title text, responsible_user_id uuid,
@@ -63,6 +71,10 @@ before(async () => {
   );
   await db.exec(await readFile(
     new URL("../../supabase/migrations/202611130007_bestie_annual_wheel_tasks.sql", import.meta.url),
+    "utf8",
+  ));
+  await db.exec(await readFile(
+    new URL("../../supabase/migrations/202611140005_bestie_after_meeting.sql", import.meta.url),
     "utf8",
   ));
 });
@@ -317,4 +329,33 @@ test("a stale task version cannot overwrite a newer task edit", async () => {
       .count,
     0,
   );
+});
+
+test("final approval queues personal meeting summaries once and accepts a private reply", async () => {
+  const meeting = id(30);
+  const minutes = id(31);
+  await db.exec(`
+    insert into meetings(id, organization_id, committee_id, title) values ('${meeting}', '${org}', '${committee}', 'Novembermøde');
+    insert into meeting_minutes values ('${minutes}', '${meeting}', '${org}', '${committee}', 'ready_for_approval');
+    update tasks set meeting_id = '${meeting}' where id = '${task}';
+    insert into meeting_attendees values ('${meeting}', '${outsider}', 'attended');
+    insert into decisions values ('${id(32)}', '${org}', '${committee}', '${meeting}', null, '${person}', 'Fælles indkøb', null, 'waiting');
+  `);
+  assert.equal((await db.query("select * from bestie_threads where meeting_id = $1", [meeting])).rows.length, 0);
+  await db.query("update meeting_minutes set status = 'approved' where id = $1", [minutes]);
+  await db.query("update meeting_minutes set status = 'approved' where id = $1", [minutes]);
+  const { rows } = await db.query("select * from bestie_threads where meeting_id = $1", [meeting]);
+  assert.equal(rows.length, 1);
+  const summary = rows[0];
+  assert.equal(summary.user_id, person);
+  assert.equal(summary.meeting_summary.tasks.length, 1);
+  assert.deepEqual(summary.meeting_summary.decisions, ["Fælles indkøb"]);
+
+  const { rows: [{ messages }] } = await db.query(
+    "select (bestie_apply_reply($1, $2, $3, null, $4, 'Jeg har taget første skridt.', 'Gemt i samtalen.', null, null, null, false, null, null)).messages",
+    [summary.id, person, summary.updated_at, id(33)],
+  );
+  assert.equal(messages[1].body, "Jeg har taget første skridt.");
+  await db.query("update meeting_minutes set status = 'ready_for_approval' where id = $1", [minutes]);
+  assert.deepEqual((await db.query("select bestie_target_is_accessible(b) as allowed from bestie_threads b where b.id = $1", [summary.id])).rows, [{ allowed: false }]);
 });

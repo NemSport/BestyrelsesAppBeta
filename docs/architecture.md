@@ -2952,3 +2952,15 @@ occurrences on the current meeting.
 An explicit link takes precedence. The general follow-up lists and their counts
 exclude those tasks, which remain visible under their agenda point. A link to a
 point on another meeting does not exclude a task.
+
+## Bestie after a meeting
+
+The final approved transition on meeting minutes inserts one private summary
+thread per eligible recipient. Sources are scoped to the meeting and committee.
+Recipients are internal participants who accepted or attended, minutes
+approvers who approved, and members responsible for a relevant open task or
+decision. Push uses the same conversation and delivery queue as task follow-up.
+The approval endpoint triggers immediate delivery after the response, with the
+scheduled Bestie job handling queued retries. Access checks require an active
+organization membership and committee access and still-approved minutes.
+Replies are grounded in the saved summary and stored in the private thread.
