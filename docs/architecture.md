@@ -2994,3 +2994,8 @@ organization owner or administrator. It shows overdue tasks, outstanding
 responses and approvals, and 30 days of recent activity. The RPC never exposes
 private Bestie message text. A reply to an explicit status request is visible
 as a response indicator while its proposal awaits approval.
+
+The compact month calendar on Overblik uses active committee memberships and
+the signed-in client’s RLS. Month links request only the selected month.
+Meeting timestamps use Europe/Copenhagen dates and Annual Wheel activities
+appear on each date in their recorded range.

@@ -321,7 +321,7 @@ test("reminder compares absolute UTC instants from datetime-local conversion", (
   );
 });
 
-test("dashboard, navigation and center share ActionService", async () => {
+test("Overblik embeds ActionCenter and refreshes actions through ActionService", async () => {
   const root = process.cwd();
   const [
     page,
@@ -371,10 +371,11 @@ test("dashboard, navigation and center share ActionService", async () => {
     ),
   ]);
   assert.match(page, /new ActionService\(db\)\.getCenter/);
-  assert.match(layout, /activeActionCount=\{actionCenter\.activeCount\}/);
+  assert.match(layout, /nextActionRefreshAt=\{actionCenter\.nextRefreshAt\}/);
   assert.match(page, /actionCenter\.inbox/);
-  assert.match(dashboard, /\$\{root\}\$\{action\.href\}/);
-  assert.match(component, /grid min-w-0 gap-3 md:grid-cols/);
+  assert.match(page, /actionSection=\{<ActionCenter/);
+  assert.match(dashboard, /id="handlinger"[^>]*>\{actionSection\}/);
+  assert.match(component, /\$\{root\}\$\{action\.href\}/);
   assert.match(component, /requireAgendaItemEditor|editableCommitteeIds/);
   assert.match(component, /Påmindelse[\s\S]*formatDateTime/);
   assert.match(refresh, /visibilitychange/);

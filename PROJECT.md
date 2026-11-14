@@ -1915,3 +1915,6 @@ Overblik brings together a member's pending actions and personal messages.
 Bestie conversations and new meeting-related email and push notifications link
 to their source. Owners and organization administrators also have an
 Adminoverblik for overdue tasks, pending responses and recent updates.
+
+Overblik also includes a month calendar for the member’s active committees.
+It shows meetings, dated task deadlines, and Annual Wheel activities.
