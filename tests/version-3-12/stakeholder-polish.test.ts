@@ -6,14 +6,15 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file: string) => readFile(path.join(root, file), "utf8");
 
-test("stakeholder module uses readable secondary eyebrows and removes permanent onboarding", async () => {
+test("stakeholder overview exposes compact metrics without redundant headings", async () => {
   const [page, workspace] = await Promise.all([
     read("src/app/(app)/organizations/[organizationId]/stakeholders/page.tsx"),
     read("src/components/stakeholders/stakeholder-workspace.tsx"),
   ]);
-  assert.match(page, /Eksterne relationer/);
-  assert.match(page, /text-muted/);
-  assert.match(workspace, /page-eyebrow text-muted/);
+  assert.match(page, /title="Interessenter & Relationer"/);
+  assert.doesNotMatch(page, /Eksterne relationer/);
+  assert.match(workspace, /<dl\s+aria-label="Interessentstatus"/);
+  assert.doesNotMatch(workspace, /Relationsarbejde/);
   assert.doesNotMatch(workspace, /Sådan bruges modulet/);
   assert.doesNotMatch(workspace, /CRM-opfølgninger bruges/);
 });
