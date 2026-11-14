@@ -119,10 +119,12 @@ export class MeetingSchedulingService {
     const delivery = await email.sendPreparedBatch(
       voters.map((voter) => ({
         from,
+        organizationId: scope.organizationId,
+        notificationPath: `/api/organizations/${scope.organizationId}/overview/poll/${pollId}`,
         to: [voter.email],
         push: {
           path: `/meeting-vote/${voter.token}`,
-          body: "Du har fået en datoafstemning.",
+          body: `Datoafstemning: ${poll.title}. Vælg de tider, der passer dig.`,
         },
         ...meetingDatePollEmailTemplate(
           poll.title,

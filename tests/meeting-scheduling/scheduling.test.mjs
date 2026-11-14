@@ -12,7 +12,8 @@ before(async () => {
     create role anon; create role authenticated; create role service_role;
     create schema auth;
     create function auth.uid() returns uuid language sql as
-      $$ select '00000000-0000-4000-8000-000000000004'::uuid $$;
+      $$ select coalesce(nullif(current_setting('test.viewer', true), ''),
+        '00000000-0000-4000-8000-000000000004')::uuid $$;
     create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz);
     create table organizations (id uuid primary key, deleted_at timestamptz);
     create table committees (id uuid primary key, organization_id uuid, deleted_at timestamptz, archived_at timestamptz);
@@ -24,7 +25,7 @@ before(async () => {
     create table meeting_external_attendees (organization_id uuid, committee_id uuid, meeting_id uuid,
       name text, email text, created_by uuid, updated_by uuid);
     create function public.is_organization_member(uuid) returns boolean language sql as $$ select true $$;
-    create function public.is_organization_admin(uuid) returns boolean language sql as $$ select false $$;
+    create function public.is_organization_admin(uuid) returns boolean language sql as $$ select coalesce(current_setting('test.admin', true) = 'yes', false) $$;
     create function public.can_manage_committee(uuid) returns boolean language sql as
       $$ select current_setting('test.manager', true) = 'yes' $$;
     create function public.create_meeting_with_standard_items(uuid, uuid, text, text, timestamptz, timestamptz, text)
@@ -263,4 +264,48 @@ test("email push resolves only subscribed accounts with a verified matching addr
   } finally {
     await db.exec("reset role");
   }
+});
+
+test("the inbox deduplicates deliveries and keeps each message private, and admin sees outstanding and submitted votes", async () => {
+  await db.exec(`
+    create table profiles (id uuid primary key, full_name text);
+    create table tasks (id uuid, committee_id uuid, organization_id uuid, archived_at timestamptz,
+      status text, deadline date, title text, responsible_user_id uuid);
+    create table bestie_threads (id uuid, task_id uuid, user_id uuid, messages jsonb, pending_action jsonb,
+      created_at timestamptz, updated_at timestamptz);
+    create table bestie_status_requests (thread_id uuid, expires_at timestamptz);
+    create table meeting_minute_approvals (id uuid, meeting_id uuid, organization_id uuid, meeting_minutes_id uuid,
+      user_id uuid, status text, responded_at timestamptz, created_at timestamptz);
+    create table meeting_minutes (id uuid, meeting_id uuid, status text);
+    create table task_comments (id uuid, task_id uuid, organization_id uuid, created_by uuid, created_at timestamptz);
+    set test.manager='yes';
+  `);
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/202611140008_overview_notifications.sql", import.meta.url,
+  ), "utf8"));
+  const poll = await scalar(`select create_meeting_date_poll($1,$2,'Overblikstest',
+    array[now() + interval '1 day', now() + interval '2 days'],
+    array['member@example.test','guest@example.test'])`, [org, committee]);
+  const token = await scalar("select token from meeting_date_poll_voters where poll_id=$1 and email='member@example.test'", [poll]);
+  await db.query("insert into profiles values ($1,'Medlem')", [member]);
+  const record = () => db.query("select record_organization_email_notification($1,$2,$3,$4,$5)", [
+    org, ["member@example.test"], `/api/organizations/${org}/overview/poll/${poll}`,
+    "Datoafstemning: Overblikstest", `/meeting-vote/${token}`,
+  ]);
+  await record();
+  await record();
+  await db.exec("set role authenticated");
+  assert.equal(await scalar("select count(*)::int from organization_notifications"), 0);
+  await db.query("select set_config('test.viewer', $1, false)", [member]);
+  assert.equal(await scalar("select count(*)::int from organization_notifications"), 1);
+  await assert.rejects(record(), { code: "42501" });
+  const overview = async () => (await db.query("select section, detail from read_admin_overview($1) where title='Overblikstest'", [org])).rows;
+  await assert.rejects(overview(), { code: "42501" });
+  await db.exec("set test.admin='yes'");
+  assert.deepEqual(await overview(), [{ section: "waiting", detail: "member@example.test · Mangler svar på datoafstemningen" }]);
+  await db.exec("reset role");
+  assert.equal(await scalar("select submit_meeting_date_vote($1,array[]::integer[])", [token]), true);
+  await db.exec("set role authenticated");
+  assert.deepEqual(await overview(), [{ section: "recent", detail: "member@example.test · Svarede på datoafstemningen" }]);
+  await db.exec("reset role");
 });

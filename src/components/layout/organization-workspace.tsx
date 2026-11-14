@@ -11,7 +11,6 @@ export function OrganizationWorkspace({
   branding,
   committees = [],
   canManageOrganization = false,
-  activeActionCount = 0,
   nextActionRefreshAt = null,
 }: {
   children: React.ReactNode;
@@ -24,7 +23,6 @@ export function OrganizationWorkspace({
     capabilities: MeetingCapabilities;
   }>;
   canManageOrganization?: boolean;
-  activeActionCount?: number;
   nextActionRefreshAt?: string | null;
 }) {
   return (
@@ -36,7 +34,6 @@ export function OrganizationWorkspace({
         style={branding?.cssVariables}
       />
       <OrganizationNav
-        activeActionCount={activeActionCount}
         canManageOrganization={canManageOrganization}
         committees={committees}
         logoUrl={branding?.logoUrl ?? null}

@@ -129,7 +129,7 @@ const appIcons: Record<AppIconName, LucideIcon> = {
 
 export const organizationNavIconNames: Record<string, AppIconName> = {
   "": "overview",
-  "/actions": "actions",
+  "/admin": "actions",
   "/annual-wheel": "annualWheel",
   "/committees": "committees",
   "/decisions": "decisions",

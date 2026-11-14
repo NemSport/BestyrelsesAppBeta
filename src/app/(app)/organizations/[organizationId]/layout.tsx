@@ -47,7 +47,6 @@ export default async function OrganizationLayout({
 
   return (
     <OrganizationWorkspace
-      activeActionCount={actionCenter.activeCount}
       nextActionRefreshAt={actionCenter.nextRefreshAt}
       branding={branding}
       canManageOrganization={isOrganizationAdmin(context.membership.role)}

@@ -2979,3 +2979,18 @@ Set `RESEND_BESTIE_REPLY_DOMAIN`, `RESEND_BESTIE_WEBHOOK_SECRET`, and
 `RESEND_BESTIE_RECEIVING_KEY` in Vercel, and subscribe
 `/api/webhooks/resend/bestie` to Resend's `email.received` event. The receiving
 key is separate from the outbound email key.
+
+## Organization overview and admin follow-up
+
+The organization home combines the existing ActionService with a compact
+message list. The previous actions URL redirects to Overblik. Bestie messages
+link to the private conversation. Other organization emails and their matching
+push share a row in `organization_notifications`, written by the service role
+and readable only by the intended member. Personal ballot and invitation links
+are resolved on the server against the member's verified email.
+
+The Adminoverblik route and `read_admin_overview` RPC require an active
+organization owner or administrator. It shows overdue tasks, outstanding
+responses and approvals, and 30 days of recent activity. The RPC never exposes
+private Bestie message text. A reply to an explicit status request is visible
+as a response indicator while its proposal awaits approval.

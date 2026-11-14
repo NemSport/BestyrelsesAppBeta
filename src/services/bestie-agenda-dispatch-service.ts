@@ -64,7 +64,7 @@ export class BestieAgendaDispatchService {
       if (!prepared) return false;
     }
 
-    const [due, drafts] = await Promise.all([
+    const [due, drafts, meeting] = await Promise.all([
       this.db
         .from("bestie_due_agendas")
         .select("meeting_id")
@@ -72,12 +72,38 @@ export class BestieAgendaDispatchService {
         .eq("user_id", userId)
         .maybeSingle(),
       new BestieAgendaRepository(this.db).listDrafts(meetingId),
+      this.db
+        .from("meetings")
+        .select("title")
+        .eq("id", meetingId)
+        .maybeSingle(),
     ]);
     if (due.error) throw due.error;
-    if (!due.data) return false;
+    if (meeting.error) throw meeting.error;
+    if (!due.data || !meeting.data) return false;
 
     let delivered = false;
     if (drafts.length) {
+      const path = `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}?view=preparation#bestie-agenda-heading`;
+      const title = `Dagsordensforslag til ${meeting.data.title}`;
+      const count =
+        drafts.length === 1 ? "1 forslag" : `${drafts.length} forslag`;
+      const body = `${title}. Gennemgå ${count} i mødeforberedelsen.`;
+      const { error: notificationError } = await this.db
+        .from("organization_notifications")
+        .upsert(
+          {
+            organization_id: organizationId,
+            user_id: userId,
+            path,
+            title,
+          },
+          {
+            onConflict: "organization_id,user_id,path,title",
+            ignoreDuplicates: true,
+          },
+        );
+      if (notificationError) throw notificationError;
       const config = bestiePushConfig();
       if (!config) return false;
       const { data: subscriptions, error } = await this.db
@@ -92,8 +118,8 @@ export class BestieAgendaDispatchService {
             subscription,
             {
               kind: "agenda",
-              body: "Bestie har dagsordensforslag klar. Åbn mødet for at gennemgå dem.",
-              path: `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}?view=preparation#bestie-agenda-heading`,
+              body,
+              path,
               tag: meetingId,
             },
             config,
