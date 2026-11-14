@@ -2972,7 +2972,8 @@ member's current access and verified email. It creates an idempotent private
 Bestie conversation. Resend receives replies on a dedicated receiving domain.
 The webhook validates the signature, sender authentication, address token,
 current assignment and membership. The incoming message ID prevents replay.
-Email and push replies use the same approval transaction as task follow-up.
+Authenticated email replies save the extracted reply as a shared task note in
+the task audit transaction. Push replies still use the approval flow.
 
 Set `RESEND_BESTIE_REPLY_DOMAIN`, `RESEND_BESTIE_WEBHOOK_SECRET`, and
 `RESEND_BESTIE_RECEIVING_KEY` in Vercel, and subscribe

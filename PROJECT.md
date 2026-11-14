@@ -14,7 +14,8 @@ items and rich-text tools retain their layout and selected-state semantics.
 
 Organization owners and administrators can request status on an open assigned
 task. Email and push point to the assignee's private Bestie conversation.
-A reply is proposed as a shared task note and saved to the task after approval.
+Email replies are saved directly as shared task notes. Replies in Bestie
+are proposed for approval.
 
 ## Bestie after a meeting
 

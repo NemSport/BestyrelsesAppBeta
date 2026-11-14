@@ -44,11 +44,14 @@ export function emailAddress(value: string) {
 }
 
 export function bestieReplyText(text: string) {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const lines = text
+    .replace(/\uFEFF/g, "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n");
   const quotedHeader = /(?:wrote|skrev)(?:\s+[^:]{1,140})?:\s*$/i;
   const boundary = lines.findIndex(
     (line, index) =>
-      /^\s*(?:>|--\s*$|_{5,}|-{2,}\s*(?:original message|oprindelig meddelelse)|fra:|from:|sent:|sendt:)/i.test(
+      /^\s*(?:>|--\s*$|_{5,}|-{2,}\s*(?:original message|oprindelig meddelelse)|fra:|from:|sent:|sendt:|en administrator har bedt om status på [“"])/i.test(
         line,
       ) ||
       (/^\s*(?:on|den)\s/i.test(line) &&

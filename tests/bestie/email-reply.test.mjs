@@ -71,3 +71,13 @@ test("drops the Danish Outlook sign-off and quoted sender line", () => {
     reply,
   );
 });
+
+test("removes the original status email even without a quoted sender line", () => {
+  const reply = "Status på aftalen.\nFølg op fredag.";
+  assert.equal(
+    bestieReplyText(
+      `${reply}\n\n\uFEFFEn administrator har bedt om status på “Testopgave”. Hvordan går det?\n\nSvar på denne mail.`,
+    ),
+    reply,
+  );
+});

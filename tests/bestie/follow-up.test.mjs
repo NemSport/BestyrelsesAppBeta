@@ -97,6 +97,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140007_save_bestie_email_status_directly.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 
 after(async () => db.close());
@@ -434,7 +443,7 @@ test("final approval queues personal meeting summaries once and accepts a privat
   );
 });
 
-test("an authenticated mail reply proposes a note only on the requested task", async () => {
+test("an authenticated mail reply saves a note only on the requested task without approval", async () => {
   const token = "a".repeat(64);
   const email = "recipient@example.com";
   await db.query("insert into auth.users values ($1, $2, now())", [
@@ -469,26 +478,14 @@ test("an authenticated mail reply proposes a note only on the requested task", a
   assert.equal(await receive("other@example.com"), null);
   assert.equal(await receive(email), first.thread_id);
   assert.equal(await receive(email), null);
-  assert.equal((await db.query("select * from task_comments")).rows.length, 0);
-
   const {
-    rows: [proposal],
+    rows: [thread],
   } = await db.query(
-    "select pending_action, updated_at from bestie_threads where id = $1",
+    "select pending_action, messages from bestie_threads where id = $1",
     [first.thread_id],
   );
-  assert.equal(proposal.pending_action.statusNote, "Jeg har sendt tilbuddet.");
-  await db.query(
-    "select bestie_apply_reply($1,$2,$3,$4,$5,'Godkend','Gemt',null,$6,null,false,null,null)",
-    [
-      first.thread_id,
-      person,
-      proposal.updated_at,
-      proposal.pending_action.taskVersion,
-      id(52),
-      proposal.pending_action.statusNote,
-    ],
-  );
+  assert.equal(thread.pending_action, null);
+  assert.match(thread.messages.at(-1).body, /gemt.*statusnote/);
   assert.deepEqual(
     (await db.query("select task_id, body from task_comments")).rows,
     [{ task_id: task, body: "Jeg har sendt tilbuddet." }],

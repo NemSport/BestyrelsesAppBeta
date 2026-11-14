@@ -85,7 +85,7 @@ export async function POST(
     ).href;
     const text = [
       `En administrator har bedt om status på “${delivery.task_title}”. Hvordan går det?`,
-      "Svar på denne mail med din status, eller svar til Bestie i appen. Godkend derefter forslaget i samtalen for at gemme status på opgaven.",
+      "Svar på denne mail med din status. Dit svar gemmes som en statusnote på opgaven. Du kan også svare til Bestie i appen og godkende forslaget dér.",
       `Åbn samtalen i BestyrelsesMate: ${conversation}`,
     ].join("\n\n");
     const sent = await fetch("https://api.resend.com/emails", {
