@@ -8,6 +8,7 @@ import { AppIcon } from "@/components/icons/app-icon";
 import {
   ActionMenu,
   Button,
+  buttonClassName,
   EmptyState,
   FieldError,
   Input,
@@ -346,9 +347,17 @@ export function StakeholderWorkspace({
             Interessentregister
           </h2>
           {data.capabilities.createStakeholders ? (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <AppIcon name="taskAdd" size={16} /> Ny interessent
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                className={buttonClassName({ size: "sm", variant: "secondary" })}
+                href={`/organizations/${organizationId}/stakeholders/import`}
+              >
+                Importér Excel
+              </Link>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <AppIcon name="taskAdd" size={16} /> Ny interessent
+              </Button>
+            </div>
           ) : null}
         </div>
         <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-2">
