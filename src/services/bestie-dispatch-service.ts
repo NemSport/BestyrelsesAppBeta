@@ -8,17 +8,19 @@ import type { Database, TableRow } from "@/types/database";
 export class BestieDispatchService {
   constructor(private readonly db: SupabaseClient<Database>) {}
 
-  async run() {
-    const { data: generated, error } = await this.db.rpc(
-      "bestie_generate_messages",
-    );
+  async run(meetingId?: string) {
+    const { data: generated, error } = meetingId
+      ? { data: 0, error: null }
+      : await this.db.rpc("bestie_generate_messages");
     if (error) throw error;
     const config = bestiePushConfig();
     if (!config) return { generated, delivered: 0 };
 
-    const { data: threads, error: claimError } = await this.db.rpc(
-      "bestie_claim_pushes",
-    );
+    const { data: threads, error: claimError } = meetingId
+      ? await this.db.rpc("bestie_claim_meeting_pushes", {
+          target_meeting: meetingId,
+        })
+      : await this.db.rpc("bestie_claim_pushes");
     if (claimError) throw claimError;
     let delivered = 0;
     for (let index = 0; index < threads.length; index += 10) {
@@ -47,9 +49,11 @@ export class BestieDispatchService {
       .eq("user_id", row.user_id);
     if (error) throw error;
     const payload = {
-      body: row.event_id && row.task_id
-        ? "Du har en opfølgning på en opgave fra årshjulet."
-        : "Du har en ny besked fra Bestie.",
+      body: row.meeting_id
+        ? "Din personlige opsamling fra mødet er klar."
+        : row.event_id && row.task_id
+          ? "Du har en opfølgning på en opgave fra årshjulet."
+          : "Du har en ny besked fra Bestie.",
       path: bestiePath(row.organization_id, row.id),
       api: `/api/organizations/${row.organization_id}/bestie/${row.id}`,
       tag: row.id,
@@ -57,7 +61,12 @@ export class BestieDispatchService {
     };
     const sent = await Promise.all(
       subscriptions.map((subscription) =>
-        sendDevicePush(this.db, { ...subscription, user_id: row.user_id }, payload, config),
+        sendDevicePush(
+          this.db,
+          { ...subscription, user_id: row.user_id },
+          payload,
+          config,
+        ),
       ),
     );
     if (!sent.includes(true)) return false;

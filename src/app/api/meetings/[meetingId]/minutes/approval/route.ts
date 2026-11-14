@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { BestieDispatchService } from "@/services/bestie-dispatch-service";
 import { createClient } from "@/lib/supabase/server";
 import { MeetingMinutesService } from "@/services/meeting-minutes-service";
 
@@ -42,6 +44,16 @@ export async function POST(
     const service = new MeetingMinutesService(await createClient());
     const meetingId = (await params).meetingId;
     const url = new URL(request.url);
+    const dispatchSummary = () =>
+      after(async () => {
+        try {
+          await new BestieDispatchService(createAdminClient()).run(meetingId);
+        } catch {
+          console.warn(
+            "Bestie could not dispatch a meeting summary immediately.",
+          );
+        }
+      });
 
     if (body.action === "send") {
       const result = await service.sendForApproval(
@@ -56,6 +68,7 @@ export async function POST(
     }
     if (body.action === "respond") {
       const approval = await service.respondToApproval({ ...body, meetingId });
+      if (body.status === "approved") dispatchSummary();
       return NextResponse.json({
         approval,
         message:
@@ -66,6 +79,7 @@ export async function POST(
     }
     if (body.action === "mark_no_response") {
       const approvals = await service.markNoResponse({ ...body, meetingId });
+      dispatchSummary();
       return NextResponse.json({
         approvals,
         message: "Manglende svar er markeret som ingen respons.",

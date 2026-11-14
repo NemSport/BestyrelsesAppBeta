@@ -14,6 +14,8 @@ type BestieThreadRow = {
   task_id: string | null;
   event_id: string | null;
   activity_start: string | null;
+  meeting_id: string | null;
+  meeting_summary: Json;
   title: string;
   dedup_key: string;
   messages: Json;
@@ -1794,6 +1796,7 @@ export type Database = {
         Returns: { email: string; user_id: string; endpoint: string; keys: Json }[];
       };
       bestie_generate_messages: { Args: never; Returns: number };
+      bestie_claim_meeting_pushes: { Args: { target_meeting: string }; Returns: BestieThreadRow[] };
       bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
       bestie_apply_reply: {
         Args: {
