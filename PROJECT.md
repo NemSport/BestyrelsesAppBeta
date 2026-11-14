@@ -1918,3 +1918,6 @@ Adminoverblik for overdue tasks, pending responses and recent updates.
 
 Overblik also includes a month calendar for the member’s active committees.
 It shows meetings, dated task deadlines, and Annual Wheel activities.
+
+Members can remove a Bestie conversation from their personal inbox. A new
+message can bring the conversation back.

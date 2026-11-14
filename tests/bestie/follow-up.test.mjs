@@ -106,6 +106,9 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(await readFile(new URL(
+    "../../supabase/migrations/202611140009_bestie_dismiss_messages.sql", import.meta.url,
+  ), "utf8"));
 });
 
 after(async () => db.close());
@@ -490,4 +493,30 @@ test("an authenticated mail reply saves a note only on the requested task withou
     (await db.query("select task_id, body from task_comments")).rows,
     [{ task_id: task, body: "Jeg har sendt tilbuddet." }],
   );
+});
+
+test("dismissing a conversation keeps the history and a new message makes it visible again", async () => {
+  await generate();
+  const { rows: [thread] } = await db.query(
+    "select id, messages from bestie_threads where task_id=$1", [task],
+  );
+  await db.query("update bestie_threads set dismissed_at=now() where id=$1", [thread.id]);
+  assert.equal((await db.query(
+    "select id from bestie_threads where id=$1 and dismissed_at is null", [thread.id],
+  )).rows.length, 0);
+  await db.query("update bestie_threads set last_read_at=now() where id=$1", [thread.id]);
+  const { rows: [hidden] } = await db.query(
+    "select messages, dismissed_at from bestie_threads where id=$1", [thread.id],
+  );
+  assert.ok(hidden.dismissed_at);
+  assert.deepEqual(hidden.messages, thread.messages);
+  await db.query(
+    "update bestie_threads set messages=messages || '[{\"role\":\"assistant\",\"body\":\"Opfølgning\"}]'::jsonb where id=$1",
+    [thread.id],
+  );
+  const { rows: [visible] } = await db.query(
+    "select messages, dismissed_at from bestie_threads where id=$1", [thread.id],
+  );
+  assert.equal(visible.dismissed_at, null);
+  assert.equal(visible.messages.at(-1).body, "Opfølgning");
 });

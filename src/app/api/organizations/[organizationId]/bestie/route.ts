@@ -26,7 +26,7 @@ export async function GET(
           if (error instanceof NotFoundError) return null;
           throw error;
         });
-      if (row) threads.push(bestieThread(row));
+      if (row && !row.dismissed_at) threads.push(bestieThread(row));
     }
     return NextResponse.json(
       { threads },
