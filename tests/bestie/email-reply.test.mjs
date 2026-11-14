@@ -58,3 +58,16 @@ test("extracts only the reply from a quoted Outlook message", () => {
   );
   assert.equal(bestieReplyText("> Tidligere tekst"), "");
 });
+
+test("drops the Danish Outlook sign-off and quoted sender line", () => {
+  const reply = "Jeg har sendt tilbuddet.\nDer følges op den 27. november.";
+  const quote =
+    "Den 14. nov. 2026 kl. 01.37 skrev BestyrelsesMate <noreply@example.com>:\n\nTidligere mail";
+  assert.equal(bestieReplyText(`${reply}\n\n${quote}`), reply);
+  assert.equal(
+    bestieReplyText(
+      `${reply}\n\nDe bedste hilsner,\nTestbruger\nMobil: 12345678\n\n${quote}`,
+    ),
+    reply,
+  );
+});

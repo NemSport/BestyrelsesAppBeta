@@ -45,16 +45,27 @@ export function emailAddress(value: string) {
 
 export function bestieReplyText(text: string) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const quotedHeader = /(?:wrote|skrev)(?:\s+[^:]{1,140})?:\s*$/i;
   const boundary = lines.findIndex(
     (line, index) =>
-      /^\s*(>|--\s*$|_{5,}|-{2,}\s*(?:original message|oprindelig meddelelse)|fra:|from:|sent:|sendt:|on .+ wrote:|den .+ skrev:)/i.test(
+      /^\s*(?:>|--\s*$|_{5,}|-{2,}\s*(?:original message|oprindelig meddelelse)|fra:|from:|sent:|sendt:)/i.test(
         line,
       ) ||
       (/^\s*(?:on|den)\s/i.test(line) &&
-        /(?:wrote|skrev):\s*$/i.test(lines[index + 1] ?? "")),
+        (quotedHeader.test(line) || quotedHeader.test(lines[index + 1] ?? ""))),
   );
-  return lines
-    .slice(0, boundary < 0 ? undefined : boundary)
+  const reply = lines.slice(0, boundary < 0 ? lines.length : boundary);
+  const signoff = reply.findIndex(
+    (line, index) =>
+      index > 0 &&
+      !reply[index - 1].trim() &&
+      /^\s*(?:med venlig hilsen|de bedste hilsner|venlig hilsen|mvh\.?|best regards|kind regards|sent from my iphone|sendt fra min iphone)[,.!]?\s*$/i.test(
+        line,
+      ) &&
+      reply.slice(index + 1).filter((part) => part.trim()).length <= 6,
+  );
+  return reply
+    .slice(0, signoff < 0 ? reply.length : signoff)
     .join("\n")
     .trim()
     .slice(0, 1500);
