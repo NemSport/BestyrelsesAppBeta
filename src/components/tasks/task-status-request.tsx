@@ -47,6 +47,7 @@ export function TaskStatusRequest({
     <div className="space-y-2">
       <Button
         variant="secondary"
+        className="!bg-blue-700 !text-white hover:!bg-blue-800"
         disabled={pending || !!message}
         onClick={() => void send()}
       >
