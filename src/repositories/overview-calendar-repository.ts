@@ -21,7 +21,7 @@ export class OverviewCalendarRepository {
       .eq("status", "active");
     if (membership.error) throw membership.error;
     const ids = membership.data.map(({ committee_id }) => committee_id);
-    if (!ids.length) return [];
+    if (!ids.length) return { committees: [], entries: [] };
 
     const committees = await this.db
       .from("committees")
@@ -29,11 +29,12 @@ export class OverviewCalendarRepository {
       .eq("organization_id", organizationId)
       .in("id", ids)
       .is("deleted_at", null)
-      .is("archived_at", null);
+      .is("archived_at", null)
+      .order("name");
     if (committees.error) throw committees.error;
     const names = new Map(committees.data.map(({ id, name }) => [id, name]));
     const committeeIds = [...names.keys()];
-    if (!committeeIds.length) return [];
+    if (!committeeIds.length) return { committees: [], entries: [] };
 
     const [meetings, tasks, activities] = await Promise.all([
       this.db
@@ -79,6 +80,7 @@ export class OverviewCalendarRepository {
       entries.push({
         id: meeting.id,
         title: meeting.title,
+        committeeId: meeting.committee_id,
         committee: names.get(meeting.committee_id)!,
         kind: "meeting",
         start: date,
@@ -95,6 +97,7 @@ export class OverviewCalendarRepository {
       entries.push({
         id: task.id,
         title: task.title,
+        committeeId: task.committee_id,
         committee: names.get(task.committee_id)!,
         kind: "task",
         start: task.deadline,
@@ -107,6 +110,7 @@ export class OverviewCalendarRepository {
       entries.push({
         id: activity.id,
         title: activity.title,
+        committeeId: activity.committee_id,
         committee: names.get(activity.committee_id)!,
         kind: "activity",
         start: activity.starts_on,
@@ -114,6 +118,6 @@ export class OverviewCalendarRepository {
         href: `${root}/committees/${activity.committee_id}/annual-wheel?event=${activity.id}`,
       });
     }
-    return entries;
+    return { committees: committees.data, entries };
   }
 }

@@ -374,7 +374,7 @@ test("Overblik embeds ActionCenter and refreshes actions through ActionService",
   assert.match(layout, /nextActionRefreshAt=\{actionCenter\.nextRefreshAt\}/);
   assert.match(page, /actionCenter\.inbox/);
   assert.match(page, /actionSection=\{<ActionCenter/);
-  assert.match(dashboard, /id="handlinger"[^>]*>\{actionSection\}/);
+  assert.match(dashboard, /id="handlinger"[^>]*>\s*\{actionSection\}/);
   assert.match(component, /\$\{root\}\$\{action\.href\}/);
   assert.match(component, /requireAgendaItemEditor|editableCommitteeIds/);
   assert.match(component, /Påmindelse[\s\S]*formatDateTime/);

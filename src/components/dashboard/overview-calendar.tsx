@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { Select } from "@/components/ui";
 import { AppIcon } from "@/components/icons/app-icon";
 import { formatDanishDate } from "@/lib/date-format";
 import type { CalendarEntry, overviewMonth } from "@/lib/overview-calendar";
@@ -23,18 +25,28 @@ const weekdays = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 export function OverviewCalendar({
   month,
   entries,
+  committees,
   root,
   actionView,
 }: {
   month: ReturnType<typeof overviewMonth>;
   entries: CalendarEntry[];
+  committees: { id: string; name: string }[];
   root: string;
   actionView: string;
 }) {
+  const searchParams = useSearchParams();
+  const requestedCommittee = searchParams.get("kalenderudvalg");
+  const committeeId = committees.some(({ id }) => id === requestedCommittee)
+    ? requestedCommittee
+    : null;
+  const visibleEntries = committeeId
+    ? entries.filter((entry) => entry.committeeId === committeeId)
+    : entries;
   const currentMonth = month.first.slice(0, 7);
   const days = Array.from({ length: month.days }, (_, index) => {
     const date = `${currentMonth}-${String(index + 1).padStart(2, "0")}`;
-    const items = entries.filter(
+    const items = visibleEntries.filter(
       ({ start, end }) => start <= date && date <= end,
     );
     return { date, items };
@@ -50,8 +62,14 @@ export function OverviewCalendar({
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(month.first));
-  const monthLink = (value: string) =>
-    `${root}?handlinger=${actionView}&maaned=${value}#maanedskalender`;
+  function monthLink(value: string) {
+    const query = new URLSearchParams({
+      handlinger: actionView,
+      maaned: value,
+    });
+    if (committeeId) query.set("kalenderudvalg", committeeId);
+    return `${root}?${query}#maanedskalender`;
+  }
 
   return (
     <section
@@ -59,9 +77,32 @@ export function OverviewCalendar({
       id="maanedskalender"
       aria-labelledby="overview-calendar-heading"
     >
-      <h2 className="mb-2 text-sm font-semibold" id="overview-calendar-heading">
-        Månedskalender
-      </h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold" id="overview-calendar-heading">
+          Månedskalender
+        </h2>
+        {committees.length ? (
+          <Select
+            aria-label="Filtrér kalender efter udvalg"
+            className="!w-auto max-w-full"
+            value={committeeId ?? ""}
+            onChange={(event) => {
+              const url = new URL(window.location.href);
+              if (event.target.value)
+                url.searchParams.set("kalenderudvalg", event.target.value);
+              else url.searchParams.delete("kalenderudvalg");
+              window.history.replaceState(null, "", url);
+            }}
+          >
+            <option value="">Alle mine udvalg</option>
+            {committees.map(({ id, name }) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+      </div>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] sm:gap-5">
         <div className="min-w-0">
           <div className="flex items-center justify-between">
