@@ -2944,3 +2944,11 @@ scheduled flows use the same source filtering and structured generation. A
 service-only reminder stores the claim, generation audit metadata, and push
 delivery state per meeting and reviewer. Push opens the authenticated meeting
 preparation page at the proposals; all agenda changes require review there.
+
+
+The meeting task follow-up read model resolves both explicit meeting-task links
+and task origin links, including transferred points, to active agenda
+occurrences on the current meeting.
+An explicit link takes precedence. The general follow-up lists and their counts
+exclude those tasks, which remain visible under their agenda point. A link to a
+point on another meeting does not exclude a task.
