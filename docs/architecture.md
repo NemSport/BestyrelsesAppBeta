@@ -2964,3 +2964,17 @@ The approval endpoint triggers immediate delivery after the response, with the
 scheduled Bestie job handling queued retries. Access checks require an active
 organization membership and committee access and still-approved minutes.
 Replies are grounded in the saved summary and stored in the private thread.
+
+## Bestie task status requests
+
+The task action verifies organization admin access and checks the assigned
+member's current access and verified email. It creates an idempotent private
+Bestie conversation. Resend receives replies on a dedicated receiving domain.
+The webhook validates the signature, sender authentication, address token,
+current assignment and membership. The incoming message ID prevents replay.
+Email and push replies use the same approval transaction as task follow-up.
+
+Set `RESEND_BESTIE_REPLY_DOMAIN`, `RESEND_BESTIE_WEBHOOK_SECRET`, and
+`RESEND_BESTIE_RECEIVING_KEY` in Vercel, and subscribe
+`/api/webhooks/resend/bestie` to Resend's `email.received` event. The receiving
+key is separate from the outbound email key.

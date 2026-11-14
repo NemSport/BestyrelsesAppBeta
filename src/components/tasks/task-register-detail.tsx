@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { AppIcon } from "@/components/icons/app-icon";
+import { TaskStatusRequest } from "@/components/tasks/task-status-request";
 import { TaskComments } from "@/components/tasks/task-comments";
 import { Button, Modal, StatusBadge } from "@/components/ui";
 import {
@@ -22,6 +23,7 @@ function formatDate(value: string | null) {
 export function TaskRegisterDetail({
   actionPending,
   canEdit,
+  canRequestStatus,
   onClose,
   onEdit,
   onStatusChange,
@@ -30,6 +32,7 @@ export function TaskRegisterDetail({
 }: {
   actionPending: boolean;
   canEdit: boolean;
+  canRequestStatus: boolean;
   onClose: () => void;
   onEdit: () => void;
   onStatusChange: (status: TaskStatus) => void;
@@ -85,6 +88,11 @@ export function TaskRegisterDetail({
           </StatusBadge>
           {!canEdit ? <StatusBadge>Skrivebeskyttet</StatusBadge> : null}
         </div>
+
+        {canRequestStatus && task.responsible_user_id && !task.archived_at &&
+        task.status !== "completed" && task.status !== "cancelled" ? (
+          <TaskStatusRequest key={task.id} taskId={task.id} organizationId={organizationId} />
+        ) : null}
 
         <dl className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
           <div>

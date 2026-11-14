@@ -591,6 +591,7 @@ export type TaskCommentView = TaskComment & {
 };
 
 export type TaskRegisterData = {
+  canRequestTaskStatus: boolean;
   userId: string;
   tasks: TaskView[];
   committees: Committee[];

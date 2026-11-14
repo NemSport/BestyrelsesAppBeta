@@ -12,6 +12,7 @@ before(async () => {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth;
+    create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql as
       $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), nullif(current_setting('test.user_id', true), ''))::uuid $$;
     create table profiles(id uuid primary key);
@@ -69,14 +70,33 @@ before(async () => {
       "utf8",
     ),
   );
-  await db.exec(await readFile(
-    new URL("../../supabase/migrations/202611130007_bestie_annual_wheel_tasks.sql", import.meta.url),
-    "utf8",
-  ));
-  await db.exec(await readFile(
-    new URL("../../supabase/migrations/202611140005_bestie_after_meeting.sql", import.meta.url),
-    "utf8",
-  ));
+  await db.exec(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130007_bestie_annual_wheel_tasks.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140005_bestie_after_meeting.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140006_bestie_status_request.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 
 after(async () => db.close());
@@ -191,19 +211,44 @@ test("each approaching annual-wheel task alerts its own assignee even without an
 test("a proposed status and follow-up are stored together only when approved", async () => {
   await generate();
   const row = await taskThread();
-  const { rows: [dates] } = await db.query(
+  const {
+    rows: [dates],
+  } = await db.query(
     "select deadline::text, (deadline + 11)::text as reminder from tasks where id = $1",
     [task],
   );
   const proposal = { statusNote: "Jeg har ringet.", reminder: dates.reminder };
-  const pending = await reply(row, { pending: JSON.stringify(proposal), note: null });
+  const pending = await reply(row, {
+    pending: JSON.stringify(proposal),
+    note: null,
+  });
   assert.equal((await db.query("select * from task_comments")).rows.length, 0);
   assert.equal(pending.follow_up_on, null);
-  await reply(pending, { replyId: id(101), body: "Godkend", note: proposal.statusNote, reminder: dates.reminder });
+  await reply(pending, {
+    replyId: id(101),
+    body: "Godkend",
+    note: proposal.statusNote,
+    reminder: dates.reminder,
+  });
   assert.equal((await taskThread()).pending_action, null);
-  assert.equal((await db.query("select follow_up_on::text from bestie_threads where id = $1", [row.id])).rows[0].follow_up_on, dates.reminder);
-  assert.equal((await db.query("select body from task_comments")).rows[0].body, proposal.statusNote);
-  assert.equal((await db.query("select deadline::text from tasks where id = $1", [task])).rows[0].deadline, dates.deadline);
+  assert.equal(
+    (
+      await db.query(
+        "select follow_up_on::text from bestie_threads where id = $1",
+        [row.id],
+      )
+    ).rows[0].follow_up_on,
+    dates.reminder,
+  );
+  assert.equal(
+    (await db.query("select body from task_comments")).rows[0].body,
+    proposal.statusNote,
+  );
+  assert.equal(
+    (await db.query("select deadline::text from tasks where id = $1", [task]))
+      .rows[0].deadline,
+    dates.deadline,
+  );
 });
 
 test("messages and task writes are restricted to the assigned user and current roles", async () => {
@@ -341,21 +386,111 @@ test("final approval queues personal meeting summaries once and accepts a privat
     insert into meeting_attendees values ('${meeting}', '${outsider}', 'attended');
     insert into decisions values ('${id(32)}', '${org}', '${committee}', '${meeting}', null, '${person}', 'Fælles indkøb', null, 'waiting');
   `);
-  assert.equal((await db.query("select * from bestie_threads where meeting_id = $1", [meeting])).rows.length, 0);
-  await db.query("update meeting_minutes set status = 'approved' where id = $1", [minutes]);
-  await db.query("update meeting_minutes set status = 'approved' where id = $1", [minutes]);
-  const { rows } = await db.query("select * from bestie_threads where meeting_id = $1", [meeting]);
+  assert.equal(
+    (
+      await db.query("select * from bestie_threads where meeting_id = $1", [
+        meeting,
+      ])
+    ).rows.length,
+    0,
+  );
+  await db.query(
+    "update meeting_minutes set status = 'approved' where id = $1",
+    [minutes],
+  );
+  await db.query(
+    "update meeting_minutes set status = 'approved' where id = $1",
+    [minutes],
+  );
+  const { rows } = await db.query(
+    "select * from bestie_threads where meeting_id = $1",
+    [meeting],
+  );
   assert.equal(rows.length, 1);
   const summary = rows[0];
   assert.equal(summary.user_id, person);
   assert.equal(summary.meeting_summary.tasks.length, 1);
   assert.deepEqual(summary.meeting_summary.decisions, ["Fælles indkøb"]);
 
-  const { rows: [{ messages }] } = await db.query(
+  const {
+    rows: [{ messages }],
+  } = await db.query(
     "select (bestie_apply_reply($1, $2, $3, null, $4, 'Jeg har taget første skridt.', 'Gemt i samtalen.', null, null, null, false, null, null)).messages",
     [summary.id, person, summary.updated_at, id(33)],
   );
   assert.equal(messages[1].body, "Jeg har taget første skridt.");
-  await db.query("update meeting_minutes set status = 'ready_for_approval' where id = $1", [minutes]);
-  assert.deepEqual((await db.query("select bestie_target_is_accessible(b) as allowed from bestie_threads b where b.id = $1", [summary.id])).rows, [{ allowed: false }]);
+  await db.query(
+    "update meeting_minutes set status = 'ready_for_approval' where id = $1",
+    [minutes],
+  );
+  assert.deepEqual(
+    (
+      await db.query(
+        "select bestie_target_is_accessible(b) as allowed from bestie_threads b where b.id = $1",
+        [summary.id],
+      )
+    ).rows,
+    [{ allowed: false }],
+  );
+});
+
+test("an authenticated mail reply proposes a note only on the requested task", async () => {
+  const token = "a".repeat(64);
+  const email = "recipient@example.com";
+  await db.query("insert into auth.users values ($1, $2, now())", [
+    person,
+    email,
+  ]);
+  const request = () =>
+    db.query("select * from bestie_request_task_status($1,$2,$3,$4,$5)", [
+      org,
+      task,
+      person,
+      id(50),
+      token,
+    ]);
+  await assert.rejects(request(), { code: "42501" });
+  await db.query(
+    "update organization_members set role = 'admin' where user_id = $1",
+    [person],
+  );
+  const {
+    rows: [first],
+  } = await request();
+  assert.equal((await request()).rows[0].thread_id, first.thread_id);
+
+  const receive = async (sender) =>
+    (
+      await db.query(
+        "select bestie_receive_task_status($1,$2,$3,'Jeg har sendt tilbuddet.') as thread",
+        [token, sender, id(51)],
+      )
+    ).rows[0].thread;
+  assert.equal(await receive("other@example.com"), null);
+  assert.equal(await receive(email), first.thread_id);
+  assert.equal(await receive(email), null);
+  assert.equal((await db.query("select * from task_comments")).rows.length, 0);
+
+  const {
+    rows: [proposal],
+  } = await db.query(
+    "select pending_action, updated_at from bestie_threads where id = $1",
+    [first.thread_id],
+  );
+  assert.equal(proposal.pending_action.statusNote, "Jeg har sendt tilbuddet.");
+  await db.query(
+    "select bestie_apply_reply($1,$2,$3,$4,$5,'Godkend','Gemt',null,$6,null,false,null,null)",
+    [
+      first.thread_id,
+      person,
+      proposal.updated_at,
+      proposal.pending_action.taskVersion,
+      id(52),
+      proposal.pending_action.statusNote,
+    ],
+  );
+  assert.deepEqual(
+    (await db.query("select task_id, body from task_comments")).rows,
+    [{ task_id: task, body: "Jeg har sendt tilbuddet." }],
+  );
 });

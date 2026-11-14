@@ -54,7 +54,7 @@ export class TaskService {
 
   async getRegister(organizationId: string) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireOrganizationMember(organizationId, user.id);
+    const { membership } = await this.authorization.requireOrganizationMember(organizationId, user.id);
     const [
       tasks,
       committees,
@@ -94,6 +94,7 @@ export class TaskService {
 
     return {
       userId: user.id,
+      canRequestTaskStatus: membership.role === "owner" || membership.role === "admin",
       tasks: tasks.map((task) =>
         editableCommitteeIdSet.has(task.committee_id)
           ? task

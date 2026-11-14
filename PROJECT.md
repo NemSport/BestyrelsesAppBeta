@@ -10,6 +10,12 @@ The shared Button, Dropdown, ActionMenu and legacy button classes share these
 rules. Inputs remain recognisable as editable fields. Native task rows, calendar
 items and rich-text tools retain their layout and selected-state semantics.
 
+## Bestie task status requests
+
+Organization owners and administrators can request status on an open assigned
+task. Email and push point to the assignee's private Bestie conversation.
+A reply is proposed as a shared task note and saved to the task after approval.
+
 ## Bestie after a meeting
 
 Final minutes approval creates a private, replyable Bestie summary for eligible

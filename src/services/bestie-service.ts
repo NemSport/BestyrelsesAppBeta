@@ -226,6 +226,16 @@ export class BestieService {
         : "Forslaget kan ikke længere gennemføres. Skriv gerne, hvad du vil gøre nu.";
     } else if (thread.pending && reject.test(input.message)) {
       answer = "Jeg har afvist forslaget. Hvad vil du gerne gøre herfra?";
+    } else if (row.dedup_key.startsWith("status-request:") && canEdit && task) {
+      // An explicit status request always proposes the reply as a task note.
+      pending = {
+        complete: false,
+        deadline: null,
+        reminder: null,
+        taskVersion: task.updated_at,
+        statusNote: input.message,
+      };
+      answer = `Skal jeg ${describeBestieAction(pending)}?`;
     } else {
       const explicitReminder = canRemind
         ? explicitBestieFollowUpDate(input.message, today)

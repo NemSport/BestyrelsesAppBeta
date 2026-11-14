@@ -1,0 +1,61 @@
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
+export function statusReplyHash(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function verifyResendSignature(
+  body: string,
+  headers: Headers,
+  secret: string,
+  now = Date.now(),
+) {
+  const id = headers.get("svix-id");
+  const timestamp = headers.get("svix-timestamp");
+  const signatures = headers.get("svix-signature");
+  if (
+    !id ||
+    !timestamp ||
+    !/^\d+$/.test(timestamp) ||
+    !signatures ||
+    Math.abs(now / 1000 - Number(timestamp)) > 300 ||
+    !secret.startsWith("whsec_")
+  )
+    return false;
+
+  const key = Buffer.from(secret.slice(6), "base64");
+  if (key.length < 16) return false;
+  const expected = createHmac("sha256", key)
+    .update(`${id}.${timestamp}.${body}`)
+    .digest();
+  return signatures.split(" ").some((signature) => {
+    const [version, value] = signature.split(",");
+    if (version !== "v1" || !value) return false;
+    const actual = Buffer.from(value, "base64");
+    return (
+      actual.length === expected.length && timingSafeEqual(actual, expected)
+    );
+  });
+}
+
+export function emailAddress(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.match(/<([^<>]+)>$/)?.[1]?.trim() ?? trimmed;
+}
+
+export function bestieReplyText(text: string) {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const boundary = lines.findIndex(
+    (line, index) =>
+      /^\s*(>|--\s*$|_{5,}|-{2,}\s*(?:original message|oprindelig meddelelse)|fra:|from:|sent:|sendt:|on .+ wrote:|den .+ skrev:)/i.test(
+        line,
+      ) ||
+      (/^\s*(?:on|den)\s/i.test(line) &&
+        /(?:wrote|skrev):\s*$/i.test(lines[index + 1] ?? "")),
+  );
+  return lines
+    .slice(0, boundary < 0 ? undefined : boundary)
+    .join("\n")
+    .trim()
+    .slice(0, 1500);
+}
