@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 
-import { Button, Modal, PageHeader, Select } from "@/components/ui";
+import { AppIcon } from "@/components/icons/app-icon";
+import {
+  Button,
+  buttonClassName,
+  Modal,
+  PageHeader,
+  Select,
+} from "@/components/ui";
 import {
   sponsorFields,
   type SponsorProposal,
@@ -19,6 +26,10 @@ const labels = {
   review: "Skal tjekkes",
   unchanged: "Uændrede",
 };
+const primaryAction = "!bg-blue-700 !text-white hover:!bg-blue-800";
+const secondaryAction =
+  "!border !border-line-strong !bg-surface !text-brand hover:!bg-brand-soft";
+
 const pageSize = 8;
 
 export function SponsorImport({ organizationId }: { organizationId: string }) {
@@ -139,11 +150,19 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
 
   return (
     <div className="space-y-3">
-      <Link className="text-sm text-brand hover:underline" href={root}>
+      <Link
+        className={buttonClassName({
+          variant: "secondary",
+          size: "sm",
+          className: secondaryAction,
+        })}
+        href={root}
+      >
+        <AppIcon name="arrowLeft" size={16} aria-hidden="true" />
         Til interessentregistret
       </Link>
       <PageHeader className="!pb-2" title="Importér sponsorer fra Excel" />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="panel flex flex-col items-start gap-2 p-3 sm:flex-row sm:items-center sm:gap-3">
         <input
           ref={fileInput}
           type="file"
@@ -165,12 +184,12 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
           }}
         />
         <Button
-          size="sm"
-          variant="secondary"
+          className={primaryAction}
           disabled={busy}
           onClick={() => fileInput.current?.click()}
         >
-          Vælg Excel-fil
+          <AppIcon name="upload" size={17} aria-hidden="true" />
+          {fileName ? "Vælg en anden Excel-fil" : "Vælg Excel-fil"}
         </Button>
         {fileName ? (
           <span className="break-all text-sm text-muted">{fileName}</span>
@@ -195,6 +214,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
             <Button
               size="sm"
               variant="secondary"
+              className={secondaryAction}
               disabled={busy}
               onClick={() => void run(() => getPreview(rows))}
             >
@@ -230,6 +250,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
             <div className="flex flex-wrap gap-1 border-b border-line pb-2">
               {(Object.keys(labels) as Group[]).map((key) => (
                 <Button
+                  className={group === key ? primaryAction : secondaryAction}
                   key={key}
                   aria-pressed={group === key}
                   size="sm"
@@ -314,6 +335,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
                       <Button
                         size="sm"
                         variant="secondary"
+                        className={secondaryAction}
                         onClick={() => setDetail(index)}
                       >
                         {kind === "review" ? "Tjek" : "Se felter"}
@@ -329,6 +351,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
               <div className="flex items-center justify-between gap-2 text-sm">
                 <Button
                   variant="secondary"
+                  className={secondaryAction}
                   size="sm"
                   disabled={page === 0}
                   onClick={() => setPage(page - 1)}
@@ -340,6 +363,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
                 </span>
                 <Button
                   variant="secondary"
+                  className={secondaryAction}
                   size="sm"
                   disabled={page + 1 === totalPages}
                   onClick={() => setPage(page + 1)}
@@ -351,6 +375,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
           </section>
           <div className="sticky bottom-0 z-10 flex justify-end border-t border-line bg-surface p-2">
             <Button
+              className={primaryAction}
               disabled={!selectionCount || busy}
               onClick={() => setConfirm(true)}
             >
@@ -366,7 +391,7 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
           onClose={() => setDetail(null)}
           maxWidth="lg"
           footer={
-            <Button onClick={() => setDetail(null)}>
+            <Button className={primaryAction} onClick={() => setDetail(null)}>
               Tilbage til oversigten
             </Button>
           }
@@ -465,12 +490,14 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
             <div className="flex justify-end gap-2">
               <Button
                 variant="secondary"
+                className={secondaryAction}
                 disabled={busy}
                 onClick={() => setConfirm(false)}
               >
                 Tilbage
               </Button>
               <Button
+                className={primaryAction}
                 disabled={busy}
                 onClick={() => {
                   setConfirm(false);
