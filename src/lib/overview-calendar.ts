@@ -4,6 +4,7 @@ export type CalendarEntry = {
   id: string;
   title: string;
   committee: string;
+  committeeId: string;
   kind: "meeting" | "task" | "activity";
   start: string;
   end: string;

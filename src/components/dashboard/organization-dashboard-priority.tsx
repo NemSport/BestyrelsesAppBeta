@@ -4,17 +4,13 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
 import { withMeetingReturnTo } from "@/lib/meeting-navigation";
-import type {
-  OrganizationOverview,
-} from "@/types/domain";
+import type { OrganizationOverview } from "@/types/domain";
 
 export function OrganizationDashboardPriority({
   actionSection,
   actionCount,
   messageCount,
   messageSection,
-  committeeCount,
-  committeeSection,
   organizationId,
   nextMeeting,
   recentMinutesSection,
@@ -23,8 +19,6 @@ export function OrganizationDashboardPriority({
   actionCount: number;
   messageCount: number;
   messageSection: ReactNode;
-  committeeCount: number;
-  committeeSection: ReactNode;
   organizationId: string;
   nextMeeting: Pick<
     OrganizationOverview["upcomingMeetings"][number],
@@ -33,9 +27,7 @@ export function OrganizationDashboardPriority({
   recentMinutesSection: ReactNode;
 }) {
   const root = `/organizations/${organizationId}`;
-  const [view, setView] = useState<"actions" | "messages" | "news" | "committees">(
-    "actions",
-  );
+  const [view, setView] = useState<"actions" | "messages" | "news">("actions");
 
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
@@ -49,7 +41,6 @@ export function OrganizationDashboardPriority({
               ["actions", `Handlinger · ${actionCount}`],
               ["messages", `Beskeder · ${messageCount}`],
               ["news", "Seneste nyt"],
-              ["committees", `Arbejdsrum · ${committeeCount}`],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -64,10 +55,12 @@ export function OrganizationDashboardPriority({
           ))}
         </div>
         {view === "actions" ? (
-          <div className="p-3 sm:p-4" id="handlinger">{actionSection}</div>
+          <div className="p-3 sm:p-4" id="handlinger">
+            {actionSection}
+          </div>
         ) : (
           <div className="p-3 text-ink sm:p-4">
-            {view === "messages" ? messageSection : view === "news" ? recentMinutesSection : committeeSection}
+            {view === "messages" ? messageSection : recentMinutesSection}
           </div>
         )}
       </section>
@@ -113,7 +106,7 @@ export function OrganizationDashboardPriority({
         )}
         <Link
           className="mt-4 block w-fit text-sm text-muted hover:underline"
-          href={`${root}/meetings`}
+          href="#maanedskalender"
         >
           Åbn kalender →
         </Link>

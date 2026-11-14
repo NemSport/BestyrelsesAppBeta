@@ -47,25 +47,11 @@ export default async function OrganizationPage({
       .order("created_at", { ascending: false }).limit(50),
     new OverviewCalendarRepository(db).list(organizationId, user.id, month),
   ]);
-  const canManage = ["owner", "admin"].includes(context.membership.role);
   const organizationRoot = `/organizations/${organizationId}`;
   const dashboardAudience = resolveOrganizationDashboardAudience(
     context.membership.role,
     overview.committees.map(({ capabilities }) => capabilities),
   );
-  const committeeHighlights = [...overview.committees]
-    .sort((left, right) => {
-      const leftAttention =
-        left.openTaskCount + left.activeDecisionCount + left.openFollowUpCount;
-      const rightAttention =
-        right.openTaskCount +
-        right.activeDecisionCount +
-        right.openFollowUpCount;
-      if (leftAttention !== rightAttention)
-        return rightAttention - leftAttention;
-      return left.committee.name.localeCompare(right.committee.name, "da");
-    })
-    .slice(0, 4);
   const recentActivity = [...overview.recentMinutes]
     .sort(
       (left, right) =>
@@ -73,92 +59,6 @@ export default async function OrganizationPage({
         new Date(left.updatedAt).getTime(),
     )
     .slice(0, 4);
-
-  const committeeSection = (
-    <section aria-labelledby="committees-title">
-      <div className="mb-1.5 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold" id="committees-title">
-            Mine arbejdsrum
-          </h2>
-        </div>
-        {overview.committees.length > committeeHighlights.length ? (
-          <Link
-            className="text-sm font-semibold text-brand hover:underline"
-            href={`${organizationRoot}/committees`}
-          >
-            Se alle arbejdsrum
-          </Link>
-        ) : null}
-      </div>
-
-      {committeeHighlights.length ? (
-        <div className={"grid gap-x-6 sm:grid-cols-2"}>
-          {committeeHighlights.map((item) => {
-            const attention =
-              item.openTaskCount +
-              item.activeDecisionCount +
-              item.openFollowUpCount;
-            const committeeRoot = `${organizationRoot}/committees/${item.committee.id}`;
-            return (
-              <article key={item.committee.id}>
-                <Link
-                  className="group grid min-h-11 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 border-b border-line py-2 transition hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
-                  href={committeeRoot}
-                >
-                  <span className="break-words text-sm font-semibold leading-5 text-ink group-hover:text-brand group-hover:underline">
-                    {item.committee.name}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <StatusBadge tone={attention ? "warning" : "success"}>
-                      {attention ? "Kræver handling" : "Roligt"}
-                    </StatusBadge>
-                    <span
-                      aria-hidden="true"
-                      className="font-semibold text-brand"
-                    >
-                      →
-                    </span>
-                  </span>
-                  {attention || item.upcomingMeetingCount ? (
-                    <span className="col-span-2 text-xs leading-4 text-muted">
-                      <span className="font-semibold text-ink">
-                        {item.openTaskCount}
-                      </span>{" "}
-                      opgaver ·{" "}
-                      <span className="font-semibold text-ink">
-                        {item.activeDecisionCount}
-                      </span>{" "}
-                      beslutninger ·{" "}
-                      <span className="font-semibold text-ink">
-                        {item.upcomingMeetingCount}
-                      </span>{" "}
-                      møder
-                    </span>
-                  ) : null}
-                  {item.nextMeeting ? (
-                    <span className="col-span-2 text-xs leading-4 text-muted">
-                      Næste møde: {formatDateTime(item.nextMeeting.starts_at)}
-                    </span>
-                  ) : null}
-                </Link>
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <EmptyState
-          compact
-          description={
-            canManage
-              ? "Opret organisationens første udvalg for at begynde at planlægge møder og fordele ansvar."
-              : "Når du bliver tilknyttet et udvalg, får du en hurtig vej til dets arbejde her."
-          }
-          title="Du har ikke adgang til nogen udvalg endnu."
-        />
-      )}
-    </section>
-  );
 
   const recentMinutesSection = (
     <section aria-labelledby="recent-minutes-title" className="min-w-0">
@@ -246,8 +146,6 @@ export default async function OrganizationPage({
           id: message.id, title: message.title, href: message.path, date: message.created_at,
         }))} />}
         messageCount={messages.length}
-        committeeCount={overview.committees.length}
-        committeeSection={committeeSection}
         organizationId={organizationId}
         nextMeeting={
           meeting
@@ -266,7 +164,8 @@ export default async function OrganizationPage({
       <OverviewCalendar
         key={month.first}
         month={month}
-        entries={calendar}
+        entries={calendar.entries}
+        committees={calendar.committees}
         root={organizationRoot}
         actionView={actionView}
       />
