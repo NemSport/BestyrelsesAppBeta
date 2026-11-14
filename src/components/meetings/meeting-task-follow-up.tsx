@@ -18,6 +18,7 @@ import {
 } from "@/hooks/use-mutation-feedback";
 import {
   activeFollowUpTasks,
+  tasksOutsideAgenda,
   beforeTaskFollowUpReviewEvent,
   followUpReasons,
   type FollowUpTask,
@@ -181,10 +182,15 @@ export function MeetingTaskFollowUp({
       .filter((link) => link.occurrence_id === occurrenceId)
       .map((link) => link.task_id),
   );
+  const unlinkedTasks = tasksOutsideAgenda(data);
   const tasks = occurrenceId
     ? data.tasks.filter((task) => linkedIds.has(task.id))
-    : activeFollowUpTasks(data.tasks, tab === "attention");
-  if (editing && !tasks.some((task) => task.id === editing.id))
+    : activeFollowUpTasks(unlinkedTasks, tab === "attention");
+  if (
+    editing &&
+    (occurrenceId || unlinkedTasks.some((task) => task.id === editing.id)) &&
+    !tasks.some((task) => task.id === editing.id)
+  )
     tasks.push(editing);
   const events = occurrenceId
     ? data.events.filter((event) => linkedIds.has(event.task_id))
@@ -226,7 +232,7 @@ export function MeetingTaskFollowUp({
             variant="ghost"
             onClick={() => setTab("attention")}
           >
-            Kræver opfølgning ({activeFollowUpTasks(data.tasks, true).length})
+            Kræver opfølgning ({activeFollowUpTasks(unlinkedTasks, true).length})
           </Button>
           <Button
             role="tab"
@@ -235,7 +241,7 @@ export function MeetingTaskFollowUp({
             variant="ghost"
             onClick={() => setTab("all")}
           >
-            Alle aktive ({activeFollowUpTasks(data.tasks, false).length})
+            Alle aktive ({activeFollowUpTasks(unlinkedTasks, false).length})
           </Button>
         </div>
       ) : null}

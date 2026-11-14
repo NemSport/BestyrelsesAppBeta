@@ -20,8 +20,9 @@ The system point's standalone page links back to the follow-up list on its
 meeting.
 
 The default **Kræver opfølgning** tab shows critical, overdue, due-within-seven-
-days and waiting tasks from this Committee. **Alle aktive** shows all open,
-unarchived tasks. Dates use Europe/Copenhagen. Members with task editing rights
+days and waiting tasks from this Committee. **Alle aktive** shows open,
+unarchived tasks. Both lists exclude tasks already shown under another agenda
+item on the current meeting. Dates use Europe/Copenhagen. Members with task editing rights
 can change status, deadline, responsible Committee Member, critical flag, and
 add a shared note. Completion updates the canonical task and Annual Wheel
 completion workflow; notes appear in existing task comments. No task is copied.

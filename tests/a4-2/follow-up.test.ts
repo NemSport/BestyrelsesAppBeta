@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import {
   activeFollowUpTasks,
+  tasksOutsideAgenda,
   followUpReasons,
   followUpStateSchema,
   type FollowUpTask,
@@ -34,6 +35,7 @@ before(async () => {
     create table agenda_items(id uuid primary key default gen_random_uuid(), organization_id uuid, committee_id uuid, title text, description text default '', item_type text, lifecycle_status text, source text, standard_key standard_agenda_item_key, created_by uuid, deleted_at timestamptz);
     create table agenda_item_occurrences(id uuid primary key default gen_random_uuid(), organization_id uuid, committee_id uuid, meeting_id uuid, agenda_item_id uuid, position integer, deleted_at timestamptz, unique(meeting_id,position), unique(meeting_id,agenda_item_id));
     create table meeting_minutes(meeting_id uuid, status text);
+    create table transferred_agenda_items(organization_id uuid, committee_id uuid, source_agenda_item_id uuid, target_agenda_item_id uuid, target_meeting_id uuid, status text);
     create table annual_wheel_events(id uuid primary key, organization_id uuid, status text, updated_by uuid);
     create table meeting_material_dispatches(id uuid primary key default gen_random_uuid(), meeting_id uuid, sent_at timestamptz default now(), delivery_status text);
     create function continue_agenda_items_on_meeting(id uuid) returns integer language sql as $$ select 0 $$;
@@ -65,6 +67,7 @@ before(async () => {
     ),
   );
   await db.exec(await readFile("supabase/migrations/202611100003_meeting_task_links_api_compatibility.sql", "utf8"));
+  await db.exec(await readFile("supabase/migrations/202611140004_meeting_task_follow_up_unlinked.sql", "utf8"));
 });
 after(async () => {
   await db.close();
@@ -409,4 +412,50 @@ test("dispatch snapshot remains fixed after task updates and omits internal note
   assert.equal(snapshot.task_snapshot[0].status, "not_started");
   assert.equal(snapshot.task_snapshot[0].deadline, "2026-11-09");
   assert.equal(JSON.stringify(snapshot).includes("internal_note"), false);
+});
+
+test("both follow-up tabs omit tasks shown under another point on this meeting only", async () => {
+  await mutate({ action: "link" });
+  const explicit = (await state()).links[0];
+  await db.exec("reset role");
+  const { rows: [point] } = await db.query<{ agenda_item_id: string }>(
+    "select agenda_item_id from agenda_item_occurrences where id=$1", [explicit.occurrence_id],
+  );
+  const native = (
+    await db.query<{ id: string }>(
+      "insert into tasks(organization_id,committee_id,title,created_by,updated_by,agenda_item_id,deadline) values($1,$2,'Oprettet på punktet',$3,$3,$4,'2026-11-09') returning id",
+      [org, committee, user, point.agenda_item_id],
+    )
+  ).rows[0].id;
+  const otherMeeting = (
+    await db.query<{ id: string }>(
+      "insert into meetings(organization_id,committee_id,title,status) values($1,$2,'Andet møde','scheduled') returning id",
+      [org, committee],
+    )
+  ).rows[0].id;
+  const { rows: [previousPoint] } = await db.query<{ id: string }>(
+    "insert into agenda_items(organization_id,committee_id,title) values($1,$2,'Tidligere punkt') returning id",
+    [org, committee],
+  );
+  const { rows: [carried] } = await db.query<{ id: string }>(
+    "insert into tasks(organization_id,committee_id,title,created_by,updated_by,agenda_item_id,deadline) values($1,$2,'Overført opgave',$3,$3,$4,'2026-11-09') returning id",
+    [org, committee, user, previousPoint.id],
+  );
+  await db.query(
+    "insert into transferred_agenda_items values($1,$2,$3,$4,$5,'scheduled')",
+    [org, committee, previousPoint.id, point.agenda_item_id, meeting],
+  );
+  await db.exec("set role authenticated");
+  const view = await state();
+  assert.deepEqual(view.links.filter(({ occurrence_id }) => occurrence_id === explicit.occurrence_id).map(({ task_id }) => task_id).sort(), [task, native, carried.id].sort());
+  const now = new Date("2026-11-10T10:00:00Z");
+  for (const attentionOnly of [true, false]) {
+    assert.deepEqual(activeFollowUpTasks(tasksOutsideAgenda(view), attentionOnly, now), []);
+    assert.deepEqual(activeFollowUpTasks(tasksOutsideAgenda(await state(otherMeeting)), attentionOnly, now).map(({ id }) => id).sort(), [task, native, carried.id].sort());
+  }
+
+  await db.exec("reset role");
+  await db.query("update agenda_item_occurrences set deleted_at = now() where id=$1", [explicit.occurrence_id]);
+  await db.exec("set role authenticated");
+  assert.deepEqual(tasksOutsideAgenda(await state()).map(({ id }) => id).sort(), [task, native, carried.id].sort());
 });

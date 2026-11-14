@@ -95,7 +95,9 @@ export function followUpReasons(task: FollowUpTask, now = new Date()) {
     reasons.push(taskDeadlineLabels.overdue);
   else if (task.deadline && task.deadline <= formatDanishDateKey(through))
     reasons.push(
-      task.deadline === today ? taskDeadlineLabels.today : taskDeadlineLabels.soon,
+      task.deadline === today
+        ? taskDeadlineLabels.today
+        : taskDeadlineLabels.soon,
     );
   if (task.status === "waiting") reasons.push(taskStatusLabels.waiting);
   return reasons;
@@ -119,4 +121,12 @@ export function activeFollowUpTasks(
         (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") ||
         a.title.localeCompare(b.title, "da"),
     );
+}
+
+export function tasksOutsideAgenda({
+  tasks,
+  links,
+}: Pick<FollowUpState, "tasks" | "links">) {
+  const linkedTaskIds = new Set(links.map(({ task_id }) => task_id));
+  return tasks.filter(({ id }) => !linkedTaskIds.has(id));
 }
