@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-import { AppIcon, type AppIconName } from "@/components/icons/app-icon";
+import { AppIcon } from "@/components/icons/app-icon";
 import {
   ActionMenu,
   Button,
@@ -209,18 +209,17 @@ export function StakeholderWorkspace({
     }
   }
 
-  const kpis: Array<[string, string | number, AppIconName]> = [
-    ["Aktive sponsorer", data.kpis.activeSponsors, "organization" as const],
+  const kpis = [
+    ["Aktive sponsorer", data.kpis.activeSponsors],
     [
       "Årlig kontraktværdi",
       formatStakeholderCurrency(data.kpis.annualContractValue),
-      "decisions" as const,
     ],
-    ["Udløber snart", data.kpis.expiringSoon, "calendar" as const],
-    ["Skal kontaktes", data.kpis.contactDue, "actions" as const],
-    ["Leads i pipeline", data.kpis.activeLeads, "progress" as const],
-    ["Manglende opfølgning", data.kpis.missingFollowUp, "pending" as const],
-  ];
+    ["Udløber snart", data.kpis.expiringSoon],
+    ["Skal kontaktes", data.kpis.contactDue],
+    ["Leads i pipeline", data.kpis.activeLeads],
+    ["Manglende opfølgning", data.kpis.missingFollowUp],
+  ] as const;
 
   function resetFilters() {
     setSearch("");
@@ -314,28 +313,23 @@ export function StakeholderWorkspace({
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <section
+    <div className="space-y-3">
+      <dl
         aria-label="Interessentstatus"
-        className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6"
+        className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-[var(--radius-panel)] border border-line bg-surface px-3 py-2.5 sm:grid-cols-3 xl:grid-cols-6"
       >
-        {kpis.map(([label, value, icon]) => (
+        {kpis.map(([label, value]) => (
           <div
-            className="flex h-full min-w-0 flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-2.5 sm:p-3"
-            key={String(label)}
+            className="flex min-w-0 flex-col gap-0.5 xl:border-l xl:border-line xl:pl-3 xl:first:border-0 xl:first:pl-0"
+            key={label}
           >
-            <span className="inline-flex size-7 items-center justify-center rounded-[var(--radius-control)] bg-brand-soft text-brand sm:size-8">
-              <AppIcon name={icon} size={16} />
-            </span>
-            <p className="mt-2 break-words text-lg font-semibold tabular-nums text-ink sm:mt-3 sm:text-xl">
+            <dt className="text-xs leading-4 text-muted">{label}</dt>
+            <dd className="break-words text-base font-semibold leading-5 tabular-nums text-ink">
               {value}
-            </p>
-            <p className="mt-0.5 text-xs font-medium leading-4 text-muted sm:mt-1">
-              {label}
-            </p>
+            </dd>
           </div>
         ))}
-      </section>
+      </dl>
 
       {error ? (
         <p
@@ -347,21 +341,12 @@ export function StakeholderWorkspace({
       ) : null}
 
       <section aria-labelledby="stakeholder-register-heading">
-        <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <p className="page-eyebrow text-muted">Relationsarbejde</p>
-            <h2
-              className="section-title mt-1"
-              id="stakeholder-register-heading"
-            >
-              Interessentregister
-            </h2>
-          </div>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-title" id="stakeholder-register-heading">
+            Interessentregister
+          </h2>
           {data.capabilities.createStakeholders ? (
-            <Button
-              className="w-full sm:w-auto"
-              onClick={() => setCreateOpen(true)}
-            >
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
               <AppIcon name="taskAdd" size={16} /> Ny interessent
             </Button>
           ) : null}
@@ -606,7 +591,8 @@ export function StakeholderWorkspace({
                                 {formatStakeholderCurrency(
                                   entry.contractValue?.amount ??
                                     Number(entry.estimated_value),
-                                  entry.contractValue?.currency ?? entry.currency,
+                                  entry.contractValue?.currency ??
+                                    entry.currency,
                                 )}
                               </dd>
                             </dl>

@@ -14,14 +14,10 @@ export default async function StakeholdersPage({
   );
   return (
     <div
-      className="page-flow w-full max-w-none !gap-5 sm:!gap-[var(--space-section)]"
+      className="page-flow w-full max-w-none !gap-3"
       data-stakeholder-workspace
     >
-      <PageHeader
-        description="Saml sponsorer, leverandører, samarbejdspartnere, aftaler og opfølgning i én arbejdsflade."
-        eyebrow={<span className="text-muted">Eksterne relationer</span>}
-        title="Interessenter & Relationer"
-      />
+      <PageHeader className="!gap-2 !pb-2" title="Interessenter & Relationer" />
       <StakeholderWorkspace data={data} organizationId={organizationId} />
     </div>
   );
