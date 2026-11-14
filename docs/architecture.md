@@ -3004,3 +3004,14 @@ Removing a Bestie inbox row marks only that user's thread as dismissed. The
 thread API verifies ownership and the viewed version before updating it.
 Overblik and the inbox exclude dismissed threads. A database trigger restores
 visibility when a new message changes the conversation.
+
+## Sponsor spreadsheet import
+
+The import page reads .xlsx workbooks in the browser and sends normalized rows to
+the organization-scoped sponsor import endpoint. It uses deterministic matching
+against stakeholders visible to the signed-in user. Preset selections require
+a unique strong match or a new sponsor with no match. The server rebuilds the
+preview at confirmation and verifies the preview revision. A security-invoker
+RPC saves the selection in one transaction with RLS, per-organization
+serialization of imports, and version checks on updates. The workbook and the
+preview are transient. No external model receives spreadsheet data.

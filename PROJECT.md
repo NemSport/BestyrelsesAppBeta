@@ -1921,3 +1921,10 @@ It shows meetings, dated task deadlines, and Annual Wheel activities.
 
 Members can remove a Bestie conversation from their personal inbox. A new
 message can bring the conversation back.
+
+## Sponsor spreadsheet import
+
+The stakeholder register has an Excel import page for members with write access.
+Bestie suggests new sponsors and updates, and leaves ambiguous matches for
+manual review. The user approves the selected rows together. Contract and
+payment fields are available in the preview for reference.

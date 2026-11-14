@@ -1843,6 +1843,10 @@ export type Database = {
       read_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: Json };
       ensure_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: string };
       mutate_meeting_task_follow_up: { Args: { target_meeting_id: string; target_task_id: string; request_id: string; expected_version: string; mutation: Json }; Returns: undefined };
+      apply_sponsor_import: {
+        Args: { target_organization: string; operations: Json };
+        Returns: number;
+      };
       update_stakeholder_pipeline_stage: {
         Args: { target_organization_id: string; target_pipeline_entry_id: string; target_stage: Database["public"]["Enums"]["stakeholder_pipeline_stage"]; target_lost_reason?: string | null };
         Returns: Database["public"]["Tables"]["stakeholder_pipeline_entries"]["Row"];
