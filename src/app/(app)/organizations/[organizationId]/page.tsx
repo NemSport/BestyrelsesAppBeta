@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { ActionCenter } from "@/components/actions/action-center";
 import { BestieRepository } from "@/repositories/bestie-repository";
 import { bestiePath } from "@/lib/bestie";
+import { OverviewCalendar } from "@/components/dashboard/overview-calendar";
+import { overviewMonth } from "@/lib/overview-calendar";
+import { OverviewCalendarRepository } from "@/repositories/overview-calendar-repository";
 import { OverviewList } from "@/components/dashboard/overview-list";
 import { AdvisoryAi } from "@/components/dashboard/advisory-ai";
 import { OrganizationDashboardPriority } from "@/components/dashboard/organization-dashboard-priority";
@@ -22,7 +25,7 @@ export default async function OrganizationPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ handlinger?: string }>;
+  searchParams: Promise<{ handlinger?: string; maaned?: string }>;
 }) {
   const { organizationId } = await params;
   const db = await createClient();
@@ -32,15 +35,17 @@ export default async function OrganizationPage({
     .catch(() => null);
   if (!context) notFound();
 
-  const { handlinger } = await searchParams;
+  const { handlinger, maaned } = await searchParams;
+  const month = overviewMonth(maaned);
   const actionView = handlinger === "mine" || handlinger === "completed" ? handlinger : "inbox";
-  const [overview, actionCenter, threads, notifications] = await Promise.all([
+  const [overview, actionCenter, threads, notifications, calendar] = await Promise.all([
     new OrganizationService(db).getOverview(organizationId),
     new ActionService(db).getCenter(organizationId),
     new BestieRepository(db).list(organizationId, user.id),
     db.from("organization_notifications").select("id,path,title,created_at")
       .eq("organization_id", organizationId).eq("user_id", user.id)
       .order("created_at", { ascending: false }).limit(50),
+    new OverviewCalendarRepository(db).list(organizationId, user.id, month),
   ]);
   const canManage = ["owner", "admin"].includes(context.membership.role);
   const organizationRoot = `/organizations/${organizationId}`;
@@ -256,6 +261,14 @@ export default async function OrganizationPage({
             : null
         }
         recentMinutesSection={recentMinutesSection}
+      />
+
+      <OverviewCalendar
+        key={month.first}
+        month={month}
+        entries={calendar}
+        root={organizationRoot}
+        actionView={actionView}
       />
 
       {dashboardAudience !== "viewer" ? (

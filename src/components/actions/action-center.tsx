@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { AppIcon } from "@/components/icons/app-icon";
@@ -103,6 +103,7 @@ export function ActionCenter({
   view: ActionView;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(5);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -287,12 +288,11 @@ export function ActionCenter({
           id="overview-action-filter"
           className="!w-auto"
           value={view}
-          onChange={(event) =>
-            router.replace(
-              `${root}?handlinger=${event.target.value}#handlinger`,
-              { scroll: false },
-            )
-          }
+          onChange={(event) => {
+            const query = new URLSearchParams(searchParams);
+            query.set("handlinger", event.target.value);
+            router.replace(`${root}?${query}#handlinger`, { scroll: false });
+          }}
         >
           {(Object.keys(viewLabels) as ActionView[]).map((key) => (
             <option key={key} value={key}>
