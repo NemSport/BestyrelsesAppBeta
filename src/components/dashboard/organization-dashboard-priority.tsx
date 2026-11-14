@@ -3,33 +3,29 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
-import { StatusBadge } from "@/components/ui";
 import { withMeetingReturnTo } from "@/lib/meeting-navigation";
-import type { OrganizationRole } from "@/lib/meeting-capabilities";
 import type {
-  ActionItem,
   OrganizationOverview,
 } from "@/types/domain";
 
 export function OrganizationDashboardPriority({
-  actions,
+  actionSection,
   actionCount,
+  messageCount,
+  messageSection,
   committeeCount,
   committeeSection,
   organizationId,
-  organizationRole,
   nextMeeting,
   recentMinutesSection,
 }: {
-  actions: Pick<
-    ActionItem,
-    "key" | "href" | "title" | "priority" | "description" | "context"
-  >[];
+  actionSection: ReactNode;
   actionCount: number;
+  messageCount: number;
+  messageSection: ReactNode;
   committeeCount: number;
   committeeSection: ReactNode;
   organizationId: string;
-  organizationRole: OrganizationRole;
   nextMeeting: Pick<
     OrganizationOverview["upcomingMeetings"][number],
     "id" | "committee_id" | "starts_at" | "title" | "committeeName"
@@ -37,11 +33,9 @@ export function OrganizationDashboardPriority({
   recentMinutesSection: ReactNode;
 }) {
   const root = `/organizations/${organizationId}`;
-  const [view, setView] = useState<"actions" | "news" | "committees">(
+  const [view, setView] = useState<"actions" | "messages" | "news" | "committees">(
     "actions",
   );
-  const [selected, setSelected] = useState<string | null>(null);
-  const action = actions.find(({ key }) => key === selected) ?? actions[0];
 
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
@@ -53,6 +47,7 @@ export function OrganizationDashboardPriority({
           {(
             [
               ["actions", `Handlinger · ${actionCount}`],
+              ["messages", `Beskeder · ${messageCount}`],
               ["news", "Seneste nyt"],
               ["committees", `Arbejdsrum · ${committeeCount}`],
             ] as const
@@ -69,74 +64,10 @@ export function OrganizationDashboardPriority({
           ))}
         </div>
         {view === "actions" ? (
-          <div className="bg-surface p-3 sm:p-4">
-            {action ? (
-              <>
-                <div
-                  className="mb-3 flex flex-wrap gap-2"
-                  aria-label="Vælg handling"
-                >
-                  {actions.map((item, index) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      aria-label={item.title}
-                      aria-pressed={item.key === action.key}
-                      onClick={() => setSelected(item.key)}
-                      className={`flex min-h-10 min-w-10 items-center justify-center rounded-lg border font-mono text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${item.key === action.key ? "border-brand bg-brand-soft text-brand" : "border-line-strong text-ink hover:bg-brand-soft"}`}
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </button>
-                  ))}
-                </div>
-                <StatusBadge
-                  tone={
-                    action.priority === "critical"
-                      ? "danger"
-                      : action.priority === "soon"
-                        ? "warning"
-                        : "neutral"
-                  }
-                >
-                  {action.priority === "critical"
-                    ? "Kræver handling"
-                    : action.priority === "soon"
-                      ? "Snart"
-                      : "Opfølgning"}
-                </StatusBadge>
-                <h2 className="mt-3 max-w-xl break-words text-xl font-semibold leading-snug tracking-tight">
-                  {action.title}
-                </h2>
-                <p className="mt-2 text-sm text-muted">
-                  {action.description}{" "}
-                  <span className="text-muted">{action.context}</span>
-                </p>
-                <Link
-                  className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-brand px-4 text-sm font-bold text-white hover:bg-brand-hover"
-                  href={`${root}${action.href}`}
-                >
-                  Åbn handling →
-                </Link>
-              </>
-            ) : (
-              <h2 className="text-xl font-semibold">
-                Ingen aktuelle handlinger
-              </h2>
-            )}
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-sm text-brand">
-              <Link className="hover:underline" href={`${root}/actions`}>
-                Alle handlinger →
-              </Link>
-              {organizationRole !== "viewer" && (
-                <Link className="hover:underline" href={`${root}/tasks/my`}>
-                  Mine opgaver →
-                </Link>
-              )}
-            </div>
-          </div>
+          <div className="p-3 sm:p-4" id="handlinger">{actionSection}</div>
         ) : (
           <div className="p-3 text-ink sm:p-4">
-            {view === "news" ? recentMinutesSection : committeeSection}
+            {view === "messages" ? messageSection : view === "news" ? recentMinutesSection : committeeSection}
           </div>
         )}
       </section>

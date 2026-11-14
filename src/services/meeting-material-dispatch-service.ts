@@ -350,10 +350,12 @@ export class MeetingMaterialDispatchService {
         });
         return emailService.sendPrepared({
           from: getEmailEnv().EMAIL_FROM,
+          organizationId: parsed.organizationId,
+          notificationPath: responseUrl ? `/api/organizations/${parsed.organizationId}/overview/meeting/${meeting.id}` : new URL(meetingUrl).pathname,
           to: [recipient.email],
           push: {
             path: new URL(responseUrl ?? meetingUrl).pathname,
-            body: responseUrl ? "Du har fået en mødeindkaldelse." : "Du har fået nyt mødemateriale.",
+            body: responseUrl ? `Mødeindkaldelse: ${meeting.title} · ${formatDateTime(meeting.starts_at)}. Svar om du deltager.` : `Nyt mødemateriale til ${meeting.title}.`,
           },
           ...template,
           attachments,

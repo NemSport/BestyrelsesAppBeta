@@ -2,12 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { after } from "next/server";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getEmailEnv } from "@/lib/email-env";
 import {
   meetingAgendaEmailTemplate,
   meetingMinutesApprovalEmailTemplate,
   type MinutesApprovalEmailTask,
 } from "@/lib/email-templates";
+import { formatDateTime } from "@/lib/localization";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { sendMeetingAgendaEmailSchema } from "@/lib/validation";
 import { meetingInvitationLinks, MeetingSchedulingRepository } from "@/repositories/meeting-scheduling-repository";
@@ -27,6 +29,8 @@ export type EmailPayload = {
   text: string;
   html: string;
   push: EmailPush;
+  organizationId?: string;
+  notificationPath?: string;
   attachments?: Array<{
     filename: string;
     content: string;
@@ -142,10 +146,12 @@ export class EmailService {
       const responseUrl = responseLinks.get(recipient.email.trim().toLowerCase());
       return {
         from: getEmailEnv().EMAIL_FROM,
+        organizationId: parsed.organizationId,
+        notificationPath: responseUrl ? `/api/organizations/${parsed.organizationId}/overview/meeting/${meeting.id}` : meetingPath,
         to: [recipient.email],
         push: {
           path: responseUrl ? new URL(responseUrl).pathname : meetingPath,
-          body: responseUrl ? "Du har fået en mødeindkaldelse." : "Du har fået en dagsorden.",
+          body: responseUrl ? `Mødeindkaldelse: ${meeting.title} · ${formatDateTime(meeting.starts_at)}. Svar om du deltager.` : `Dagsorden klar til ${meeting.title}.`,
         },
         ...meetingAgendaEmailTemplate({
           organizationName: organizationContext.organization.name,
@@ -203,6 +209,7 @@ export class EmailService {
   }
 
   async sendMeetingMinutesApprovalEmail(input: {
+    organizationId: string;
     to: string;
     recipientName: string;
     organizationName: string;
@@ -234,7 +241,8 @@ export class EmailService {
     return this.deliver({
       from: getEmailEnv().EMAIL_FROM,
       to: [input.to],
-      push: { path: input.pushPath, body: "Et referat er klar til din godkendelse." },
+      organizationId: input.organizationId,
+      push: { path: input.pushPath, body: `Referat fra ${input.meetingTitle} er klar til din godkendelse.` },
       ...template,
       attachments: [
         {
@@ -353,6 +361,22 @@ export class EmailService {
       );
     }
     const notifications = messages.map(({ to, push }) => ({ to, push }));
+    try {
+      const admin = createAdminClient();
+      const records = messages.flatMap(({ organizationId, to, push, notificationPath }) => organizationId
+        ? [admin.rpc("record_organization_email_notification", {
+            target_org: organizationId,
+            recipient_emails: to.map((email) => email.trim().toLowerCase()),
+            notification_path: notificationPath ?? push.path,
+            push_path: push.path,
+            notification_title: push.body,
+          })]
+        : []);
+      const results = await Promise.all(records);
+      if (results.some(({ error }) => error)) console.warn("Some emails could not be listed in Overblik.");
+    } catch {
+      console.warn("Sent emails could not be listed in Overblik.");
+    }
     after(async () => {
       try {
         await sendEmailPushes(notifications);

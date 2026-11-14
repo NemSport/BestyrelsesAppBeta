@@ -1908,3 +1908,10 @@ Agenda emails for an upcoming meeting contain personal links for attending or
 declining. Recipients confirm their choice without signing in. The organizer
 sees all invitation replies, including those still pending, on the meeting
 page. Invitation replies are independent of attendance recorded at the meeting.
+
+## Organization overview
+
+Overblik brings together a member's pending actions and personal messages.
+Bestie conversations and new meeting-related email and push notifications link
+to their source. Owners and organization administrators also have an
+Adminoverblik for overdue tasks, pending responses and recent updates.

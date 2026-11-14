@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ActionCenter } from "@/components/actions/action-center";
+import { BestieRepository } from "@/repositories/bestie-repository";
+import { bestiePath } from "@/lib/bestie";
+import { OverviewList } from "@/components/dashboard/overview-list";
 import { AdvisoryAi } from "@/components/dashboard/advisory-ai";
 import { OrganizationDashboardPriority } from "@/components/dashboard/organization-dashboard-priority";
 import { EmptyState, StatusBadge } from "@/components/ui";
@@ -15,8 +19,10 @@ import { ActionService } from "@/services/action-service";
 
 export default async function OrganizationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
+  searchParams: Promise<{ handlinger?: string }>;
 }) {
   const { organizationId } = await params;
   const db = await createClient();
@@ -26,9 +32,15 @@ export default async function OrganizationPage({
     .catch(() => null);
   if (!context) notFound();
 
-  const [overview, actionCenter] = await Promise.all([
+  const { handlinger } = await searchParams;
+  const actionView = handlinger === "mine" || handlinger === "completed" ? handlinger : "inbox";
+  const [overview, actionCenter, threads, notifications] = await Promise.all([
     new OrganizationService(db).getOverview(organizationId),
     new ActionService(db).getCenter(organizationId),
+    new BestieRepository(db).list(organizationId, user.id),
+    db.from("organization_notifications").select("id,path,title,created_at")
+      .eq("organization_id", organizationId).eq("user_id", user.id)
+      .order("created_at", { ascending: false }).limit(50),
   ]);
   const canManage = ["owner", "admin"].includes(context.membership.role);
   const organizationRoot = `/organizations/${organizationId}`;
@@ -211,7 +223,11 @@ export default async function OrganizationPage({
     </section>
   );
 
-  const actions = [...actionCenter.inbox, ...actionCenter.mine];
+  const messages = [
+    ...threads.map(({ id, title, updated_at }) => ({ id, title, path: bestiePath(organizationId, id), created_at: updated_at })),
+    ...(notifications.data ?? []),
+  ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const actionCount = actionCenter.inbox.length + actionCenter.mine.length;
   const meeting = overview.upcomingMeetings[0];
 
   return (
@@ -219,24 +235,15 @@ export default async function OrganizationPage({
       <AdvisoryAi organizationId={organizationId} />
 
       <OrganizationDashboardPriority
-        actionCount={actions.length}
-        actions={actions.slice(0, 3).map(
-          ({ key, href, title, priority, description, context, sourceType }) => ({
-            key,
-            href:
-              sourceType === "meeting_minutes"
-                ? withMeetingReturnTo(href, organizationRoot)
-                : href,
-            title,
-            priority,
-            description,
-            context,
-          }),
-        )}
+        actionCount={actionCount}
+        actionSection={<ActionCenter key={actionView} center={actionCenter} organizationId={organizationId} view={actionView} />}
+        messageSection={<OverviewList empty="Ingen beskeder endnu." rows={messages.map((message) => ({
+          id: message.id, title: message.title, href: message.path, date: message.created_at,
+        }))} />}
+        messageCount={messages.length}
         committeeCount={overview.committees.length}
         committeeSection={committeeSection}
         organizationId={organizationId}
-        organizationRole={context.membership.role}
         nextMeeting={
           meeting
             ? {

@@ -107,6 +107,12 @@ export type Database = {
         Relationships: [];
       };
 
+      organization_notifications: {
+        Row: { id: string; organization_id: string; user_id: string; path: string; title: string; created_at: string };
+        Insert: { organization_id: string; user_id: string; path: string; title: string; created_at?: string };
+        Update: { created_at?: string };
+        Relationships: [];
+      };
       bestie_threads: {
         Row: BestieThreadRow;
         Insert: Partial<BestieThreadRow>;
@@ -1718,6 +1724,14 @@ export type Database = {
       };
     };
     Functions: {
+      read_admin_overview: {
+        Args: { target_org: string };
+        Returns: { section: string; item_id: string; title: string; detail: string; path: string; occurred_at: string }[];
+      };
+      record_organization_email_notification: {
+        Args: { target_org: string; recipient_emails: string[]; notification_path: string; notification_title: string; push_path: string };
+        Returns: undefined;
+      };
       claim_bestie_agendas: {
         Args: Record<PropertyKey, never>;
         Returns: BestieAgendaClaim[];

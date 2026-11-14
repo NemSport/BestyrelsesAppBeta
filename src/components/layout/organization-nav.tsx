@@ -18,14 +18,12 @@ export function OrganizationNav({
   committees = [],
   organizationId,
   organizationName,
-  activeActionCount = 0,
 }: {
   logoUrl?: string | null;
   canManageOrganization?: boolean;
   committees?: Array<{ id: string; name: string }>;
   organizationId: string;
   organizationName?: string;
-  activeActionCount?: number;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -80,14 +78,6 @@ export function OrganizationNav({
               <AppIcon name={organizationNavIconNames[item.suffix]} />
             </span>
             <span>{item.label}</span>
-            {item.suffix === "/actions" && activeActionCount > 0 ? (
-              <span
-                aria-label={`${activeActionCount} aktive handlinger`}
-                className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-[0.65rem] font-bold text-ink"
-              >
-                {activeActionCount > 99 ? "99+" : activeActionCount}
-              </span>
-            ) : null}
           </Link>
         );
       })}

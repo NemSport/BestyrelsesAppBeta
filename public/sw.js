@@ -1,4 +1,4 @@
-const CACHE_NAME = "bestyrelsesapp-v5";
+const CACHE_NAME = "bestyrelsesapp-v6";
 const APP_ASSETS = [
   "/manifest.webmanifest",
   "/icons/app-icon-192.png",
@@ -6,6 +6,10 @@ const APP_ASSETS = [
   "/icons/maskable-icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
+
+function isPersonalOverview(url) {
+  return /^\/organizations\/[\da-f-]{36}(?:\/admin)?\/?$/i.test(url.pathname);
+}
 
 function isPersonalMeetingPage(url) {
   return url.pathname.startsWith("/meeting-vote/") || url.pathname.startsWith("/meeting-response/");
@@ -48,7 +52,7 @@ self.addEventListener("message", (event) => {
             try {
               const response = await fetch(url, { credentials: "include" });
               const page = new URL(url, self.location.origin);
-              if (response.ok && !page.pathname.endsWith("/bestie") && !isPersonalMeetingPage(page)) {
+              if (response.ok && !page.pathname.endsWith("/bestie") && !isPersonalMeetingPage(page) && !isPersonalOverview(page)) {
                 await cache.put(url, response);
               }
             } catch {
@@ -72,6 +76,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/auth/") ||
     url.pathname.startsWith("/invite/") ||
     isPersonalMeetingPage(url) ||
+    isPersonalOverview(url) ||
     url.pathname === "/forgot-password" ||
     url.pathname === "/reset-password" ||
     url.pathname === "/ux-review"

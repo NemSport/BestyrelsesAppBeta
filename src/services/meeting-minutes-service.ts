@@ -1386,6 +1386,7 @@ export class MeetingMinutesService {
         .filter((approval) => approval.memberEmail)
         .map((approval) =>
           emailService.sendMeetingMinutesApprovalEmail({
+            organizationId,
             to: approval.memberEmail,
             recipientName: approval.memberName,
             organizationName: data.organization.name,
@@ -1393,7 +1394,7 @@ export class MeetingMinutesService {
             meetingTitle: data.meeting.title,
             meetingDate: formatDanishDateTime(data.meeting.starts_at, "full"),
             approvalUrl: `${meetingUrl}#minutes-approval`,
-            pushPath: `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}`,
+            pushPath: `/organizations/${organizationId}/committees/${committeeId}/meetings/${meetingId}#minutes-approval`,
             personalTasks: data.tasks
               .filter((task) => task.responsible_user_id === approval.user_id)
               .map((task) =>

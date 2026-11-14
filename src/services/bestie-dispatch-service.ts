@@ -60,12 +60,12 @@ export class BestieDispatchService {
     if (error) throw error;
     const payload = {
       body: row.meeting_id
-        ? "Din personlige opsamling fra mødet er klar."
+        ? `${row.title}. Se dine opgaver, frister og beslutninger.`
         : row.dedup_key.startsWith("status-request:")
-          ? "Bestie har en statusbesked om din opgave."
+          ? `${row.title}. Åbn Bestie for at se eller svare på beskeden.`
           : row.event_id && row.task_id
-            ? "Du har en opfølgning på en opgave fra årshjulet."
-            : "Du har en ny besked fra Bestie.",
+            ? `Opfølgning fra årshjulet: ${row.title}.`
+            : `${row.title}. Åbn Bestie for at svare.`,
       path: bestiePath(row.organization_id, row.id),
       api: `/api/organizations/${row.organization_id}/bestie/${row.id}`,
       tag: row.id,

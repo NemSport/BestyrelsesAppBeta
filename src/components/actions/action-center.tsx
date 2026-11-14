@@ -11,7 +11,7 @@ import {
   buttonClassName,
   staticSurfaceClassName,
 } from "@/components/ui";
-import { formatDate, formatDateTime } from "@/lib/localization";
+import { formatDate } from "@/lib/localization";
 import type { ActionCenterData, ActionItem, TaskView } from "@/types/domain";
 
 type ActionView = "inbox" | "mine" | "completed";
@@ -82,6 +82,7 @@ export function ActionCenter({
   view: ActionView;
 }) {
   const router = useRouter();
+  const [visibleCount, setVisibleCount] = useState(5);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customDates, setCustomDates] = useState<Record<string, string>>({});
@@ -213,7 +214,7 @@ export function ActionCenter({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <nav aria-label="Handlingsvisning" className="flex flex-wrap gap-2 border-b border-line pb-3">
         {([
           ["inbox", "Min indbakke", center.inbox.length],
@@ -227,7 +228,8 @@ export function ActionCenter({
               size: "sm",
               variant: view === key ? "primary" : "secondary",
             })}
-            href={`${root}/actions?view=${key}`}
+            href={`${root}?handlinger=${key}#handlinger`}
+            scroll={false}
             key={key}
           >
             {label} <span aria-label={`${count} handlinger`}>({count})</span>
@@ -243,7 +245,7 @@ export function ActionCenter({
 
       {actions.length ? (
         <div className="divide-y divide-line border-y border-line">
-          {actions.map((action) => {
+          {actions.slice(0, visibleCount).map((action) => {
             const isPending = pendingKey === action.key;
             const canEditTask =
               action.task && center.editableCommitteeIds.includes(action.task.committee_id);
@@ -255,52 +257,27 @@ export function ActionCenter({
                 )
               : [];
             return (
-              <article className="py-4" data-action-key={action.key} key={action.key}>
-                <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge tone={priorityTones[action.priority]}>
-                        {priorityLabels[action.priority]}
-                      </StatusBadge>
-                      <span className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">
-                        {action.category === "deadline"
-                          ? "Deadline"
-                          : action.category === "requires_action"
-                            ? "Kræver din handling"
-                            : "Opfølgning"}
-                      </span>
-                    </div>
-                    <h2 className="mt-2 break-words text-base font-semibold text-ink">
-                      {action.title}
-                    </h2>
-                    <p className="mt-1 text-sm leading-5 text-muted">{action.description}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {action.context}
-                      {action.deadline ? ` · Frist ${formatDate(action.deadline)}` : ""}
-                      {action.reminderAt
-                        ? ` · Påmindelse ${formatDateTime(action.reminderAt)}`
-                        : ""}
-                      {action.followUpAt
-                        ? ` · Opfølgning ${formatDateTime(action.followUpAt)}`
-                        : ""}
-                      {action.task?.responsible?.full_name
-                        ? ` · Ansvarlig: ${action.task.responsible.full_name}`
-                        : ""}
-                    </p>
-                  </div>
+              <article className="py-2" data-action-key={action.key} key={action.key}>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <Link href={`${root}${action.href}`} className="min-w-0 flex-1 break-words text-sm font-semibold text-brand hover:underline">
+                    {action.title}
+                  </Link>
+                  <StatusBadge tone={priorityTones[action.priority]}>
+                    {priorityLabels[action.priority]}
+                  </StatusBadge>
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {action.context}{action.deadline ? ` · Frist ${formatDate(action.deadline)}` : ""}
+                </p>
 
-                  <div className="flex flex-wrap gap-2 md:justify-end">
-                    <Link
-                      className={buttonClassName({ size: "sm" })}
-                      href={`${root}${action.href}`}
-                    >
-                      {action.type === "minutes_approval"
-                        ? "Gennemgå referat"
-                        : action.sourceType === "task"
-                          ? "Åbn opgave"
-                          : "Åbn aktivitet"}
-                    </Link>
-                    {view !== "completed" && canEditTask ? (
+                {view !== "completed" ? (
+                  <details className={staticSurfaceClassName("mt-1 px-2")}>
+                    <summary className="cursor-pointer py-1.5 text-xs font-semibold text-brand">
+                      Flere handlinger
+                    </summary>
+                    <p className="mb-2 text-sm text-muted">{action.description}</p>
+                    <div className="mb-2 flex flex-wrap gap-1">
+                    {canEditTask ? (
                       <Button
                         disabled={isPending}
                         onClick={() => completeTask(action)}
@@ -311,7 +288,7 @@ export function ActionCenter({
                         Markér gennemført
                       </Button>
                     ) : null}
-                    {view !== "completed" && action.type === "minutes_approval" ? (
+                    {action.type === "minutes_approval" ? (
                       <Button
                         disabled={isPending}
                         onClick={() => approveMinutes(action)}
@@ -333,14 +310,7 @@ export function ActionCenter({
                         Tag ansvar
                       </Button>
                     ) : null}
-                  </div>
-                </div>
-
-                {view !== "completed" ? (
-                  <details className={staticSurfaceClassName("mt-3 px-3 py-2")}>
-                    <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-brand">
-                      Flere handlinger
-                    </summary>
+                    </div>
                     <div className="grid gap-4 border-t border-line pt-3 lg:grid-cols-3">
                       <div>
                         <p className="text-sm font-semibold">Mind mig senere</p>
@@ -496,6 +466,11 @@ export function ActionCenter({
           }
         />
       )}
+      {actions.length > visibleCount ? (
+        <Button size="sm" variant="secondary" onClick={() => setVisibleCount(visibleCount + 5)}>
+          Vis flere handlinger
+        </Button>
+      ) : null}
     </div>
   );
 }

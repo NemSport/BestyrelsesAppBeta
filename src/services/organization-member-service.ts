@@ -256,10 +256,11 @@ export class OrganizationMemberService {
     );
     const delivery = await new EmailService(this.db).sendPrepared({
       from: getEmailEnv().EMAIL_FROM,
+      organizationId: invitation.organization_id,
       to: [invitation.email],
       push: {
         path: `/invite/${invitation.id}`,
-        body: "Du er inviteret til et arbejdsrum.",
+        body: `Du er inviteret til ${organizationName}.`,
       },
       ...template,
     }).catch(() => null);

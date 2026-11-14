@@ -7,7 +7,7 @@ export type OrganizationNavItem = {
 
 export const organizationNavItems: readonly OrganizationNavItem[] = [
   { label: "Overblik", suffix: "" },
-  { label: "Handlinger", suffix: "/actions" },
+  { label: "Adminoverblik", suffix: "/admin", adminOnly: true },
   { label: "Udvalg", suffix: "/committees" },
   { label: "Møder", suffix: "/meetings" },
   { label: "Beslutninger", suffix: "/decisions" },
