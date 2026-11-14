@@ -1413,6 +1413,7 @@ export function TaskRegister({
       )}
 
       <TaskRegisterDetail
+        canRequestStatus={data.canRequestTaskStatus}
         actionPending={Boolean(selectedTask && actionId === selectedTask.id)}
         canEdit={Boolean(
           selectedTask &&

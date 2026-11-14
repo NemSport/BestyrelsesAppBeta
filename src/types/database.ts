@@ -1796,6 +1796,15 @@ export type Database = {
         Returns: { email: string; user_id: string; endpoint: string; keys: Json }[];
       };
       bestie_generate_messages: { Args: never; Returns: number };
+      bestie_claim_thread_push: { Args: { target_thread: string }; Returns: BestieThreadRow[] };
+      bestie_request_task_status: {
+        Args: { target_org: string; target_task: string; actor: string; request_key: string; token_hash: string };
+        Returns: { thread_id: string; recipient_email: string; task_title: string }[];
+      };
+      bestie_receive_task_status: {
+        Args: { token_hash: string; sender: string; inbound_id: string; reply_text: string };
+        Returns: string | null;
+      };
       bestie_claim_meeting_pushes: { Args: { target_meeting: string }; Returns: BestieThreadRow[] };
       bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
       bestie_apply_reply: {

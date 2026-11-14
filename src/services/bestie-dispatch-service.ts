@@ -39,6 +39,16 @@ export class BestieDispatchService {
     return { generated, delivered };
   }
 
+  async sendToThread(threadId: string) {
+    const config = bestiePushConfig();
+    if (!config) return false;
+    const { data, error } = await this.db.rpc("bestie_claim_thread_push", {
+      target_thread: threadId,
+    });
+    if (error) throw error;
+    return data[0] ? this.send(data[0], config) : false;
+  }
+
   private async send(
     row: TableRow<"bestie_threads">,
     config: NonNullable<ReturnType<typeof bestiePushConfig>>,
@@ -51,9 +61,11 @@ export class BestieDispatchService {
     const payload = {
       body: row.meeting_id
         ? "Din personlige opsamling fra mødet er klar."
-        : row.event_id && row.task_id
-          ? "Du har en opfølgning på en opgave fra årshjulet."
-          : "Du har en ny besked fra Bestie.",
+        : row.dedup_key.startsWith("status-request:")
+          ? "Bestie har en statusbesked om din opgave."
+          : row.event_id && row.task_id
+            ? "Du har en opfølgning på en opgave fra årshjulet."
+            : "Du har en ny besked fra Bestie.",
       path: bestiePath(row.organization_id, row.id),
       api: `/api/organizations/${row.organization_id}/bestie/${row.id}`,
       tag: row.id,
