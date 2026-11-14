@@ -289,7 +289,8 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
               {visible
                 .slice(page * pageSize, (page + 1) * pageSize)
                 .map(({ proposal, index }) => {
-                  const { row, kind, candidates, reason } = proposal;
+                  const { row, kind, candidates, reason, additionalRows } =
+                    proposal;
                   const match =
                     candidates.find(({ id }) => id === selected[index]) ??
                     (kind === "update" ? candidates[0] : undefined);
@@ -330,6 +331,9 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
                                 ? `Opdatér ${match.name} · ${match.changes.length + Number(match.contact)} ændringer`
                                 : (reason ?? "Opret")}{" "}
                           · {row.source}, række {row.row}
+                          {additionalRows?.length
+                            ? ` + ${additionalRows.length} samlet`
+                            : ""}
                         </p>
                       </div>
                       <Button
@@ -397,6 +401,14 @@ export function SponsorImport({ organizationId }: { organizationId: string }) {
           }
         >
           <div className="space-y-3">
+            {active.additionalRows?.length ? (
+              <p className="text-sm text-muted">
+                Samlet fra{" "}
+                {[active.row, ...active.additionalRows]
+                  .map(({ source, row }) => `${source}, række ${row}`)
+                  .join(" · ")}
+              </p>
+            ) : null}
             {active.kind === "review" ? (
               <>
                 <p className="text-sm text-muted">{active.reason}</p>

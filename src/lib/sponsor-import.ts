@@ -54,6 +54,7 @@ export type SponsorCandidate = Pick<
 > & { archived: boolean };
 export type SponsorProposal = {
   row: SponsorRow;
+  additionalRows?: Pick<SponsorRow, "source" | "row">[];
   kind: "new" | "update" | "review" | "unchanged";
   candidates: (SponsorCandidate & {
     reason: string;
@@ -83,6 +84,110 @@ const cvr = (value: string | null | undefined) =>
 const phone = (value: string | null | undefined) =>
   digits(value).replace(/^45(?=\d{8}$)/, "");
 
+function groupSponsorRows(rows: SponsorRow[]) {
+  const byName = new Map<string, SponsorRow[]>();
+  for (const row of rows) {
+    const name = normalizeSponsorName(row.fields.name);
+    const group = byName.get(name) ?? [];
+    group.push(row);
+    byName.set(name, group);
+  }
+  const merged = new Map<
+    SponsorRow,
+    {
+      row: SponsorRow;
+      additionalRows: NonNullable<SponsorProposal["additionalRows"]>;
+    }
+  >();
+  const consumed = new Set<SponsorRow>();
+  for (const group of byName.values()) {
+    if (group.length < 2 || group.some(({ warnings }) => warnings.length))
+      continue;
+    const values = (get: (row: SponsorRow) => string | undefined) =>
+      new Set(group.map(get).filter(Boolean));
+    const numbers = values(({ fields }) => cvr(fields.cvr_number));
+    const emails = values(({ fields }) => fields.email?.toLowerCase());
+    const sameNumber =
+      numbers.size === 1 && group.every(({ fields }) => cvr(fields.cvr_number));
+    const sameEmail =
+      emails.size === 1 && group.every(({ fields }) => fields.email);
+    if (numbers.size > 1 || emails.size > 1 || (!sameNumber && !sameEmail))
+      continue;
+    const [first, ...rest] = group;
+    const combined: SponsorRow = {
+      ...first,
+      fields: { ...first.fields },
+      details: [...first.details],
+    };
+    for (const row of rest) {
+      const source = `${row.source}, række ${row.row}`;
+      for (const key of Object.keys(sponsorFields) as SponsorField[]) {
+        const incoming = row.fields[key];
+        if (!incoming) continue;
+        if (!combined.fields[key]) combined.fields[key] = incoming;
+        else if (combined.fields[key] !== incoming) {
+          combined.details.push([
+            `${source} · ${sponsorFields[key]}`,
+            incoming,
+          ]);
+          if (
+            key !== "notes" &&
+            key !== "name" &&
+            normalizeSponsorName(combined.fields[key]!) !==
+              normalizeSponsorName(incoming) &&
+            !(
+              key === "cvr_number" &&
+              cvr(combined.fields[key]) === cvr(incoming)
+            )
+          ) {
+            combined.warnings = [
+              ...new Set([
+                ...combined.warnings,
+                `Forskellige værdier for ${sponsorFields[key]}`,
+              ]),
+            ];
+          }
+        }
+      }
+      if (!combined.owner) combined.owner = row.owner;
+      else if (
+        row.owner &&
+        normalizeSponsorName(combined.owner) !== normalizeSponsorName(row.owner)
+      ) {
+        combined.warnings = [
+          ...new Set([...combined.warnings, "Forskellige interne ansvarlige"]),
+        ];
+        combined.details.push([`${source} · Intern ansvarlig`, row.owner]);
+      }
+      if (!combined.contact) combined.contact = row.contact;
+      else if (
+        row.contact &&
+        normalizeSponsorName(combined.contact) !==
+          normalizeSponsorName(row.contact)
+      ) {
+        combined.warnings = [
+          ...new Set([...combined.warnings, "Forskellige kontaktpersoner"]),
+        ];
+        combined.details.push([`${source} · Kontaktperson`, row.contact]);
+      }
+      combined.details.push(
+        ...row.details.map(([label, value]): [string, string] => [
+          `${source} · ${label}`,
+          value,
+        ]),
+      );
+      consumed.add(row);
+    }
+    merged.set(first, {
+      row: combined,
+      additionalRows: rest.map(({ source, row }) => ({ source, row })),
+    });
+  }
+  return rows
+    .filter((row) => !consumed.has(row))
+    .map((row) => merged.get(row) ?? { row, additionalRows: undefined });
+}
+
 export function proposeSponsors(
   rows: SponsorRow[],
   existing: SponsorRecord[],
@@ -90,13 +195,16 @@ export function proposeSponsors(
 ): SponsorProposal[] {
   const workbookNames = new Map<string, number>();
   const workbookCvrs = new Map<string, number>();
-  for (const { fields } of rows) {
+  const groups = groupSponsorRows(rows);
+  for (const {
+    row: { fields },
+  } of groups) {
     const name = normalizeSponsorName(fields.name);
     const number = cvr(fields.cvr_number);
     workbookNames.set(name, (workbookNames.get(name) ?? 0) + 1);
     if (number) workbookCvrs.set(number, (workbookCvrs.get(number) ?? 0) + 1);
   }
-  return rows.map((row) => {
+  return groups.map(({ row, additionalRows }) => {
     const fields = row.fields;
     const ownerId = row.owner
       ? owners.get(normalizeSponsorName(row.owner))
@@ -166,6 +274,12 @@ export function proposeSponsors(
                 contact,
                 archived: Boolean(entry.archived_at),
               },
+              addressOnly:
+                sameAddress &&
+                !sameCvr &&
+                !sameName &&
+                !sameEmail &&
+                !samePhone,
               strong:
                 !entry.archived_at &&
                 !conflict &&
@@ -175,7 +289,12 @@ export function proposeSponsors(
           ]
         : [];
     });
-    const candidates = matches.map(({ candidate }) => candidate);
+    const strong = matches.filter((match) => match.strong);
+    const relevant =
+      strong.length === 1
+        ? matches.filter((match) => !match.addressOnly)
+        : matches;
+    const candidates = relevant.map(({ candidate }) => candidate);
     const duplicate =
       (workbookNames.get(name) ?? 0) > 1 ||
       (number && (workbookCvrs.get(number) ?? 0) > 1);
@@ -184,11 +303,12 @@ export function proposeSponsors(
       duplicate ||
       unresolvedOwner ||
       row.warnings.length ||
-      matches.length > 1 ||
-      (matches.length === 1 && !matches[0].strong)
+      relevant.length > 1 ||
+      (relevant.length === 1 && !relevant[0].strong)
     )
       return {
         row,
+        additionalRows,
         candidates,
         ownerName,
         kind: "review",
@@ -202,9 +322,10 @@ export function proposeSponsors(
       };
     return {
       row,
+      additionalRows,
       candidates,
       ownerName,
-      kind: !matches.length
+      kind: !relevant.length
         ? "new"
         : candidates[0].changes.length || candidates[0].contact
           ? "update"

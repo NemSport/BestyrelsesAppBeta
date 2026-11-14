@@ -137,3 +137,65 @@ test("database approval writes in one transaction, preserves missing fields and 
     await db.close();
   }
 });
+
+test("a unique strong match prevails over another sponsor at the same address", () => {
+  const shared = {
+    ...current,
+    id: organization,
+    name: "Sponsor B",
+    cvr_number: null,
+    phone: null,
+    email: null,
+  };
+  const input = row({
+    name: current.name,
+    address_line: current.address_line!,
+    postal_code: current.postal_code!,
+  });
+  const [proposal] = proposeSponsors([input], [shared, current]);
+  assert.equal(proposal.kind, "unchanged");
+  assert.deepEqual(
+    proposal.candidates.map(({ id }) => id),
+    [current.id],
+  );
+  assert.equal(proposeSponsors([input], [shared])[0].kind, "review");
+  const competing = { ...shared, cvr_number: current.cvr_number };
+  assert.equal(
+    proposeSponsors(
+      [row({ ...input.fields, cvr_number: current.cvr_number! })],
+      [current, competing],
+    )[0].kind,
+    "review",
+  );
+});
+
+test("rows with the same name and email make one proposal with both source references", () => {
+  const first = row({
+    name: "Sponsor A",
+    email: "hello@example.test",
+    phone: "12345678",
+    notes: "Første note",
+  });
+  const other = {
+    ...row({
+      name: "Sponsor A",
+      email: "HELLO@example.test",
+      notes: "Anden note",
+    }),
+    source: "Anden fane",
+    row: 3,
+    details: [["Pris", "1000"]] as SponsorRow["details"],
+  };
+  const proposals = proposeSponsors([first, other], []);
+  assert.equal(proposals.length, 1);
+  assert.equal(proposals[0].kind, "new");
+  assert.equal(proposals[0].row.fields.phone, "12345678");
+  assert.deepEqual(proposals[0].additionalRows, [
+    { source: "Anden fane", row: 3 },
+  ]);
+  assert.ok(
+    proposals[0].row.details.some(([, value]) => value === "Anden note"),
+  );
+  const conflict = { ...other, fields: { ...other.fields, phone: "87654321" } };
+  assert.equal(proposeSponsors([first, conflict], [])[0].kind, "review");
+});
