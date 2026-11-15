@@ -1942,3 +1942,8 @@ the draft.
 Bestie distinguishes notice deadlines from deadlines for renegotiation or
 renewal. Payment instalments and separate costs appear in the preview and are
 saved as contract notes on approval.
+
+A draft sponsor contract can be activated from its stakeholder profile. Bestie
+creates a linked task for each recorded renegotiation or notice deadline in the
+selected committee. The activation form asks for an active member responsible
+for the tasks. Bestie's normal task reminders follow the recorded deadlines.

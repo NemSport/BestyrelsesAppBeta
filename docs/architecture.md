@@ -3037,3 +3037,10 @@ selected for new contracts.
 The contract extraction prompt keeps instalments and separate costs distinct
 from contract value. Approval persists the editable text in contract notes and
 uses the existing renewal date for a deadline to renegotiate or renew.
+
+The contract activation endpoint calls a security-invoker RPC that locks the
+draft and checks stakeholder permissions, committee scope, and active assignee
+membership. It inserts work for the structured contract deadlines and promotes
+the same contract in one transaction. Retried activation of an active contract
+is a no-op. Generated tasks use the existing Bestie scheduler and do not depend
+on another AI extraction.
