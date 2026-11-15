@@ -116,6 +116,13 @@ export default async function OrganizationMeetingsPage({
             {meetingCommittee ? (
               <>
                 <Link
+                  className={buttonClassName({ size: "sm", variant: "secondary" })}
+                  href={`${meetingsRoot}/import`}
+                >
+                  <AppIcon name="upload" size={15} />
+                  Importér referat
+                </Link>
+                <Link
                   className={buttonClassName({ size: "sm" })}
                   href={`${meetingsRoot}/polls`}
                 >

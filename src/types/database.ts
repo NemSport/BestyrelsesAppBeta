@@ -1843,6 +1843,10 @@ export type Database = {
       read_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: Json };
       ensure_meeting_task_follow_up: { Args: { target_meeting_id: string }; Returns: string };
       mutate_meeting_task_follow_up: { Args: { target_meeting_id: string; target_task_id: string; request_id: string; expected_version: string; mutation: Json }; Returns: undefined };
+      save_historical_meeting_import: {
+        Args: { target_organization: string; target_committee: string; target_analysis: string; proposal: Json };
+        Returns: string;
+      };
       activate_stakeholder_contract: {
         Args: {
           target_organization: string;
