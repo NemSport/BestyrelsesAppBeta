@@ -511,10 +511,17 @@ export function StakeholderProfile({
                         <dd>{formatDate(contract.notice_deadline)}</dd>
                       </div>
                       <div>
-                        <dt className="metadata">Fornyelsesfrist</dt>
+                        <dt className="metadata">
+                          Frist for genforhandling eller fornyelse
+                        </dt>
                         <dd>{formatDate(contract.renewal_deadline)}</dd>
                       </div>
                     </dl>
+                    {contract.notes ? (
+                      <p className="mt-3 whitespace-pre-line break-words text-sm text-muted">
+                        {contract.notes}
+                      </p>
+                    ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {contract.deliverables.map((item) => (
                         <span

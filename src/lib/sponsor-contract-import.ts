@@ -17,7 +17,9 @@ export const sponsorContractFields = {
   annual: "Årligt beløb",
   currency: "Valuta",
   noticeDeadline: "Opsigelsesfrist",
-  renewalDeadline: "Fornyelsesfrist",
+  renewalDeadline: "Frist for genforhandling eller fornyelse",
+  paymentSchedule: "Betalingsrater",
+  extraCosts: "Særskilte omkostninger",
 } as const;
 
 export type ContractField = keyof typeof sponsorContractFields;
@@ -26,6 +28,10 @@ const extracted = z.object({
   page: z.number().int().positive().nullable(),
 });
 const keys = Object.keys(sponsorContractFields) as ContractField[];
+export const sponsorContractTermNotes = [
+  "paymentSchedule",
+  "extraCosts",
+] as const;
 export const extractedSponsorContract = z.object({
   fields: z.object(
     Object.fromEntries(keys.map((key) => [key, extracted])) as Record<
@@ -44,11 +50,15 @@ export const extractedSponsorContract = z.object({
     .max(20),
 });
 
-export const contractImportValues = z.object(
+const approvalFields = z.object(
   Object.fromEntries(
     keys.map((key) => [key, z.string().trim().max(240)]),
   ) as Record<ContractField, z.ZodString>,
 );
+
+const contractImportValues = approvalFields
+  .partial({ paymentSchedule: true, extraCosts: true })
+  .transform((fields) => ({ paymentSchedule: "", extraCosts: "", ...fields }));
 
 export const approveSponsorContract = z.object({
   analysisId: z.string().uuid(),
@@ -98,6 +108,10 @@ export function validateContractApproval(
       .regex(/^[a-z]{3}$/i, "Angiv en valutakode på tre bogstaver.")
       .parse(fields.currency),
     autoRenew: input.autoRenew,
+    notes: sponsorContractTermNotes
+      .filter((key) => fields[key])
+      .map((key) => `${sponsorContractFields[key]}: ${fields[key]}`)
+      .join("\n\n"),
   });
   const sponsor = z
     .object({

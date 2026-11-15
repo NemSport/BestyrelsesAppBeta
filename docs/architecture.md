@@ -3033,3 +3033,7 @@ completed preview. The security-invoker RPC uses RLS and the Excel import lock
 to save the sponsor, contact, draft and deliverables together. A per-organization
 PDF hash prevents saving the same file twice, and archived sponsors cannot be
 selected for new contracts.
+
+The contract extraction prompt keeps instalments and separate costs distinct
+from contract value. Approval persists the editable text in contract notes and
+uses the existing renewal date for a deadline to renegotiate or renew.

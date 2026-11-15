@@ -1938,3 +1938,7 @@ contract and its deliverables on the selected sponsor, or creates a new sponsor
 if explicitly selected. Existing sponsor values are preserved and empty fields
 can be filled. The uploaded PDF is used for extraction and is not attached to
 the draft.
+
+Bestie distinguishes notice deadlines from deadlines for renegotiation or
+renewal. Payment instalments and separate costs appear in the preview and are
+saved as contract notes on approval.

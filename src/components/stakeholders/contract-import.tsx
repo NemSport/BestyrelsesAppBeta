@@ -6,6 +6,7 @@ import { AppIcon } from "@/components/icons/app-icon";
 import { Button, Input, PageHeader, Select } from "@/components/ui";
 import {
   sponsorContractFields,
+  sponsorContractTermNotes,
   type ContractField,
   type ContractPreview,
 } from "@/lib/sponsor-contract-import";
@@ -312,6 +313,38 @@ export function ContractImport({ organizationId }: { organizationId: string }) {
               </section>
             ))}
           </div>
+          <section className="panel space-y-2 p-3">
+            <h2 className="font-semibold">Betalingsvilkår</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {sponsorContractTermNotes.map((key) => (
+                <label key={key} className="min-w-0 space-y-1 text-sm">
+                  <span className="font-medium">
+                    {sponsorContractFields[key]}
+                  </span>
+                  <textarea
+                    value={fields[key] ?? ""}
+                    rows={2}
+                    maxLength={240}
+                    disabled={busy}
+                    className="field block w-full"
+                    onChange={(event) =>
+                      setFields((previous) => ({
+                        ...previous,
+                        [key]: event.target.value,
+                      }))
+                    }
+                  />
+                  <span className="block text-xs text-muted">
+                    {preview.fields[key]?.page
+                      ? `Side ${preview.fields[key].page}`
+                      : preview.fields[key]?.value
+                        ? "Uden sidehenvisning"
+                        : "Ikke fundet i PDF"}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
           <section className="panel space-y-2 p-3">
             <h2 className="font-semibold">Aftalte ydelser</h2>
             <label className="block text-sm text-muted">
