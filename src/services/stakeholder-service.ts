@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { AuthorizationError, NotFoundError } from "@/lib/errors";
+import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
 import { getStakeholderCapabilities } from "@/lib/stakeholder-capabilities";
 import {
   activeContractFor,
@@ -16,6 +16,7 @@ import {
   stakeholderContactArchiveSchema,
   stakeholderContactInputSchema,
   stakeholderContactUpdateSchema,
+  stakeholderContractActivationSchema,
   stakeholderContractInputSchema,
   stakeholderDeliverableInputSchema,
   stakeholderInputSchema,
@@ -240,7 +241,7 @@ export class StakeholderService {
                     : null,
                 overdueFollowUp: Boolean(
                   entry.next_follow_up_at &&
-                    new Date(entry.next_follow_up_at).getTime() < now.getTime(),
+                  new Date(entry.next_follow_up_at).getTime() < now.getTime(),
                 ),
                 ownerName:
                   memberNames.get(
@@ -605,6 +606,28 @@ export class StakeholderService {
       created_by: user.id,
       updated_by: user.id,
     });
+  }
+
+  async activateContract(input: unknown) {
+    const parsed = stakeholderContractActivationSchema.parse(input);
+    const { capabilities } = await this.context(parsed.organizationId);
+    this.requireCapability(capabilities, "manageContracts");
+    const { error } = await this.db.rpc("activate_stakeholder_contract", {
+      target_organization: parsed.organizationId,
+      target_stakeholder: parsed.stakeholderId,
+      target_contract: parsed.contractId,
+      target_committee: parsed.committeeId,
+      responsible_member: parsed.responsibleUserId,
+    });
+    if (error?.code === "P0002") throw new NotFoundError("Kontrakten");
+    if (error?.code === "55000")
+      throw new AppError("Kun en kladde kan aktiveres.", 409);
+    if (error?.code === "42501" || error?.code === "22023")
+      throw new AppError(
+        "Vælg et udvalg, du kan oprette opgaver i, og en aktiv ansvarlig i udvalget.",
+        422,
+      );
+    if (error) throw error;
   }
 
   async createDeliverable(input: unknown) {

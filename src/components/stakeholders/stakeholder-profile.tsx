@@ -39,6 +39,7 @@ type Dialog =
   | "edit"
   | "contact"
   | "contract"
+  | "activateContract"
   | "activity"
   | "deliverable"
   | "pipeline"
@@ -89,6 +90,7 @@ export function StakeholderProfile({
   const [selectedContractId, setSelectedContractId] = useState<string | null>(
     null,
   );
+  const [activationCommittee, setActivationCommittee] = useState("");
   const [selectedPipeline, setSelectedPipeline] =
     useState<StakeholderPipelineEntry | null>(null);
   const [tasks, setTasks] = useState(data.tasks);
@@ -97,8 +99,28 @@ export function StakeholderProfile({
   const activeContracts = data.contracts.filter(
     (contract) => contract.status === "active",
   );
-  const previousContracts = data.contracts.filter(
-    (contract) => contract.status !== "active",
+  const inactiveContractGroups = [
+    {
+      title: "Kladder",
+      isDraft: true,
+      contracts: data.contracts.filter(
+        (contract) => contract.status === "draft",
+      ),
+    },
+    {
+      title: "Tidligere kontrakter",
+      isDraft: false,
+      contracts: data.contracts.filter(
+        (contract) =>
+          contract.status !== "active" && contract.status !== "draft",
+      ),
+    },
+  ];
+  const activationContract = data.contracts.find(
+    ({ id }) => id === selectedContractId,
+  );
+  const activationHasTasks = Boolean(
+    activationContract?.renewal_deadline || activationContract?.notice_deadline,
   );
   const activePipeline =
     data.pipelineEntries.find((entry) => !entry.closed_at) ?? null;
@@ -110,6 +132,13 @@ export function StakeholderProfile({
       name: member.full_name || member.email,
       committeeIds: member.committees.map((committee) => committee.id),
     }));
+
+  const activationMembers = responsiblePeople.filter(({ committeeIds }) =>
+    committeeIds.includes(activationCommittee),
+  );
+  const activationOwner = activationMembers.find(
+    ({ id }) => id === stakeholder.internal_owner_user_id,
+  );
 
   useEffect(() => {
     setTasks(data.tasks);
@@ -229,6 +258,21 @@ export function StakeholderProfile({
         notes: nullable(form, "notes"),
       },
       "Kontrakten kunne ikke oprettes.",
+    );
+  }
+
+  async function activateContract(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activationContract || busy) return;
+    const form = new FormData(event.currentTarget);
+    await jsonMutation(
+      `/api/stakeholders/${stakeholder.id}/contracts/${activationContract.id}/activate`,
+      "POST",
+      {
+        committeeId: nullable(form, "committeeId"),
+        responsibleUserId: nullable(form, "responsibleUserId"),
+      },
+      "Kontrakten kunne ikke aktiveres.",
     );
   }
 
@@ -590,41 +634,65 @@ export function StakeholderProfile({
                 title="Ingen aktive kontrakter"
               />
             )}
-            {previousContracts.length ? (
-              <details className="mt-4 border-t border-line pt-3">
-                <summary className="cursor-pointer text-sm font-semibold">
-                  Tidligere kontrakter ({previousContracts.length})
-                </summary>
-                <div className="mt-2 divide-y divide-line">
-                  {previousContracts.map((contract) => (
-                    <div
-                      className="flex flex-wrap justify-between gap-2 py-3 text-sm"
-                      key={contract.id}
-                    >
-                      <span>{contract.title}</span>
-                      <span className="text-muted">
-                        {formatDate(contract.start_date)} –{" "}
-                        {formatDate(contract.end_date)} ·{" "}
-                        {contract.status === "draft"
-                          ? "Kladde"
-                          : contract.status}
-                      </span>
-                      {contract.renewal_deadline ? (
-                        <p className="basis-full text-muted">
-                          Frist for genforhandling eller fornyelse ·{" "}
-                          {formatDate(contract.renewal_deadline)}
-                        </p>
-                      ) : null}
-                      {contract.notes ? (
-                        <p className="basis-full whitespace-pre-line break-words text-muted">
-                          {contract.notes}
-                        </p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </details>
-            ) : null}
+            {inactiveContractGroups.map(({ title, isDraft, contracts }) =>
+              contracts.length ? (
+                <details
+                  key={title}
+                  open={isDraft || undefined}
+                  className="mt-4 border-t border-line pt-3"
+                >
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    {title} ({contracts.length})
+                  </summary>
+                  <div className="mt-2 divide-y divide-line">
+                    {contracts.map((contract) => (
+                      <div
+                        className="flex flex-wrap justify-between gap-2 py-3 text-sm"
+                        key={contract.id}
+                      >
+                        <span>{contract.title}</span>
+                        <span className="text-muted">
+                          {formatDate(contract.start_date)} –{" "}
+                          {formatDate(contract.end_date)} ·{" "}
+                          {contract.status === "draft"
+                            ? "Kladde"
+                            : contract.status}
+                        </span>
+                        {contract.renewal_deadline ? (
+                          <p className="basis-full text-muted">
+                            Frist for genforhandling eller fornyelse ·{" "}
+                            {formatDate(contract.renewal_deadline)}
+                          </p>
+                        ) : null}
+                        {isDraft && data.capabilities.manageContracts ? (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => {
+                              setError(null);
+                              setSelectedContractId(contract.id);
+                              setActivationCommittee(
+                                committeeOptions.length === 1
+                                  ? committeeOptions[0].id
+                                  : "",
+                              );
+                              setDialog("activateContract");
+                            }}
+                          >
+                            Aktivér kontrakt
+                          </Button>
+                        ) : null}
+                        {contract.notes ? (
+                          <p className="basis-full whitespace-pre-line break-words text-muted">
+                            {contract.notes}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null,
+            )}
           </section>
 
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-3 sm:p-4">
@@ -1152,6 +1220,97 @@ export function StakeholderProfile({
           <DialogFooter busy={busy} close={() => setDialog(null)} />
         </form>
       </Modal>
+      <Modal
+        onClose={() => {
+          if (!busy) setDialog(null);
+        }}
+        open={dialog === "activateContract"}
+        title="Aktivér kontrakt"
+      >
+        <form className="space-y-3" onSubmit={activateContract}>
+          <p className="font-medium">{activationContract?.title}</p>
+          {activationHasTasks ? (
+            <>
+              <ul className="space-y-1 text-sm text-muted">
+                {activationContract?.renewal_deadline ? (
+                  <li>
+                    Genforhandl sponsoraftalen · Frist{" "}
+                    {formatDate(activationContract.renewal_deadline)}
+                  </li>
+                ) : null}
+                {activationContract?.notice_deadline ? (
+                  <li>
+                    Tag stilling til opsigelse · Frist{" "}
+                    {formatDate(activationContract.notice_deadline)}
+                  </li>
+                ) : null}
+              </ul>
+              {committeeOptions.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className="label">Udvalg til Besties opgaver</span>
+                    <Select
+                      name="committeeId"
+                      value={activationCommittee}
+                      required
+                      onChange={(event) =>
+                        setActivationCommittee(event.target.value)
+                      }
+                    >
+                      <option value="">Vælg udvalg</option>
+                      {committeeOptions.map(({ id, name }) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label>
+                    <span className="label">Ansvarlig</span>
+                    <Select
+                      key={activationCommittee}
+                      name="responsibleUserId"
+                      required
+                      disabled={!activationCommittee}
+                      defaultValue={activationOwner?.id ?? ""}
+                    >
+                      <option value="">Vælg ansvarlig</option>
+                      {activationMembers.map(({ id, name }) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                </div>
+              ) : (
+                <p className="text-sm text-muted">
+                  Et medlem med adgang til at oprette opgaver i et udvalg kan
+                  aktivere kontrakten.
+                </p>
+              )}
+            </>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                (activationHasTasks &&
+                  (!activationCommittee || !activationMembers.length))
+              }
+            >
+              {busy ? "Aktiverer …" : "Aktivér kontrakt"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal
         maxWidth="2xl"
         onClose={() => setDialog(null)}

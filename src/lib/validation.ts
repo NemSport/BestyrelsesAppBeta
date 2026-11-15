@@ -694,6 +694,14 @@ export const stakeholderContractInputSchema = z.object({
   }
 });
 
+export const stakeholderContractActivationSchema = z.object({
+  organizationId: uuidSchema,
+  stakeholderId: uuidSchema,
+  contractId: uuidSchema,
+  committeeId: uuidSchema.nullable(),
+  responsibleUserId: uuidSchema.nullable(),
+});
+
 export const stakeholderDeliverableInputSchema = z.object({
   organizationId: uuidSchema,
   stakeholderId: uuidSchema,

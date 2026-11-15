@@ -92,6 +92,14 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
         field text, meeting_id uuid, agenda_item_id uuid, user_id uuid, organization_id uuid
       );
       create table organizations (id uuid primary key, deleted_at timestamptz);
+      create function public.can_edit_agenda_item(uuid) returns boolean language sql as $$ select true $$;
+      create table committees (id uuid, organization_id uuid, deleted_at timestamptz);
+      create table committee_members (committee_id uuid, organization_id uuid, user_id uuid, status text);
+      create table tasks (organization_id uuid, committee_id uuid, stakeholder_id uuid,
+        stakeholder_contract_id uuid, title text, description text, deadline date,
+        responsible_user_id uuid, created_by uuid, updated_by uuid);
+      insert into committees values ('${actor}', '${organization}', null);
+      insert into committee_members values ('${actor}', '${organization}', '${actor}', 'active');
       create table stakeholders (
         id uuid primary key default gen_random_uuid(), organization_id uuid, name text,
         stakeholder_type text, relationship_status text, cvr_number text, address_line text,
@@ -102,7 +110,7 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
       create table stakeholder_contracts (id uuid primary key default gen_random_uuid(),
         organization_id uuid, stakeholder_id uuid references stakeholders(id), title text,
         status text, contract_value numeric(14,2), annual_value numeric(14,2), currency text,
-        start_date date, end_date date, notice_deadline date, renewal_deadline date, auto_renew boolean, notes text,
+        start_date date, end_date date, notice_deadline date, renewal_deadline date, auto_renew boolean, notes text, archived_at timestamptz,
         created_by uuid, updated_by uuid);
       create table stakeholder_contract_deliverables (organization_id uuid, contract_id uuid references stakeholder_contracts(id),
         deliverable_type text, title text, created_by uuid, updated_by uuid);
@@ -185,6 +193,62 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
       fileHash: "b".repeat(64),
     });
     assert.equal((await db.query("select * from stakeholders")).rows.length, 2);
+    await db.exec(
+      await readFile(
+        "supabase/migrations/202611150002_activate_stakeholder_contract.sql",
+        "utf8",
+      ),
+    );
+    const original = (
+      await db.query<{ id: string; notes: string }>(
+        "select id, notes from stakeholder_contracts where stakeholder_id = $1",
+        [sponsor],
+      )
+    ).rows[0];
+    const activate = (responsible = actor) =>
+      db.query("select activate_stakeholder_contract($1,$2,$3,$4,$5)", [
+        organization,
+        sponsor,
+        original.id,
+        actor,
+        responsible,
+      ]);
+    await assert.rejects(activate(sponsor), { code: "22023" });
+    assert.equal((await db.query("select * from tasks")).rows.length, 0);
+    assert.deepEqual(
+      (
+        await db.query(
+          "select status from stakeholder_contracts where id = $1",
+          [original.id],
+        )
+      ).rows,
+      [{ status: "draft" }],
+    );
+    await activate();
+    await activate();
+    assert.deepEqual(
+      (
+        await db.query(
+          "select status, notes from stakeholder_contracts where id = $1",
+          [original.id],
+        )
+      ).rows,
+      [{ status: "active", notes: original.notes }],
+    );
+    assert.deepEqual(
+      (
+        await db.query(
+          "select stakeholder_contract_id, deadline::text, responsible_user_id from tasks",
+        )
+      ).rows,
+      [
+        {
+          stakeholder_contract_id: original.id,
+          deadline: "2027-06-30",
+          responsible_user_id: actor,
+        },
+      ],
+    );
   } finally {
     await db.close();
   }
