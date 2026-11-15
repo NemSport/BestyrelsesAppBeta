@@ -604,8 +604,22 @@ export function StakeholderProfile({
                       <span>{contract.title}</span>
                       <span className="text-muted">
                         {formatDate(contract.start_date)} –{" "}
-                        {formatDate(contract.end_date)} · {contract.status}
+                        {formatDate(contract.end_date)} ·{" "}
+                        {contract.status === "draft"
+                          ? "Kladde"
+                          : contract.status}
                       </span>
+                      {contract.renewal_deadline ? (
+                        <p className="basis-full text-muted">
+                          Frist for genforhandling eller fornyelse ·{" "}
+                          {formatDate(contract.renewal_deadline)}
+                        </p>
+                      ) : null}
+                      {contract.notes ? (
+                        <p className="basis-full whitespace-pre-line break-words text-muted">
+                          {contract.notes}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
