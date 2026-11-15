@@ -511,10 +511,17 @@ export function StakeholderProfile({
                         <dd>{formatDate(contract.notice_deadline)}</dd>
                       </div>
                       <div>
-                        <dt className="metadata">Fornyelsesfrist</dt>
+                        <dt className="metadata">
+                          Frist for genforhandling eller fornyelse
+                        </dt>
                         <dd>{formatDate(contract.renewal_deadline)}</dd>
                       </div>
                     </dl>
+                    {contract.notes ? (
+                      <p className="mt-3 whitespace-pre-line break-words text-sm text-muted">
+                        {contract.notes}
+                      </p>
+                    ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {contract.deliverables.map((item) => (
                         <span
@@ -597,8 +604,22 @@ export function StakeholderProfile({
                       <span>{contract.title}</span>
                       <span className="text-muted">
                         {formatDate(contract.start_date)} –{" "}
-                        {formatDate(contract.end_date)} · {contract.status}
+                        {formatDate(contract.end_date)} ·{" "}
+                        {contract.status === "draft"
+                          ? "Kladde"
+                          : contract.status}
                       </span>
+                      {contract.renewal_deadline ? (
+                        <p className="basis-full text-muted">
+                          Frist for genforhandling eller fornyelse ·{" "}
+                          {formatDate(contract.renewal_deadline)}
+                        </p>
+                      ) : null}
+                      {contract.notes ? (
+                        <p className="basis-full whitespace-pre-line break-words text-muted">
+                          {contract.notes}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>

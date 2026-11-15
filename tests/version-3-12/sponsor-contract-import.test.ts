@@ -28,6 +28,9 @@ const fields = {
   endDate: "2027-12-31",
   total: "12500,50",
   currency: "dkk",
+  renewalDeadline: "2027-06-30",
+  paymentSchedule: "To rater med forfald 1. januar og 1. juli.",
+  extraCosts: "Sponsor betaler tryk af eget skilt.",
 };
 const input = {
   analysisId: actor,
@@ -63,6 +66,12 @@ test("approval validates dates and money and preserves missing optional values",
   assert.equal(contract.contractValue, 12500.5);
   assert.equal(contract.annualValue, null);
   assert.equal(contract.currency, "DKK");
+  assert.equal(contract.noticeDeadline, null);
+  assert.equal(contract.renewalDeadline, "2027-06-30");
+  assert.equal(
+    contract.notes,
+    "Betalingsrater: To rater med forfald 1. januar og 1. juli.\n\nSærskilte omkostninger: Sponsor betaler tryk af eget skilt.",
+  );
   assert.throws(() =>
     approval({ ...input, fields: { ...fields, startDate: "" } }),
   );
@@ -93,7 +102,7 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
       create table stakeholder_contracts (id uuid primary key default gen_random_uuid(),
         organization_id uuid, stakeholder_id uuid references stakeholders(id), title text,
         status text, contract_value numeric(14,2), annual_value numeric(14,2), currency text,
-        start_date date, end_date date, notice_deadline date, renewal_deadline date, auto_renew boolean,
+        start_date date, end_date date, notice_deadline date, renewal_deadline date, auto_renew boolean, notes text,
         created_by uuid, updated_by uuid);
       create table stakeholder_contract_deliverables (organization_id uuid, contract_id uuid references stakeholder_contracts(id),
         deliverable_type text, title text, created_by uuid, updated_by uuid);
@@ -104,6 +113,12 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
     await db.exec(
       await readFile(
         "supabase/migrations/202611140011_sponsor_contract_import.sql",
+        "utf8",
+      ),
+    );
+    await db.exec(
+      await readFile(
+        "supabase/migrations/202611150001_sponsor_contract_payment_terms.sql",
         "utf8",
       ),
     );
@@ -126,7 +141,7 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
     assert.deepEqual(
       (
         await db.query(
-          "select stakeholder_id,status,contract_value,annual_value from stakeholder_contracts",
+          "select stakeholder_id,status,contract_value,annual_value,notice_deadline,renewal_deadline::text,notes from stakeholder_contracts",
         )
       ).rows,
       [
@@ -135,6 +150,9 @@ test("approval saves a linked draft and rolls back duplicate and conflicting imp
           status: "draft",
           contract_value: "12500.50",
           annual_value: null,
+          notice_deadline: null,
+          renewal_deadline: "2027-06-30",
+          notes: approval(input).contract.notes,
         },
       ],
     );
