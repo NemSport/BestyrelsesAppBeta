@@ -1947,3 +1947,14 @@ A draft sponsor contract can be activated from its stakeholder profile. Bestie
 creates a linked task for each recorded renegotiation or notice deadline in the
 selected committee. The activation form asks for an active member responsible
 for the tasks. Bestie's normal task reminders follow the recorded deadlines.
+
+## Historical meeting import
+
+From the organization meeting list, a committee manager can select an eligible
+committee and review Bestie's proposal for a past meeting. A preview can combine
+up to four Word (.docx), PDF, JPG or PNG sources for the same meeting, up to 4 MB
+in total. The user can edit the minutes and agenda notes, remove proposals,
+review unclear handwriting with source references and assign follow-ups to committee
+members. Explicit confirmation creates a completed meeting with draft minutes,
+agenda items, recorded decisions and linked tasks. A missing meeting time is
+shown in the review and stored as 12:00 local time when the field is left empty.

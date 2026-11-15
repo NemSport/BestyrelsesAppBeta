@@ -3044,3 +3044,19 @@ membership. It inserts work for the structured contract deadlines and promotes
 the same contract in one transaction. Retried activation of an active contract
 is a no-op. Generated tasks use the existing Bestie scheduler and do not depend
 on another AI extraction.
+
+## Historical meeting import
+
+The committee-scoped meeting import route requires existing meeting manager
+permissions. The server extracts bounded DOCX text and sends it with PDFs or
+JPG/PNG images to the configured OpenAI model with response storage disabled.
+The proposal is untrusted, is displayed with source references and uncertainties,
+and is kept separate from meeting records until confirmation. The application
+retains hashes, model, prompt version, token counts and status in the AI activity
+log. It does not attach the source files to the imported meeting.
+
+An RLS-bound transaction locks the confirming user's audit record, validates the
+committee, and saves a completed meeting, draft minutes and agenda notes plus
+linked decisions and tasks. A per-committee source-set hash protects against
+repeat imports. Missing owners are left unassigned unless an eligible member
+is selected. The import never marks minutes approved or sends invitations.
