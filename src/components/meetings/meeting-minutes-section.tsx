@@ -1080,7 +1080,7 @@ function AgendaMinutesCard({
     <article
       aria-labelledby={`agenda-point-${occurrence.id}-heading`}
       className={clsx(
-        "scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line/80 bg-surface xl:rounded-none xl:border-0",
+        "org-topbar-scroll-target overflow-hidden rounded-[var(--radius-panel)] border border-line/80 bg-surface xl:rounded-none xl:border-0",
         isStandardItem && "bg-subtle/20",
         isTransferredItem && "border-l-[3px] border-l-progress/50",
         isAnyOtherBusiness && "border-dashed",
@@ -2123,7 +2123,7 @@ function AgendaMinutesCard({
 
         <aside
           aria-label="Kontekst for aktivt dagsordenspunkt"
-          className="workspace-scrollbar border-t border-line/70 bg-subtle/15 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:border-l xl:border-t-0"
+          className="workspace-scrollbar border-t border-line/70 bg-subtle/15 xl:sticky org-topbar-sticky-offset org-topbar-sticky-height xl:overflow-y-auto xl:border-l xl:border-t-0"
         >
           <section
             className="border-b border-line/70 p-2.5"
@@ -2649,7 +2649,7 @@ function LegacyMeetingMinutesSection({
         referentLock={referentLock}
       />
       <section
-        className="order-2 scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
+        className="order-2 org-topbar-scroll-target overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm"
         aria-labelledby="general-minutes-heading"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
@@ -2670,7 +2670,7 @@ function LegacyMeetingMinutesSection({
             </span>
             <span>
               <span
-                className="block scroll-mt-24 font-semibold text-ink"
+                className="block org-topbar-scroll-target font-semibold text-ink"
                 id="general-minutes-heading"
                 tabIndex={-1}
               >
@@ -2927,7 +2927,7 @@ function LegacyMeetingMinutesSection({
           <div>
             <p className="page-eyebrow">Dagsorden</p>
             <h3
-              className="section-title mt-1 scroll-mt-24"
+              className="section-title mt-1 org-topbar-scroll-target"
               id="agenda-minutes-heading"
               tabIndex={-1}
             >
@@ -3584,7 +3584,7 @@ export function MeetingMinutesSection({
           >
             <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 xl:absolute xl:bottom-5 xl:left-0 xl:z-10 xl:mb-0 xl:w-[18%] xl:border-t xl:border-line/70 xl:bg-surface xl:p-2">
               <h2
-                className="scroll-mt-24 text-sm font-semibold text-ink xl:hidden"
+                className="org-topbar-scroll-target text-sm font-semibold text-ink xl:hidden"
                 id="agenda-minutes-heading"
                 tabIndex={-1}
               >
@@ -3636,7 +3636,7 @@ export function MeetingMinutesSection({
                 <div className="grid min-w-0 gap-2 xl:grid-cols-[minmax(12rem,18fr)_minmax(0,82fr)] xl:items-start xl:gap-0 xl:overflow-hidden xl:rounded-[var(--radius-panel)] xl:border xl:border-line/70 xl:bg-surface">
                   <nav
                     aria-label="Dagsordenspunkter"
-                    className="workspace-scrollbar sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain bg-surface pb-14 xl:block xl:border-r xl:border-line/70"
+                    className="workspace-scrollbar sticky org-topbar-sticky-offset org-topbar-sticky-height hidden overflow-y-auto overscroll-contain bg-surface pb-14 xl:block xl:border-r xl:border-line/70"
                   >
                     <div className="flex items-center justify-between border-b border-line/70 px-2.5 py-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -3908,7 +3908,7 @@ export function MeetingMinutesSection({
           <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(12rem,20fr)_minmax(0,61fr)_minmax(14rem,19fr)] xl:items-start">
             <nav
               aria-label="Dagsordenspunkter i referatet"
-              className="workspace-scrollbar sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto rounded-[var(--radius-panel)] border border-line bg-surface xl:block"
+              className="workspace-scrollbar sticky org-topbar-sticky-offset org-topbar-sticky-height hidden overflow-y-auto rounded-[var(--radius-panel)] border border-line bg-surface xl:block"
             >
               <div className="flex items-center justify-between border-b border-line/70 px-2.5 py-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -4029,7 +4029,7 @@ export function MeetingMinutesSection({
 
                     return (
                       <section
-                        className="scroll-mt-24 py-5 first:pt-4 last:pb-1"
+                        className="org-topbar-scroll-target py-5 first:pt-4 last:pb-1"
                         id={`agenda-point-${occurrence.id}`}
                         key={occurrence.id}
                       >
@@ -4163,7 +4163,7 @@ export function MeetingMinutesSection({
               )}
             </article>
 
-            <aside className="xl:sticky xl:top-20">
+            <aside className="xl:sticky org-topbar-sticky-offset">
               <MinutesApprovalPanel
                 attachmentCount={
                   meetingAttachments.length +

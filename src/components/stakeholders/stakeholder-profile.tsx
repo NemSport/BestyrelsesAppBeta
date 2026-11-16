@@ -846,7 +846,7 @@ export function StakeholderProfile({
             )}
           </section>
         </div>
-        <aside className="space-y-4 xl:sticky xl:top-20">
+        <aside className="space-y-4 xl:sticky org-topbar-sticky-offset">
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="section-title">Kontaktpersoner</h2>

@@ -873,7 +873,7 @@ export function MinutesApprovalPanel({
   if (compact) {
     return (
       <section
-        className={`rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-sm ${className ?? ""}`}
+        className={`org-topbar-scroll-target rounded-[var(--radius-panel)] border border-line bg-surface p-3 shadow-sm ${className ?? ""}`}
         id="minutes-approval"
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1060,7 +1060,7 @@ export function MinutesApprovalPanel({
   return (
     <section
       id="minutes-approval"
-      className={`overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm ${className ?? ""}`}
+      className={`org-topbar-scroll-target overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-sm ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div className="min-w-0">

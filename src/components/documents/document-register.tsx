@@ -569,7 +569,7 @@ export function DocumentRegister({
           </section>
         </div>
 
-        <aside className="grid w-full gap-3 xl:sticky xl:top-20">
+        <aside className="grid w-full gap-3 xl:sticky org-topbar-sticky-offset">
           <section className="w-full rounded-[var(--radius-panel)] border border-line bg-surface p-3.5">
             <h2 className="text-sm font-semibold text-ink">
               Hurtige handlinger

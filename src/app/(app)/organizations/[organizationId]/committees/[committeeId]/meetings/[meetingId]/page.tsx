@@ -592,7 +592,7 @@ export default async function MeetingPage({
 
       {invitations.length ? (
         <details
-          className="panel my-3 scroll-mt-20 px-4 py-3"
+          className="panel my-3 org-topbar-scroll-target px-4 py-3"
           id={meetingInvitationResponsesAnchor}
           open={view === meetingInvitationResponsesView ? true : undefined}
         >

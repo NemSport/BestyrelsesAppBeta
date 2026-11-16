@@ -2980,6 +2980,16 @@ Set `RESEND_BESTIE_REPLY_DOMAIN`, `RESEND_BESTIE_WEBHOOK_SECRET`, and
 `/api/webhooks/resend/bestie` to Resend's `email.received` event. The receiving
 key is separate from the outbound email key.
 
+## Responsive organization topbar
+
+`OrganizationWorkspace` renders the organization navigation in server-rendered
+flow immediately below the authenticated header. The two sticky rows share
+CSS height variables, including the iPhone top safe area and offsets for
+agenda anchors and sticky workspace panels. `OrganizationNav` uses one passive
+scroll listener with separate compact and expand thresholds. CSS breakpoints
+move links between the inline rail and the existing disclosure menu. Route
+matching and capability filtering remain in the shared navigation model.
+
 ## Previous minutes approval
 
 The approval API and database both require meeting management permission for

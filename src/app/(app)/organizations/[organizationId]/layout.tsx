@@ -52,7 +52,6 @@ export default async function OrganizationLayout({
       canManageOrganization={isOrganizationAdmin(context.membership.role)}
       committees={committeeOptions}
       organizationId={organizationId}
-      organizationName={context.organization.name}
     >
       {children}
     </OrganizationWorkspace>

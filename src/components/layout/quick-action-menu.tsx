@@ -397,83 +397,78 @@ export function QuickActionMenu({
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <Dropdown
+        className="app-header-dropdown app-header-overflow-dropdown"
+        hideChevron
+        label={
+          <>
+            <AppIcon name="taskAdd" size={17} />
+            <span className="app-header-action-label">Opret</span>
+            <span className="sr-only lg:hidden">Opret</span>
+          </>
+        }
+        onOpenChange={setMenuOpen}
+        open={menuOpen}
+        panelId="quick-action-options"
+      >
         {canCreateMeeting ? (
           <button
             aria-label="Nyt møde"
-            className="app-header-action"
+            className="quick-action-item"
             onClick={openMeetingModal}
             type="button"
           >
-            <AppIcon name="meetingAdd" size={16} />
-            <span className="app-header-action-label">Nyt møde</span>
+            <span className="font-semibold text-ink">Nyt møde</span>
           </button>
         ) : null}
         {canCreateTask ? (
           <Link
-            aria-label="Ny opgave"
-            className="app-header-action"
+            className="quick-action-item font-semibold text-ink"
             href={`/organizations/${organizationId}/tasks?create=1`}
+            onClick={() => setMenuOpen(false)}
           >
-            <AppIcon name="taskAdd" size={16} />
-            <span className="app-header-action-label">Ny opgave</span>
+            Ny opgave
           </Link>
         ) : null}
-        {canCreateQuickMeeting || canScheduleAgendaItem ? (
-          <Dropdown
-            className="app-header-dropdown app-header-overflow-dropdown"
-            hideChevron
-            label={
-              <>
-                <AppIcon name="more" size={17} />
-                <span className="sr-only">Flere opretmuligheder</span>
-              </>
-            }
-            onOpenChange={setMenuOpen}
-            open={menuOpen}
-            panelId="quick-action-options"
+        {canCreateQuickMeeting ? (
+          <button
+            className="quick-action-item"
+            onClick={openQuickMeetingModal}
+            type="button"
           >
-            {canCreateQuickMeeting ? (
-              <button
-                className="quick-action-item"
-                onClick={openQuickMeetingModal}
-                type="button"
-              >
-                <span className="font-semibold text-ink">Hurtigt møde</span>
-                <span className="text-xs text-muted">
-                  Ad hoc-møde uden dagsorden.
-                </span>
-              </button>
-            ) : null}
-            {canScheduleAgendaItem ? (
-              <button
-                className="quick-action-item"
-                disabled={!canCreateAgendaItem}
-                onClick={() => {
-                  if (!canCreateAgendaItem) return;
-                  setMenuOpen(false);
-                  setAgendaItemOpen(true);
-                }}
-                title={
-                  canCreateAgendaItem
-                    ? "Opret dagsordenspunkt på det åbne møde."
-                    : "Vælg eller åbn et møde først"
-                }
-                type="button"
-              >
-                <span className="font-semibold text-ink">
-                  Nyt dagsordenspunkt
-                </span>
-                <span className="text-xs text-muted">
-                  {canCreateAgendaItem
-                    ? "Opret på det aktuelle møde."
-                    : "Vælg eller åbn et møde først"}
-                </span>
-              </button>
-            ) : null}
-          </Dropdown>
+            <span className="font-semibold text-ink">Hurtigt møde</span>
+            <span className="text-xs text-muted">
+              Ad hoc-møde uden dagsorden.
+            </span>
+          </button>
         ) : null}
-      </div>
+        {canScheduleAgendaItem ? (
+          <button
+            className="quick-action-item"
+            disabled={!canCreateAgendaItem}
+            onClick={() => {
+              if (!canCreateAgendaItem) return;
+              setMenuOpen(false);
+              setAgendaItemOpen(true);
+            }}
+            title={
+              canCreateAgendaItem
+                ? "Opret dagsordenspunkt på det åbne møde."
+                : "Vælg eller åbn et møde først"
+            }
+            type="button"
+          >
+            <span className="font-semibold text-ink">
+              Nyt dagsordenspunkt
+            </span>
+            <span className="text-xs text-muted">
+              {canCreateAgendaItem
+                ? "Opret på det aktuelle møde."
+                : "Vælg eller åbn et møde først"}
+            </span>
+          </button>
+        ) : null}
+      </Dropdown>
 
       <Modal
         description="Mødet oprettes med faste standardpunkter og åbnes efter gem."

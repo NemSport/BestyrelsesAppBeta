@@ -1895,6 +1895,14 @@ use the same flow. A standalone activity supports private replies and reminders.
 Web Push is optional per device. Reply inline where the browser supports it,
 or open the conversation from the notification and type a reply there.
 
+## Responsive organization topbar
+
+The authenticated header and organization navigation stay at the top and
+contract after scrolling. Overblik, Møder and Opgaver stay visible on the
+smallest screens. Wider layouts add more direct links, and Mere contains the
+rest. Opret groups the existing actions according to the member's permissions.
+The organization page uses the available width without a sidebar.
+
 ## Previous minutes approval
 
 Committee managers can record a missing approval on behalf of a named
