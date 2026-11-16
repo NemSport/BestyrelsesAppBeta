@@ -3060,3 +3060,7 @@ committee, and saves a completed meeting, draft minutes and agenda notes plus
 linked decisions and tasks. A per-committee source-set hash protects against
 repeat imports. Missing owners are left unassigned unless an eligible member
 is selected. The import never marks minutes approved or sends invitations.
+
+Point minutes use a compact editable plain-text format with heading and bullet
+markers. Preview rendering and confirmation use the same supported markers,
+with plain text escaped before rich-text storage.
