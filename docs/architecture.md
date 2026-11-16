@@ -3074,3 +3074,7 @@ A bounded second model request checks the extracted point minutes for explicit
 follow-ups missing from the existing proposals. It preserves the first
 proposals and associates additions by agenda position. A failed check is
 surfaced for review.
+
+Meeting extraction distinguishes an unreadable deadline from an unmentioned one
+per task. Server-side preview normalization clears unreadable dates and adds
+a source-linked clarification independently of the model's general questions.
