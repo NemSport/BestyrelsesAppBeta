@@ -21,6 +21,8 @@ type BestieThreadRow = {
   messages: Json;
   pending_action: Json;
   follow_up_on: string | null;
+  follow_up_at: string | null;
+  timed_reminder_queued_at: string | null;
   last_read_at: string | null;
   dismissed_at: string | null;
   push_sent_at: string | null;
@@ -1822,7 +1824,8 @@ export type Database = {
       };
       bestie_claim_meeting_pushes: { Args: { target_meeting: string }; Returns: BestieThreadRow[] };
       bestie_claim_pushes: { Args: never; Returns: BestieThreadRow[] };
-      bestie_apply_reply: {
+      bestie_fire_timed_reminders: { Args: { dispatch_token: string }; Returns: { thread_id: string }[] };
+      bestie_apply_reply_with_time: {
         Args: {
           target_id: string;
           actor_id: string;
@@ -1836,6 +1839,7 @@ export type Database = {
           new_deadline: string | null;
           complete_task: boolean;
           reminder_date: string | null;
+          reminder_at: string | null;
           ai_metadata: Json;
         };
         Returns: BestieThreadRow;

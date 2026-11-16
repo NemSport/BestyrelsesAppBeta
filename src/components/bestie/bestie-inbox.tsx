@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BestieInboxRow } from "@/components/bestie/bestie-inbox-row";
 import { BestiePushToggle } from "@/components/bestie/bestie-push-toggle";
 import { Button, EmptyState } from "@/components/ui";
-import { bestieDate, bestiePath, type BestieThread } from "@/lib/bestie";
+import { bestieDate, bestieDateTime, bestiePath, type BestieThread } from "@/lib/bestie";
 
 export function BestieInbox({
   initialThreads,
@@ -239,8 +239,12 @@ export function BestieInbox({
               >
                 Åbn i appen
               </Link>
-              {current.followUpOn ? (
+              {current.followUpAt ? (
                 <p className="mt-1 text-sm text-muted">
+                  Opfølgning {bestieDateTime(current.followUpAt)}
+                </p>
+              ) : current.followUpOn ? (
+                <p className="text-xs text-muted">
                   Opfølgning {bestieDate(current.followUpOn)}
                 </p>
               ) : null}

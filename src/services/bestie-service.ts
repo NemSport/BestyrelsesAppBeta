@@ -7,6 +7,7 @@ import { getAiEnv } from "@/lib/ai-env";
 import {
   bestieActionSchema,
   bestieDate,
+  bestieDateTime,
   bestiePendingActionSchema,
   describeBestieAction,
   validBestieDate,
@@ -14,7 +15,7 @@ import {
   type BestiePendingAction,
   type BestieThread,
 } from "@/lib/bestie";
-import { explicitBestieFollowUpDate } from "@/lib/bestie-follow-up-date";
+import { explicitBestieFollowUpDate, explicitBestieFollowUpTime } from "@/lib/bestie-follow-up-date";
 import { formatDanishDateKey } from "@/lib/date-format";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { getTaskDetailPath } from "@/lib/task-register-state";
@@ -57,6 +58,7 @@ export function bestieThread(row: TableRow<"bestie_threads">): BestieThread {
       Date.parse(row.last_read_at) < Date.parse(row.updated_at),
     messages: chatMessages.parse(row.messages),
     followUpOn: row.follow_up_on,
+    followUpAt: row.follow_up_at,
     version: row.updated_at,
     pending: pending.success ? pending.data : null,
   };
@@ -135,11 +137,13 @@ export class BestieService {
       (!row.task_id || Boolean(open)) &&
       (!row.event_id ||
         Boolean(event && !["completed", "cancelled"].includes(event.status)));
-    const today = formatDanishDateKey(new Date());
+    const now = new Date();
+    const today = formatDanishDateKey(now);
+    const timed = canRemind ? explicitBestieFollowUpTime(input.message, now) : null;
     const tomorrow = new Date(`${today}T00:00:00Z`);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const nextDay = tomorrow.toISOString().slice(0, 10);
-    let action: BestieAction | null = null;
+    let action: (BestieAction & { reminderAt?: string | null }) | null = null;
     let pending: BestiePendingAction | null = null;
     let statusNote: string | null = null;
     let aiMetadata = null;
@@ -205,27 +209,45 @@ export class BestieService {
       if (
         (writesTask && !canEdit) ||
         (proposed.deadline && !deadline) ||
-        (proposed.reminder && (!canRemind || !reminder))
+        (proposed.reminder && (!canRemind || !reminder)) ||
+        (proposed.reminderAt && (!canRemind || Date.parse(proposed.reminderAt) <= now.getTime()))
       ) {
         throw new AppError(
           "Forslaget kan ikke længere gennemføres. Afvis det, og bed Bestie om et nyt.",
           409,
         );
       }
-      action = { deadline, reminder, complete: proposed.complete };
+      action = { deadline, reminder, reminderAt: proposed.reminderAt, complete: proposed.complete };
       statusNote = proposed.statusNote ?? null;
       const done = [];
       if (statusNote) done.push("gemt din status på opgaven");
       if (action.complete) done.push("markeret opgaven som færdig");
       if (action.deadline)
         done.push(`flyttet fristen til ${bestieDate(action.deadline)}`);
-      if (action.reminder)
+      if (action.reminderAt)
+        done.push(`sat en opfølgning til ${bestieDateTime(action.reminderAt)}`);
+      else if (action.reminder)
         done.push(`sat en opfølgning til ${bestieDate(action.reminder)}`);
       answer = done.length
         ? `Jeg har ${done.join(" og ")}.`
         : "Forslaget kan ikke længere gennemføres. Skriv gerne, hvad du vil gøre nu.";
     } else if (thread.pending && reject.test(input.message)) {
       answer = "Jeg har afvist forslaget. Hvad vil du gerne gøre herfra?";
+    } else if (timed?.needsClarification) {
+      answer = "Hvilken dato og hvilket klokkeslæt skal jeg minde dig om? Vælg et tidspunkt, der ligger fremme i tiden.";
+    } else if (timed?.at) {
+      const statusNote = canEdit
+        ? timed.precedingText ?? (thread.pending?.taskVersion === task?.updated_at ? thread.pending?.statusNote : null)
+        : null;
+      pending = {
+        complete: false,
+        deadline: null,
+        reminder: null,
+        reminderAt: timed.at,
+        taskVersion: task?.updated_at ?? null,
+        statusNote,
+      };
+      answer = `Skal jeg ${describeBestieAction(pending)}?`;
     } else if (row.dedup_key.startsWith("status-request:") && canEdit && task) {
       // An explicit status request always proposes the reply as a task note.
       pending = {
@@ -356,6 +378,7 @@ export class BestieService {
           new_deadline: action?.deadline ?? null,
           complete_task: action?.complete ?? false,
           reminder_date: action?.reminder ?? null,
+          reminder_at: action?.reminderAt ?? null,
           ai_metadata: aiMetadata,
         }),
       );

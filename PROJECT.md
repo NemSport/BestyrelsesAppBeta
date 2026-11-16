@@ -1,5 +1,9 @@
 # AI Committee Assistant
 
+## Bestie clock-time reminders
+
+Bestie can propose a personal follow-up with a local date and clock time from a chat reply, including replies to status requests. Approval shows and saves the exact Copenhagen time. The timed follow-up opens the same conversation.
+
 ## Shared action design
 
 Actions across the app use the same quiet, borderless visual language:

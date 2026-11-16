@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatDanishDate, formatDanishTime } from "./date-format";
 
 export const bestieReplySchema = z.object({
   replyId: z.string().uuid(),
@@ -14,6 +15,7 @@ export const bestieActionSchema = z.object({
 
 export const bestiePendingActionSchema = bestieActionSchema.extend({
   taskVersion: z.string().nullable(),
+  reminderAt: z.string().datetime({ offset: true }).nullable().optional(),
   statusNote: z.string().trim().min(1).max(1500).nullable().optional(),
 });
 export type BestieAction = z.infer<typeof bestieActionSchema>;
@@ -32,6 +34,7 @@ export type BestieThread = {
   unread: boolean;
   messages: BestieMessage[];
   followUpOn: string | null;
+  followUpAt?: string | null;
   version: string;
   pending: BestiePendingAction | null;
 };
@@ -58,13 +61,19 @@ export function validBestieDate(value: string | null, earliest: string) {
     : null;
 }
 
+export function bestieDateTime(value: string) {
+  return `${formatDanishDate(value, "long")} kl. ${formatDanishTime(value)}`;
+}
+
 export function describeBestieAction(action: BestiePendingAction) {
   const changes = [];
   if (action.statusNote) changes.push(`gemme status “${action.statusNote}” på opgaven`);
   if (action.complete) changes.push("markere opgaven som færdig");
   if (action.deadline)
     changes.push(`flytte fristen til ${bestieDate(action.deadline)}`);
-  if (action.reminder)
+  if (action.reminderAt)
+    changes.push(`minde dig om at følge op ${bestieDateTime(action.reminderAt)}`);
+  else if (action.reminder)
     changes.push(`minde dig om at følge op ${bestieDate(action.reminder)}`);
   return changes.join(" og ");
 }

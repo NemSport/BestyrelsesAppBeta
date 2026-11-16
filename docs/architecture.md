@@ -1,5 +1,9 @@
 # System Architecture
 
+## Bestie clock-time reminders
+
+Clock-time follow-ups extend the Bestie reply transaction with an absolute timestamp. PostgreSQL checks for due reminders each minute and calls only the timed-reminder endpoint when work is due. A capability generated inside Supabase Vault authorizes the callback. The enqueue transaction and existing per-thread push claims handle retries. Date-only follow-ups continue to use the daily job.
+
 ## Shared action presentation
 
 `ui-action` and its primary/danger/menu modifiers in `globals.css` are the

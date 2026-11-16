@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, TableRow } from "@/types/database";
 
-type ApplyReply = Database["public"]["Functions"]["bestie_apply_reply"]["Args"];
+type ApplyReply = Database["public"]["Functions"]["bestie_apply_reply_with_time"]["Args"];
 
 export class BestieRepository {
   constructor(private readonly db: SupabaseClient<Database>) {}
@@ -56,7 +56,7 @@ export class BestieRepository {
   }
 
   async applyReply(input: ApplyReply) {
-    const { data, error } = await this.db.rpc("bestie_apply_reply", input);
+    const { data, error } = await this.db.rpc("bestie_apply_reply_with_time", input);
     if (error) throw error;
     return data;
   }

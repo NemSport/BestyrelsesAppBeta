@@ -109,6 +109,18 @@ before(async () => {
   await db.exec(await readFile(new URL(
     "../../supabase/migrations/202611140009_bestie_dismiss_messages.sql", import.meta.url,
   ), "utf8"));
+  await db.exec(`
+    create schema vault;
+    create table vault.decrypted_secrets(name text, decrypted_secret text);
+    insert into vault.decrypted_secrets values ('bestie_timed_reminder_dispatch', 'qa-token');
+  `);
+  const timedMigration = await readFile(new URL(
+    "../../supabase/migrations/202611160004_bestie_timed_reminders.sql", import.meta.url,
+  ), "utf8");
+  await db.exec(timedMigration
+    .replace(/create extension if not exists pg_cron;[\s\S]+?(?=create function public.bestie_fire_timed_reminders)/u, "")
+    .replace(/select cron\.schedule\([\s\S]+?\$job\$\);/u, ""));
+
 });
 
 after(async () => db.close());
@@ -519,4 +531,28 @@ test("dismissing a conversation keeps the history and a new message makes it vis
   );
   assert.equal(visible.dismissed_at, null);
   assert.equal(visible.messages.at(-1).body, "Opfølgning");
+});
+
+test("a confirmed clock-time reminder waits until due and queues the same conversation once", async () => {
+  await generate();
+  const thread = await taskThread();
+  const target = new Date(Date.now() + 300_000);
+  const result = await db.query(
+    `select (public.bestie_apply_reply_with_time($1,$2,$3,null,$4,
+      'Godkend', 'Påmindelsen er sat.', null, null, null, false, null, $5, null)).*`,
+    [thread.id, person, thread.updated_at, id(128), target],
+  );
+  assert.equal(new Date(result.rows[0].follow_up_at).toISOString(), target.toISOString());
+  assert.equal(result.rows[0].follow_up_on, null);
+
+  await assert.rejects(db.query("select * from bestie_fire_timed_reminders('invalid')"), { code: "42501" });
+  assert.deepEqual((await db.query("select * from bestie_fire_timed_reminders('qa-token')")).rows, []);
+  await db.query("update bestie_threads set follow_up_at = now() - interval '1 second' where id = $1", [thread.id]);
+  await db.query("select * from bestie_fire_timed_reminders('qa-token')");
+  await db.query("select * from bestie_fire_timed_reminders('qa-token')");
+  const due = await taskThread();
+  assert.equal(due.follow_up_at, null);
+  assert.ok(due.timed_reminder_queued_at);
+  assert.equal(due.messages.filter((message) => message.body.startsWith("Hej igen!")).length, 1);
+  assert.equal(due.push_sent_at, null);
 });
