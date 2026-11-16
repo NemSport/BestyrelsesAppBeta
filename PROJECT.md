@@ -1914,7 +1914,10 @@ page. Invitation replies are independent of attendance recorded at the meeting.
 Overblik brings together a member's pending actions and personal messages.
 Bestie conversations and new meeting-related email and push notifications link
 to their source. Owners and organization administrators also have an
-Adminoverblik for overdue tasks, pending responses and recent updates.
+Adminoverblik for overdue tasks, pending responses and recent updates. Compact
+rows show the status next to an arrow and put timestamps below the details on
+mobile. Recent activity spans the desktop grid. A pending invitation opens the
+matching meeting with its response list expanded.
 
 Overblik also includes a month calendar for the member’s active committees.
 It shows meetings, dated task deadlines, and Annual Wheel activities.
