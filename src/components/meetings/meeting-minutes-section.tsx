@@ -69,6 +69,7 @@ import {
 import {
   getAgendaItemHref,
   getMeetingAgendaPointHref,
+  meetingInvitationResponsesAnchor,
 } from "@/lib/meeting-navigation";
 import type { AgendaItemHistoryMetadata } from "@/lib/agenda-item-history";
 import { firstRichTextToPlainText, richTextToPlainText } from "@/lib/rich-text";
@@ -3235,6 +3236,18 @@ export function MeetingMinutesSection({
       document.getElementById("minutes-approval")?.scrollIntoView();
     }
   }, [hasPendingApproval, workspaceMode]);
+
+  useEffect(() => {
+    if (window.location.hash !== `#${meetingInvitationResponsesAnchor}`) return;
+
+    // The meeting may stream in after navigation has already resolved the fragment.
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(meetingInvitationResponsesAnchor)
+        ?.scrollIntoView({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const activeIndex = Math.max(
     0,
