@@ -36,7 +36,8 @@ const proposal = {
   items: [
     {
       title: "Fælles aktivitet",
-      notes: "Forslaget blev drøftet.",
+      notes:
+        "## Udvalg\n- Forslaget blev drøftet.\n- Brug <materiale>.\n\n## Projekter\nNæste skridt afklares.",
       decisions: [
         { title: "Gennemfør aktiviteten", details: "", completed: false },
       ],
@@ -120,6 +121,12 @@ test("confirmed import links all records, keeps minutes as draft and prevents du
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        "supabase/migrations/202611160001_format_imported_point_minutes.sql",
+        "utf8",
+      ),
+    );
     const save = (input = proposal, targetCommittee = committee) =>
       db.query<{ id: string }>(
         "select save_historical_meeting_import($1,$2,$3,$4) as id",
@@ -166,7 +173,8 @@ test("confirmed import links all records, keeps minutes as draft and prevents du
         status: "completed",
         minutes_status: "draft",
         minutes_text: "<p>Kort referat &lt;uden HTML&gt;<br>Næste afsnit</p>",
-        notes: "<p>Forslaget blev drøftet.</p>",
+        notes:
+          "<h2>Udvalg</h2><ul><li>Forslaget blev drøftet.</li><li>Brug &lt;materiale&gt;.</li></ul><h2>Projekter</h2><p>Næste skridt afklares.</p>",
         lifecycle_status: "resolved",
         decision: "Gennemfør aktiviteten",
         task: "Find en dato",

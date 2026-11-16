@@ -1958,3 +1958,6 @@ review unclear handwriting with source references and assign follow-ups to commi
 members. Explicit confirmation creates a completed meeting with draft minutes,
 agenda items, recorded decisions and linked tasks. A missing meeting time is
 shown in the review and stored as 12:00 local time when the field is left empty.
+
+Imported point minutes use short bullet lists. Topics such as committee updates
+have a subheading for each committee, both in preview and in the saved minutes.

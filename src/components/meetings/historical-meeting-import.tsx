@@ -344,17 +344,32 @@ export function HistoricalMeetingImport({
                       }
                     />
                   </label>
-                  <label className="block text-sm">
-                    <span className="label">Referatnoter</span>
-                    <Textarea
-                      value={point.notes}
-                      rows={3}
-                      maxLength={6000}
-                      onChange={(event) =>
-                        changePoint(index, { notes: event.target.value })
-                      }
-                    />
-                  </label>
+                  <section
+                    aria-label="Punktreferat"
+                    className="space-y-2 text-sm"
+                  >
+                    <h3 className="font-medium">Punktreferat</h3>
+                    <PointNotes notes={point.notes} />
+                    <details>
+                      <summary className="cursor-pointer text-brand">
+                        Redigér punktreferat
+                      </summary>
+                      <Textarea
+                        aria-label="Punktreferat"
+                        className="mt-2"
+                        value={point.notes}
+                        rows={7}
+                        maxLength={6000}
+                        onChange={(event) =>
+                          changePoint(index, { notes: event.target.value })
+                        }
+                      />
+                      <p className="text-xs text-muted">
+                        Start en linje med ## for en underoverskrift eller - for
+                        et punkt.
+                      </p>
+                    </details>
+                  </section>
                   {point.decisions.map((entry, position) => (
                     <Entry
                       key={position}
@@ -463,6 +478,56 @@ export function HistoricalMeetingImport({
           </div>
         </form>
       ) : null}
+    </div>
+  );
+}
+
+function PointNotes({ notes }: { notes: string }) {
+  const blocks: { type: "heading" | "list" | "paragraph"; lines: string[] }[] =
+    [];
+  let separate = false;
+  for (const line of notes.split(/\r?\n/)) {
+    const heading = /^##[ \t]+(\S.*)$/.exec(line);
+    const bullet = /^-[ \t]+(\S.*)$/.exec(line);
+    if (!line.trim()) {
+      separate = true;
+      continue;
+    }
+    const type = heading ? "heading" : bullet ? "list" : "paragraph";
+    const value = heading?.[1] ?? bullet?.[1] ?? line;
+    const previous = blocks.at(-1);
+    if (!separate && type !== "heading" && previous?.type === type) {
+      previous.lines.push(value);
+    } else {
+      blocks.push({ type, lines: [value] });
+    }
+    separate = false;
+  }
+  if (!blocks.length)
+    return <p className="text-muted">Ingen noter til punktet.</p>;
+  return (
+    <div className="space-y-2">
+      {blocks.map(({ type, lines }, index) => {
+        if (type === "heading")
+          return (
+            <h4 key={index} className="font-semibold">
+              {lines[0]}
+            </h4>
+          );
+        if (type === "list")
+          return (
+            <ul key={index} className="list-disc space-y-1 pl-5">
+              {lines.map((line, position) => (
+                <li key={position}>{line}</li>
+              ))}
+            </ul>
+          );
+        return (
+          <p key={index} className="whitespace-pre-line">
+            {lines.join("\n")}
+          </p>
+        );
+      })}
     </div>
   );
 }
