@@ -1966,3 +1966,6 @@ Bestie also proposes separate tasks for firmly assigned follow-ups described
 within point minutes. When the source explicitly pairs initials with a name
 that uniquely matches an active committee member, the review suggests that
 person as assignee.
+
+A mentioned but unreadable task deadline appears as a source-linked
+clarification. The proposed task remains editable and its date stays blank.

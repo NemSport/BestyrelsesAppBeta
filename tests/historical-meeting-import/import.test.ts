@@ -6,6 +6,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { extractMeetingDocx } from "../../src/lib/meeting-import-docx";
 import {
   addCheckedMeetingFollowUps,
+  clarifyMeetingImportDeadlines,
   extractedMeetingFollowUps,
   extractedMeetingImport,
   meetingImportApproval,
@@ -122,6 +123,7 @@ test("a dedicated follow-up check fills omitted tasks on the same agenda point",
     details: "Kontakt leverandøren",
     namedOwner: "AE",
     deadline: null,
+    deadlineStatus: "not_mentioned",
     completed: false,
   };
   const preview = extractedMeetingImport.parse({
@@ -146,6 +148,60 @@ test("a dedicated follow-up check fills omitted tasks on the same agenda point",
   assert.deepEqual(merged.items[0].tasks, [task]);
   assert.equal(merged.questions.length, 0);
   assert.equal(addCheckedMeetingFollowUps(preview, null).questions.length, 1);
+});
+
+test("an unreadable deadline becomes a source-linked clarification and clears the input date", () => {
+  const source = { file: 1, page: null };
+  const preview = extractedMeetingImport.parse({
+    ...proposal,
+    questions: [],
+    participantAliases: [{ initials: "BE", name: "Bo Eksempel", source }],
+    items: [
+      {
+        title: "Materialer",
+        source,
+        notes: "",
+        decisions: [],
+        tasks: [
+          {
+            title: "Indhent tilbud",
+            details: "",
+            namedOwner: "BE",
+            completed: false,
+            deadline: "2026-01-02",
+            deadlineStatus: "unreadable",
+          },
+          {
+            title: "Find levering",
+            details: "",
+            namedOwner: "",
+            completed: false,
+            deadline: null,
+            deadlineStatus: "not_mentioned",
+          },
+          {
+            title: "Book lokale",
+            details: "",
+            namedOwner: "",
+            completed: false,
+            deadline: "2026-01-03",
+            deadlineStatus: "readable",
+          },
+        ],
+      },
+    ],
+  });
+  const clarified = clarifyMeetingImportDeadlines(preview);
+  assert.deepEqual(
+    clarified.items[0].tasks.map(({ deadline }) => deadline),
+    [null, null, "2026-01-03"],
+  );
+  assert.deepEqual(clarified.questions, [
+    {
+      text: "Fristen for “Indhent tilbud” (Bo Eksempel) kan ikke læses i kilden.",
+      source,
+    },
+  ]);
 });
 
 test("confirmed import links all records, keeps minutes as draft and prevents duplicate saves", async () => {

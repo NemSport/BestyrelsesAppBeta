@@ -14,8 +14,9 @@ const action = z.object({
   completed: z.boolean(),
 });
 const task = action.extend({
-  deadline: z.string().nullable(),
   namedOwner: text(160),
+  deadlineStatus: z.enum(["not_mentioned", "readable", "unreadable"]),
+  deadline: z.string().nullable(),
 });
 const item = z.object({
   title: text(200),
@@ -89,6 +90,35 @@ export function addCheckedMeetingFollowUps(
         source: item.source,
       });
   }
+  return { ...meeting, items, questions };
+}
+
+export function clarifyMeetingImportDeadlines(
+  meeting: MeetingImportPreview,
+): MeetingImportPreview {
+  const questions = [...meeting.questions];
+  const items = meeting.items.map((item) => ({
+    ...item,
+    tasks: item.tasks.map((task) => {
+      if (task.deadlineStatus !== "unreadable") return task;
+      const owner = normalizeParticipantName(task.namedOwner);
+      const names = new Set(
+        meeting.participantAliases
+          .filter(
+            ({ initials }) =>
+              owner && normalizeParticipantName(initials) === owner,
+          )
+          .map(({ name }) => name),
+      );
+      const name =
+        names.size === 1 ? names.values().next().value : task.namedOwner;
+      questions.push({
+        text: `Fristen for “${task.title}”${name ? ` (${name})` : ""} kan ikke læses i kilden.`,
+        source: item.source,
+      });
+      return { ...task, deadline: null };
+    }),
+  }));
   return { ...meeting, items, questions };
 }
 
