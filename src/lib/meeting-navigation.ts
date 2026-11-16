@@ -1,3 +1,10 @@
+export const meetingInvitationResponsesView = "invitation-responses";
+export const meetingInvitationResponsesAnchor = "meeting-invitation-responses";
+
+export function getMeetingInvitationResponsesHref(path: string) {
+  return `${path}?view=${meetingInvitationResponsesView}#${meetingInvitationResponsesAnchor}`;
+}
+
 export function withMeetingReturnTo(href: string, returnTo: string) {
   const [path, hash] = href.split("#", 2);
   const separator = path.includes("?") ? "&" : "?";

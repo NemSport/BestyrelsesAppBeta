@@ -29,7 +29,12 @@ import {
   resolveSelectedMeetingMaterialRecipients,
 } from "@/lib/meeting-material-dispatch";
 import { getMeetingCapabilities } from "@/lib/permissions";
-import { getMeetingReturnLink, withMeetingReturnTo } from "@/lib/meeting-navigation";
+import {
+  getMeetingReturnLink,
+  meetingInvitationResponsesAnchor,
+  meetingInvitationResponsesView,
+  withMeetingReturnTo,
+} from "@/lib/meeting-navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OrganizationMemberRepository } from "@/repositories/organization-member-repository";
 import { AuthService } from "@/services/auth-service";
@@ -586,7 +591,11 @@ export default async function MeetingPage({
       />
 
       {invitations.length ? (
-        <details className="panel my-3 px-4 py-3">
+        <details
+          className="panel my-3 scroll-mt-20 px-4 py-3"
+          id={meetingInvitationResponsesAnchor}
+          open={view === meetingInvitationResponsesView ? true : undefined}
+        >
           <summary className="cursor-pointer font-semibold">
             Svar på mødeindkaldelsen
             <span className="ml-2 text-sm font-normal text-muted">

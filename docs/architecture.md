@@ -2993,7 +2993,11 @@ The Adminoverblik route and `read_admin_overview` RPC require an active
 organization owner or administrator. It shows overdue tasks, outstanding
 responses and approvals, and 30 days of recent activity. The RPC never exposes
 private Bestie message text. A reply to an explicit status request is visible
-as a response indicator while its proposal awaits approval.
+as a response indicator while its proposal awaits approval. In the waiting
+section the RPC's plain meeting path represents a pending invitation. The UI
+adds the invitation-responses view and fragment to that path. The meeting page
+renders the targeted disclosure open on the server and the fragment scrolls to
+it.
 
 The compact month calendar on Overblik uses active committee memberships and
 the signed-in client’s RLS. Month links request only the selected month.
