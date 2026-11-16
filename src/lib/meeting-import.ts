@@ -39,6 +39,64 @@ export const extractedMeetingImport = z.object({
 
 export type MeetingImportPreview = z.infer<typeof extractedMeetingImport>;
 
+export const extractedMeetingFollowUps = z.object({
+  groups: z
+    .array(
+      z.object({
+        agendaTitle: text(200),
+        source,
+        tasks: z.array(task).max(8),
+      }),
+    )
+    .max(20),
+});
+
+function agendaImportKey(title: string) {
+  return normalizeParticipantName(
+    title
+      .replace(/^\s*\d+[.)]\s*/, "")
+      .replace(/\s*\((?:[ODB]\s*[/,]?\s*)+\)\s*$/i, ""),
+  );
+}
+
+export function addCheckedMeetingFollowUps(
+  meeting: MeetingImportPreview,
+  checked: z.infer<typeof extractedMeetingFollowUps> | null,
+): MeetingImportPreview {
+  if (!checked)
+    return {
+      ...meeting,
+      questions: [
+        ...meeting.questions,
+        {
+          text: "Bestie kunne ikke kontrollere opfølgningerne særskilt. Gennemgå de aftalte handlinger i kilden.",
+          source: { file: 1, page: null },
+        },
+      ],
+    };
+
+  const items = meeting.items.map((item) => ({ ...item }));
+  const questions = [...meeting.questions];
+  const seen = new Set<number>();
+  for (const group of checked.groups) {
+    const key = agendaImportKey(group.agendaTitle);
+    const matches = items.flatMap((item, index) =>
+      key && key === agendaImportKey(item.title) ? [index] : [],
+    );
+    if (!group.tasks.length) continue;
+    if (matches.length !== 1 || seen.has(matches[0])) {
+      questions.push({
+        text: `Bestie fandt opfølgninger under ${group.agendaTitle}, men kunne ikke knytte dem sikkert til ét dagsordenspunkt: ${group.tasks.map(({ title }) => title).join("; ")}`,
+        source: group.source,
+      });
+      continue;
+    }
+    seen.add(matches[0]);
+    items[matches[0]].tasks = group.tasks;
+  }
+  return { ...meeting, items, questions };
+}
+
 function normalizeParticipantName(value: string) {
   return value
     .normalize("NFC")

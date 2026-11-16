@@ -5,6 +5,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { zodTextFormat } from "openai/helpers/zod";
 import { extractMeetingDocx } from "../../src/lib/meeting-import-docx";
 import {
+  addCheckedMeetingFollowUps,
+  extractedMeetingFollowUps,
   extractedMeetingImport,
   meetingImportApproval,
   suggestMeetingImportAssignee,
@@ -110,6 +112,51 @@ test("source initialisms suggest a unique committee member without guessing", ()
     ),
     "",
   );
+});
+
+test("a dedicated follow-up check fills omitted tasks on the same agenda point", () => {
+  const source = { file: 1, page: 2 };
+  const notes = "## Projekter\n- AE undersøger lejeprisen.";
+  const task = {
+    title: "Undersøg lejeprisen",
+    details: "Kontakt leverandøren",
+    namedOwner: "AE",
+    deadline: null,
+    completed: false,
+  };
+  const preview = extractedMeetingImport.parse({
+    ...proposal,
+    participantAliases: [],
+    questions: [],
+    items: [
+      {
+        title: "Siden sidst - Nyt fra udvalgene",
+        source,
+        notes,
+        tasks: [],
+        decisions: [],
+      },
+    ],
+  });
+  const check = extractedMeetingFollowUps.parse({
+    groups: [
+      {
+        agendaTitle: "3) Siden sidst – Nyt fra udvalgene (O / D)",
+        source,
+        tasks: [task],
+      },
+      {
+        agendaTitle: "Ukendt punkt",
+        source,
+        tasks: [{ ...task, title: "Undersøg andet" }],
+      },
+    ],
+  });
+  const merged = addCheckedMeetingFollowUps(preview, check);
+  assert.equal(merged.items[0].notes, notes);
+  assert.deepEqual(merged.items[0].tasks, [task]);
+  assert.match(merged.questions[0].text, /Undersøg andet/);
+  assert.equal(addCheckedMeetingFollowUps(preview, null).questions.length, 1);
 });
 
 test("confirmed import links all records, keeps minutes as draft and prevents duplicate saves", async () => {
