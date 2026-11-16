@@ -3070,6 +3070,7 @@ format. A deterministic match in the selected committee uses source-explicit
 initial/name pairs or a full name. The assignee is only preselected when the
 normalized full name is unique and remains editable before approval.
 
-A second model request checks explicit follow-ups in the original material in
-parallel. It updates the task proposals only for uniquely matched agenda
-titles. Unmatched proposals and a failed check are surfaced for review.
+A bounded second model request checks the extracted point minutes for explicit
+follow-ups missing from the existing proposals. It preserves the first
+proposals and associates additions by agenda position. A failed check is
+surfaced for review.

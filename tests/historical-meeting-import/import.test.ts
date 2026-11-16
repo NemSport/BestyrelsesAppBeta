@@ -139,23 +139,12 @@ test("a dedicated follow-up check fills omitted tasks on the same agenda point",
     ],
   });
   const check = extractedMeetingFollowUps.parse({
-    groups: [
-      {
-        agendaTitle: "3) Siden sidst – Nyt fra udvalgene (O / D)",
-        source,
-        tasks: [task],
-      },
-      {
-        agendaTitle: "Ukendt punkt",
-        source,
-        tasks: [{ ...task, title: "Undersøg andet" }],
-      },
-    ],
+    groups: [{ pointNumber: 1, tasks: [task] }],
   });
   const merged = addCheckedMeetingFollowUps(preview, check);
   assert.equal(merged.items[0].notes, notes);
   assert.deepEqual(merged.items[0].tasks, [task]);
-  assert.match(merged.questions[0].text, /Undersøg andet/);
+  assert.equal(merged.questions.length, 0);
   assert.equal(addCheckedMeetingFollowUps(preview, null).questions.length, 1);
 });
 
