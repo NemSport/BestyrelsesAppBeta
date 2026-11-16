@@ -72,13 +72,23 @@ export function addCheckedMeetingFollowUps(
   for (const group of checked.groups) {
     const item = items[group.pointNumber - 1];
     if (!item || !group.tasks.length) continue;
-    const known = new Set(
-      item.tasks.map(({ title }) => normalizeParticipantName(title)),
-    );
-    const additions = group.tasks.filter(({ title }) => {
-      const key = normalizeParticipantName(title);
-      if (!key || known.has(key)) return false;
-      known.add(key);
+    const known = item.tasks.map(({ title, namedOwner }) => ({
+      title: normalizeParticipantName(title),
+      owner: normalizeParticipantName(namedOwner),
+    }));
+    const additions = group.tasks.filter(({ title, namedOwner }) => {
+      const normalizedTitle = normalizeParticipantName(title);
+      const owner = normalizeParticipantName(namedOwner);
+      if (
+        !normalizedTitle ||
+        known.some(
+          (entry) =>
+            entry.title === normalizedTitle &&
+            (!entry.owner || !owner || entry.owner === owner),
+        )
+      )
+        return false;
+      known.push({ title: normalizedTitle, owner });
       return true;
     });
     const capacity = 8 - item.tasks.length;

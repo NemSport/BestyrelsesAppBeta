@@ -1965,7 +1965,9 @@ have a subheading for each committee, both in preview and in the saved minutes.
 Bestie also proposes separate tasks for firmly assigned follow-ups described
 within point minutes. When the source explicitly pairs initials with a name
 that uniquely matches an active committee member, the review suggests that
-person as assignee.
+person as assignee. A follow-up assigned to a different person gets its own
+proposal even if it depends on another task. The proposal describes the
+prerequisite and leaves the date blank unless the source gives a deadline.
 
 A mentioned but unreadable task deadline appears as a source-linked
 clarification. The proposed task remains editable and its date stays blank.
