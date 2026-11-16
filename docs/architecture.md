@@ -3071,9 +3071,12 @@ initial/name pairs or a full name. The assignee is only preselected when the
 normalized full name is unique and remains editable before approval.
 
 A bounded second model request checks the extracted point minutes for explicit
-follow-ups missing from the existing proposals. It preserves the first
-proposals and associates additions by agenda position. A failed check is
-surfaced for review.
+follow-ups missing from the existing proposals. The first pass keeps the
+actor and any prerequisite for each action in the point minutes. The check
+compares assigned actions with the existing proposals, keeps prerequisites
+in the new task details, and associates additions by agenda position. The
+merge distinguishes matching titles with different named owners. A failed
+check is surfaced for review.
 
 Meeting extraction distinguishes an unreadable deadline from an unmentioned one
 per task. Server-side preview normalization clears unreadable dates and adds

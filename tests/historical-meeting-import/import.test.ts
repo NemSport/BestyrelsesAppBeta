@@ -150,6 +150,45 @@ test("a dedicated follow-up check fills omitted tasks on the same agenda point",
   assert.equal(addCheckedMeetingFollowUps(preview, null).questions.length, 1);
 });
 
+test("a conditional follow-up stays separate from the prerequisite owner's task", () => {
+  const prerequisite = {
+    title: "Afklar finansieringen",
+    details: "Indhent et tilbud på maling.",
+    namedOwner: "AD",
+    deadline: null,
+    deadlineStatus: "not_mentioned",
+    completed: false,
+  };
+  const followUp = {
+    ...prerequisite,
+    details: "Tal med kommunen, når AD har indhentet tilbuddet på maling.",
+    namedOwner: "BK",
+  };
+  const notes =
+    "## Projekter\n- AD indhenter tilbuddet.\n- BK taler med kommunen, når tilbuddet er klar.";
+  const preview = extractedMeetingImport.parse({
+    ...proposal,
+    participantAliases: [],
+    questions: [],
+    items: [
+      {
+        title: "Projekter",
+        source: { file: 1, page: 2 },
+        notes,
+        tasks: [prerequisite],
+        decisions: [],
+      },
+    ],
+  });
+  const check = extractedMeetingFollowUps.parse({
+    groups: [{ pointNumber: 1, tasks: [prerequisite, followUp, followUp] }],
+  });
+
+  const merged = addCheckedMeetingFollowUps(preview, check);
+  assert.equal(merged.items[0].notes, notes);
+  assert.deepEqual(merged.items[0].tasks, [prerequisite, followUp]);
+});
+
 test("an unreadable deadline becomes a source-linked clarification and clears the input date", () => {
   const source = { file: 1, page: null };
   const preview = extractedMeetingImport.parse({
