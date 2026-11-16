@@ -43,21 +43,12 @@ export const extractedMeetingFollowUps = z.object({
   groups: z
     .array(
       z.object({
-        agendaTitle: text(200),
-        source,
+        pointNumber: z.number().int().min(1).max(20),
         tasks: z.array(task).max(8),
       }),
     )
     .max(20),
 });
-
-function agendaImportKey(title: string) {
-  return normalizeParticipantName(
-    title
-      .replace(/^\s*\d+[.)]\s*/, "")
-      .replace(/\s*\((?:[ODB]\s*[/,]?\s*)+\)\s*$/i, ""),
-  );
-}
 
 export function addCheckedMeetingFollowUps(
   meeting: MeetingImportPreview,
@@ -77,22 +68,26 @@ export function addCheckedMeetingFollowUps(
 
   const items = meeting.items.map((item) => ({ ...item }));
   const questions = [...meeting.questions];
-  const seen = new Set<number>();
   for (const group of checked.groups) {
-    const key = agendaImportKey(group.agendaTitle);
-    const matches = items.flatMap((item, index) =>
-      key && key === agendaImportKey(item.title) ? [index] : [],
+    const item = items[group.pointNumber - 1];
+    if (!item || !group.tasks.length) continue;
+    const known = new Set(
+      item.tasks.map(({ title }) => normalizeParticipantName(title)),
     );
-    if (!group.tasks.length) continue;
-    if (matches.length !== 1 || seen.has(matches[0])) {
+    const additions = group.tasks.filter(({ title }) => {
+      const key = normalizeParticipantName(title);
+      if (!key || known.has(key)) return false;
+      known.add(key);
+      return true;
+    });
+    const capacity = 8 - item.tasks.length;
+    item.tasks = [...item.tasks, ...additions.slice(0, capacity)];
+    const remaining = additions.slice(capacity);
+    if (remaining.length)
       questions.push({
-        text: `Bestie fandt opfølgninger under ${group.agendaTitle}, men kunne ikke knytte dem sikkert til ét dagsordenspunkt: ${group.tasks.map(({ title }) => title).join("; ")}`,
-        source: group.source,
+        text: `Flere mulige opfølgninger under ${item.title}: ${remaining.map(({ title }) => title).join("; ")}`,
+        source: item.source,
       });
-      continue;
-    }
-    seen.add(matches[0]);
-    items[matches[0]].tasks = group.tasks;
   }
   return { ...meeting, items, questions };
 }
