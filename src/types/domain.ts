@@ -473,6 +473,7 @@ export type MeetingMinutesBundle = {
 export type MeetingMinuteApprovalView = MeetingMinuteApproval & {
   memberName: string;
   memberEmail: string;
+  manualApprovedByName?: string;
 };
 
 export type MinuteAttachmentView = {
@@ -490,6 +491,19 @@ export type MinuteAttachmentView = {
 export type PreviousMeetingMinutesReference = {
   meeting: Pick<Meeting, "id" | "title" | "starts_at"> | null;
   minutes: Pick<MeetingMinutes, "status" | "minutes_text" | "decisions"> | null;
+  approvals: Array<
+    Pick<
+      MeetingMinuteApprovalView,
+      | "id"
+      | "user_id"
+      | "updated_by"
+      | "memberName"
+      | "status"
+      | "comment"
+      | "manualApprovedByName"
+    >
+  >;
+  canManageApproval: boolean;
   agendaItemMinutes: Array<{
     id: string;
     position: number;

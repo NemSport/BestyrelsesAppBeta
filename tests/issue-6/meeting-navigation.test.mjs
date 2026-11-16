@@ -516,7 +516,7 @@ test("point responsibility, deadline, attachments, and status share one metadata
   assert.match(card, /name="members"/);
   assert.match(card, /name="calendar"/);
   assert.match(card, /name="attachments"/);
-  assert.match(card, /agendaStatusIconName\(status\)/);
+  assert.match(card, /agendaStatusIconName\(displayStatus\)/);
   assert.match(card, /Sidst opdateret/);
   assert.match(card, /primaryAttachment\.fileName/);
   assert.match(

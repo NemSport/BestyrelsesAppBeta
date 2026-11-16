@@ -77,6 +77,17 @@ export async function POST(
             : "Dit ændringsønske er gemt.",
       });
     }
+    if (body.action === "record_manual_approval") {
+      const approval = await service.recordManualApproval({
+        ...body,
+        meetingId,
+      });
+      dispatchSummary();
+      return NextResponse.json({
+        approval,
+        message: "Manuel godkendelse er registreret.",
+      });
+    }
     if (body.action === "mark_no_response") {
       const approvals = await service.markNoResponse({ ...body, meetingId });
       dispatchSummary();

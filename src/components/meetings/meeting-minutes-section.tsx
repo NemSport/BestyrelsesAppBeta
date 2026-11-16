@@ -71,6 +71,7 @@ import {
   getMeetingAgendaPointHref,
   meetingInvitationResponsesAnchor,
 } from "@/lib/meeting-navigation";
+import { previousMinutesAgendaStatus } from "@/lib/previous-minutes-approval";
 import type { AgendaItemHistoryMetadata } from "@/lib/agenda-item-history";
 import { firstRichTextToPlainText, richTextToPlainText } from "@/lib/rich-text";
 import { taskStatusLabels, taskStatusTones } from "@/lib/tasks";
@@ -1065,6 +1066,12 @@ function AgendaMinutesCard({
     .split(/\s+/)
     .filter(Boolean).length;
   const statusOptions = agendaItemMinutesStatusOptions[itemType];
+  const hasPreviousMinutesPoint =
+    item.standard_key === "previous_minutes_approval" &&
+    Boolean(previousMeetingMinutes.meeting);
+  const displayStatus = hasPreviousMinutesPoint
+    ? previousMinutesAgendaStatus(previousMeetingMinutes, status)
+    : status;
   const completedStatus = completedAgendaStatusForType(itemType);
   const fieldGuidance = agendaMinutesFieldGuidance[itemType];
   const primaryAttachment = attachments[0] ?? null;
@@ -1214,7 +1221,7 @@ function AgendaMinutesCard({
           <div className="flex min-w-0 items-start gap-1.5 sm:min-w-28">
             <AppIcon
               className="mt-0.5 shrink-0 text-muted"
-              name={agendaStatusIconName(status)}
+              name={agendaStatusIconName(displayStatus)}
               size={14}
             />
             <div>
@@ -1222,11 +1229,14 @@ function AgendaMinutesCard({
                 Status
               </p>
               <p className="text-xs font-medium text-ink">
-                {agendaItemMinutesStatusLabels[status]}
+                {agendaItemMinutesStatusLabels[displayStatus]}
               </p>
             </div>
           </div>
-          {canEdit && completedStatus && !isCompletedAgendaStatus(status) ? (
+          {canEdit &&
+          !hasPreviousMinutesPoint &&
+          completedStatus &&
+          !isCompletedAgendaStatus(status) ? (
             <button
               className="ui-action col-span-2 self-center text-xs text-success sm:col-span-1"
               disabled={markingCompleted || autosave.status === "saving"}
@@ -1498,8 +1508,11 @@ function AgendaMinutesCard({
           />
           {item.standard_key === "previous_minutes_approval" ? (
             <PreviousMinutesReference
+              committeeId={committeeId}
+              organizationId={organizationId}
               reference={previousMeetingMinutes}
               root={root}
+              userId={userId}
             />
           ) : null}
 
@@ -1599,10 +1612,11 @@ function AgendaMinutesCard({
                       aria-invalid={Boolean(fieldErrors.status?.[0])}
                       className="min-h-7 w-auto min-w-36 py-0.5 text-xs"
                       id={`status-${occurrence.id}`}
+                      disabled={hasPreviousMinutesPoint}
                       onChange={(event) =>
                         setStatus(event.target.value as AgendaMinutesStatus)
                       }
-                      value={status}
+                      value={displayStatus}
                     >
                       {statusOptions.map((option) => (
                         <option key={option} value={option}>
@@ -3314,13 +3328,25 @@ export function MeetingMinutesSection({
     setWorkspaceMode("review");
   }
 
+  function resolvePointStatus(
+    occurrence: AgendaOccurrence,
+    status: AgendaMinutesStatus,
+  ) {
+    return occurrence.agenda_items?.standard_key === "previous_minutes_approval"
+      ? previousMinutesAgendaStatus(previousMeetingMinutes, status)
+      : status;
+  }
+
   const completedCount = occurrences.filter((occurrence) =>
     isCompletedAgendaStatus(
-      agendaItemStatusOverrides[occurrence.agenda_item_id] ??
-        initialAgendaItemMinutes.find(
-          (entry) => entry.agenda_item_id === occurrence.agenda_item_id,
-        )?.status ??
-        "not_started",
+      resolvePointStatus(
+        occurrence,
+        agendaItemStatusOverrides[occurrence.agenda_item_id] ??
+          initialAgendaItemMinutes.find(
+            (entry) => entry.agenda_item_id === occurrence.agenda_item_id,
+          )?.status ??
+          "not_started",
+      ),
     ),
   ).length;
   const tasksNeedingAttention = meetingTasks.filter(
@@ -3341,11 +3367,14 @@ export function MeetingMinutesSection({
     const itemMinutes = initialAgendaItemMinutes.find(
       (candidate) => candidate.agenda_item_id === occurrence.agenda_item_id,
     );
-    const itemStatus = normalizeAgendaItemMinutesStatus(
-      item.item_type,
-      agendaItemStatusOverrides[occurrence.agenda_item_id] ??
-        itemMinutes?.status ??
-        "not_started",
+    const itemStatus = resolvePointStatus(
+      occurrence,
+      normalizeAgendaItemMinutesStatus(
+        item.item_type,
+        agendaItemStatusOverrides[occurrence.agenda_item_id] ??
+          itemMinutes?.status ??
+          "not_started",
+      ),
     );
     const isActive = occurrence.id === activeOccurrence?.id;
     const isCompleted = isCompletedAgendaStatus(itemStatus);
@@ -3952,12 +3981,15 @@ export function MeetingMinutesSection({
                       (candidate) =>
                         candidate.agenda_item_id === occurrence.agenda_item_id,
                     );
-                    const itemStatus = normalizeAgendaItemMinutesStatus(
-                      item.item_type,
-                      agendaItemStatusOverrides[occurrence.agenda_item_id] ??
-                        reviewAgendaDrafts[occurrence.agenda_item_id]?.status ??
-                        itemMinutes?.status ??
-                        "not_started",
+                    const itemStatus = resolvePointStatus(
+                      occurrence,
+                      normalizeAgendaItemMinutesStatus(
+                        item.item_type,
+                        agendaItemStatusOverrides[occurrence.agenda_item_id] ??
+                          reviewAgendaDrafts[occurrence.agenda_item_id]?.status ??
+                          itemMinutes?.status ??
+                          "not_started",
+                      ),
                     );
                     const reviewDraft =
                       reviewAgendaDrafts[occurrence.agenda_item_id];
@@ -4021,6 +4053,15 @@ export function MeetingMinutesSection({
                         </div>
 
                         <div className="ml-0 mt-4 max-w-[52rem] sm:ml-7">
+                          {item.standard_key === "previous_minutes_approval" ? (
+                            <PreviousMinutesReference
+                              committeeId={committeeId}
+                              organizationId={organizationId}
+                              reference={previousMeetingMinutes}
+                              root={root}
+                              userId={userId}
+                            />
+                          ) : null}
                           {hasDistinctAgendaContext ? (
                             <section className="mb-4">
                               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
