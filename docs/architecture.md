@@ -2980,6 +2980,17 @@ Set `RESEND_BESTIE_REPLY_DOMAIN`, `RESEND_BESTIE_WEBHOOK_SECRET`, and
 `/api/webhooks/resend/bestie` to Resend's `email.received` event. The receiving
 key is separate from the outbound email key.
 
+## Previous minutes approval
+
+The approval API and database both require meeting management permission for
+manual responses. The RPC locks the source minutes and targets the approval
+row ID from the current round. It accepts pending and expired rows, preserves
+change requests and stores the actor in the existing approval audit columns.
+Personal replies, expiry and manual replies serialize on the minutes row.
+The next meeting derives the status of its standard approval point from the
+previous non-cancelled meeting in the same committee and its authorized
+approval rows, with no duplicate agenda status write.
+
 ## Organization overview and admin follow-up
 
 The organization home combines the existing ActionService with a compact

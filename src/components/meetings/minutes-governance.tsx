@@ -3,6 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ManualMinutesApprovalButton } from "@/components/meetings/manual-minutes-approval-button";
+import {
+  canRecordManualMinutesApproval,
+  isManualMinutesApproval,
+  isMinutesFullyApproved,
+} from "@/lib/previous-minutes-approval";
+
 import {
   Button,
   EmptyState,
@@ -799,8 +806,9 @@ export function MinutesApprovalPanel({
     }
   }
 
+  const fullyApproved = isMinutesFullyApproved({ minutes, approvals });
   const approvalSummary =
-    minutes?.status === "approved"
+    fullyApproved
       ? "Referatet er godkendt"
       : approvals.length > 0
         ? `${counts.approved} af ${approvals.length} har godkendt`
@@ -808,7 +816,7 @@ export function MinutesApprovalPanel({
   const approvalStatusLabel =
     !minutes || minutes.status === "draft"
       ? "Kladde"
-      : minutes.status === "approved"
+      : fullyApproved
         ? "Godkendt"
         : counts.approved > 0 ||
             counts.change_requested > 0 ||
@@ -835,6 +843,32 @@ export function MinutesApprovalPanel({
               : `${approvalRecipientInfo.eligibleCount} aktive udvalgsmedlemmer`
           }.`
         : "Der findes ingen mulige godkendere. Registrer deltagere eller opdater udvalgets medlemmer.";
+
+  function manualApprovalButton(approval: MeetingMinuteApprovalView) {
+    if (
+      !canEdit ||
+      !minutes ||
+      approval.user_id === userId ||
+      !canRecordManualMinutesApproval(minutes.status, approval.status)
+    ) {
+      return null;
+    }
+    return (
+      <ManualMinutesApprovalButton
+        committeeId={committeeId}
+        meetingId={meetingId}
+        approvalId={approval.id}
+        memberName={approval.memberName}
+        organizationId={organizationId}
+      />
+    );
+  }
+
+  function approvalLabel(approval: MeetingMinuteApprovalView) {
+    return isManualMinutesApproval(approval)
+      ? `Manuelt godkendt af ${approval.manualApprovedByName ?? "ukendt medlem"}`
+      : meetingMinuteApprovalStatusLabels[approval.status];
+  }
 
   if (compact) {
     return (
@@ -869,23 +903,25 @@ export function MinutesApprovalPanel({
         {hasApprovalRound && approvals.length > 0 ? (
           <div className="mt-2 divide-y divide-line/70 border-y border-line/70">
             {approvals.map((approval) => (
-              <div
-                className="flex min-w-0 items-center gap-2 py-2"
-                key={approval.id}
-              >
-                <span
-                  aria-hidden="true"
-                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[0.62rem] font-bold text-brand"
-                  title={approval.memberName}
-                >
-                  {approvalInitials(approval.memberName)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
-                  {approval.memberName}
-                </span>
-                <span className="shrink-0 text-[0.68rem] text-muted">
-                  {meetingMinuteApprovalStatusLabels[approval.status]}
-                </span>
+              <div className="py-2" key={approval.id}>
+                <div className="flex min-w-0 items-start gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[0.62rem] font-bold text-brand"
+                    title={approval.memberName}
+                  >
+                    {approvalInitials(approval.memberName)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-xs font-medium text-ink">
+                      {approval.memberName}
+                    </p>
+                    <p className="mt-0.5 break-words text-[0.68rem] text-muted">
+                      {approvalLabel(approval)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-1 pl-9 empty:hidden">{manualApprovalButton(approval)}</div>
               </div>
             ))}
           </div>
@@ -921,7 +957,7 @@ export function MinutesApprovalPanel({
           </div>
         ) : null}
 
-        {canApprove && ownApproval ? (
+        {canApprove && ownApproval && !isManualMinutesApproval(ownApproval) ? (
           <div className="mt-3 border-t border-line pt-3">
             <p className="text-xs text-muted">
               Dit svar: {meetingMinuteApprovalStatusLabels[ownApproval.status]}
@@ -1240,7 +1276,7 @@ export function MinutesApprovalPanel({
           </div>
         ) : null}
 
-        {canApprove && ownApproval ? (
+        {canApprove && ownApproval && !isManualMinutesApproval(ownApproval) ? (
           <div className="mt-5 rounded-[var(--radius-control)] border border-accent/25 bg-mist/60 p-4">
             <p className="font-semibold">Dit svar</p>
             <p className="mt-1 text-sm text-slate-600">
@@ -1306,9 +1342,10 @@ export function MinutesApprovalPanel({
                     </p>
                   </div>
                   <StatusBadge tone={approvalStatusTones[approval.status]}>
-                    {meetingMinuteApprovalStatusLabels[approval.status]}
+                    {approvalLabel(approval)}
                   </StatusBadge>
                 </div>
+                <div className="mt-2 empty:hidden">{manualApprovalButton(approval)}</div>
                 {approval.comment ? (
                   <div className="mt-3 rounded-lg border-l-4 border-warning/40 bg-warning-soft p-3 text-sm text-warning">
                     <p className="text-xs font-semibold uppercase tracking-wide">

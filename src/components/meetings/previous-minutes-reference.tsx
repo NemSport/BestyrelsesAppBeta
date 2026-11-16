@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { AgendaItemDocumentTitle } from "@/components/agenda-items/agenda-item-document-title";
+import { ManualMinutesApprovalButton } from "@/components/meetings/manual-minutes-approval-button";
 import { RichTextContent } from "@/components/forms/rich-text-content";
 import {
   Button,
@@ -15,27 +16,47 @@ import {
 import {
   formatDateTime,
   meetingMinutesStatusLabels,
+  meetingMinuteApprovalStatusLabels,
 } from "@/lib/localization";
+import {
+  canRecordManualMinutesApproval,
+  isManualMinutesApproval,
+  isMinutesFullyApproved,
+} from "@/lib/previous-minutes-approval";
 import { isRichTextEmpty } from "@/lib/rich-text";
 import type { PreviousMeetingMinutesReference } from "@/types/domain";
 
 export function PreviousMinutesReference({
   reference,
   root,
+  organizationId,
+  committeeId,
+  userId,
 }: {
   reference: PreviousMeetingMinutesReference;
   root: string;
+  organizationId: string;
+  committeeId: string;
+  userId: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
   const meeting = reference.meeting;
   const minutes = reference.minutes;
+  const approved = isMinutesFullyApproved(reference);
+  const changes = reference.approvals.filter(
+    ({ status }) => status === "change_requested",
+  );
+  const missing = reference.approvals.filter(
+    ({ status }) => status === "pending" || status === "no_response",
+  );
+  const manual = reference.approvals.filter(isManualMinutesApproval);
 
   const message = !meeting
     ? "Der findes ikke et tidligere referat at godkende."
     : !minutes
       ? "Der findes endnu ikke et referat fra seneste møde."
-      : minutes.status === "approved"
+      : approved
         ? "Seneste referat er godkendt."
         : "Seneste referat er endnu ikke godkendt.";
 
@@ -48,16 +69,14 @@ export function PreviousMinutesReference({
             <p className="mt-1 text-sm text-muted">{message}</p>
           </div>
           {minutes ? (
-            <StatusBadge
-              tone={
-                minutes.status === "approved"
-                  ? "success"
-                  : minutes.status === "ready_for_approval"
-                    ? "warning"
-                    : "neutral"
-              }
-            >
-              {meetingMinutesStatusLabels[minutes.status]}
+            <StatusBadge tone={approved ? "success" : "warning"}>
+              {approved
+                ? "Godkendt"
+                : changes.length
+                  ? "Ændringer ønskes"
+                  : missing.length
+                    ? "Afventer godkendelse"
+                    : meetingMinutesStatusLabels[minutes.status]}
             </StatusBadge>
           ) : null}
         </div>
@@ -75,6 +94,56 @@ export function PreviousMinutesReference({
           </dl>
         ) : null}
 
+        {meeting &&
+        minutes &&
+        (changes.length > 0 || missing.length > 0 || manual.length > 0) ? (
+          <div className="mt-3 divide-y divide-line border-y border-line text-sm">
+            {changes.map((approval) => (
+              <div className="py-2" key={approval.id}>
+                <p className="font-semibold">
+                  {approval.memberName} · Ændringer ønskes
+                </p>
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-muted">
+                  {approval.comment}
+                </p>
+              </div>
+            ))}
+            {missing.map((approval) => (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 py-2"
+                key={approval.id}
+              >
+                <div>
+                  <p className="font-semibold">{approval.memberName}</p>
+                  <p className="text-xs text-muted">
+                    {meetingMinuteApprovalStatusLabels[approval.status]}
+                  </p>
+                </div>
+                {reference.canManageApproval &&
+                approval.user_id !== userId &&
+                canRecordManualMinutesApproval(
+                  minutes.status,
+                  approval.status,
+                ) ? (
+                  <ManualMinutesApprovalButton
+                    committeeId={committeeId}
+                    meetingId={meeting.id}
+                    approvalId={approval.id}
+                    memberName={approval.memberName}
+                    organizationId={organizationId}
+                  />
+                ) : null}
+              </div>
+            ))}
+            {manual.map((approval) => (
+              <p className="py-2 text-xs text-muted" key={approval.id}>
+                {approval.memberName} · Manuelt godkendt af{" "}
+                {approval.manualApprovedByName}
+              </p>
+            ))}
+          </div>
+        ) : null}
+
         {meeting ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {minutes ? (
@@ -82,9 +151,9 @@ export function PreviousMinutesReference({
             ) : null}
             <Link
               className={buttonClassName({ variant: "secondary" })}
-              href={`${root}/meetings/${meeting.id}`}
+              href={`${root}/meetings/${meeting.id}${minutes && !approved ? "#minutes-approval" : ""}`}
             >
-              Gå til møde
+              {minutes && !approved ? "Åbn referatgodkendelse" : "Gå til møde"}
             </Link>
           </div>
         ) : null}

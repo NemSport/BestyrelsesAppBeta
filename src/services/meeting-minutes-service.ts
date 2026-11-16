@@ -3,12 +3,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, AuthorizationError, NotFoundError } from "@/lib/errors";
 import { getAgendaItemTransferRule } from "@/lib/agenda-item-minutes";
 import { formatDanishDateKey, formatDanishDateTime } from "@/lib/date-format";
+import { getMeetingCapabilities } from "@/lib/meeting-capabilities";
 import { generateMeetingMinutesPdf } from "@/lib/minutes-pdf";
 import type { PdfReportAttachment } from "@/lib/pdf-report";
+import { isManualMinutesApproval } from "@/lib/previous-minutes-approval";
 import { richTextToPlainText, sanitizeRichText } from "@/lib/rich-text";
 import {
   agendaItemPrivateNoteInputSchema,
   agendaItemMinutesInputSchema,
+  manualMinutesApprovalSchema,
   markNoResponseSchema,
   meetingMinutesInputSchema,
   meetingPrivateNoteInputSchema,
@@ -336,6 +339,9 @@ export class MeetingMinutesService {
           membersById.get(approval.user_id)?.email ||
           "Ukendt medlem",
         memberEmail: membersById.get(approval.user_id)?.email || "",
+        manualApprovedByName: isManualMinutesApproval(approval)
+          ? membersById.get(approval.updated_by)?.full_name || "Ukendt medlem"
+          : undefined,
       })),
       meetingAttachments: meetingAttachments.map(attachmentView),
       agendaItemAttachments: agendaItemAttachments.map(attachmentView),
@@ -349,7 +355,7 @@ export class MeetingMinutesService {
     meetingId: string,
   ) {
     const user = await this.auth.requireUser();
-    await this.authorization.requireCommitteeMember(
+    const context = await this.authorization.requireCommitteeMember(
       organizationId,
       committeeId,
       user.id,
@@ -370,6 +376,8 @@ export class MeetingMinutesService {
         meeting: null,
         minutes: null,
         agendaItemMinutes: [],
+        approvals: [],
+        canManageApproval: false,
       };
     }
 
@@ -377,6 +385,18 @@ export class MeetingMinutesService {
       this.minutes.findMeetingMinutes(previousMeeting.id),
       this.minutes.listAgendaItemMinutes(previousMeeting.id),
     ]);
+    const [approvalRows, members] = meetingMinutes
+      ? await Promise.all([
+          this.governance.listApprovals(meetingMinutes.id),
+          this.members.listMembers(organizationId),
+        ])
+      : ([[], []] as const);
+    const names = new Map(
+      members.map((member) => [
+        member.user_id,
+        member.full_name || member.email,
+      ]),
+    );
     const minutesByAgendaItem = new Map(
       agendaItemMinutes.map((minutes) => [minutes.agenda_item_id, minutes]),
     );
@@ -394,6 +414,21 @@ export class MeetingMinutesService {
             decisions: meetingMinutes.decisions,
           }
         : null,
+      approvals: approvalRows.map((approval) => ({
+        id: approval.id,
+        user_id: approval.user_id,
+        updated_by: approval.updated_by,
+        status: approval.status,
+        comment: approval.comment,
+        memberName: names.get(approval.user_id) ?? "Ukendt medlem",
+        manualApprovedByName: isManualMinutesApproval(approval)
+          ? names.get(approval.updated_by) ?? "Ukendt medlem"
+          : undefined,
+      })),
+      canManageApproval: getMeetingCapabilities(
+        context.organizationMembership.role,
+        context.membership?.role ?? null,
+      ).manageMinutesApproval,
       agendaItemMinutes: previousMeeting.agenda_item_occurrences.flatMap(
         (occurrence) => {
           const item = occurrence.agenda_items;
@@ -883,6 +918,25 @@ export class MeetingMinutesService {
       parsed.status,
       parsed.comment ?? null,
     );
+  }
+
+  async recordManualApproval(input: unknown) {
+    const user = await this.auth.requireUser();
+    const parsed = manualMinutesApprovalSchema.parse(input);
+    await this.authorization.requireMeetingCapability(
+      parsed.organizationId,
+      parsed.committeeId,
+      user.id,
+      "manageMinutesApproval",
+    );
+    await this.requireMeeting(
+      parsed.organizationId,
+      parsed.committeeId,
+      parsed.meetingId,
+    );
+    const minutes = await this.minutes.findMeetingMinutes(parsed.meetingId);
+    if (!minutes) throw new NotFoundError("Referatet");
+    return this.governance.recordManualApproval(minutes.id, parsed.approvalId);
   }
 
   async markNoResponse(input: unknown) {

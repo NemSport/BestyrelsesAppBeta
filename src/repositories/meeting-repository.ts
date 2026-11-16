@@ -94,6 +94,7 @@ export class MeetingRepository {
       .eq("organization_id", organizationId)
       .eq("committee_id", committeeId)
       .is("deleted_at", null)
+      .neq("status", "cancelled")
       .lt("starts_at", startsBefore)
       .order("starts_at", { ascending: false })
       .order("created_at", { ascending: false })

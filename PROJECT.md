@@ -1895,6 +1895,15 @@ use the same flow. A standalone activity supports private replies and reminders.
 Web Push is optional per device. Reply inline where the browser supports it,
 or open the conversation from the notification and type a reply there.
 
+## Previous minutes approval
+
+Committee managers can record a missing approval on behalf of a named
+recipient. The approval stores the recording user and time and is identified as
+manual. On the next meeting, the standard previous-minutes point reads the
+latest relevant minutes and shows requested changes and missing approvals.
+It is complete automatically when the referenced minutes are approved and no
+approval rows are outstanding. An expired response is still outstanding.
+
 ## Meeting date polls and invitation responses
 
 Committee managers create date polls from the meeting list and invite

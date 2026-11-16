@@ -2073,6 +2073,10 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"];
       };
+      record_manual_meeting_minutes_approval: {
+        Args: { target_meeting_minutes_id: string; target_approval_id: string };
+        Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"];
+      };
       mark_missing_approval_responses: {
         Args: { target_meeting_minutes_id: string };
         Returns: Database["public"]["Tables"]["meeting_minute_approvals"]["Row"][];

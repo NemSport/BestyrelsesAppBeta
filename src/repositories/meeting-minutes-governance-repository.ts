@@ -165,6 +165,15 @@ export class MeetingMinutesGovernanceRepository {
     return data;
   }
 
+  async recordManualApproval(meetingMinutesId: string, approvalId: string) {
+    const { data, error } = await this.db.rpc(
+      "record_manual_meeting_minutes_approval",
+      { target_meeting_minutes_id: meetingMinutesId, target_approval_id: approvalId },
+    );
+    if (error) throw error;
+    return data;
+  }
+
   async markNoResponse(meetingMinutesId: string) {
     const { data, error } = await this.db.rpc(
       "mark_missing_approval_responses",
