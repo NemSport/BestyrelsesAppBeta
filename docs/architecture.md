@@ -3064,3 +3064,8 @@ is selected. The import never marks minutes approved or sends invitations.
 Point minutes use a compact editable plain-text format with heading and bullet
 markers. Preview rendering and confirmation use the same supported markers,
 with plain text escaped before rich-text storage.
+
+Historical meeting extraction separates structured tasks from the agenda note
+format. A deterministic match in the selected committee uses source-explicit
+initial/name pairs or a full name. The assignee is only preselected when the
+normalized full name is unique and remains editable before approval.

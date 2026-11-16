@@ -1961,3 +1961,8 @@ shown in the review and stored as 12:00 local time when the field is left empty.
 
 Imported point minutes use short bullet lists. Topics such as committee updates
 have a subheading for each committee, both in preview and in the saved minutes.
+
+Bestie also proposes separate tasks for firmly assigned follow-ups described
+within point minutes. When the source explicitly pairs initials with a name
+that uniquely matches an active committee member, the review suggests that
+person as assignee.

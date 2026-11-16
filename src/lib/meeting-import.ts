@@ -19,10 +19,10 @@ const task = action.extend({
 });
 const item = z.object({
   title: text(200),
-  notes: text(6000),
   source,
-  decisions: z.array(action).max(8),
   tasks: z.array(task).max(8),
+  decisions: z.array(action).max(8),
+  notes: text(6000),
 });
 export const extractedMeetingImport = z.object({
   title: text(160),
@@ -30,11 +30,45 @@ export const extractedMeetingImport = z.object({
   time: z.string().nullable(),
   location: text(240),
   summary: text(8000),
+  participantAliases: z
+    .array(z.object({ initials: text(20), name: text(160), source }))
+    .max(40),
   items: z.array(item).max(20),
   questions: z.array(z.object({ text: text(500), source })).max(24),
 });
 
 export type MeetingImportPreview = z.infer<typeof extractedMeetingImport>;
+
+function normalizeParticipantName(value: string) {
+  return value
+    .normalize("NFC")
+    .toLocaleLowerCase("da-DK")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+export function suggestMeetingImportAssignee(
+  sourceName: string,
+  aliases: MeetingImportPreview["participantAliases"],
+  members: readonly { id: string; name: string }[],
+) {
+  const name = normalizeParticipantName(sourceName);
+  if (!name) return "";
+  const expansions = new Set(
+    aliases
+      .filter(({ initials }) => normalizeParticipantName(initials) === name)
+      .map((alias) => normalizeParticipantName(alias.name))
+      .filter((value) => value.includes(" ")),
+  );
+  if (expansions.size > 1) return "";
+  const lookup = expansions.values().next().value ?? name;
+  // Assign only a complete name with a unique exact match in this committee.
+  if (!lookup.includes(" ")) return "";
+  const matching = members.filter(
+    (member) => normalizeParticipantName(member.name) === lookup,
+  );
+  return matching.length === 1 ? matching[0].id : "";
+}
 
 const approvalAction = action.extend({
   title: text(240).min(2, "Angiv en titel."),
