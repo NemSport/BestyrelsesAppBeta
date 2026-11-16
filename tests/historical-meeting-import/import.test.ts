@@ -7,6 +7,7 @@ import { extractMeetingDocx } from "../../src/lib/meeting-import-docx";
 import {
   extractedMeetingImport,
   meetingImportApproval,
+  suggestMeetingImportAssignee,
 } from "../../src/lib/meeting-import";
 
 test("Word body retains separate paragraphs, line breaks and Danish characters", async () => {
@@ -64,6 +65,7 @@ test("AI can mark illegible notes and missing dates without creating actionable 
     time: null,
     items: [],
     questions: [{ text: "Datoen kan ikke læses.", source }],
+    participantAliases: [],
   });
   assert.deepEqual(preview.questions[0].source, source);
   assert.throws(() =>
@@ -79,6 +81,34 @@ test("AI can mark illegible notes and missing dates without creating actionable 
         },
       ],
     }),
+  );
+});
+
+test("source initialisms suggest a unique committee member without guessing", () => {
+  const alias = {
+    initials: "MHE",
+    name: "Mette-Helen Eksempel",
+    source: { file: 1, page: 1 },
+  };
+  const member = { id: user, name: "Mette Helen Eksempel" };
+  assert.equal(suggestMeetingImportAssignee("MHE", [alias], [member]), user);
+  assert.equal(suggestMeetingImportAssignee("MHE", [], [member]), "");
+  assert.equal(suggestMeetingImportAssignee("MHE", [alias], []), "");
+  assert.equal(
+    suggestMeetingImportAssignee(
+      "MHE",
+      [alias],
+      [member, { ...member, id: org }],
+    ),
+    "",
+  );
+  assert.equal(
+    suggestMeetingImportAssignee(
+      "MHE",
+      [alias, { ...alias, name: "Mads Henrik Eksempel" }],
+      [member],
+    ),
+    "",
   );
 });
 

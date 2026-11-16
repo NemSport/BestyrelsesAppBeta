@@ -7,6 +7,7 @@ import { Button, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import {
   meetingImportMaxBytes,
   meetingImportMaxFiles,
+  suggestMeetingImportAssignee,
   type MeetingImportApproval,
   type MeetingImportPreview,
 } from "@/lib/meeting-import";
@@ -108,7 +109,11 @@ export function HistoricalMeetingImport({
         tasks: point.tasks.map((task) => ({
           ...task,
           deadline: task.deadline ?? "",
-          responsibleUserId: "",
+          responsibleUserId: suggestMeetingImportAssignee(
+            task.namedOwner,
+            result.participantAliases,
+            availableMembers,
+          ),
         })),
       })),
     });
@@ -433,7 +438,7 @@ export function HistoricalMeetingImport({
                             />
                           </label>
                           <label>
-                            <span className="label">Tildel medlem</span>
+                            <span className="label">Ansvarlig i udvalget</span>
                             <Select
                               value={entry.responsibleUserId}
                               onChange={(event) =>
