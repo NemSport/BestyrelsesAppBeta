@@ -7,19 +7,26 @@ export type OrganizationNavItem = {
 
 export const organizationNavItems: readonly OrganizationNavItem[] = [
   { label: "Overblik", suffix: "" },
-  { label: "Adminoverblik", suffix: "/admin", adminOnly: true },
-  { label: "Udvalg", suffix: "/committees" },
   { label: "Møder", suffix: "/meetings" },
+  { label: "Opgaver", match: "exact", suffix: "/tasks" },
+  { label: "Udvalg", suffix: "/committees" },
+  { label: "Årshjul", suffix: "/annual-wheel" },
   { label: "Beslutninger", suffix: "/decisions" },
   { label: "Dokumenter", suffix: "/documents" },
+  { label: "Adminoverblik", suffix: "/admin", adminOnly: true },
   { label: "Interessenter & Relationer", suffix: "/stakeholders" },
-  { label: "Opgaver", match: "exact", suffix: "/tasks" },
-  { label: "Årshjul", suffix: "/annual-wheel" },
   { label: "Jobkort", suffix: "/job-cards" },
   { label: "Medlemmer", suffix: "/members" },
   { label: "Organisationsindstillinger", suffix: "/edit", adminOnly: true },
   { label: "Papirkurv", suffix: "/trash", adminOnly: true },
 ];
+
+export function organizationNavTier(suffix: string) {
+  if (["", "/meetings", "/tasks"].includes(suffix)) return "essential";
+  if (["/committees", "/annual-wheel"].includes(suffix)) return "medium";
+  if (["/decisions", "/documents", "/admin"].includes(suffix)) return "wide";
+  return "overflow";
+}
 
 export function getVisibleOrganizationNavItems(canManageOrganization: boolean) {
   return organizationNavItems.filter(

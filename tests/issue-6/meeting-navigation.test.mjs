@@ -71,7 +71,7 @@ test("meeting workspace renders one active agenda item in a compact three-column
     /xl:grid-cols-\[minmax\(0,27fr\)_minmax\(16rem,14fr\)\]/,
   );
   assert.match(minutes, /aria-label="Dagsordenspunkter"/);
-  assert.match(minutes, /max-h-\[calc\(100vh-6rem\)\]/);
+  assert.match(minutes, /org-topbar-sticky-height/);
   assert.match(minutes, /overflow-y-auto/);
   assert.match(minutes, /aria-current=\{isActive \? "location" : undefined\}/);
   assert.match(minutes, /border-brand bg-brand-soft\/70 text-brand/);
@@ -234,7 +234,7 @@ test("review mode keeps point decisions and tasks read-only", () => {
 });
 
 test("review mode uses the compact sticky approval panel", () => {
-  assert.match(minutes, /<aside className="xl:sticky xl:top-20">/);
+  assert.match(minutes, /<aside className="xl:sticky org-topbar-sticky-offset">/);
   assert.match(minutes, /<MinutesApprovalPanel[\s\S]*compact/);
   assert.match(minutes, /Afventer \$\{pendingCount\}/);
   assert.match(minutesGovernance, /if \(compact\) \{/);

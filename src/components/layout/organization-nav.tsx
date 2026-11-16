@@ -1,179 +1,124 @@
 "use client";
 
-import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { AppIcon, organizationNavIconNames } from "@/components/icons/app-icon";
-import { useDialogFocus } from "@/hooks/use-dialog-focus";
+import { Dropdown } from "@/components/ui/dropdown";
 import {
-  getActiveCommitteeId,
   getVisibleOrganizationNavItems,
   isOrganizationNavItemActive,
+  organizationNavTier,
 } from "@/lib/organization-navigation";
 
 export function OrganizationNav({
   canManageOrganization = false,
-  committees = [],
   organizationId,
-  organizationName,
 }: {
-  logoUrl?: string | null;
   canManageOrganization?: boolean;
-  committees?: Array<{ id: string; name: string }>;
   organizationId: string;
-  organizationName?: string;
 }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
+  const navRef = useRef<HTMLElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const panelId = useId();
   const root = `/organizations/${organizationId}`;
-  const items = getVisibleOrganizationNavItems(canManageOrganization);
-  const activeItem = items.find((item) =>
-    isOrganizationNavItemActive(pathname, root, item),
+  const items = getVisibleOrganizationNavItems(canManageOrganization).map(
+    (item) => ({
+      ...item,
+      tier: organizationNavTier(item.suffix),
+      active: isOrganizationNavItemActive(pathname, root, item),
+    }),
   );
-  const activeLabel = activeItem?.label ?? "Organisation";
-  const activeCommitteeId = getActiveCommitteeId(pathname, root);
-  const activeCommittee = committees.find(
-    (committee) => committee.id === activeCommitteeId,
-  );
-  useDialogFocus({
-    active: mobileOpen,
-    containerRef: drawerRef,
-    onEscape: () => setMobileOpen(false),
-    returnFocusRef: triggerRef,
-  });
+  const active = items.find((item) => item.active);
 
   useEffect(() => {
-    setMobileOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    const desktopMedia = window.matchMedia("(min-width: 1024px)");
-    const closeOnDesktop = (event: MediaQueryListEvent) => {
-      if (event.matches) setMobileOpen(false);
+    const app = navRef.current?.closest<HTMLElement>(".app-frame");
+    if (!app) return;
+
+    let compact = false;
+    function update() {
+      // Separate thresholds keep the header steady when its own height changes.
+      const next = window.scrollY > (compact ? 24 : 72);
+      if (next === compact) return;
+      compact = next;
+      app?.toggleAttribute("data-org-topbar-compact", compact);
+    }
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", update);
+      app.removeAttribute("data-org-topbar-compact");
     };
-    desktopMedia.addEventListener("change", closeOnDesktop);
-    return () => desktopMedia.removeEventListener("change", closeOnDesktop);
   }, []);
 
-  const navLinks = (onNavigate?: () => void) => (
-    <div className="org-nav-list">
-      {items.map((item) => {
-        const href = `${root}${item.suffix}`;
-        const active = isOrganizationNavItemActive(pathname, root, item);
-
-        return (
-          <Link
-            aria-current={active ? "page" : undefined}
-            className={clsx("org-nav-link", active && "org-nav-link-active")}
-            href={href}
-            key={item.label}
-            onClick={onNavigate}
-          >
-            <span className="org-nav-icon">
-              <AppIcon name={organizationNavIconNames[item.suffix]} />
-            </span>
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-
   return (
-    <aside className="org-sidebar">
-      <div className="org-mobile-context">
-        <div className="min-w-0">
-          <p className="org-mobile-organization truncate">
-            {organizationName ?? "Organisation"}
-          </p>
-          <p className="org-mobile-location truncate">
-            {activeCommittee ? `${activeCommittee.name} · ` : ""}
-            {activeLabel}
-          </p>
-        </div>
-        <button
-          aria-controls="organization-mobile-navigation"
-          aria-expanded={mobileOpen}
-          aria-haspopup="dialog"
-          className="org-mobile-menu-trigger"
-          onClick={() => setMobileOpen(true)}
-          ref={triggerRef}
-          type="button"
-        >
-          Menu
-          <AppIcon name="menu" size={17} />
-        </button>
-      </div>
-
-      <nav
-        aria-label="Organisationsnavigation"
-        className="org-desktop-navigation"
-      >
-        <div className="org-sidebar-header">
-          <p className="org-sidebar-kicker text-[0.62rem] font-semibold uppercase tracking-[0.16em]">
-            Organisation
-          </p>
-          <p className="org-sidebar-title mt-0.5 text-[0.82rem] font-semibold leading-5">
-            {organizationName ?? "Organisation"}
-          </p>
-          <p className="org-sidebar-current mt-1.5 text-[0.72rem] font-medium">
-            Aktuel side: <span>{activeLabel}</span>
-          </p>
-        </div>
-        {navLinks()}
-      </nav>
-
-      {mobileOpen ? (
-        <div
-          className="org-mobile-overlay"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setMobileOpen(false);
-          }}
-        >
-          <div
-            aria-labelledby={titleId}
-            aria-modal="true"
-            className="org-mobile-drawer"
-            id="organization-mobile-navigation"
-            ref={drawerRef}
-            role="dialog"
-          >
-            <div className="org-mobile-drawer-header">
-              <div className="min-w-0">
-                <p className="org-sidebar-kicker text-xs font-semibold uppercase tracking-[0.14em]">
-                  Organisation
-                </p>
-                <h2
-                  className="org-sidebar-title mt-1 truncate text-base font-semibold"
-                  id={titleId}
-                >
-                  {organizationName ?? "Organisation"}
-                </h2>
-                <p className="org-sidebar-current mt-1 text-sm">
-                  {activeCommittee ? `${activeCommittee.name} · ` : ""}
-                  <span>{activeLabel}</span>
-                </p>
-              </div>
-              <button
-                aria-label="Luk navigation"
-                className="org-mobile-close"
-                onClick={() => setMobileOpen(false)}
-                type="button"
+    <nav
+      aria-label="Organisationsnavigation"
+      className="org-topbar"
+      ref={navRef}
+    >
+      <div className="org-topbar-inner">
+        <div className="org-topbar-primary">
+          {items
+            .filter(({ tier }) => tier !== "overflow")
+            .map((item) => (
+              <Link
+                aria-current={item.active ? "page" : undefined}
+                className="org-nav-link"
+                data-tier={item.tier}
+                href={`${root}${item.suffix}`}
+                key={item.suffix}
               >
-                Luk
-              </button>
-            </div>
-            <nav aria-label="Mobil organisationsnavigation">
-              {navLinks(() => setMobileOpen(false))}
-            </nav>
-          </div>
+                <span>{item.label}</span>
+              </Link>
+            ))}
         </div>
-      ) : null}
-    </aside>
+        <div className="org-topbar-more" data-active-tier={active?.tier}>
+          <Dropdown
+            className="org-topbar-dropdown"
+            label={
+              <>
+                Mere
+                {active ? (
+                  <span className="org-topbar-current sr-only">
+                    {" "}
+                    · Aktuel side: {active.label}
+                  </span>
+                ) : null}
+              </>
+            }
+            onOpenChange={setMoreOpen}
+            open={moreOpen}
+            panelId={panelId}
+            quiet={false}
+          >
+            {items
+              .filter(({ tier }) => tier !== "essential")
+              .map((item) => (
+                <Link
+                  aria-current={item.active ? "page" : undefined}
+                  className="org-nav-overflow-link"
+                  data-tier={item.tier}
+                  href={`${root}${item.suffix}`}
+                  key={item.suffix}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <AppIcon
+                    name={organizationNavIconNames[item.suffix]}
+                    size={16}
+                  />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+          </Dropdown>
+        </div>
+      </div>
+    </nav>
   );
 }

@@ -7,7 +7,6 @@ import type { MeetingCapabilities } from "@/lib/permissions";
 export function OrganizationWorkspace({
   children,
   organizationId,
-  organizationName,
   branding,
   committees = [],
   canManageOrganization = false,
@@ -15,7 +14,6 @@ export function OrganizationWorkspace({
 }: {
   children: React.ReactNode;
   organizationId: string;
-  organizationName?: string;
   branding?: SafeOrganizationBranding;
   committees?: Array<{
     id: string;
@@ -35,10 +33,7 @@ export function OrganizationWorkspace({
       />
       <OrganizationNav
         canManageOrganization={canManageOrganization}
-        committees={committees}
-        logoUrl={branding?.logoUrl ?? null}
         organizationId={organizationId}
-        organizationName={organizationName}
       />
       <div className="org-layout-content">{children}</div>
     </div>

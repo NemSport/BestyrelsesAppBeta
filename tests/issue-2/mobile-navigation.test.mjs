@@ -7,6 +7,7 @@ import {
   getVisibleOrganizationNavItems,
   isOrganizationNavItemActive,
   organizationNavItems,
+  organizationNavTier,
 } from "../../src/lib/organization-navigation.ts";
 import { getMeetingCapabilities } from "../../src/lib/meeting-capabilities.ts";
 import { canManageOrganizationTrash } from "../../src/lib/trash-capabilities.ts";
@@ -92,43 +93,51 @@ test("viewer, member, chair, and admin retain existing action visibility", () =>
   assert.equal(canManageOrganizationTrash("admin"), true);
 });
 
-test("mobile drawer implements dialog semantics and interaction lifecycle", async () => {
-  const [navigation, dialogFocus, styles] = await Promise.all([
+test("the responsive topbar keeps primary destinations and puts other links under Mere", async () => {
+  const [navigation, dropdown, styles] = await Promise.all([
     source("../../src/components/layout/organization-nav.tsx"),
-    source("../../src/hooks/use-dialog-focus.ts"),
+    source("../../src/components/ui/dropdown.tsx"),
     source("../../src/app/globals.css"),
   ]);
 
-  assert.match(navigation, /aria-expanded=\{mobileOpen\}/);
-  assert.match(navigation, /aria-haspopup="dialog"/);
-  assert.match(navigation, /aria-modal="true"/);
-  assert.match(navigation, /role="dialog"/);
-  assert.match(navigation, /useDialogFocus/);
-  assert.match(dialogFocus, /event\.key === "Escape"/);
-  assert.match(dialogFocus, /event\.key !== "Tab"/);
-  assert.match(dialogFocus, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(dialogFocus, /returnTarget\?\.isConnected/);
-  assert.match(navigation, /window\.matchMedia\("\(min-width: 1024px\)"\)/);
-  assert.match(navigation, /aria-current=\{active \? "page" : undefined\}/);
-  assert.match(navigation, /organizationNavIconNames\[item\.suffix\]/);
-  assert.match(navigation, /<AppIcon name="menu"/);
-  assert.match(styles, /\.org-mobile-drawer[\s\S]*overflow-y: auto/);
-  assert.match(styles, /min-height: 2\.75rem/);
+  const tiers = Object.fromEntries(
+    ["essential", "medium", "wide", "overflow"].map((tier) => [
+      tier,
+      organizationNavItems
+        .filter((item) => organizationNavTier(item.suffix) === tier)
+        .map((item) => item.label),
+    ]),
+  );
+  assert.deepEqual(tiers.essential, ["Overblik", "Møder", "Opgaver"]);
+  assert.deepEqual(tiers.medium, ["Udvalg", "Årshjul"]);
+  assert.deepEqual(tiers.wide, ["Beslutninger", "Dokumenter", "Adminoverblik"]);
+  assert.deepEqual(tiers.overflow, [
+    "Interessenter & Relationer",
+    "Jobkort",
+    "Medlemmer",
+    "Organisationsindstillinger",
+    "Papirkurv",
+  ]);
+  assert.match(navigation, /<Dropdown/);
+  assert.match(navigation, /Mere/);
+  assert.match(navigation, /useEffect\(\(\) => \{\s*setMoreOpen\(false\);\s*\}, \[pathname\]\)/);
+  assert.match(navigation, /aria-current=\{item\.active \? "page" : undefined\}/);
+  assert.match(dropdown, /useDismissibleDetails\(detailsRef\)/);
+  assert.match(styles, /@media \(max-width: 559px\)[\s\S]*\.org-nav-link\[data-tier="medium"\]/);
+  assert.match(styles, /@media \(max-width: 899px\)[\s\S]*\.org-nav-link\[data-tier="wide"\]/);
 });
 
-test("desktop navigation remains present outside the mobile breakpoint", async () => {
+test("both organization header rows stay sticky and compact with a safe-area offset", async () => {
   const [navigation, styles] = await Promise.all([
     source("../../src/components/layout/organization-nav.tsx"),
     source("../../src/app/globals.css"),
   ]);
-  assert.match(navigation, /className="org-desktop-navigation"/);
-  assert.match(styles, /@media \(min-width: 1024px\)/);
-  assert.match(styles, /\.org-sidebar[\s\S]*position: sticky/);
-  assert.match(styles, /\.org-nav-link-active[\s\S]*inset 3px 0 0/);
-  assert.match(
-    styles,
-    /@media \(max-width: 1023px\)[\s\S]*\.org-desktop-navigation[\s\S]*display: none/,
-  );
+  assert.match(navigation, /window\.addEventListener\("scroll", update, \{ passive: true \}\)/);
+  assert.match(navigation, /compact \? 24 : 72/);
+  assert.match(styles, /\.org-topbar \{\s*position: sticky;\s*top: var\(--org-header-height\)/);
+  assert.match(styles, /--org-topbar-height: calc\(var\(--org-header-height\) \+ var\(--org-nav-row\)\)/);
+  assert.match(styles, /padding-top: env\(safe-area-inset-top, 0px\)/);
+  assert.match(styles, /\.org-topbar-scroll-target \{[\s\S]*scroll-margin-top: calc\(var\(--org-topbar-height/);
 });
 
 test("every existing organization destination has one decorative Lucide icon", async () => {
@@ -226,7 +235,7 @@ test("Version 3.1.4b shares the organization theme and dropdown pattern", async 
   );
   assert.match(
     styles,
-    /\.org-sidebar \{[\s\S]*background: rgb\(var\(--brand-primary\)\)/,
+    /\.org-topbar \{[\s\S]*background: rgb\(var\(--brand-surface\)\)/,
   );
   assert.match(switcher, /active \? "bg-brand-soft text-brand" : "text-ink"/);
   assert.match(dropdown, /dropdown-panel[\s\S]*bg-surface[\s\S]*text-ink/);
