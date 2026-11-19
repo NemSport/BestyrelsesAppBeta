@@ -3110,3 +3110,5 @@ check is surfaced for review.
 Meeting extraction distinguishes an unreadable deadline from an unmentioned one
 per task. Server-side preview normalization clears unreadable dates and adds
 a source-linked clarification independently of the model's general questions.
+
+Job Cards can be drafted from administrator-supplied notes as the sole Bestie source. The editor preselects populated sections and saves the selected content after review.

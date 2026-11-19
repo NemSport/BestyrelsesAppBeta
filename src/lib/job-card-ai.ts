@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const jobCardAiRequestSchema = z.object({
   organizationId: z.string().uuid(),
+  notes: z.string().trim().min(1).max(5000).optional(),
   roleProfileId: z.string().uuid().nullable().optional(),
 });
 
@@ -33,7 +34,7 @@ export const jobCardAiOutputSchema = z.object({
   sourceIds: z.array(z.string().trim().min(1).max(100)).min(1).max(12),
 }).strict();
 
-export const jobCardAiPromptVersion = "job-card-draft-v1";
+export const jobCardAiPromptVersion = "job-card-draft-v2";
 export const jobCardAiInstructions = `
 Du er en dansk organisations- og onboardingassistent.
 Lav ét redigerbart udkast til et jobkort baseret udelukkende på KILDER.

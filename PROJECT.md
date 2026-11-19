@@ -1995,3 +1995,5 @@ prerequisite and leaves the date blank unless the source gives a deadline.
 
 A mentioned but unreadable task deadline appears as a source-linked
 clarification. The proposed task remains editable and its date stays blank.
+
+Job Cards can be drafted from administrator-supplied notes as the sole Bestie source. The editor preselects populated sections and saves the selected content after review.

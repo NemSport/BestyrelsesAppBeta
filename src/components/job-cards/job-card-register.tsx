@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { RichTextContent } from "@/components/forms/rich-text-content";
@@ -79,6 +79,38 @@ type AiJobCardDraft = {
   sourceIds: string[];
   sources: Array<{ id: string; label: string }>;
 };
+
+const sectionFields = {
+  purpose: ["Formål", "purpose"],
+  description: ["Beskrivelse", "description"],
+  responsibilities: ["Ansvar", "responsibilities"],
+  exclusions: ["Afgrænsning", "exclusions"],
+  competencies: ["Kompetencer", "competencies"],
+  collaboration: ["Samarbejde", "collaboration"],
+  meetingExpectations: ["Møder", "meetingExpectations"],
+  contactPeople: ["Kontaktpersoner", "contactPeople"],
+  areas: ["Ansvarsområder", "responsibilityAreaIds", "responsibilityAreaNames"],
+  committees: ["Udvalg", "committeeIds"],
+  holders: ["Rolleholdere", "assignedUserIds"],
+  relations: ["Relationer", "annualWheelEventIds", "decisionIds"],
+  documents: ["Dokumenter og links", "documents"],
+  templates: ["Opgaveskabeloner", "taskTemplates"],
+  onboarding: ["Onboarding", "onboarding"],
+} as const;
+type Section = keyof typeof sectionFields;
+const sections = Object.keys(sectionFields) as Section[];
+
+function initialSections(draft: RoleDraft) {
+  return sections.filter((section) => {
+    const [, ...keys] = sectionFields[section];
+    return keys.some((key) => {
+      const value = draft[key];
+      return typeof value === "string" || Array.isArray(value)
+        ? value.length > 0
+        : Object.values(value).some(Boolean);
+    });
+  });
+}
 
 function emptyDraft(): RoleDraft {
   return {
@@ -263,6 +295,28 @@ export function JobCardRegister({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<RoleDraft | null>(null);
+  const [entryMode, setEntryMode] = useState<"notes" | "form">("form");
+  const [notes, setNotes] = useState("");
+  const [activeSections, setActiveSections] = useState<Section[]>([]);
+  const requestVersion = useRef(0);
+
+  function openEditor(value: RoleDraft, mode: "notes" | "form" = "form") {
+    requestVersion.current++;
+    setAiLoadingId(null);
+    setAreaName("");
+    setError(null);
+    setNotes("");
+    setActiveSections(initialSections(value));
+    setEntryMode(mode);
+    setDraft(value);
+  }
+
+  function closeEditor() {
+    requestVersion.current++;
+    setAiLoadingId(null);
+    setDraft(null);
+  }
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [areaName, setAreaName] = useState("");
@@ -319,10 +373,17 @@ export function JobCardRegister({
     setSaving(true);
     setError(null);
     const draftForSubmit = addResponsibilityAreaInput(
-      draft,
+      { ...draft },
       areaName,
       data.responsibilityAreas,
     );
+    const blank = emptyDraft();
+    for (const section of sections) {
+      if (activeSections.includes(section)) continue;
+      const [, ...keys] = sectionFields[section];
+      for (const key of keys)
+        Object.assign(draftForSubmit, { [key]: blank[key] });
+    }
     try {
       const response = await fetch(
         draft.id
@@ -437,81 +498,96 @@ export function JobCardRegister({
     }
   }
 
-  async function suggest(role?: RoleProfileView) {
-    setAiLoadingId(role?.id ?? "new");
-    setTaskMessage(null);
-    const response = await fetch(
-      `/api/organizations/${organizationId}/job-cards/suggestions`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          roleProfileId: role?.id ?? null,
+  async function suggest(role?: RoleProfileView, inputNotes?: string) {
+    const version = ++requestVersion.current;
+    setError(null);
+    try {
+      setAiLoadingId(role?.id ?? "new");
+      setTaskMessage(null);
+      const response = await fetch(
+        `/api/organizations/${organizationId}/job-cards/suggestions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizationId,
+            roleProfileId: role?.id ?? null,
+            notes: inputNotes,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (version !== requestVersion.current) return;
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Bestie kunne ikke lave et udkast.");
+        return;
+      }
+      const suggestion = payload as AiJobCardDraft;
+      const base = role ? fromRole(role) : emptyDraft();
+      const normalizedAreas = new Set(
+        suggestion.responsibilityAreas.map((value) => normalizeAreaName(value)),
+      );
+      const normalizedCommittees = new Set(
+        suggestion.committeeNames.map((value) =>
+          value.toLocaleLowerCase("da-DK"),
+        ),
+      );
+      openEditor({
+        ...base,
+        title: suggestion.title,
+        purpose: suggestion.purpose,
+        description: suggestion.description,
+        responsibilities: suggestion.responsibilities,
+        exclusions: suggestion.exclusions,
+        competencies: suggestion.competencies,
+        collaboration: suggestion.collaboration,
+        meetingExpectations: suggestion.meetingExpectations,
+        contactPeople: suggestion.contactPeople,
+        responsibilityAreaIds: data.responsibilityAreas
+          .filter((area) => normalizedAreas.has(normalizeAreaName(area.name)))
+          .map((area) => area.id),
+        responsibilityAreaNames: suggestion.responsibilityAreas.filter(
+          (suggestedArea) =>
+            !data.responsibilityAreas.some(
+              (area) =>
+                normalizeAreaName(area.name) ===
+                normalizeAreaName(suggestedArea),
+            ),
+        ),
+        committeeIds: data.committees
+          .filter((committee) =>
+            normalizedCommittees.has(committee.name.toLocaleLowerCase("da-DK")),
+          )
+          .map((committee) => committee.id),
+        taskTemplates: suggestion.taskTemplates.flatMap((template) => {
+          const committee = data.committees.find(
+            (candidate) =>
+              candidate.name.toLocaleLowerCase("da-DK") ===
+              template.committeeName.toLocaleLowerCase("da-DK"),
+          );
+          return committee ? [{ ...template, committeeId: committee.id }] : [];
         }),
-      },
-    );
-    const payload = await response.json().catch(() => ({}));
-    setAiLoadingId(null);
-    if (!response.ok) {
-      setTaskMessage(payload.error ?? "AI kunne ikke foreslå et jobkort.");
-      return;
+        onboarding: suggestion.onboarding,
+      });
+      setTaskMessage(
+        `AI-udkast åbnet til gennemgang. Kilder: ${suggestion.sourceIds
+          .map(
+            (sourceId) =>
+              suggestion.sources.find((source) => source.id === sourceId)
+                ?.label,
+          )
+          .filter(Boolean)
+          .join(", ")}.`,
+      );
+    } catch (error) {
+      if (version === requestVersion.current) {
+        const message = error instanceof Error ? error.message : "Prøv igen.";
+        if (inputNotes) setError(message);
+        else setTaskMessage(message);
+      }
+    } finally {
+      if (version === requestVersion.current) setAiLoadingId(null);
     }
-    const suggestion = payload as AiJobCardDraft;
-    const base = role ? fromRole(role) : emptyDraft();
-    const normalizedAreas = new Set(
-      suggestion.responsibilityAreas.map((value) => normalizeAreaName(value)),
-    );
-    const normalizedCommittees = new Set(
-      suggestion.committeeNames.map((value) =>
-        value.toLocaleLowerCase("da-DK"),
-      ),
-    );
-    setDraft({
-      ...base,
-      title: suggestion.title,
-      purpose: suggestion.purpose,
-      description: suggestion.description,
-      responsibilities: suggestion.responsibilities,
-      exclusions: suggestion.exclusions,
-      competencies: suggestion.competencies,
-      collaboration: suggestion.collaboration,
-      meetingExpectations: suggestion.meetingExpectations,
-      contactPeople: suggestion.contactPeople,
-      responsibilityAreaIds: data.responsibilityAreas
-        .filter((area) => normalizedAreas.has(normalizeAreaName(area.name)))
-        .map((area) => area.id),
-      responsibilityAreaNames: suggestion.responsibilityAreas.filter(
-        (suggestedArea) =>
-          !data.responsibilityAreas.some(
-            (area) =>
-              normalizeAreaName(area.name) === normalizeAreaName(suggestedArea),
-          ),
-      ),
-      committeeIds: data.committees
-        .filter((committee) =>
-          normalizedCommittees.has(committee.name.toLocaleLowerCase("da-DK")),
-        )
-        .map((committee) => committee.id),
-      taskTemplates: suggestion.taskTemplates.flatMap((template) => {
-        const committee = data.committees.find(
-          (candidate) =>
-            candidate.name.toLocaleLowerCase("da-DK") ===
-            template.committeeName.toLocaleLowerCase("da-DK"),
-        );
-        return committee ? [{ ...template, committeeId: committee.id }] : [];
-      }),
-      onboarding: suggestion.onboarding,
-    });
-    setTaskMessage(
-      `AI-udkast åbnet til gennemgang. Kilder: ${suggestion.sourceIds
-        .map(
-          (sourceId) =>
-            suggestion.sources.find((source) => source.id === sourceId)?.label,
-        )
-        .filter(Boolean)
-        .join(", ")}.`,
-    );
   }
 
   return (
@@ -562,7 +638,7 @@ export function JobCardRegister({
             </p>
           </div>
           <div className="section-actions">
-            <Button onClick={() => setDraft(emptyDraft())}>
+            <Button onClick={() => openEditor(emptyDraft(), "notes")}>
               Opret jobkort
             </Button>
             <ActionMenu>
@@ -683,15 +759,17 @@ export function JobCardRegister({
                         <div className="min-w-0">
                           <dt className="text-xs text-muted">Rolleholdere</dt>
                           <dd className="break-words">
-                            {role.assignments.map(({ name }) => name).join(", ") ||
-                              "Ingen rolleholdere"}
+                            {role.assignments
+                              .map(({ name }) => name)
+                              .join(", ") || "Ingen rolleholdere"}
                           </dd>
                         </div>
                         <div className="min-w-0">
                           <dt className="text-xs text-muted">Udvalg</dt>
                           <dd className="break-words">
-                            {role.committees.map(({ name }) => name).join(", ") ||
-                              "Ingen tilknyttede udvalg"}
+                            {role.committees
+                              .map(({ name }) => name)
+                              .join(", ") || "Ingen tilknyttede udvalg"}
                           </dd>
                         </div>
                       </dl>
@@ -721,7 +799,7 @@ export function JobCardRegister({
                           </button>
                           <button
                             className="ui-action ui-action-menu w-full text-left text-sm"
-                            onClick={() => setDraft(fromRole(role))}
+                            onClick={() => openEditor(fromRole(role))}
                             type="button"
                           >
                             Rediger jobkort
@@ -915,7 +993,7 @@ export function JobCardRegister({
         <EmptyState
           action={
             data.canManage ? (
-              <Button onClick={() => setDraft(emptyDraft())}>
+              <Button onClick={() => openEditor(emptyDraft(), "notes")}>
                 Opret det første jobkort
               </Button>
             ) : undefined
@@ -936,7 +1014,25 @@ export function JobCardRegister({
         error={error}
         onAreaName={setAreaName}
         onArchive={archive}
-        onClose={() => setDraft(null)}
+        onClose={closeEditor}
+        entryMode={entryMode}
+        notes={notes}
+        onNotes={setNotes}
+        onManual={() => {
+          const manual = emptyDraft();
+          manual.description = notes.trim();
+          openEditor(manual);
+        }}
+        onSuggest={() => void suggest(undefined, notes.trim())}
+        aiBusy={aiLoadingId !== null}
+        active={activeSections}
+        onToggle={(section) =>
+          setActiveSections((current) =>
+            current.includes(section)
+              ? current.filter((item) => item !== section)
+              : [...current, section],
+          )
+        }
         onCreateArea={createArea}
         onDraft={setDraft}
         onSubmit={submit}
@@ -981,6 +1077,7 @@ function CompactMetaList({
 }
 
 function TextBlock({ title, value }: { title: string; value?: string | null }) {
+  if (!value?.trim()) return null;
   return (
     <section className="min-w-0">
       <h3 className="text-sm font-semibold">{title}</h3>
@@ -1025,6 +1122,14 @@ function ContextList({
 }
 
 function RoleModal(props: {
+  entryMode: "notes" | "form";
+  notes: string;
+  onNotes: (value: string) => void;
+  onManual: () => void;
+  onSuggest: () => void;
+  aiBusy: boolean;
+  active: Section[];
+  onToggle: (section: Section) => void;
   data: JobCardOverview;
   draft: RoleDraft | null;
   error: string | null;
@@ -1045,276 +1150,327 @@ function RoleModal(props: {
       open={Boolean(draft)}
       title={draft?.id ? "Rediger jobkort" : "Opret jobkort"}
     >
-      {draft ? (
+      {draft && props.entryMode === "notes" ? (
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (props.notes.trim() && !props.aiBusy) props.onSuggest();
+          }}
+        >
+          <Field label="Hvad skal der gøres?">
+            <Textarea
+              autoFocus
+              maxLength={5000}
+              value={props.notes}
+              disabled={props.aiBusy}
+              placeholder="Skriv et par stikord om opgaven"
+              onChange={(event) => props.onNotes(event.target.value)}
+            />
+          </Field>
+          {props.error && (
+            <p role="alert" className="alert-danger p-3">
+              {props.error}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={props.aiBusy || !props.notes.trim()}
+              type="submit"
+            >
+              {props.aiBusy ? "Bestie skriver…" : "Lav udkast med Bestie"}
+            </Button>
+            <Button onClick={props.onManual} type="button" variant="secondary">
+              Udfyld selv
+            </Button>
+          </div>
+        </form>
+      ) : draft ? (
         <form className="space-y-6" onSubmit={props.onSubmit}>
           {props.error ? (
             <div className="alert-danger p-3 text-sm">{props.error}</div>
           ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Titel">
-              <Input
-                value={draft.title}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, title: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Formål">
-              <Input
-                value={draft.purpose}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, purpose: e.target.value })
-                }
-              />
-            </Field>
-          </div>
-          <Field label="Beskrivelse">
-            <Textarea
-              value={draft.description}
+          <Field label="Titel">
+            <Input
+              required
+              minLength={2}
+              maxLength={180}
+              value={draft.title}
               onChange={(e) =>
-                props.onDraft({ ...draft, description: e.target.value })
+                props.onDraft({ ...draft, title: e.target.value })
               }
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Hvad rollen har ansvar for">
-              <Textarea
-                value={draft.responsibilities}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, responsibilities: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Hvad rollen ikke har ansvar for">
-              <Textarea
-                value={draft.exclusions}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, exclusions: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Kompetencer">
-              <Textarea
-                value={draft.competencies}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, competencies: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Samarbejder med">
-              <Textarea
-                value={draft.collaboration}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, collaboration: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Normale møder">
-              <Textarea
-                value={draft.meetingExpectations}
-                onChange={(e) =>
-                  props.onDraft({
-                    ...draft,
-                    meetingExpectations: e.target.value,
-                  })
-                }
-              />
-            </Field>
-            <Field label="Kontaktpersoner">
-              <Textarea
-                value={draft.contactPeople}
-                onChange={(e) =>
-                  props.onDraft({ ...draft, contactPeople: e.target.value })
-                }
-              />
-            </Field>
-          </div>
-          <ChoiceGroup
-            label="Ansvarsområder"
-            options={data.responsibilityAreas.map((area) => ({
-              id: area.id,
-              label: area.name,
-            }))}
-            values={draft.responsibilityAreaIds}
-            onToggle={(id) =>
-              props.onDraft({
-                ...draft,
-                responsibilityAreaIds: toggle(draft.responsibilityAreaIds, id),
-              })
-            }
-          />
-          {draft.responsibilityAreaNames.length ? (
-            <div className="flex flex-wrap gap-2">
-              {draft.responsibilityAreaNames.map((name) => (
-                <button
-                  className="ui-action text-sm text-brand"
-                  key={normalizeAreaName(name)}
-                  onClick={() =>
-                    props.onDraft({
-                      ...draft,
-                      responsibilityAreaNames:
-                        draft.responsibilityAreaNames.filter(
-                          (current) =>
-                            normalizeAreaName(current) !==
-                            normalizeAreaName(name),
-                        ),
-                    })
-                  }
-                  type="button"
-                >
-                  {name} x
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <div className="flex gap-2">
-            <Input
-              list="job-card-responsibility-areas"
-              placeholder="Skriv nyt eller eksisterende ansvarsområde"
-              value={props.areaName}
-              onChange={(e) => props.onAreaName(e.target.value)}
-            />
-            <datalist id="job-card-responsibility-areas">
-              {data.responsibilityAreas.map((area) => (
-                <option key={area.id} value={area.name} />
-              ))}
-            </datalist>
-            <Button
-              disabled={!props.areaName.trim()}
-              onClick={props.onCreateArea}
-              type="button"
-              variant="secondary"
-            >
-              Tilføj område
-            </Button>
-          </div>
-          <ChoiceGroup
-            label="Udvalg"
-            options={data.committees.map((committee) => ({
-              id: committee.id,
-              label: committee.name,
-            }))}
-            values={draft.committeeIds}
-            onToggle={(id) =>
-              props.onDraft({
-                ...draft,
-                committeeIds: toggle(draft.committeeIds, id),
-              })
-            }
-          />
-          <ChoiceGroup
-            label="Rolleholdere"
-            options={data.members
-              .filter((member) => member.status === "active")
-              .map((member) => ({
-                id: member.user_id,
-                label: member.full_name || member.email,
-              }))}
-            values={draft.assignedUserIds}
-            onToggle={(id) =>
-              props.onDraft({
-                ...draft,
-                assignedUserIds: toggle(draft.assignedUserIds, id),
-              })
-            }
-          />
-          <details className="border-y border-line py-4">
-            <summary className="cursor-pointer text-sm font-semibold">
-              Relationer
-              <span className="ml-2 font-normal text-muted">
-                ({draft.annualWheelEventIds.length + draft.decisionIds.length})
-              </span>
+          <details className="rounded border border-line p-3">
+            <summary className="cursor-pointer font-semibold">
+              Vælg felter
             </summary>
-            <div className="mt-4 space-y-5">
-              <RelationChoiceGroup
-                empty="Ingen årshjulsaktiviteter er tilgængelige."
-                label="Årshjulsaktiviteter"
-                onToggle={(id) =>
-                  props.onDraft({
-                    ...draft,
-                    annualWheelEventIds: toggle(draft.annualWheelEventIds, id),
-                  })
-                }
-                options={data.annualWheelEvents.map((event) => ({
-                  id: event.id,
-                  label: event.title,
-                  meta: `${event.starts_on} · ${
-                    event.committee?.name ?? "Hele organisationen"
-                  }`,
-                }))}
-                values={draft.annualWheelEventIds}
-              />
-              <RelationChoiceGroup
-                empty="Ingen beslutninger er tilgængelige."
-                label="Beslutninger"
-                onToggle={(id) =>
-                  props.onDraft({
-                    ...draft,
-                    decisionIds: toggle(draft.decisionIds, id),
-                  })
-                }
-                options={data.decisions.map((decision) => ({
-                  id: decision.id,
-                  label: decision.title,
-                  meta: `${decision.decision_date} · ${
-                    data.committees.find(
-                      (committee) => committee.id === decision.committee_id,
-                    )?.name ?? "Udvalg"
-                  }`,
-                }))}
-                values={draft.decisionIds}
-              />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {sections.map((section) => (
+                <label
+                  key={section}
+                  className="flex items-center gap-2 py-1 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={props.active.includes(section)}
+                    onChange={() => props.onToggle(section)}
+                  />
+                  {sectionFields[section][0]}
+                </label>
+              ))}
             </div>
           </details>
-          <DynamicDocuments draft={draft} onDraft={props.onDraft} />
-          <DynamicTemplates data={data} draft={draft} onDraft={props.onDraft} />
-          <div className="border-t border-line pt-5">
-            <h3 className="font-semibold">Onboarding</h3>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Field label="Introduktion til rollen">
+          {(
+            [
+              "purpose",
+              "description",
+              "responsibilities",
+              "exclusions",
+              "competencies",
+              "collaboration",
+              "meetingExpectations",
+              "contactPeople",
+            ] as const
+          )
+            .filter((key) => props.active.includes(key))
+            .map((key) => (
+              <Field key={key} label={sectionFields[key][0]}>
                 <Textarea
-                  value={draft.onboarding.introduction}
+                  value={draft[key]}
                   onChange={(e) =>
-                    props.onDraft({
-                      ...draft,
-                      onboarding: {
-                        ...draft.onboarding,
-                        introduction: e.target.value,
-                      },
-                    })
+                    props.onDraft({ ...draft, [key]: e.target.value })
                   }
                 />
               </Field>
-              <Field label="Prioriterede opgaver de første 30 dage">
-                <Textarea
-                  value={draft.onboarding.first30Days}
-                  onChange={(e) =>
-                    props.onDraft({
-                      ...draft,
-                      onboarding: {
-                        ...draft.onboarding,
-                        first30Days: e.target.value,
-                      },
-                    })
-                  }
+            ))}
+          {props.active.includes("areas") && (
+            <>
+              <ChoiceGroup
+                label="Ansvarsområder"
+                options={data.responsibilityAreas.map((area) => ({
+                  id: area.id,
+                  label: area.name,
+                }))}
+                values={draft.responsibilityAreaIds}
+                onToggle={(id) =>
+                  props.onDraft({
+                    ...draft,
+                    responsibilityAreaIds: toggle(
+                      draft.responsibilityAreaIds,
+                      id,
+                    ),
+                  })
+                }
+              />
+              {draft.responsibilityAreaNames.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {draft.responsibilityAreaNames.map((name) => (
+                    <button
+                      className="ui-action text-sm text-brand"
+                      key={normalizeAreaName(name)}
+                      onClick={() =>
+                        props.onDraft({
+                          ...draft,
+                          responsibilityAreaNames:
+                            draft.responsibilityAreaNames.filter(
+                              (current) =>
+                                normalizeAreaName(current) !==
+                                normalizeAreaName(name),
+                            ),
+                        })
+                      }
+                      type="button"
+                    >
+                      {name} x
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex gap-2">
+                <Input
+                  list="job-card-responsibility-areas"
+                  placeholder="Skriv nyt eller eksisterende ansvarsområde"
+                  value={props.areaName}
+                  onChange={(e) => props.onAreaName(e.target.value)}
                 />
-              </Field>
-              <Field label="Praktisk information">
-                <Textarea
-                  value={draft.onboarding.practicalInformation}
-                  onChange={(e) =>
-                    props.onDraft({
-                      ...draft,
-                      onboarding: {
-                        ...draft.onboarding,
-                        practicalInformation: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          </div>
+                <datalist id="job-card-responsibility-areas">
+                  {data.responsibilityAreas.map((area) => (
+                    <option key={area.id} value={area.name} />
+                  ))}
+                </datalist>
+                <Button
+                  disabled={!props.areaName.trim()}
+                  onClick={props.onCreateArea}
+                  type="button"
+                  variant="secondary"
+                >
+                  Tilføj område
+                </Button>
+              </div>
+            </>
+          )}
+          {props.active.includes("committees") && (
+            <>
+              <ChoiceGroup
+                label="Udvalg"
+                options={data.committees.map((committee) => ({
+                  id: committee.id,
+                  label: committee.name,
+                }))}
+                values={draft.committeeIds}
+                onToggle={(id) =>
+                  props.onDraft({
+                    ...draft,
+                    committeeIds: toggle(draft.committeeIds, id),
+                  })
+                }
+              />
+            </>
+          )}
+          {props.active.includes("holders") && (
+            <>
+              <ChoiceGroup
+                label="Rolleholdere"
+                options={data.members
+                  .filter((member) => member.status === "active")
+                  .map((member) => ({
+                    id: member.user_id,
+                    label: member.full_name || member.email,
+                  }))}
+                values={draft.assignedUserIds}
+                onToggle={(id) =>
+                  props.onDraft({
+                    ...draft,
+                    assignedUserIds: toggle(draft.assignedUserIds, id),
+                  })
+                }
+              />
+            </>
+          )}
+          {props.active.includes("relations") && (
+            <>
+              <details className="border-y border-line py-4">
+                <summary className="cursor-pointer text-sm font-semibold">
+                  Relationer
+                  <span className="ml-2 font-normal text-muted">
+                    (
+                    {draft.annualWheelEventIds.length +
+                      draft.decisionIds.length}
+                    )
+                  </span>
+                </summary>
+                <div className="mt-4 space-y-5">
+                  <RelationChoiceGroup
+                    empty="Ingen årshjulsaktiviteter er tilgængelige."
+                    label="Årshjulsaktiviteter"
+                    onToggle={(id) =>
+                      props.onDraft({
+                        ...draft,
+                        annualWheelEventIds: toggle(
+                          draft.annualWheelEventIds,
+                          id,
+                        ),
+                      })
+                    }
+                    options={data.annualWheelEvents.map((event) => ({
+                      id: event.id,
+                      label: event.title,
+                      meta: `${event.starts_on} · ${
+                        event.committee?.name ?? "Hele organisationen"
+                      }`,
+                    }))}
+                    values={draft.annualWheelEventIds}
+                  />
+                  <RelationChoiceGroup
+                    empty="Ingen beslutninger er tilgængelige."
+                    label="Beslutninger"
+                    onToggle={(id) =>
+                      props.onDraft({
+                        ...draft,
+                        decisionIds: toggle(draft.decisionIds, id),
+                      })
+                    }
+                    options={data.decisions.map((decision) => ({
+                      id: decision.id,
+                      label: decision.title,
+                      meta: `${decision.decision_date} · ${
+                        data.committees.find(
+                          (committee) => committee.id === decision.committee_id,
+                        )?.name ?? "Udvalg"
+                      }`,
+                    }))}
+                    values={draft.decisionIds}
+                  />
+                </div>
+              </details>
+            </>
+          )}
+          {props.active.includes("documents") && (
+            <>
+              <DynamicDocuments draft={draft} onDraft={props.onDraft} />
+            </>
+          )}
+          {props.active.includes("templates") && (
+            <>
+              <DynamicTemplates
+                data={data}
+                draft={draft}
+                onDraft={props.onDraft}
+              />
+            </>
+          )}
+          {props.active.includes("onboarding") && (
+            <>
+              <div className="border-t border-line pt-5">
+                <h3 className="font-semibold">Onboarding</h3>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <Field label="Introduktion til rollen">
+                    <Textarea
+                      value={draft.onboarding.introduction}
+                      onChange={(e) =>
+                        props.onDraft({
+                          ...draft,
+                          onboarding: {
+                            ...draft.onboarding,
+                            introduction: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Prioriterede opgaver de første 30 dage">
+                    <Textarea
+                      value={draft.onboarding.first30Days}
+                      onChange={(e) =>
+                        props.onDraft({
+                          ...draft,
+                          onboarding: {
+                            ...draft.onboarding,
+                            first30Days: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Praktisk information">
+                    <Textarea
+                      value={draft.onboarding.practicalInformation}
+                      onChange={(e) =>
+                        props.onDraft({
+                          ...draft,
+                          onboarding: {
+                            ...draft.onboarding,
+                            practicalInformation: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+              </div>
+            </>
+          )}
           <div className="flex justify-between gap-3">
             {draft.id ? (
               <Button
