@@ -1991,3 +1991,5 @@ prerequisite and leaves the date blank unless the source gives a deadline.
 
 A mentioned but unreadable task deadline appears as a source-linked
 clarification. The proposed task remains editable and its date stays blank.
+
+Committee managers can also upload meeting material directly from Bestie on the organization overview. Bestie asks which committee held the meeting when needed and uses answers to clarification questions to revise the proposal before confirmation.

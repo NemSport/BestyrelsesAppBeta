@@ -3106,3 +3106,5 @@ check is surfaced for review.
 Meeting extraction distinguishes an unreadable deadline from an unmentioned one
 per task. Server-side preview normalization clears unreadable dates and adds
 a source-linked clarification independently of the model's general questions.
+
+The overview and meeting import page share the same client workflow and committee-authorized endpoint. Files stay in the current form until the committee is selected. Clarifications re-run extraction with the original files and bounded user input, generating a new review before explicit confirmation. The preview supplies active assignees for the selected committee.

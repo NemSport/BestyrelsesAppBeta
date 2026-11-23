@@ -1,5 +1,6 @@
 "use client";
 
+import { HistoricalMeetingImport } from "@/components/meetings/historical-meeting-import";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { AppIcon } from "@/components/icons/app-icon";
@@ -13,9 +14,11 @@ type Answer = {
 export function AdvisoryAi({
   organizationId,
   summary = false,
+  committees = [],
 }: {
   organizationId: string;
   summary?: boolean;
+  committees?: { id: string; name: string }[];
 }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -102,6 +105,14 @@ export function AdvisoryAi({
               {pending ? "Søger …" : "Spørg →"}
             </button>
           </form>
+          {committees.length > 0 && (
+            <HistoricalMeetingImport
+              dashboard
+              userNote={question}
+              organizationId={organizationId}
+              committees={committees}
+            />
+          )}
         </>
       )}
       <div aria-live="polite">
