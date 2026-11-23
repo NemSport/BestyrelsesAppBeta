@@ -20,11 +20,13 @@ type Action = Point["decisions"][number];
 export function HistoricalMeetingImport({
   organizationId,
   committees,
-  members,
+  dashboard = false,
+  userNote = "",
 }: {
   organizationId: string;
   committees: { id: string; name: string }[];
-  members: { id: string; name: string; committees: string[] }[];
+  dashboard?: boolean;
+  userNote?: string;
 }) {
   const root = `/organizations/${organizationId}`;
   const input = useRef<HTMLInputElement>(null);
@@ -33,14 +35,19 @@ export function HistoricalMeetingImport({
   );
   const [preview, setPreview] = useState<MeetingImportPreview | null>(null);
   const [proposal, setProposal] = useState<MeetingImportApproval | null>(null);
-  const [fileNames, setFileNames] = useState<string[]>([]);
   const [busy, setBusy] = useState<"read" | "save" | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
 
-  const availableMembers = members.filter((member) =>
-    member.committees.includes(committee),
-  );
+  const [availableMembers, setAvailableMembers] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileNames = files.map((file) => file.name);
+  const [asking, setAsking] = useState(false);
+  const [reply, setReply] = useState("");
+  const [priorReply, setPriorReply] = useState("");
+  const [fileNote, setFileNote] = useState("");
   const showSource = (source: Source) =>
     [fileNames[source.file - 1], source.page ? `side ${source.page}` : ""]
       .filter(Boolean)
@@ -49,12 +56,13 @@ export function HistoricalMeetingImport({
   async function request(
     body: FormData | MeetingImportApproval,
     operation: "read" | "save",
+    committeeId = committee,
   ) {
     setBusy(operation);
     setError("");
     try {
       const response = await fetch(
-        `/api${root}/committees/${committee}/meeting-import`,
+        `/api${root}/committees/${committeeId}/meeting-import`,
         {
           method: "POST",
           headers:
@@ -80,8 +88,13 @@ export function HistoricalMeetingImport({
     }
   }
 
-  async function readFiles(files: File[]) {
-    if (!files.length || busy || !committee) return;
+  async function readFiles(
+    files: File[],
+    committeeId: string,
+    clarification = "",
+    note = fileNote,
+  ) {
+    if (!files.length || busy) return;
     if (
       files.length > meetingImportMaxFiles ||
       files.reduce((size, file) => size + file.size, 0) > meetingImportMaxBytes
@@ -89,14 +102,30 @@ export function HistoricalMeetingImport({
       setError("Vælg højst 4 filer på maks. 4 MB tilsammen.");
       return;
     }
+    if (!committeeId) return;
+    if (clarification.length > 24000) {
+      setError(
+        "Afklaringen er blevet for lang. Gennemgå forslaget og ret felterne direkte.",
+      );
+      return;
+    }
     const form = new FormData();
+    if (note.trim()) form.set("note", note.trim());
+    if (clarification) form.set("clarification", clarification);
     files.forEach((file) => form.append("files", file));
-    const result: (MeetingImportPreview & { analysisId: string }) | null =
-      await request(form, "read");
+    const result:
+      | (MeetingImportPreview & {
+          analysisId: string;
+          members: typeof availableMembers;
+        })
+      | null = await request(form, "read", committeeId);
     if (!result) return;
+    setAvailableMembers(result.members);
+    setAsking(result.questions.length > 0 || !result.date);
+    setReply("");
+    setPriorReply(clarification);
     setPreview(result);
     setSaved("");
-    setFileNames(files.map(({ name }) => name));
     setProposal({
       analysisId: result.analysisId,
       title: result.title,
@@ -112,7 +141,7 @@ export function HistoricalMeetingImport({
           responsibleUserId: suggestMeetingImportAssignee(
             task.namedOwner,
             result.participantAliases,
-            availableMembers,
+            result.members,
           ),
         })),
       })),
@@ -143,36 +172,55 @@ export function HistoricalMeetingImport({
 
   return (
     <div className="space-y-3">
-      <Link
-        href={`${root}/meetings?period=previous`}
-        className="text-sm font-medium text-brand underline"
-      >
-        Til mødeoversigten
-      </Link>
-      <PageHeader title="Importér referat og mødenoter" className="!pb-2" />
-      <section className="panel flex flex-wrap items-end gap-3 p-3">
-        <label className="min-w-40 text-sm">
-          <span className="label">Udvalg</span>
-          <Select
-            value={committee}
-            disabled={Boolean(busy)}
-            onChange={(event) => {
-              setCommittee(event.target.value);
-              setPreview(null);
-              setProposal(null);
-              setFileNames([]);
-              setError("");
-              setSaved("");
-            }}
+      {!dashboard && (
+        <>
+          <Link
+            href={`${root}/meetings?period=previous`}
+            className="text-sm font-medium text-brand underline"
           >
-            <option value="">Vælg udvalg</option>
-            {committees.map(({ id, name }) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </Select>
-        </label>
+            Til mødeoversigten
+          </Link>
+          <PageHeader title="Importér referat og mødenoter" className="!pb-2" />
+        </>
+      )}
+      <section
+        className={
+          dashboard
+            ? "mt-2 flex flex-wrap items-end gap-2"
+            : "panel flex flex-wrap items-end gap-3 p-3"
+        }
+      >
+        {(!dashboard || files.length > 0) && (
+          <label className="min-w-40 text-sm">
+            <span className="label">
+              {files.length && !committee
+                ? "Hvilket udvalg holdt mødet?"
+                : "Udvalg"}
+            </span>
+            <Select
+              value={committee}
+              disabled={Boolean(busy)}
+              onChange={(event) => {
+                setCommittee(event.target.value);
+                setPreview(null);
+                setProposal(null);
+                setError("");
+                setSaved("");
+                setAsking(false);
+                setPriorReply("");
+                setReply("");
+                if (files.length) void readFiles(files, event.target.value);
+              }}
+            >
+              <option value="">Vælg udvalg</option>
+              {committees.map(({ id, name }) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
         <input
           ref={input}
           type="file"
@@ -180,22 +228,48 @@ export function HistoricalMeetingImport({
           hidden
           accept=".docx,.pdf,.jpg,.jpeg,.png"
           onChange={(event) => {
-            void readFiles(Array.from(event.target.files ?? []));
+            const selected = Array.from(event.target.files ?? []);
+            if (!selected.length) return;
+            if (
+              selected.length > meetingImportMaxFiles ||
+              selected.reduce((n, file) => n + file.size, 0) >
+                meetingImportMaxBytes
+            ) {
+              setError("Vælg højst 4 filer på maks. 4 MB tilsammen.");
+              event.target.value = "";
+              return;
+            }
+            setFiles(selected);
+            setSaved("");
+            setAsking(false);
+            setPreview(null);
+            setProposal(null);
+            setPriorReply("");
+            setReply("");
+            setError("");
+            setFileNote(userNote);
+            void readFiles(selected, committee, "", userNote);
             event.target.value = "";
           }}
         />
         <Button
           className={primary}
-          disabled={!committee || Boolean(busy)}
+          disabled={Boolean(busy)}
           onClick={() => input.current?.click()}
         >
-          {busy === "read" ? "Bestie læser …" : "Vælg filer"}
+          {busy === "read"
+            ? "Bestie læser …"
+            : dashboard
+              ? "Upload fil"
+              : "Vælg filer"}
         </Button>
-        <p className="w-full text-sm text-muted">
-          {fileNames.length
-            ? fileNames.join(" · ")
-            : "Op til 4 filer til samme møde · Word (.docx), PDF, JPG eller PNG · Højst 4 MB tilsammen"}
-        </p>
+        {(!dashboard || files.length > 0) && (
+          <p className="w-full text-sm text-muted">
+            {fileNames.length
+              ? fileNames.join(" · ")
+              : "Op til 4 filer til samme møde · Word (.docx), PDF, JPG eller PNG · Højst 4 MB tilsammen"}
+          </p>
+        )}
       </section>
       {error ? (
         <p role="alert" className="text-sm text-danger">
@@ -214,7 +288,67 @@ export function HistoricalMeetingImport({
         </p>
       ) : null}
 
-      {preview && proposal && !saved ? (
+      {asking && preview && proposal && (
+        <section
+          className="panel space-y-2 p-3"
+          aria-label="Spørgsmål fra Bestie"
+        >
+          <h2 className="font-semibold">Bestie har brug for din hjælp</h2>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {!preview.date && <li>Hvilken dato blev mødet holdt?</li>}
+            {preview.questions.map(({ text, source }, index) => (
+              <li key={index}>
+                {text}{" "}
+                <span className="text-muted">({showSource(source)})</span>
+              </li>
+            ))}
+          </ul>
+          <label className="block text-sm">
+            <span className="label">Dit svar til Bestie</span>
+            <Textarea
+              value={reply}
+              maxLength={2000}
+              disabled={Boolean(busy)}
+              onChange={(event) => setReply(event.target.value)}
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={Boolean(busy) || !reply.trim()}
+              onClick={() =>
+                void readFiles(
+                  files,
+                  committee,
+                  [
+                    priorReply,
+                    JSON.stringify({
+                      questions: [
+                        ...(!preview.date
+                          ? ["Hvilken dato blev mødet holdt?"]
+                          : []),
+                        ...preview.questions.map((q) => q.text),
+                      ],
+                      svar: reply.trim(),
+                    }),
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
+                )
+              }
+            >
+              Opdatér forslag med mit svar
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={Boolean(busy)}
+              onClick={() => setAsking(false)}
+            >
+              Gennemgå forslaget selv
+            </Button>
+          </div>
+        </section>
+      )}
+      {preview && proposal && !saved && !asking ? (
         <form
           className="space-y-3"
           onSubmit={(event) => event.preventDefault()}

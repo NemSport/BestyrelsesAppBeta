@@ -137,7 +137,9 @@ export default async function OrganizationPage({
 
   return (
     <div className="space-y-4 xl:space-y-2.5" data-organization-dashboard>
-      <AdvisoryAi organizationId={organizationId} />
+      <AdvisoryAi key={organizationId} organizationId={organizationId}
+        committees={overview.committees.filter(({ capabilities }) => capabilities.createMeeting)
+          .map(({ committee: { id, name } }) => ({ id, name }))} />
 
       <OrganizationDashboardPriority
         actionCount={actionCount}
